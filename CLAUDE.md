@@ -39,6 +39,10 @@ pnpm typecheck      # tsc --noEmit in every workspace
 pnpm test           # vitest run in every workspace
 pnpm build          # tsc builds to dist/
 pnpm format         # prettier --write (markdown is excluded)
+pnpm mock:api       # serve packages/api-client/openapi.json with Prism (Docker image) on 127.0.0.1:4010
+pnpm --filter @photoo/shared openapi:generate       # zod contract -> packages/api-client/openapi.json
+pnpm --filter @photoo/api-client generate           # openapi.json -> typed client (src/schema.ts)
+pnpm --filter @photoo/api-client generate:check     # fail if the typed client is stale
 pnpm --filter @photoo/<name> <script>
 pnpm stack:up       # docker compose: postgres+postgis, redis, minio, mailpit (127.0.0.1 only)
 pnpm stack:down     # stop the local dev stack
@@ -46,7 +50,7 @@ pnpm stack:reset    # stop the local dev stack and remove its volumes
 pnpm db:seed        # forwards to packages/db seed script
 ```
 
-Planned, not yet present: `pnpm dev` running the apps against the stack, `pnpm mock:api` (0.11). Workspaces are named `@photoo/<dir>`. TypeScript stays on 6.0 until typescript-eslint supports 7. A husky pre-commit hook runs lint-staged.
+Planned, not yet present: `pnpm dev` running the apps against the stack. Workspaces are named `@photoo/<dir>`. TypeScript stays on 6.0 until typescript-eslint supports 7. A husky pre-commit hook runs lint-staged.
 
 Update this section when scripts change (docs-sync agent).
 

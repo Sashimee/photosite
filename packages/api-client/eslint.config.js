@@ -1,3 +1,3 @@
 import { createConfig } from '@photoo/config/eslint';
 
-export default createConfig(import.meta.dirname);
+export default [{ ignores: ['src/schema.ts'] }, ...createConfig(import.meta.dirname)];

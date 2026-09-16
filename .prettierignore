@@ -4,3 +4,5 @@ coverage
 .turbo
 *.md
 packages/db/src/generated
+packages/api-client/openapi.json
+packages/api-client/src/schema.ts

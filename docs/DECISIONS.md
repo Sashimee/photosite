@@ -22,6 +22,7 @@ Decisions taken with Alex on 2026-09-16 before any code was written. Change a de
 | D16 | Admin backend | Separate Next.js app `apps/admin` on admin.photoo.lu, mandatory 2FA, RBAC | Route group inside the public web app | Separate origin and bundle shrink the attack surface |
 | D17 | Analytics | GA4 through Google Tag Manager with Consent Mode v2 behind a self-built consent banner; Firebase Analytics on mobile behind explicit consent and iOS ATT | Third-party CMP | Full control of consent records, no vendor fee |
 | D18 | Country model | `Country` configuration table (currency, VAT rate, required verification documents, legal texts). Luxembourg only enabled at launch | Hard-coded Luxembourg | "Luxembourg now, world later" without a rewrite |
+| D19 | API contract tooling | zod 4 schemas and a route registry in `packages/shared`, OpenAPI 3.1 generated with `@asteasolutions/zod-to-openapi`; typed client with `openapi-typescript` + `openapi-fetch`; mock server with Prism. The NestJS API (1A) serves the same registry | NestJS-first Swagger decorators; orval/hey-api generated SDKs | Contract exists before the API, clients build against a mock, one source of truth for validation and docs |
 
 ## Open decisions (need Alex)
 
