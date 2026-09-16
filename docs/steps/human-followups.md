@@ -2,7 +2,7 @@
 
 Work in `docs/PLAN.md` that needs Alex. The /loop run skips these and keeps building around them. Each entry says what is needed, what it unblocks and what happens meanwhile.
 
-Last updated: 2026-09-16.
+Last updated: 2026-09-17.
 
 ## Open decisions (`docs/DECISIONS.md`)
 
@@ -12,7 +12,7 @@ Last updated: 2026-09-16.
 | O2 | Legal entity operating photoo.lu | 0.6 Stripe platform, store accounts, 0.7, DAC7 | None needed before Phase 1 payments |
 | O3 | Confirm auto-release delay | 1A.8 | Seeded as `autoReleaseDays = 7` in `PlatformSetting`, editable later |
 | O4 | AI detection and reverse-search vendors | 1A.10 | Vendor adapters behind an interface with a fake adapter in tests |
-| O5 | Brand kit | 1B.1 design tokens, 1C.9 store assets | Neutral shadcn/ui tokens, swapped when 0.8 lands |
+| O5 | Brand kit | 1B.1 design tokens, 1C.9 store assets | Neutral tokens in `apps/web/src/styles/tokens.css` and a text wordmark; swap that one file when 0.8 lands |
 
 ## Human-only plan steps
 
@@ -28,3 +28,10 @@ Last updated: 2026-09-16.
 | Issue | Needed from Alex | Why deferred |
 |-------|------------------|--------------|
 | The `postgis/postgis` image installs `postgis_tiger_geocoder`, `postgis_topology` and `fuzzystrmatch` into the dev database, so `prisma migrate dev` reports drift and asks for a reset | Consent to (a) override the image's init so only `postgis` is enabled and (b) run `pnpm stack:reset` to recreate the local volumes | Destroys local data; Prisma refuses a reset from an AI agent without consent. Meanwhile migrations are generated with `prisma migrate diff` and applied with `prisma migrate deploy` |
+
+## Credentials pending (0.6) and their placeholders
+
+| Service | Placeholder until Alex provides it |
+|---------|------------------------------------|
+| Sentry | `@sentry/nextjs` is a no-op without `SENTRY_DSN`; staging/prod set `SENTRY_REQUIRED=true` so a missing DSN fails the build |
+| OAuth apps (Google, Apple, Facebook, Microsoft) | 1A.2 enables a provider only when its client id/secret env vars are set; email + password works without them |
