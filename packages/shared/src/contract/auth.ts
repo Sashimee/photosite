@@ -6,7 +6,7 @@ import {
   LocaleSchema,
   errorResponses,
 } from './common.js';
-import { API_PREFIX, apiPath, registry } from './registry.js';
+import { API_PREFIX, AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
 
 const PASSWORD_MIN_LENGTH = 10;
@@ -18,8 +18,6 @@ const SIGNUP_ROLES = [
 ] as const satisfies readonly UserRole[];
 
 const OAUTH_PROVIDERS = ['google', 'apple', 'facebook', 'microsoft'] as const;
-
-const AUTH_SECURITY = [{ cookieAuth: [] }, { bearerAuth: [] }];
 
 const PasswordSchema = z
   .string()
