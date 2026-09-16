@@ -25,6 +25,16 @@ pnpm stack:reset  # stop the stack and remove its volumes
 
 Mailpit UI: http://localhost:8025. MinIO console: http://localhost:9001.
 
+## API contract
+
+Endpoints are zod schemas and a route registry in `packages/shared/src/contract`, compiled to OpenAPI 3.1 (`packages/api-client/openapi.json`) and a typed client (`packages/api-client`). Regenerate after changing a contract file:
+
+```
+pnpm --filter @photoo/shared openapi:generate   # zod schemas -> openapi.json
+pnpm --filter @photoo/api-client generate       # openapi.json -> typed client
+pnpm mock:api                                   # serve openapi.json with Prism (Docker image) on 127.0.0.1:4010
+```
+
 ## Branching
 
 `feature -> dev -> main`. Branch off `dev` (`feat/<slug>`, `fix/<slug>`, `chore/<slug>`) and open PRs into `dev`.
