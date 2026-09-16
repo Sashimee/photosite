@@ -141,7 +141,7 @@ Parallel groups in lane D: `{1D.1}` -> `{1D.2, 1D.3, 1D.4, 1D.5, 1D.6, 1D.7}` ->
 |----|------|-------|--------|-----------|
 | 2.1 | Full security review of the MVP against `SECURITY.md`; fix all "must" findings | security-reviewer then api/web/mobile developers | L | Phase 1 |
 | 2.2 | Compliance sign-off: RoPA, DPIA, retention jobs, consent flows, legal texts wired per locale, imprint, security.txt | compliance-reviewer + human (lawyer) | M | Phase 1, 0.7 |
-| 2.3 | Translations: fr, de, pt, es catalogs completed and reviewed by native speakers; legal texts per locale | i18n-maintainer + human | M | Phase 1 |
+| 2.3 | Translations: fr, de, pt, es catalogs completed and reviewed by native speakers; legal texts per locale; switch `pnpm i18n:check` to `--strict` in CI | i18n-maintainer + human | M | Phase 1 |
 | 2.4 | Production environment: prod Dokploy project, real Stripe keys, Connect platform approval, Brevo domain authentication (SPF/DKIM/DMARC), production buckets, DNS cut-over, HSTS | devops-engineer + human | M | 1E.1, 0.6 |
 | 2.5 | Store submissions: App Store review, Play review, account deletion and privacy declarations, handle rejections | mobile-developer + human | M | 1C.9 |
 | 2.6 | SEO launch: Search Console verification, sitemap submission, GA4/GTM production container, Ads conversion tags verified with consent, initial landing pages for Luxembourg cities and top categories | seo-auditor + human | S | 1B.11, 2.4 |

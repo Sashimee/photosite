@@ -14,6 +14,7 @@
     "build": "turbo run build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "i18n:check": "pnpm --filter @photoo/i18n i18n:check",
     "prepare": "husky",
     "stack:up": "docker compose -f infra/docker/compose.dev.yml up -d --wait postgres redis minio mailpit && docker compose -f infra/docker/compose.dev.yml run --rm minio-init",
     "stack:down": "docker compose -f infra/docker/compose.dev.yml down",

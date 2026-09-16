@@ -34,6 +34,7 @@ Scaffolded in step 0.1 (pnpm 12, Node 24). Run from the root:
 ```
 pnpm install
 pnpm lint           # eslint in every workspace (turbo)
+pnpm i18n:check     # check catalog consistency (strict mode added in 2.3)
 pnpm typecheck      # tsc --noEmit in every workspace
 pnpm test           # vitest run in every workspace
 pnpm build          # tsc builds to dist/
@@ -45,7 +46,7 @@ pnpm stack:reset    # stop the local dev stack and remove its volumes
 pnpm db:seed        # forwards to packages/db seed script
 ```
 
-Planned, not yet present: `pnpm dev` running the apps against the stack, `pnpm i18n:check` (0.10), `pnpm mock:api` (0.11). Workspaces are named `@photoo/<dir>`. TypeScript stays on 6.0 until typescript-eslint supports 7. A husky pre-commit hook runs lint-staged.
+Planned, not yet present: `pnpm dev` running the apps against the stack, `pnpm mock:api` (0.11). Workspaces are named `@photoo/<dir>`. TypeScript stays on 6.0 until typescript-eslint supports 7. A husky pre-commit hook runs lint-staged.
 
 Update this section when scripts change (docs-sync agent).
 

@@ -1,0 +1,17 @@
+{
+  "common": {
+    "appName": "Photoo",
+    "cancel": "Cancel",
+    "error": "An error occurred",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "save": "Save"
+  },
+  "locale": {
+    "de": "German",
+    "en": "English",
+    "es": "Spanish",
+    "fr": "French",
+    "pt": "Portuguese"
+  }
+}
