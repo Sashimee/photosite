@@ -4,3 +4,8 @@ RESUME.md
 .DS_Store
 node_modules/
 dist/
+.turbo/
+coverage/
+.next/
+.expo/
+*.tsbuildinfo
