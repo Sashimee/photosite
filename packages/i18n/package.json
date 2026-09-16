@@ -11,9 +11,14 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "i18n:check": "tsc -p tsconfig.build.json && node dist/scripts/check.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@formatjs/icu-messageformat-parser": "3.5.19",
+    "@photoo/shared": "workspace:*"
   },
   "devDependencies": {
     "@photoo/config": "workspace:*",

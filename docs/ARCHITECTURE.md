@@ -93,6 +93,6 @@ Full detail in `DATA-MODEL.md`.
 
 - Contract first: every endpoint is described by zod schemas in `packages/shared` and exposed in OpenAPI; `packages/api-client` is regenerated in CI and committed.
 - Every state change that touches money, verification or moderation writes an `AuditLog` row.
-- All user-facing strings come from `packages/i18n`; missing keys fail CI.
+- All user-facing strings come from `packages/i18n`; missing keys fail CI in strict mode (enabled in phase 2.3).
 - No direct object-storage access from clients; only presigned URLs with content-type and size limits.
 - Country-specific behaviour (documents, VAT, currency, legal text) reads from the `Country` table, never from code branches.
