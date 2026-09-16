@@ -15,7 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
-    "stack:up": "docker compose -f infra/docker/compose.dev.yml up -d --wait postgres redis minio mailpit && docker compose -f infra/docker/compose.dev.yml up minio-init",
+    "stack:up": "docker compose -f infra/docker/compose.dev.yml up -d --wait postgres redis minio mailpit && docker compose -f infra/docker/compose.dev.yml run --rm minio-init",
     "stack:down": "docker compose -f infra/docker/compose.dev.yml down",
     "stack:reset": "docker compose -f infra/docker/compose.dev.yml down -v",
     "db:seed": "pnpm --filter @photoo/db run seed"
