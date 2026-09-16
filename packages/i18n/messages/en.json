@@ -13,5 +13,48 @@
     "es": "Spanish",
     "fr": "French",
     "pt": "Portuguese"
+  },
+  "web": {
+    "skipToContent": "Skip to content",
+    "nav": {
+      "findPhotographer": "Find a photographer",
+      "forPhotographers": "For photographers",
+      "jobs": "Jobs",
+      "signIn": "Sign in",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu",
+      "menuTitle": "Navigation"
+    },
+    "localeSwitcher": {
+      "label": "Change language"
+    },
+    "footer": {
+      "legalNav": "Legal",
+      "imprint": "Imprint",
+      "privacy": "Privacy policy",
+      "terms": "Terms of service",
+      "cookies": "Cookie policy",
+      "rights": "© {year} {appName}. All rights reserved."
+    },
+    "home": {
+      "heroTitle": "Book trusted photographers in Luxembourg",
+      "heroSubtitle": "Compare quotes from verified photographers and professionals for your next shoot.",
+      "searchLabel": "Search for a photography category or city",
+      "searchPlaceholder": "Wedding, portrait, corporate…",
+      "searchCta": "Search"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "description": "The page you are looking for does not exist or has been moved.",
+      "backHome": "Back to home"
+    },
+    "error": {
+      "title": "Something went wrong",
+      "description": "An unexpected error occurred while loading this page."
+    },
+    "globalError": {
+      "title": "Something went wrong",
+      "description": "The application ran into an unexpected error. Please try again."
+    }
   }
 }

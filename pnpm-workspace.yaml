@@ -2,7 +2,10 @@ packages:
   - apps/*
   - packages/*
 allowBuilds:
+  '@parcel/watcher': false
   '@prisma/engines': true
+  '@sentry/cli': false
+  '@swc/core': false
   prisma: true
 minimumReleaseAgeExclude:
   - '@types/node@24.13.5'
