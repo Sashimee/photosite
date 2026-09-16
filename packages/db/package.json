@@ -10,17 +10,28 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "seed": "node src/seed.ts"
+    "generate": "prisma generate",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:status": "prisma migrate status",
+    "build": "pnpm run generate && tsc -p tsconfig.build.json",
+    "lint": "pnpm run generate && eslint .",
+    "typecheck": "pnpm run generate && tsc --noEmit",
+    "test": "pnpm run generate && vitest run --passWithNoTests",
+    "seed": "pnpm run generate && tsc -p tsconfig.build.json && node dist/seed.js"
   },
   "devDependencies": {
     "@photoo/config": "workspace:*",
     "@types/node": "24.13.5",
     "eslint": "9.39.5",
+    "prisma": "7.10.0",
     "typescript": "6.0.3",
     "vitest": "5.0.1"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "dotenv": "17.4.2",
+    "pg": "8.23.0"
   }
 }

@@ -1,0 +1,31 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [postgis]
+}
+
+model Country {
+  code              String   @id @db.Char(2)
+  name              String
+  enabled           Boolean  @default(true)
+  currency          String   @db.Char(3)
+  vatRate           Decimal  @db.Decimal(5, 2)
+  requiredDocuments Json
+  legalTexts        Json
+  defaultLocale     String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model PlatformSetting {
+  key              String   @id
+  value            Json
+  updatedByAdminId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}

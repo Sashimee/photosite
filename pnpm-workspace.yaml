@@ -1,6 +1,9 @@
 packages:
   - apps/*
   - packages/*
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true
 minimumReleaseAgeExclude:
   - '@types/node@24.13.5'
   - prettier@3.9.7

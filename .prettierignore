@@ -3,3 +3,4 @@ dist
 coverage
 .turbo
 *.md
+packages/db/src/generated

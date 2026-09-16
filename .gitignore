@@ -6,6 +6,7 @@ RESUME.md
 node_modules/
 dist/
 .turbo/
+packages/db/src/generated/
 coverage/
 .next/
 .expo/
