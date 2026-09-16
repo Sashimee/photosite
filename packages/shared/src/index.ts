@@ -24,6 +24,10 @@ export {
   DATA_REQUEST_TYPES,
   DATA_REQUEST_STATUSES,
   ADMIN_PERMISSIONS,
+  DEVICE_PLATFORMS,
+  CONSENT_PURPOSES,
+  AUDIT_ACTOR_TYPES,
+  NOTIFICATION_CHANNELS,
   type UserRole,
   type UserStatus,
   type PhotographerCategory,
@@ -41,6 +45,10 @@ export {
   type DataRequestType,
   type DataRequestStatus,
   type AdminPermission,
+  type DevicePlatform,
+  type ConsentPurpose,
+  type AuditActorType,
+  type NotificationChannel,
 } from './enums.js';
 
 export { calculatePlatformFee, quoteTotals, type LineItem, type QuoteTotals } from './fee.js';

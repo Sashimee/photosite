@@ -1,6 +1,13 @@
+import { verify } from '@node-rs/argon2';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createPrismaClient } from './index.js';
-import { LUXEMBOURG_REQUIRED_DOCUMENTS, seedDatabase } from './seed.js';
+import {
+  CREDENTIAL_PROVIDER_ID,
+  LUXEMBOURG_REQUIRED_DOCUMENTS,
+  SEED_USERS,
+  getSeedUserPassword,
+  seedDatabase,
+} from './seed.js';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -55,5 +62,72 @@ describe('seedDatabase', () => {
     expect(after.updatedAt).toEqual(before.updatedAt);
     expect(await prisma.country.count()).toBe(1);
     expect(await prisma.platformSetting.count()).toBe(2);
+  });
+
+  it('seeds one active user per role with no roles missing', async () => {
+    await seedDatabase(prisma);
+
+    for (const { email, roles } of SEED_USERS) {
+      const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+      expect(user.roles).toEqual([...roles]);
+      expect(user.status).toBe('active');
+      expect(user.emailVerifiedAt).not.toBeNull();
+    }
+  });
+
+  it('seeds exactly one credential account per user, verifiable against the seed password', async () => {
+    await seedDatabase(prisma);
+    const seedPassword = getSeedUserPassword();
+
+    for (const { email } of SEED_USERS) {
+      const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+      const credentialAccounts = await prisma.account.findMany({
+        where: { userId: user.id, providerId: CREDENTIAL_PROVIDER_ID },
+      });
+
+      expect(credentialAccounts).toHaveLength(1);
+      const [credentialAccount] = credentialAccounts;
+      if (!credentialAccount?.password) {
+        throw new Error(`no credential account password found for ${email}`);
+      }
+      expect(credentialAccount.accountId).toBe(user.id);
+
+      const verified = await verify(credentialAccount.password, seedPassword);
+      expect(verified).toBe(true);
+    }
+  });
+
+  it('refuses to run when NODE_ENV=production', async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+
+    try {
+      await expect(seedDatabase(prisma)).rejects.toThrow(/production/);
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it('is idempotent: running the seed again does not duplicate or update seed users', async () => {
+    const [firstSeedUser] = SEED_USERS;
+    if (!firstSeedUser) {
+      throw new Error('SEED_USERS is empty');
+    }
+
+    await seedDatabase(prisma);
+    const before = await prisma.user.findUniqueOrThrow({
+      where: { email: firstSeedUser.email },
+    });
+
+    await seedDatabase(prisma);
+    const after = await prisma.user.findUniqueOrThrow({
+      where: { email: firstSeedUser.email },
+    });
+
+    expect(after.updatedAt).toEqual(before.updatedAt);
+    const seedUserCount = await prisma.user.count({
+      where: { email: { in: SEED_USERS.map((seedUser) => seedUser.email) } },
+    });
+    expect(seedUserCount).toBe(SEED_USERS.length);
   });
 });

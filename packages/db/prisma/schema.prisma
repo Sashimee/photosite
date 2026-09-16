@@ -6,7 +6,52 @@ generator client {
 
 datasource db {
   provider   = "postgresql"
-  extensions = [postgis]
+  extensions = [postgis, citext]
+}
+
+enum Locale {
+  en
+  fr
+  de
+  pt
+  es
+}
+
+enum UserRole {
+  client
+  photographer
+  professional
+  admin
+}
+
+enum UserStatus {
+  active
+  suspended
+  deleted
+}
+
+enum DevicePlatform {
+  ios
+  android
+  web
+}
+
+enum ConsentPurpose {
+  analytics
+  ads
+  marketing
+}
+
+enum AuditActorType {
+  user
+  admin
+  system
+}
+
+enum NotificationChannel {
+  email
+  push
+  in_app
 }
 
 model Country {
@@ -20,12 +65,181 @@ model Country {
   defaultLocale     String
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  users User[]
 }
 
 model PlatformSetting {
   key              String   @id
   value            Json
   updatedByAdminId String?
+  updatedByAdmin   User?    @relation(fields: [updatedByAdminId], references: [id])
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  @@index([updatedByAdminId])
+}
+
+// Shape driven by Better Auth 1.7 (D20); see docs/steps/1A.1-identity-schema.md
+// "Field mapping" for how each column corresponds to the library's schema.
+model User {
+  id               String     @id @default(uuid(7))
+  email            String     @unique @db.Citext
+  emailVerifiedAt  DateTime?
+  locale           Locale
+  countryCode      String     @db.Char(2)
+  country          Country    @relation(fields: [countryCode], references: [code])
+  roles            UserRole[]
+  status           UserStatus @default(active)
+  twoFactorEnabled Boolean    @default(false)
+  lastLoginAt      DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  accounts                Account[]
+  sessions                Session[]
+  twoFactors              TwoFactor[]
+  devices                 Device[]
+  consentRecords          ConsentRecord[]
+  notifications           Notification[]
+  updatedPlatformSettings PlatformSetting[]
+
+  @@index([countryCode])
+  @@index([status])
+}
+
+// Better Auth "account" table: OAuth links and the credential (email+password)
+// row, where `password` holds the Argon2id hash written by the 1A.2 wrapper.
+model Account {
+  id                    String    @id @default(uuid(7))
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerId            String
+  accountId             String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+// Better Auth "session" table. `token` is renamed to `tokenHash`: the 1A.2
+// adapter wrapper hashes it (SHA-256) on write and lookup per SECURITY.md.
+model Session {
+  id        String   @id @default(uuid(7))
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Better Auth "verification" table (email verification / password reset
+// tokens). `value` is stored as issued by the library; see the "Field
+// mapping" note in the subplan about hashing it at rest in 1A.2.
+model Verification {
+  id         String   @id @default(uuid(7))
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+// Better Auth two-factor plugin's "twoFactor" table. `secret` is the TOTP
+// seed; encryption-at-rest for it lands in 1A.2.
+model TwoFactor {
+  id                      String    @id @default(uuid(7))
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secret                  String
+  backupCodes             String
+  verified                Boolean   @default(true)
+  failedVerificationCount Int       @default(0)
+  lockedUntil             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Device {
+  id            String         @id @default(uuid(7))
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expoPushToken String         @unique
+  platform      DevicePlatform
+  lastSeenAt    DateTime
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([userId])
+}
+
+// Append-only: no updatedAt, no update paths in seed code. A hand-written
+// CHECK constraint enforces exactly one of userId/anonymousId being set.
+model ConsentRecord {
+  id            String         @id @default(uuid(7))
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id])
+  anonymousId   String?
+  purpose       ConsentPurpose
+  granted       Boolean
+  policyVersion String
+  ip            String?
+  userAgent     String?
+  recordedAt    DateTime       @default(now())
+
+  @@index([userId])
+  @@index([anonymousId])
+}
+
+// Append-only: no updatedAt, no update paths in seed code. `actorId` is not
+// a foreign key so entries survive even if the actor's User row is gone.
+// Revoking UPDATE/DELETE at the database level is out of scope; see 1A.14.
+model AuditLog {
+  id         String         @id @default(uuid(7))
+  actorType  AuditActorType
+  actorId    String?
+  action     String
+  targetType String
+  targetId   String?
+  before     Json?
+  after      Json?
+  ip         String?
+  occurredAt DateTime       @default(now())
+
+  @@index([targetType, targetId])
+  @@index([actorId])
+  @@index([occurredAt])
+}
+
+model Notification {
+  id        String                @id @default(uuid(7))
+  userId    String
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  payload   Json
+  channels  NotificationChannel[]
+  readAt    DateTime?
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@index([userId, readAt])
 }
