@@ -6,6 +6,11 @@ import './products.js';
 import './requests.js';
 import './quotes.js';
 import './bookings.js';
+import './uploads.js';
+import './chat.js';
+import './verification.js';
+import './admin.js';
+import './gdpr.js';
 
 export const OPENAPI_INFO_VERSION = '0.1.0';
 

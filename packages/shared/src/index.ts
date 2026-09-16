@@ -16,6 +16,14 @@ export {
   REQUEST_STATUSES,
   QUOTE_STATUSES,
   BOOKING_STATUSES,
+  CONVERSATION_TYPES,
+  ATTACHMENT_KINDS,
+  VIRUS_SCAN_STATUSES,
+  VERIFICATION_CASE_STATUSES,
+  PROVENANCE_VERDICTS,
+  DATA_REQUEST_TYPES,
+  DATA_REQUEST_STATUSES,
+  ADMIN_PERMISSIONS,
   type UserRole,
   type UserStatus,
   type PhotographerCategory,
@@ -25,6 +33,14 @@ export {
   type RequestStatus,
   type QuoteStatus,
   type BookingStatus,
+  type ConversationType,
+  type AttachmentKind,
+  type VirusScanStatus,
+  type VerificationCaseStatus,
+  type ProvenanceVerdict,
+  type DataRequestType,
+  type DataRequestStatus,
+  type AdminPermission,
 } from './enums.js';
 
 export { calculatePlatformFee, quoteTotals, type LineItem, type QuoteTotals } from './fee.js';
@@ -47,7 +63,7 @@ export {
   type StandardErrorStatusCode,
 } from './contract/common.js';
 
-export { API_PREFIX, apiPath, registry } from './contract/registry.js';
+export { ADMIN_SECURITY, API_PREFIX, apiPath, registry } from './contract/registry.js';
 
 export { buildOpenApiDocument, OPENAPI_INFO_VERSION } from './contract/generate.js';
 
@@ -108,6 +124,7 @@ export {
 export { CreateQuoteRequestSchema, LineItemSchema, QuoteSchema } from './contract/quotes.js';
 
 export {
+  BookingBaseSchema,
   BookingSchema,
   CancelBookingRequestSchema,
   CreateDeliveryRequestSchema,
@@ -115,3 +132,74 @@ export {
   DeliverySchema,
   PaymentIntentResponseSchema,
 } from './contract/bookings.js';
+
+export {
+  UPLOAD_PURPOSES,
+  UPLOAD_PURPOSE_LIMITS,
+  CreateUploadRequestSchema,
+  CreateUploadResponseSchema,
+  MimeTypeSchema,
+  UploadPurposeSchema,
+  UploadDownloadResponseSchema,
+  UploadSchema,
+  type UploadPurpose,
+} from './contract/uploads.js';
+
+export {
+  ArchiveConversationRequestSchema,
+  ConversationSchema,
+  MarkConversationReadRequestSchema,
+  MessageAttachmentSchema,
+  MessageSchema,
+  SendMessageRequestSchema,
+} from './contract/chat.js';
+
+export {
+  CLIENT_SOCKET_EVENTS,
+  ClientMessageSendEventSchema,
+  ClientReadEventSchema,
+  ClientTypingEventSchema,
+  SERVER_SOCKET_EVENTS,
+  ServerConversationUpdatedEventSchema,
+  ServerMessageNewEventSchema,
+  ServerReadEventSchema,
+  ServerTypingEventSchema,
+  SocketHandshakeAuthSchema,
+} from './contract/socket.js';
+
+export {
+  AdminVerificationCaseSchema,
+  AttachVerificationDocumentRequestSchema,
+  CreateVerificationCaseRequestSchema,
+  RequiredDocumentSchema,
+  UpdateVerificationCaseRequestSchema,
+  VerificationCaseSchema,
+  VerificationDocumentSchema,
+  VerificationRequirementsResponseSchema,
+} from './contract/verification.js';
+
+export {
+  AdminAuditLogEntrySchema,
+  AdminAuditLogQuerySchema,
+  AdminBookingSchema,
+  AdminProvenanceCheckSchema,
+  AdminReportSchema,
+  AdminUserSchema,
+  AdminUserSearchQuerySchema,
+  PlatformSettingsSchema,
+  RefundBookingRequestSchema,
+  RejectProvenanceCheckRequestSchema,
+  ResolveReportRequestSchema,
+  ReverseBookingTransferRequestSchema,
+  SetUserRolesRequestSchema,
+  SuspendUserRequestSchema,
+  UpdatePlatformSettingsRequestSchema,
+} from './contract/admin.js';
+
+export {
+  ConsentPurposeSchema,
+  ConsentRecordSchema,
+  CreateConsentRequestSchema,
+  CreateDataRequestRequestSchema,
+  DataRequestSchema,
+} from './contract/gdpr.js';

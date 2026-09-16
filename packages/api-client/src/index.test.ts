@@ -156,4 +156,85 @@ describe('createApiClient', () => {
 
     expect(response.ok).toBe(true);
   });
+
+  it('accepts a typed upload create call and rejects a malformed sizeBytes', async () => {
+    const client = createApiClient({ baseUrl: 'http://127.0.0.1:4010', fetch: stubFetch });
+
+    const { response } = await client.POST('/v1/uploads', {
+      body: { purpose: 'portfolio', mimeType: 'image/jpeg', sizeBytes: 1024 },
+    });
+
+    await client.POST('/v1/uploads', {
+      body: {
+        purpose: 'portfolio',
+        mimeType: 'image/jpeg',
+        // @ts-expect-error sizeBytes must be a number, not a string
+        sizeBytes: 'huge',
+      },
+    });
+
+    expect(response.ok).toBe(true);
+  });
+
+  it('accepts a typed conversation list call', async () => {
+    const client = createApiClient({ baseUrl: 'http://127.0.0.1:4010', fetch: stubFetch });
+
+    const { response } = await client.GET('/v1/conversations', {
+      params: { query: { limit: 20 } },
+    });
+
+    await client.GET('/v1/conversations', {
+      // @ts-expect-error limit must be a number, not a string
+      params: { query: { limit: 'twenty' } },
+    });
+
+    expect(response.ok).toBe(true);
+  });
+
+  it('accepts a typed send message call and rejects a malformed attachmentIds', async () => {
+    const client = createApiClient({ baseUrl: 'http://127.0.0.1:4010', fetch: stubFetch });
+
+    const { response } = await client.POST('/v1/conversations/{id}/messages', {
+      params: { path: { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6' } },
+      body: { body: 'Hello there' },
+    });
+
+    await client.POST('/v1/conversations/{id}/messages', {
+      params: { path: { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6' } },
+      // @ts-expect-error attachmentIds must be an array of strings, not numbers
+      body: { attachmentIds: [1, 2] },
+    });
+
+    expect(response.ok).toBe(true);
+  });
+
+  it('accepts a typed admin user search call', async () => {
+    const client = createApiClient({ baseUrl: 'http://127.0.0.1:4010', fetch: stubFetch });
+
+    const { response } = await client.GET('/v1/admin/users', {
+      params: { query: { limit: 20 } },
+    });
+
+    await client.GET('/v1/admin/users', {
+      // @ts-expect-error role must be one of the known user roles
+      params: { query: { role: 'moderator' } },
+    });
+
+    expect(response.ok).toBe(true);
+  });
+
+  it('accepts a typed data request create call and rejects an unknown type', async () => {
+    const client = createApiClient({ baseUrl: 'http://127.0.0.1:4010', fetch: stubFetch });
+
+    const { response } = await client.POST('/v1/me/data-requests', {
+      body: { type: 'export' },
+    });
+
+    await client.POST('/v1/me/data-requests', {
+      // @ts-expect-error type must be "export" or "delete"
+      body: { type: 'anonymize' },
+    });
+
+    expect(response.ok).toBe(true);
+  });
 });
