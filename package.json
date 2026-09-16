@@ -1,0 +1,35 @@
+{
+  "name": "photosite",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "build": "turbo run build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "prettier --write",
+      "eslint --flag v10_config_lookup_from_file --no-warn-ignored"
+    ],
+    "*.{json,yml,yaml}": "prettier --write"
+  },
+  "devDependencies": {
+    "@photoo/config": "workspace:*",
+    "eslint": "9.39.5",
+    "husky": "9.1.7",
+    "lint-staged": "17.5.1",
+    "prettier": "3.9.7",
+    "turbo": "2.10.13",
+    "typescript": "6.0.3"
+  }
+}

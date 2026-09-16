@@ -1,0 +1,6 @@
+packages:
+  - apps/*
+  - packages/*
+minimumReleaseAgeExclude:
+  - '@types/node@24.13.5'
+  - prettier@3.9.7

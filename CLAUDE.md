@@ -2,7 +2,7 @@
 
 Marketplace connecting clients, photographers and professionals: web (photoo.lu), iOS and Android apps, admin backend. Luxembourg first, worldwide later. The platform takes a 5 % fee on bookings.
 
-Status: **planned, not scaffolded**. Read `docs/PLAN.md` before doing any work; execution starts only when Alex says so.
+Status: **in execution** (Phase 0). Read `docs/PLAN.md` before doing any work; per-step subplans live in `docs/steps/`.
 
 ## Docs
 
@@ -29,20 +29,21 @@ pnpm + Turborepo monorepo, TypeScript strict everywhere.
 
 ## Commands
 
-Not scaffolded yet. Once step 0.1 of the plan lands, the root scripts are expected to be:
+Scaffolded in step 0.1 (pnpm 12, Node 24). Run from the root:
 
 ```
-pnpm dev            # all apps + local compose stack
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm i18n:check     # fails on missing/extra catalog keys
-pnpm mock:api       # Prism mock server from the OpenAPI contract
-pnpm --filter <app> <script>
+pnpm install
+pnpm lint           # eslint in every workspace (turbo)
+pnpm typecheck      # tsc --noEmit in every workspace
+pnpm test           # vitest run in every workspace
+pnpm build          # tsc builds to dist/
+pnpm format         # prettier --write (markdown is excluded)
+pnpm --filter @photoo/<name> <script>
 ```
 
-Update this section when the scripts exist (docs-sync agent).
+Planned, not yet present: `pnpm dev` with the local compose stack (0.3), `pnpm i18n:check` (0.10), `pnpm mock:api` (0.11). Workspaces are named `@photoo/<dir>`. TypeScript stays on 6.0 until typescript-eslint supports 7. A husky pre-commit hook runs lint-staged.
+
+Update this section when scripts change (docs-sync agent).
 
 ## Conventions
 
