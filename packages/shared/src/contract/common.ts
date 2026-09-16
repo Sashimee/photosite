@@ -19,6 +19,26 @@ export const CountryCodeSchema = z
   .regex(/^[A-Z]{2}$/, 'must be a 2-letter uppercase ISO 3166-1 country code')
   .openapi({ description: 'ISO 3166-1 alpha-2 country code', example: 'LU' });
 
+export const LanguageCodeSchema = z
+  .string()
+  .regex(/^[a-z]{2}$/, 'must be a 2-letter lowercase ISO 639-1 language code')
+  .openapi({ description: 'ISO 639-1 language code', example: 'en' });
+
+export const SlugSchema = z
+  .string()
+  .min(3)
+  .max(60)
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'must be lowercase alphanumeric words separated by hyphens')
+  .openapi({ description: 'URL-safe profile slug', example: 'jane-doe-photography' });
+
+export const LatLngSchema = z
+  .object({
+    lat: z.number().min(-90).max(90).openapi({ example: 49.6116 }),
+    lng: z.number().min(-180).max(180).openapi({ example: 6.1319 }),
+  })
+  .strict()
+  .openapi('LatLng');
+
 export const MoneySchema = z
   .object({
     amountCents: z.int().nonnegative().openapi({ example: 15000 }),

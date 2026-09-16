@@ -6,6 +6,8 @@ export function apiPath(path: string): string {
   return `${API_PREFIX}${path}`;
 }
 
+export const AUTH_SECURITY = [{ cookieAuth: [] }, { bearerAuth: [] }];
+
 export const registry = new OpenAPIRegistry();
 
 registry.registerComponent('securitySchemes', 'cookieAuth', {
