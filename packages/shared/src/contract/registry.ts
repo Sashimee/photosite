@@ -8,6 +8,8 @@ export function apiPath(path: string): string {
 
 export const AUTH_SECURITY = [{ cookieAuth: [] }, { bearerAuth: [] }];
 
+export const ADMIN_SECURITY = [{ cookieAuth: [] }];
+
 export const registry = new OpenAPIRegistry();
 
 registry.registerComponent('securitySchemes', 'cookieAuth', {

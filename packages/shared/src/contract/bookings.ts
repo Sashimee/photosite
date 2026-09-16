@@ -11,24 +11,23 @@ import {
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
 
-export const BookingSchema = z
-  .object({
-    id: IdSchema,
-    quoteId: IdSchema,
-    clientId: IdSchema,
-    photographerId: IdSchema,
-    scheduledAt: IsoDateTimeSchema,
-    location: LatLngSchema,
-    total: MoneySchema,
-    status: z.enum(BOOKING_STATUSES),
-    releaseDueAt: IsoDateTimeSchema.nullable(),
-    deliveredAt: IsoDateTimeSchema.nullable(),
-    releasedAt: IsoDateTimeSchema.nullable(),
-    cancelledAt: IsoDateTimeSchema.nullable(),
-    cancellationReason: z.string().max(2000).nullable(),
-  })
-  .strict()
-  .openapi('Booking');
+export const BookingBaseSchema = z.object({
+  id: IdSchema,
+  quoteId: IdSchema,
+  clientId: IdSchema,
+  photographerId: IdSchema,
+  scheduledAt: IsoDateTimeSchema,
+  location: LatLngSchema,
+  total: MoneySchema,
+  status: z.enum(BOOKING_STATUSES),
+  releaseDueAt: IsoDateTimeSchema.nullable(),
+  deliveredAt: IsoDateTimeSchema.nullable(),
+  releasedAt: IsoDateTimeSchema.nullable(),
+  cancelledAt: IsoDateTimeSchema.nullable(),
+  cancellationReason: z.string().max(2000).nullable(),
+});
+
+export const BookingSchema = BookingBaseSchema.strict().openapi('Booking');
 
 export const DeliverySchema = z
   .object({
