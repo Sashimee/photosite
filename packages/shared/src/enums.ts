@@ -107,3 +107,19 @@ export const ADMIN_PERMISSIONS = [
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
+
+export const DEVICE_PLATFORMS = ['ios', 'android', 'web'] as const;
+
+export type DevicePlatform = (typeof DEVICE_PLATFORMS)[number];
+
+export const CONSENT_PURPOSES = ['analytics', 'ads', 'marketing'] as const;
+
+export type ConsentPurpose = (typeof CONSENT_PURPOSES)[number];
+
+export const AUDIT_ACTOR_TYPES = ['user', 'admin', 'system'] as const;
+
+export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number];
+
+export const NOTIFICATION_CHANNELS = ['email', 'push', 'in_app'] as const;
+
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];

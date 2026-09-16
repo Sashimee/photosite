@@ -4,8 +4,8 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 
 ## Identity and roles
 
-- **User** – id, email (unique, citext), emailVerifiedAt, passwordHash (nullable for OAuth-only), locale, country, roles (`client`, `photographer`, `professional`, `admin` as a set), status (`active`, `suspended`, `deleted`), twoFactorEnabled, lastLoginAt, deletedAt.
-- **Account** – OAuth links (provider, providerAccountId, tokens) – shape dictated by the auth library.
+- **User** – id, email (unique, citext), emailVerifiedAt, locale, country, roles (`client`, `photographer`, `professional`, `admin` as a set), status (`active`, `suspended`, `deleted`), twoFactorEnabled, lastLoginAt, deletedAt.
+- **Account** – OAuth links (provider, providerAccountId, tokens) – shape dictated by the auth library. The Argon2id password hash for email+password sign-in lives on the credential row (`providerId = 'credential'`, `accountId = user.id`) in `Account.password`, not on `User`, per D20 (Better Auth verifies logins against this row).
 - **Session** – token hash, userId, device info, ip, expiresAt.
 - **Device** – userId, expoPushToken, platform, lastSeenAt.
 - **ConsentRecord** – userId or anonymousId, purpose (`analytics`, `ads`, `marketing`), granted, version of the policy, ip, userAgent, recordedAt. Append-only.

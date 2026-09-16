@@ -1,4 +1,4 @@
-import { DATA_REQUEST_STATUSES, DATA_REQUEST_TYPES } from '../enums.js';
+import { CONSENT_PURPOSES, DATA_REQUEST_STATUSES, DATA_REQUEST_TYPES } from '../enums.js';
 import { IdSchema, IsoDateTimeSchema, errorResponses } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
@@ -19,8 +19,6 @@ export const CreateDataRequestRequestSchema = z
     type: z.enum(DATA_REQUEST_TYPES),
   })
   .strict();
-
-const CONSENT_PURPOSES = ['analytics', 'ads', 'marketing'] as const;
 
 export const ConsentPurposeSchema = z.enum(CONSENT_PURPOSES).openapi({ example: 'analytics' });
 
