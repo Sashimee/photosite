@@ -13,7 +13,8 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "seed": "node src/seed.ts"
   },
   "devDependencies": {
     "@photoo/config": "workspace:*",

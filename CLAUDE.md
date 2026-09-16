@@ -39,9 +39,13 @@ pnpm test           # vitest run in every workspace
 pnpm build          # tsc builds to dist/
 pnpm format         # prettier --write (markdown is excluded)
 pnpm --filter @photoo/<name> <script>
+pnpm stack:up       # docker compose: postgres+postgis, redis, minio, mailpit (127.0.0.1 only)
+pnpm stack:down     # stop the local dev stack
+pnpm stack:reset    # stop the local dev stack and remove its volumes
+pnpm db:seed        # forwards to packages/db seed script
 ```
 
-Planned, not yet present: `pnpm dev` with the local compose stack (0.3), `pnpm i18n:check` (0.10), `pnpm mock:api` (0.11). Workspaces are named `@photoo/<dir>`. TypeScript stays on 6.0 until typescript-eslint supports 7. A husky pre-commit hook runs lint-staged.
+Planned, not yet present: `pnpm dev` running the apps against the stack, `pnpm i18n:check` (0.10), `pnpm mock:api` (0.11). Workspaces are named `@photoo/<dir>`. TypeScript stays on 6.0 until typescript-eslint supports 7. A husky pre-commit hook runs lint-staged.
 
 Update this section when scripts change (docs-sync agent).
 
