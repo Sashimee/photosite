@@ -20,6 +20,6 @@ import { ProfilesService } from './profiles.service.js';
     PortfolioCleanupQueueService,
     OriginGuard,
   ],
-  exports: [ProfilesService],
+  exports: [ProfilesService, ProfilesRepository],
 })
 export class ProfilesModule {}
