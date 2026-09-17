@@ -14,6 +14,12 @@ export const UPLOAD_PURPOSES = [
 
 export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
 
+export const PUBLIC_UPLOAD_PURPOSES = [
+  'portfolio',
+  'avatar',
+  'cover',
+] as const satisfies readonly UploadPurpose[];
+
 const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 const DOCUMENT_MIME_TYPES = ['application/pdf'] as const;
 

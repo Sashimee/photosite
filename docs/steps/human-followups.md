@@ -40,6 +40,12 @@ Last updated: 2026-09-17.
 |-------|------------------|--------------|
 | The `postgis/postgis` image installs `postgis_tiger_geocoder`, `postgis_topology` and `fuzzystrmatch` into the dev database, so `prisma migrate dev` reports drift and asks for a reset | Consent to (a) override the image's init so only `postgis` is enabled and (b) run `pnpm stack:reset` to recreate the local volumes | Destroys local data; Prisma refuses a reset from an AI agent without consent. Meanwhile migrations are generated with `prisma migrate diff` and applied with `prisma migrate deploy` |
 
+## Security follow-ups
+
+| Issue | Needed from Alex | Why deferred |
+|-------|------------------|--------------|
+| #91: before the fix, `image-process` wrote resized variants for every image upload (including `chat_attachment`/`verification_document`) to the public bucket. Local dev/test MinIO and the `photoo`/`photoo_test` Postgres databases were checked on 2026-09-17: no `Upload` row for a private purpose has a non-null `variants` column, and `photoo-public` only holds seed `avatar`/`cover`/`portfolio` keys, so nothing to clean there. `main`/`footoo.bas.lu` preview is far behind `dev` (chat API isn't deployed there yet) and its seed script never creates `chat_attachment`/`verification_document` uploads, so it almost certainly has none either — but nobody has shell/S3 access to footoo.bas.lu's MinIO to confirm | Once dev merges to main and preview redeploys with chat/verification live, spot-check the preview `photoo-public` bucket (`mc ls --recursive`) for any `chat_attachment`/`verification_document` upload's variants before real users start attaching files, and delete any found | Not exploitable today: no such uploads exist pre-fix, and the fix stops new ones |
+
 ## Credentials pending (0.6) and their placeholders
 
 | Service | Placeholder until Alex provides it |
