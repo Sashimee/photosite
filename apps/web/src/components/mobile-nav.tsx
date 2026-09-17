@@ -18,8 +18,7 @@ export interface NavLink {
 export function MobileNav({
   locale,
   links,
-  signInLabel,
-  signInHref,
+  authLink,
   openLabel,
   closeLabel,
   menuTitle,
@@ -28,8 +27,7 @@ export function MobileNav({
 }: {
   locale: Locale;
   links: NavLink[];
-  signInLabel: string;
-  signInHref: string;
+  authLink: NavLink;
   openLabel: string;
   closeLabel: string;
   menuTitle: string;
@@ -62,14 +60,14 @@ export function MobileNav({
             </Link>
           ))}
           <Link
-            href={signInHref}
+            href={authLink.href}
             lang={locale}
             onClick={() => {
               setOpen(false);
             }}
             className="text-sm font-medium text-foreground"
           >
-            {signInLabel}
+            {authLink.label}
           </Link>
           <LocaleSwitcher currentLocale={locale} label={switcherLabel} localeNames={localeNames} />
         </nav>

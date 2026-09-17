@@ -12,6 +12,9 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    env: {
+      NEXT_PUBLIC_API_URL: 'http://127.0.0.1:4010',
+    },
     setupFiles: ['./vitest.setup.ts'],
     coverage: {
       provider: 'v8',
@@ -26,12 +29,14 @@ export default defineConfig({
         // No branching logic of our own.
         'src/instrumentation.ts',
         'src/instrumentation-client.ts',
+        // Test-only helpers, not product code (mirrors apps/api/src/testing).
+        'src/testing/**',
       ],
       thresholds: {
-        statements: 48,
-        branches: 60,
-        functions: 55,
-        lines: 48,
+        statements: 76,
+        branches: 83,
+        functions: 74,
+        lines: 76,
       },
     },
   },
