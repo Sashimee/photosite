@@ -15,6 +15,16 @@ export const LANDING_RESULTS_LIMIT = 20;
 // report.
 export const LANDING_CITIES_LIMIT = 20;
 
+export const loadEnabledCountryCodes = cache(async (): Promise<string[]> => {
+  const { data, response } = await api.GET('/v1/countries', {
+    next: { revalidate: LANDING_REVALIDATE_SECONDS },
+  });
+  if (!data) {
+    throw new Error(`Failed to load enabled countries: HTTP ${String(response.status)}`);
+  }
+  return data.map((country) => country.code);
+});
+
 export const loadCountryCities = cache(async (countryCode: string): Promise<CitySummary[]> => {
   const { data, response } = await api.GET('/v1/cities', {
     params: { query: { countryCode, limit: LANDING_CITIES_LIMIT } },
@@ -58,7 +68,8 @@ export const searchLandingPhotographers = cache(
 );
 
 export const resolveCountryLanding = cache(async (countryCode: string) => {
-  if (!isEnabledCountryCode(countryCode)) {
+  const enabledCountryCodes = await loadEnabledCountryCodes();
+  if (!isEnabledCountryCode(countryCode, enabledCountryCodes)) {
     return null;
   }
   const [cities, photographers] = await Promise.all([
@@ -69,7 +80,8 @@ export const resolveCountryLanding = cache(async (countryCode: string) => {
 });
 
 export const resolveCityLanding = cache(async (countryCode: string, citySlug: string) => {
-  if (!isEnabledCountryCode(countryCode)) {
+  const enabledCountryCodes = await loadEnabledCountryCodes();
+  if (!isEnabledCountryCode(countryCode, enabledCountryCodes)) {
     return null;
   }
   const cities = await loadCountryCities(countryCode);

@@ -1,14 +1,10 @@
 import { PHOTOGRAPHER_CATEGORIES, type PhotographerCategory } from '@photoo/shared';
 
-// D18 (docs/DECISIONS.md): only Luxembourg is enabled at launch, and there
-// is no public endpoint listing enabled countries yet, so this mirrors the
-// `Country` seed row directly.
-export const ENABLED_COUNTRY_CODES = ['LU'] as const;
-
-export type EnabledCountryCode = (typeof ENABLED_COUNTRY_CODES)[number];
-
-export function isEnabledCountryCode(value: string): value is EnabledCountryCode {
-  return (ENABLED_COUNTRY_CODES as readonly string[]).includes(value);
+export function isEnabledCountryCode(
+  value: string,
+  enabledCountryCodes: readonly string[],
+): boolean {
+  return enabledCountryCodes.includes(value);
 }
 
 const COUNTRY_SEGMENT_PATTERN = /^[a-z]{2}$/;

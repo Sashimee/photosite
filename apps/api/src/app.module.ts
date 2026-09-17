@@ -8,6 +8,7 @@ import { EnvModule } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { CitiesModule } from './modules/cities/cities.module.js';
+import { CountriesModule } from './modules/countries/countries.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { ProductsModule } from './modules/products/products.module.js';
 import { ProfilesModule } from './modules/profiles/profiles.module.js';
@@ -33,6 +34,7 @@ import { StorageModule } from './storage/storage.module.js';
     ProfilesModule,
     ProductsModule,
     CitiesModule,
+    CountriesModule,
     RequestsModule,
     QuotesModule,
     NotificationsModule,
