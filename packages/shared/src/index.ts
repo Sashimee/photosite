@@ -75,6 +75,8 @@ export { ADMIN_SECURITY, API_PREFIX, apiPath, registry } from './contract/regist
 
 export { buildOpenApiDocument, OPENAPI_INFO_VERSION } from './contract/generate.js';
 
+export { HealthResponseSchema, ReadyResponseSchema } from './contract/health.js';
+
 export {
   AddRoleRequestSchema,
   AddRoleResponseSchema,

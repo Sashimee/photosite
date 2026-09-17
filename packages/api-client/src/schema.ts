@@ -4,6 +4,87 @@
  */
 
 export interface paths {
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Liveness check */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The service process is running */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HealthResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Readiness check: database and Redis are reachable */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The service and its dependencies are reachable */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReadyResponse"];
+                    };
+                };
+                /** @description A dependency is unreachable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/sign-up": {
         parameters: {
             query?: never;
@@ -6229,6 +6310,33 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        HealthResponse: {
+            /** @enum {string} */
+            status: "ok";
+        };
+        ReadyResponse: {
+            /** @enum {string} */
+            status: "ok";
+            checks: {
+                /** @enum {string} */
+                database: "ok";
+                /** @enum {string} */
+                redis: "ok";
+            };
+        };
+        ApiError: {
+            /** @example VALIDATION_ERROR */
+            code: string;
+            /** @example Request validation failed */
+            message: string;
+            details?: unknown;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            requestId: string;
+        };
         User: {
             /**
              * Format: uuid
@@ -6273,19 +6381,6 @@ export interface components {
              * @example 2026-09-16T12:00:00.000Z
              */
             lastLoginAt: string | null;
-        };
-        ApiError: {
-            /** @example VALIDATION_ERROR */
-            code: string;
-            /** @example Request validation failed */
-            message: string;
-            details?: unknown;
-            /**
-             * Format: uuid
-             * @description UUID identifier
-             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
-             */
-            requestId: string;
         };
         AuthSession: {
             /** @example sess_3fa85f64571445 */
