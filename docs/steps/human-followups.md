@@ -57,6 +57,15 @@ Last updated: 2026-09-17.
 | Must a job offer carry a compensation range to be published? Pay-transparency rules are moving, and Luxembourg's position should be checked before the board is public | Confirm with the lawyer | Making the field required (a one-line contract change) | `compensation` is optional in Phase 1 |
 | Job board terms: what a professional warrants when posting, and the takedown process | Folded into the Phase 2 ToS work already listed | Public launch of the board | Offers are reportable by id; moderation queue is 1A.11 |
 
+## Payments (1A.8) — the biggest schedule risk
+
+| Issue | Needed from Alex | Blocks | Workaround meanwhile |
+|-------|------------------|--------|----------------------|
+| O2: the operating legal entity, and then the Stripe platform account | Decide the entity, create the Stripe account, provide **test-mode** keys (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) | Every live payment path: Connect Express onboarding, real webhook signatures, 3-D Secure and Radar behaviour | `docs/steps/1A.8-payments.md`: all Stripe access goes through a `StripeGateway` interface with a deterministic fake used in tests, CI and local dev. The state machine, ledger, idempotency, refunds, release job and PDFs are all built and tested against it. The API refuses to boot in production without a real key — the fake is never a fallback |
+| Once test-mode keys exist, a short live checklist has to be run | Connect Express onboarding with a test account; `stripe listen` webhook replay against a real signature; a 3-D Secure test card through the Payment Element; a partial refund; a transfer reversal | Confidence that the fake matched reality | The checklist is written down in the step plan so it is a scheduled verification, not an unknown |
+| Accountant: VAT on the platform fee for Luxembourg photographers (17 %), whether the platform issues the fee invoice itself, and DAC7 applicability plus the exact seller fields to collect | Answers from the accountant | Correct invoicing and the yearly DAC7 export (Phase 3) | The shared fee helper takes a VAT-on-fee flag driven by `Country.vatRate`, defaulting to off |
+| Stripe Radar rules, and whether 3-D Secure is forced on every payment | A decision once the account exists | Fraud posture at launch | Automatic payment methods decide, which is Stripe's default |
+
 ## Local environment
 
 | Issue | Needed from Alex | Why deferred |
