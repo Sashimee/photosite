@@ -2,18 +2,19 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createPrismaClient } from './index.js';
 import { seedDatabase } from './seed.js';
+import { requireIntegrationEnv } from './testing/require-integration-env.js';
 
-const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL']);
 
 describe('identity schema', () => {
-  if (!testDatabaseUrl) {
+  if (!testEnv) {
     it.skip(
       'enforces citext uniqueness and the consent subject check constraint (skipped: TEST_DATABASE_URL is not set)',
     );
     return;
   }
 
-  const prisma = createPrismaClient(testDatabaseUrl);
+  const prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
 
   afterAll(async () => {
     await prisma.$disconnect();
