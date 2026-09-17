@@ -75,6 +75,35 @@ describe('seedDatabase', () => {
     }
   });
 
+  it('sets each seed user name to the email local part', async () => {
+    await seedDatabase(prisma);
+
+    for (const { email } of SEED_USERS) {
+      const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+      expect(user.name).toBe(email.split('@')[0]);
+    }
+  });
+
+  it('backfills the name of an existing seed user row with no name', async () => {
+    const [firstSeedUser] = SEED_USERS;
+    if (!firstSeedUser) {
+      throw new Error('SEED_USERS is empty');
+    }
+
+    await seedDatabase(prisma);
+    await prisma.user.update({
+      where: { email: firstSeedUser.email },
+      data: { name: null },
+    });
+
+    await seedDatabase(prisma);
+    const backfilled = await prisma.user.findUniqueOrThrow({
+      where: { email: firstSeedUser.email },
+    });
+
+    expect(backfilled.name).toBe(firstSeedUser.email.split('@')[0]);
+  });
+
   it('seeds exactly one credential account per user, verifiable against the seed password', async () => {
     await seedDatabase(prisma);
     const seedPassword = getSeedUserPassword();

@@ -223,6 +223,9 @@ export interface paths {
                         "application/json": {
                             user: components["schemas"]["User"];
                             session: components["schemas"]["AuthSession"];
+                        } | {
+                            /** @enum {boolean} */
+                            twoFactorRequired: true;
                         };
                     };
                 };
@@ -264,6 +267,132 @@ export interface paths {
                 };
                 /** @description Too many requests */
                 429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/sign-in/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete sign-in for a TOTP-enabled account */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @example 123456 */
+                        code?: string;
+                        backupCode?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Signed in */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            user: components["schemas"]["User"];
+                            session: components["schemas"]["AuthSession"];
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/sessions/revoke-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign out of every session (log out everywhere) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description All sessions revoked */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -729,7 +858,14 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @example correct horse battery staple */
+                        password: string;
+                    };
+                };
+            };
             responses: {
                 /** @description TOTP secret and enrollment URI */
                 200: {
@@ -738,6 +874,15 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["TotpEnrollment"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
                     };
                 };
                 /** @description Unauthorized */
@@ -869,6 +1014,8 @@ export interface paths {
                     "application/json": {
                         /** @example 123456 */
                         code: string;
+                        /** @example correct horse battery staple */
+                        password: string;
                     };
                 };
             };
@@ -6400,6 +6547,13 @@ export interface components {
              * @example otpauth://totp/photoo.lu:client@example.com?secret=JBSWY3DPEHPK3PXP
              */
             otpauthUrl: string;
+            /**
+             * @example [
+             *       "abcde-12345",
+             *       "fghij-67890"
+             *     ]
+             */
+            backupCodes: string[];
         };
         PhotographerSummary: {
             /**

@@ -19,6 +19,11 @@ const SIGNUP_ROLES = [
 
 const OAUTH_PROVIDERS = ['google', 'apple', 'facebook', 'microsoft'] as const;
 
+const TotpCodeSchema = z
+  .string()
+  .regex(/^\d{6}$/, 'must be a 6-digit code')
+  .openapi({ example: '123456' });
+
 const PasswordSchema = z
   .string()
   .min(PASSWORD_MIN_LENGTH, `must be at least ${String(PASSWORD_MIN_LENGTH)} characters`)
@@ -78,12 +83,34 @@ export const SignInRequestSchema = z
   })
   .strict();
 
-export const SignInResponseSchema = z
+export const SignedInResponseSchema = z
   .object({
     user: UserSchema,
     session: AuthSessionSchema,
   })
   .strict();
+
+export const TwoFactorRequiredResponseSchema = z
+  .object({
+    twoFactorRequired: z.literal(true),
+  })
+  .strict();
+
+export const SignInResponseSchema = z.union([
+  SignedInResponseSchema,
+  TwoFactorRequiredResponseSchema,
+]);
+
+export const SignInTotpRequestSchema = z
+  .object({
+    code: TotpCodeSchema.optional(),
+    backupCode: z.string().min(1).optional(),
+  })
+  .strict()
+  .refine(
+    (value) => Boolean(value.code) !== Boolean(value.backupCode),
+    'exactly one of code or backupCode is required',
+  );
 
 export const SessionResponseSchema = z
   .object({
@@ -140,14 +167,16 @@ export const TotpEnrollResponseSchema = z
     otpauthUrl: z
       .url()
       .openapi({ example: 'otpauth://totp/photoo.lu:client@example.com?secret=JBSWY3DPEHPK3PXP' }),
+    backupCodes: z.array(z.string()).openapi({ example: ['abcde-12345', 'fghij-67890'] }),
   })
   .strict()
   .openapi('TotpEnrollment');
 
-const TotpCodeSchema = z
-  .string()
-  .regex(/^\d{6}$/, 'must be a 6-digit code')
-  .openapi({ example: '123456' });
+export const TotpEnrollRequestSchema = z
+  .object({
+    password: z.string().min(1).openapi({ example: 'correct horse battery staple' }),
+  })
+  .strict();
 
 export const TotpVerifyRequestSchema = z
   .object({
@@ -158,6 +187,7 @@ export const TotpVerifyRequestSchema = z
 export const TotpDisableRequestSchema = z
   .object({
     code: TotpCodeSchema,
+    password: z.string().min(1).openapi({ example: 'correct horse battery staple' }),
   })
   .strict();
 
@@ -198,6 +228,35 @@ registry.registerPath({
       content: { 'application/json': { schema: SignInResponseSchema } },
     },
     ...errorResponses([400, 401, 403, 422, 429]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/auth/sign-in/totp'),
+  summary: 'Complete sign-in for a TOTP-enabled account',
+  tags: ['auth'],
+  request: {
+    body: { content: { 'application/json': { schema: SignInTotpRequestSchema } } },
+  },
+  responses: {
+    '200': {
+      description: 'Signed in',
+      content: { 'application/json': { schema: SignedInResponseSchema } },
+    },
+    ...errorResponses([400, 401, 422, 429]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/auth/sessions/revoke-all'),
+  summary: 'Sign out of every session (log out everywhere)',
+  tags: ['auth'],
+  security: AUTH_SECURITY,
+  responses: {
+    '204': { description: 'All sessions revoked' },
+    ...errorResponses([401]),
   },
 });
 
@@ -303,12 +362,15 @@ registry.registerPath({
   summary: 'Start TOTP enrollment for the current user',
   tags: ['auth'],
   security: AUTH_SECURITY,
+  request: {
+    body: { content: { 'application/json': { schema: TotpEnrollRequestSchema } } },
+  },
   responses: {
     '200': {
       description: 'TOTP secret and enrollment URI',
       content: { 'application/json': { schema: TotpEnrollResponseSchema } },
     },
-    ...errorResponses([401, 409]),
+    ...errorResponses([400, 401, 409]),
   },
 });
 

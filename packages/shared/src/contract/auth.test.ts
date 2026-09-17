@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   AddRoleRequestSchema,
   SignInRequestSchema,
+  SignInResponseSchema,
+  SignInTotpRequestSchema,
   SignUpRequestSchema,
+  TotpDisableRequestSchema,
+  TotpEnrollRequestSchema,
+  TotpEnrollResponseSchema,
   TotpVerifyRequestSchema,
   UserSchema,
 } from './auth.js';
@@ -115,6 +120,94 @@ describe('TotpVerifyRequestSchema', () => {
 
   it('rejects a non-numeric code', () => {
     expect(TotpVerifyRequestSchema.safeParse({ code: 'abcdef' }).success).toBe(false);
+  });
+});
+
+describe('SignInResponseSchema', () => {
+  it('accepts a two-factor-required response', () => {
+    expect(SignInResponseSchema.safeParse({ twoFactorRequired: true }).success).toBe(true);
+  });
+
+  it('accepts a full signed-in response', () => {
+    expect(
+      SignInResponseSchema.safeParse({
+        user: validUser,
+        session: { token: 'x', expiresAt: '2026-09-16T12:00:00.000Z' },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a mixed shape', () => {
+    expect(
+      SignInResponseSchema.safeParse({ twoFactorRequired: true, user: validUser }).success,
+    ).toBe(false);
+  });
+});
+
+describe('SignInTotpRequestSchema', () => {
+  it('accepts a code', () => {
+    expect(SignInTotpRequestSchema.safeParse({ code: '123456' }).success).toBe(true);
+  });
+
+  it('accepts a backup code', () => {
+    expect(SignInTotpRequestSchema.safeParse({ backupCode: 'abcde-12345' }).success).toBe(true);
+  });
+
+  it('rejects both a code and a backup code', () => {
+    expect(
+      SignInTotpRequestSchema.safeParse({ code: '123456', backupCode: 'abcde-12345' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects neither', () => {
+    expect(SignInTotpRequestSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('TotpEnrollResponseSchema', () => {
+  it('requires backupCodes', () => {
+    expect(
+      TotpEnrollResponseSchema.safeParse({
+        secret: 'JBSWY3DPEHPK3PXP',
+        otpauthUrl: 'otpauth://totp/x?secret=JBSWY3DPEHPK3PXP',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts a full enrollment payload', () => {
+    expect(
+      TotpEnrollResponseSchema.safeParse({
+        secret: 'JBSWY3DPEHPK3PXP',
+        otpauthUrl: 'otpauth://totp/x?secret=JBSWY3DPEHPK3PXP',
+        backupCodes: ['abcde-12345'],
+      }).success,
+    ).toBe(true);
+  });
+});
+
+describe('TotpEnrollRequestSchema', () => {
+  it('accepts a password', () => {
+    expect(TotpEnrollRequestSchema.safeParse({ password: 'x' }).success).toBe(true);
+  });
+
+  it('rejects an empty password', () => {
+    expect(TotpEnrollRequestSchema.safeParse({ password: '' }).success).toBe(false);
+  });
+
+  it('rejects unknown keys', () => {
+    expect(TotpEnrollRequestSchema.safeParse({ password: 'x', extra: 1 }).success).toBe(false);
+  });
+});
+
+describe('TotpDisableRequestSchema', () => {
+  it('accepts a code and password', () => {
+    expect(TotpDisableRequestSchema.safeParse({ code: '123456', password: 'x' }).success).toBe(
+      true,
+    );
+  });
+
+  it('rejects a missing password', () => {
+    expect(TotpDisableRequestSchema.safeParse({ code: '123456' }).success).toBe(false);
   });
 });
 

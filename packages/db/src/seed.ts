@@ -80,6 +80,16 @@ export function getSeedUserPassword(): string {
 // row (D20), so the Argon2id hash lives on `Account.password`, not on User.
 export const CREDENTIAL_PROVIDER_ID = 'credential';
 
+// Better Auth requires `User.name`; seed users get it from the email local
+// part, matching the default new sign-ups get (DATA-MODEL.md).
+function nameFromEmail(email: string): string {
+  const [localPart] = email.split('@');
+  if (!localPart) {
+    throw new Error(`db seed: cannot derive a name from email "${email}"`);
+  }
+  return localPart;
+}
+
 async function seedUser(
   prisma: ReturnType<typeof createPrismaClient>,
   email: string,
@@ -87,12 +97,19 @@ async function seedUser(
 ): Promise<{ id: string }> {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
+    if (existing.name === null) {
+      return prisma.user.update({
+        where: { id: existing.id },
+        data: { name: nameFromEmail(email) },
+      });
+    }
     return existing;
   }
   return prisma.user.create({
     data: {
       email,
       emailVerifiedAt: new Date(),
+      name: nameFromEmail(email),
       locale: 'en',
       countryCode: 'LU',
       roles: [...roles],

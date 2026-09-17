@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { loadEnv } from './env.js';
 
 const validEnv = {
+  NODE_ENV: 'development',
   DATABASE_URL: 'postgresql://user:pass@127.0.0.1:5432/photoo',
   REDIS_URL: 'redis://127.0.0.1:6379',
   PORT: '4000',
   PUBLIC_API_URL: 'http://localhost:4000',
   WEB_ORIGINS: 'http://localhost:3000',
+  WEB_APP_URL: 'http://localhost:3000',
+  AUTH_SECRET: 'a'.repeat(32),
+  AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
 };
 
 describe('loadEnv', () => {
@@ -18,6 +22,59 @@ describe('loadEnv', () => {
     expect(env.PUBLIC_API_URL).toBe(validEnv.PUBLIC_API_URL);
     expect(env.WEB_ORIGINS).toEqual(['http://localhost:3000']);
     expect(env.NODE_ENV).toBe('development');
+    expect(env.AUTH_ENCRYPTION_KEY).toBeInstanceOf(Buffer);
+    expect(env.SMTP_HOST).toBe('localhost');
+    expect(env.SMTP_PORT).toBe(1025);
+    expect(env.SMTP_FROM).toBe('dev@photoo.lu');
+    expect(env.GOOGLE_CLIENT_ID).toBeUndefined();
+    expect(env.DEV_MAIL_WORKER).toBe(false);
+    expect(env.TRUSTED_PROXIES).toEqual([]);
+  });
+
+  it('rejects a missing NODE_ENV', () => {
+    const withoutNodeEnv: Record<string, string> = { ...validEnv };
+    delete withoutNodeEnv.NODE_ENV;
+    expect(() => loadEnv(withoutNodeEnv)).toThrow(/NODE_ENV/);
+  });
+
+  it('parses DEV_MAIL_WORKER=true and a comma-separated TRUSTED_PROXIES', () => {
+    const env = loadEnv({
+      ...validEnv,
+      DEV_MAIL_WORKER: 'true',
+      TRUSTED_PROXIES: '10.0.0.0/24, 192.168.1.1',
+    });
+    expect(env.DEV_MAIL_WORKER).toBe(true);
+    expect(env.TRUSTED_PROXIES).toEqual(['10.0.0.0/24', '192.168.1.1']);
+  });
+
+  it('refuses the .env.example AUTH_SECRET placeholder in production', () => {
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: 'production',
+        AUTH_SECRET: 'dev-only-auth-secret-change-me-please-32-chars-min',
+      }),
+    ).toThrow(/AUTH_SECRET/);
+  });
+
+  it('refuses the .env.example AUTH_ENCRYPTION_KEY placeholder in production', () => {
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: 'production',
+        AUTH_SECRET: 'b'.repeat(32),
+        AUTH_ENCRYPTION_KEY: 'qA5jxlkWykGDbMKLOSqgSGG+lbzsuDkUWUS8nV9twig=',
+      }),
+    ).toThrow(/AUTH_ENCRYPTION_KEY/);
+  });
+
+  it('accepts the example values outside production', () => {
+    const env = loadEnv({
+      ...validEnv,
+      NODE_ENV: 'development',
+      AUTH_SECRET: 'dev-only-auth-secret-change-me-please-32-chars-min',
+    });
+    expect(env.AUTH_SECRET).toBe('dev-only-auth-secret-change-me-please-32-chars-min');
   });
 
   it('splits and trims a comma-separated WEB_ORIGINS', () => {
@@ -56,5 +113,47 @@ describe('loadEnv', () => {
 
   it('rejects an invalid NODE_ENV', () => {
     expect(() => loadEnv({ ...validEnv, NODE_ENV: 'staging' })).toThrow(/NODE_ENV/);
+  });
+
+  it('rejects a missing AUTH_SECRET', () => {
+    const withoutSecret: Record<string, string> = { ...validEnv };
+    delete withoutSecret.AUTH_SECRET;
+    expect(() => loadEnv(withoutSecret)).toThrow(/AUTH_SECRET/);
+  });
+
+  it('rejects an AUTH_SECRET shorter than 32 characters', () => {
+    expect(() => loadEnv({ ...validEnv, AUTH_SECRET: 'short' })).toThrow(/AUTH_SECRET/);
+  });
+
+  it('rejects an AUTH_ENCRYPTION_KEY that is not 32 bytes', () => {
+    expect(() =>
+      loadEnv({ ...validEnv, AUTH_ENCRYPTION_KEY: Buffer.alloc(16).toString('base64') }),
+    ).toThrow(/AUTH_ENCRYPTION_KEY/);
+  });
+
+  it('leaves OAuth provider credentials unset when not provided', () => {
+    const env = loadEnv(validEnv);
+    expect(env.GOOGLE_CLIENT_ID).toBeUndefined();
+    expect(env.GOOGLE_CLIENT_SECRET).toBeUndefined();
+  });
+
+  it('treats an empty-string OAuth credential (as .env files set unfilled keys) as unset', () => {
+    const env = loadEnv({
+      ...validEnv,
+      GOOGLE_CLIENT_ID: '',
+      GOOGLE_CLIENT_SECRET: '',
+    });
+    expect(env.GOOGLE_CLIENT_ID).toBeUndefined();
+    expect(env.GOOGLE_CLIENT_SECRET).toBeUndefined();
+  });
+
+  it('accepts a non-empty OAuth credential pair', () => {
+    const env = loadEnv({
+      ...validEnv,
+      GOOGLE_CLIENT_ID: 'client-id',
+      GOOGLE_CLIENT_SECRET: 'client-secret',
+    });
+    expect(env.GOOGLE_CLIENT_ID).toBe('client-id');
+    expect(env.GOOGLE_CLIENT_SECRET).toBe('client-secret');
   });
 });

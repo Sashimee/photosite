@@ -1,7 +1,8 @@
-import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
 import { AppModule } from '../app.module.js';
 import { configureApp } from '../bootstrap/configure-app.js';
+import { createFastifyAdapter } from '../bootstrap/fastify-adapter.js';
 import { APP_CONFIG, type Env } from '../config/env.js';
 
 export async function createTestApp(env: Env): Promise<NestFastifyApplication> {
@@ -10,7 +11,9 @@ export async function createTestApp(env: Env): Promise<NestFastifyApplication> {
     .useValue(env)
     .compile();
 
-  const app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+  const app = moduleRef.createNestApplication<NestFastifyApplication>(
+    createFastifyAdapter(env.TRUSTED_PROXIES),
+  );
   await configureApp(app, env);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();

@@ -6,6 +6,7 @@ allowBuilds:
   '@prisma/engines': true
   '@sentry/cli': false
   '@swc/core': false
+  msgpackr-extract: false
   prisma: true
 minimumReleaseAgeExclude:
   - '@types/node@24.13.5'

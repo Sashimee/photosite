@@ -5,9 +5,10 @@ import { BODY_LIMIT_BYTES, REQUEST_ID_HEADER } from '../common/constants.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export function createFastifyAdapter(): FastifyAdapter {
+export function createFastifyAdapter(trustedProxies: readonly string[] = []): FastifyAdapter {
   return new FastifyAdapter({
     bodyLimit: BODY_LIMIT_BYTES,
+    trustProxy: trustedProxies.length > 0 ? [...trustedProxies] : false,
     genReqId: (request: IncomingMessage) => {
       const header = request.headers[REQUEST_ID_HEADER];
       const value = Array.isArray(header) ? header[0] : header;
