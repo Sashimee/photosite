@@ -135,3 +135,13 @@ export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number];
 export const NOTIFICATION_CHANNELS = ['email', 'push', 'in_app'] as const;
 
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+
+export const NOTIFICATION_TYPES = [
+  'quote_received',
+  'quote_accepted',
+  'quote_declined',
+  'quote_withdrawn',
+  'quote_expired',
+] as const;
+
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

@@ -6,8 +6,16 @@ import {
   FileScanJobSchema,
   IMAGE_PROCESS_QUEUE_NAME,
   ImageProcessJobSchema,
+  NOTIFICATIONS_CLEANUP_QUEUE_NAME,
+  NotificationsCleanupJobSchema,
+  NOTIFY_QUEUE_NAME,
+  NOTIFY_SWEEP_QUEUE_NAME,
+  NotifyJobSchema,
+  NotifySweepJobSchema,
   PORTFOLIO_IMAGE_CLEANUP_QUEUE_NAME,
   PortfolioImageCleanupJobSchema,
+  PUSH_RECEIPTS_QUEUE_NAME,
+  PushReceiptsJobSchema,
   QUEUE_JOB_SCHEMAS,
   QUEUE_NAMES,
   QUOTE_EXPIRY_QUEUE_NAME,
@@ -27,6 +35,10 @@ describe('QUEUE_NAMES', () => {
       'uploads-cleanup',
       'portfolio-image-cleanup',
       'quote-expiry',
+      'notify',
+      'notify-sweep',
+      'push-receipts',
+      'notifications-cleanup',
     ]);
     expect(new Set(QUEUE_NAMES).size).toBe(QUEUE_NAMES.length);
   });
@@ -39,6 +51,10 @@ describe('QUEUE_NAMES', () => {
       UPLOADS_CLEANUP_QUEUE_NAME,
       PORTFOLIO_IMAGE_CLEANUP_QUEUE_NAME,
       QUOTE_EXPIRY_QUEUE_NAME,
+      NOTIFY_QUEUE_NAME,
+      NOTIFY_SWEEP_QUEUE_NAME,
+      PUSH_RECEIPTS_QUEUE_NAME,
+      NOTIFICATIONS_CLEANUP_QUEUE_NAME,
     ]).toEqual(QUEUE_NAMES);
   });
 });
@@ -177,6 +193,40 @@ describe('quote-expiry job schema', () => {
 
   it('rejects unknown extra keys', () => {
     expect(QuoteExpiryJobSchema.safeParse({ uploadId: VALID_UPLOAD_ID }).success).toBe(false);
+  });
+});
+
+describe('NotifyJobSchema', () => {
+  it('accepts a valid notificationId', () => {
+    expect(NotifyJobSchema.safeParse({ notificationId: VALID_UPLOAD_ID }).success).toBe(true);
+  });
+
+  it('rejects a missing notificationId', () => {
+    expect(NotifyJobSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects a non-uuid notificationId', () => {
+    expect(NotifyJobSchema.safeParse({ notificationId: 'not-a-uuid' }).success).toBe(false);
+  });
+
+  it('rejects unknown extra keys', () => {
+    expect(
+      NotifyJobSchema.safeParse({ notificationId: VALID_UPLOAD_ID, extra: 'nope' }).success,
+    ).toBe(false);
+  });
+});
+
+describe.each([
+  ['notify-sweep', NotifySweepJobSchema] as const,
+  ['push-receipts', PushReceiptsJobSchema] as const,
+  ['notifications-cleanup', NotificationsCleanupJobSchema] as const,
+])('%s job schema', (_name, schema) => {
+  it('accepts an empty payload', () => {
+    expect(schema.safeParse({}).success).toBe(true);
+  });
+
+  it('rejects unknown extra keys', () => {
+    expect(schema.safeParse({ uploadId: VALID_UPLOAD_ID }).success).toBe(false);
   });
 });
 
