@@ -1298,6 +1298,8 @@ export interface paths {
                     lng?: number | null;
                     radiusKm?: number;
                     city?: string;
+                    /** @description ISO 3166-1 alpha-2 country code */
+                    countryCode?: string;
                     category?: "wedding" | "portrait" | "event" | "product" | "real-estate" | "corporate";
                     /** @description ISO 639-1 language code */
                     language?: string;
@@ -1970,6 +1972,65 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List cities with published photographer profiles */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description ISO 3166-1 alpha-2 country code */
+                    countryCode?: string;
+                    q?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Matching cities, ordered by photographer count then name */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CitySummary"][];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -7715,6 +7776,16 @@ export interface components {
             order: number;
             /** @enum {string} */
             status: "processing" | "pending_review" | "approved" | "flagged" | "rejected";
+        };
+        CitySummary: {
+            slug: string;
+            name: string;
+            /**
+             * @description ISO 3166-1 alpha-2 country code
+             * @example LU
+             */
+            countryCode: string;
+            photographerCount: number;
         };
         Product: {
             /**

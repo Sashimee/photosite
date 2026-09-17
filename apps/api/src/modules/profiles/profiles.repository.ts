@@ -9,6 +9,7 @@ export interface SearchFilters {
   lng?: number | undefined;
   radiusKm?: number | undefined;
   city?: string | undefined;
+  countryCode?: string | undefined;
   category?: PhotographerCategory | undefined;
   language?: string | undefined;
   priceMinCents?: number | undefined;
@@ -80,6 +81,9 @@ export class ProfilesRepository {
 
     if (filters.city !== undefined) {
       conditions.push(Prisma.sql`lower(p.city) = lower(${filters.city})`);
+    }
+    if (filters.countryCode !== undefined) {
+      conditions.push(Prisma.sql`p."countryCode" = ${filters.countryCode}`);
     }
     if (filters.category !== undefined) {
       conditions.push(Prisma.sql`${filters.category}::"PhotographerCategory" = ANY(p.categories)`);
