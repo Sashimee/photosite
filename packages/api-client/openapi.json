@@ -225,11 +225,22 @@
             "type": "string",
             "format": "uri",
             "example": "otpauth://totp/photoo.lu:client@example.com?secret=JBSWY3DPEHPK3PXP"
+          },
+          "backupCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "abcde-12345",
+              "fghij-67890"
+            ]
           }
         },
         "required": [
           "secret",
-          "otpauthUrl"
+          "otpauthUrl",
+          "backupCodes"
         ],
         "additionalProperties": false
       },
@@ -2796,20 +2807,39 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "user": {
-                      "$ref": "#/components/schemas/User"
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "user": {
+                          "$ref": "#/components/schemas/User"
+                        },
+                        "session": {
+                          "$ref": "#/components/schemas/AuthSession"
+                        }
+                      },
+                      "required": [
+                        "user",
+                        "session"
+                      ],
+                      "additionalProperties": false
                     },
-                    "session": {
-                      "$ref": "#/components/schemas/AuthSession"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "twoFactorRequired": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      },
+                      "required": [
+                        "twoFactorRequired"
+                      ],
+                      "additionalProperties": false
                     }
-                  },
-                  "required": [
-                    "user",
-                    "session"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }
@@ -2856,6 +2886,131 @@
           },
           "429": {
             "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/sign-in/totp": {
+      "post": {
+        "summary": "Complete sign-in for a TOTP-enabled account",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$",
+                    "example": "123456"
+                  },
+                  "backupCode": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/AuthSession"
+                    }
+                  },
+                  "required": [
+                    "user",
+                    "session"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/sessions/revoke-all": {
+      "post": {
+        "summary": "Sign out of every session (log out everywhere)",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "All sessions revoked"
+          },
+          "401": {
+            "description": "Unauthorized",
             "content": {
               "application/json": {
                 "schema": {
@@ -3346,6 +3501,26 @@
             "bearerAuth": []
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "example": "correct horse battery staple"
+                  }
+                },
+                "required": [
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "TOTP secret and enrollment URI",
@@ -3353,6 +3528,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TotpEnrollment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
@@ -3501,10 +3686,16 @@
                     "type": "string",
                     "pattern": "^\\d{6}$",
                     "example": "123456"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "example": "correct horse battery staple"
                   }
                 },
                 "required": [
-                  "code"
+                  "code",
+                  "password"
                 ],
                 "additionalProperties": false
               }

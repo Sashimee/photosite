@@ -6,12 +6,15 @@ import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module.js';
 import { configureApp } from './bootstrap/configure-app.js';
 import { createFastifyAdapter } from './bootstrap/fastify-adapter.js';
-import { APP_CONFIG, type Env } from './config/env.js';
+import { APP_CONFIG, loadEnv, type Env } from './config/env.js';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, createFastifyAdapter(), {
-    bufferLogs: true,
-  });
+  const bootstrapConfig = loadEnv();
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    createFastifyAdapter(bootstrapConfig.TRUSTED_PROXIES),
+    { bufferLogs: true },
+  );
 
   app.useLogger(app.get(Logger));
 

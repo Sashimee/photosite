@@ -1,7 +1,7 @@
 import { Writable } from 'node:stream';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
-import { buildPinoHttpOptions } from './logger.options.js';
+import { buildPinoHttpOptions, sanitizeLoggedUrl } from './logger.options.js';
 
 function collectLogs(): { stream: Writable; lines: () => unknown[] } {
   const chunks: string[] = [];
@@ -74,6 +74,52 @@ describe('buildPinoHttpOptions redaction', () => {
 
     const [line] = lines() as [{ res: { headers: { 'set-cookie': string } } }];
     expect(line.res.headers['set-cookie']).toBe('[Redacted]');
+  });
+
+  it('redacts nested verification/reset token material one level deep', () => {
+    const { stream, lines } = collectLogs();
+    const logger = pino({ redact: getRedact() }, stream);
+
+    logger.info({
+      body: {
+        code: '123456',
+        backupCode: 'abcde-12345',
+        backupCodes: ['abcde-12345'],
+        newPassword: 'x',
+        currentPassword: 'y',
+        url: 'https://api.photoo.lu/v1/auth/reset-password/SECRET?callbackURL=%2F',
+        otpauthUrl: 'otpauth://totp/x?secret=SECRET',
+        email: 'kept@example.com',
+      },
+    });
+
+    const [line] = lines() as [{ body: Record<string, unknown> }];
+    expect(line.body.code).toBe('[Redacted]');
+    expect(line.body.backupCode).toBe('[Redacted]');
+    expect(line.body.backupCodes).toBe('[Redacted]');
+    expect(line.body.newPassword).toBe('[Redacted]');
+    expect(line.body.currentPassword).toBe('[Redacted]');
+    expect(line.body.url).toBe('[Redacted]');
+    expect(line.body.otpauthUrl).toBe('[Redacted]');
+    expect(line.body.email).toBe('kept@example.com');
+  });
+});
+
+describe('sanitizeLoggedUrl', () => {
+  it('strips the query string from a verify-email link', () => {
+    expect(
+      sanitizeLoggedUrl('/v1/auth/verify-email?token=SYNTHETIC-TOKEN-123&callbackURL=%2F'),
+    ).toBe('/v1/auth/verify-email');
+  });
+
+  it('masks the token path segment of a reset-password link', () => {
+    expect(
+      sanitizeLoggedUrl('/v1/auth/reset-password/SYNTHETIC-RESET-TOKEN-456?callbackURL=%2F'),
+    ).toBe('/v1/auth/reset-password/[Redacted]');
+  });
+
+  it('leaves an ordinary path untouched', () => {
+    expect(sanitizeLoggedUrl('/v1/auth/session')).toBe('/v1/auth/session');
   });
 });
 

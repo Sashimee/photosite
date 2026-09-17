@@ -4,21 +4,6 @@ export interface NotYetImplementedRoute {
 }
 
 export const NOT_YET_IMPLEMENTED: readonly NotYetImplementedRoute[] = [
-  { method: 'POST', path: '/v1/auth/sign-up' },
-  { method: 'POST', path: '/v1/auth/sign-in' },
-  { method: 'POST', path: '/v1/auth/sign-out' },
-  { method: 'GET', path: '/v1/auth/session' },
-  { method: 'POST', path: '/v1/auth/verify-email' },
-  { method: 'POST', path: '/v1/auth/password-reset/request' },
-  { method: 'POST', path: '/v1/auth/password-reset/confirm' },
-  { method: 'POST', path: '/v1/auth/roles' },
-  { method: 'POST', path: '/v1/auth/totp/enroll' },
-  { method: 'POST', path: '/v1/auth/totp/verify' },
-  { method: 'POST', path: '/v1/auth/totp/disable' },
-  { method: 'GET', path: '/v1/auth/oauth/google/start' },
-  { method: 'GET', path: '/v1/auth/oauth/apple/start' },
-  { method: 'GET', path: '/v1/auth/oauth/facebook/start' },
-  { method: 'GET', path: '/v1/auth/oauth/microsoft/start' },
   { method: 'GET', path: '/v1/photographers' },
   { method: 'GET', path: '/v1/photographers/:slug' },
   { method: 'GET', path: '/v1/me/photographer-profile' },
