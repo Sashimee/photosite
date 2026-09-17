@@ -126,4 +126,65 @@ describe('CityAutocomplete', () => {
 
     expect(screen.queryByRole('option', { hidden: true })).not.toBeInTheDocument();
   });
+
+  it('calls onCitySelect with the matching suggestion once the typed value matches it exactly', async () => {
+    apiGetMock.mockResolvedValue({
+      data: [
+        {
+          slug: 'luxembourg-city',
+          name: 'Luxembourg City',
+          countryCode: 'LU',
+          photographerCount: 3,
+          location: { lat: 49.61, lng: 6.13 },
+        },
+      ],
+    });
+    const onCitySelect = vi.fn();
+    const CityAutocomplete = await loadCityAutocomplete();
+    render(<CityAutocomplete label="City" name="city" onCitySelect={onCitySelect} />);
+
+    fireEvent.change(screen.getByLabelText('City'), { target: { value: 'luxembourg city' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+
+    expect(onCitySelect).toHaveBeenLastCalledWith({
+      slug: 'luxembourg-city',
+      name: 'Luxembourg City',
+      countryCode: 'LU',
+      photographerCount: 3,
+      location: { lat: 49.61, lng: 6.13 },
+    });
+  });
+
+  it('calls onCitySelect with null once the typed value stops matching a suggestion', async () => {
+    apiGetMock.mockResolvedValue({
+      data: [
+        {
+          slug: 'luxembourg-city',
+          name: 'Luxembourg City',
+          countryCode: 'LU',
+          photographerCount: 3,
+          location: { lat: 49.61, lng: 6.13 },
+        },
+      ],
+    });
+    const onCitySelect = vi.fn();
+    const CityAutocomplete = await loadCityAutocomplete();
+    render(<CityAutocomplete label="City" name="city" onCitySelect={onCitySelect} />);
+    const input = screen.getByLabelText('City');
+
+    fireEvent.change(input, { target: { value: 'Luxembourg City' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    onCitySelect.mockClear();
+
+    fireEvent.change(input, { target: { value: 'Luxembourg Cit' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+
+    expect(onCitySelect).toHaveBeenLastCalledWith(null);
+  });
 });

@@ -40,6 +40,12 @@ export function AccountMenu({ locale, user }: { locale: Locale; user: SessionUse
         <DropdownMenuItem asChild>
           <Link href={`/${locale}/account`}>{t('account')}</Link>
         </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/${locale}/requests`}>{t('myRequests')}</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/${locale}/quotes`}>{t('quotes')}</Link>
+        </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() => {
             void handleSignOut();

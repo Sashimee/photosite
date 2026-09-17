@@ -92,3 +92,59 @@ describe('getSession', () => {
     await expect(getSession()).rejects.toThrow('HTTP 500');
   });
 });
+
+describe('serverApi', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+    vi.clearAllMocks();
+  });
+
+  it('forwards the session cookie on every call', async () => {
+    cookiesMock.mockResolvedValue({
+      getAll: () => [
+        { name: 'photoo_session', value: 'abc' },
+        { name: 'other', value: 'def' },
+      ],
+    });
+
+    const { serverApi } = await import('./session');
+    const client = await serverApi();
+    await client.GET('/v1/countries');
+
+    const [request] = fetchMock.mock.calls[0] as [Request];
+    expect(request.headers.get('cookie')).toBe('photoo_session=abc');
+  });
+
+  it('still returns a working client without a session cookie', async () => {
+    cookiesMock.mockResolvedValue({ getAll: () => [{ name: 'other', value: 'def' }] });
+
+    const { serverApi } = await import('./session');
+    const client = await serverApi();
+    await client.GET('/v1/countries');
+
+    const [request] = fetchMock.mock.calls[0] as [Request];
+    expect(request.headers.get('cookie')).toBeNull();
+  });
+
+  it('rejects a redirect from the API instead of following it', async () => {
+    cookiesMock.mockResolvedValue({
+      getAll: () => [{ name: 'photoo_session', value: 'abc' }],
+    });
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const { serverApi } = await import('./session');
+    const client = await serverApi();
+
+    await expect(client.GET('/v1/countries')).rejects.toThrow();
+    const [, init] = fetchMock.mock.calls[0] as [RequestInfo, RequestInit];
+    expect(init.redirect).toBe('error');
+  });
+});
