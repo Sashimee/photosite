@@ -14,6 +14,7 @@ import {
   UPLOAD_STATUSES,
   USER_ROLES,
   USER_STATUSES,
+  VERIFICATION_CASE_STATUSES,
   VERIFICATION_STATUSES,
   VIRUS_SCAN_STATUSES,
 } from '@photoo/shared';
@@ -34,6 +35,7 @@ import {
   UploadStatus,
   UserRole,
   UserStatus,
+  VerificationCaseStatus,
   VerificationStatus,
   VirusScanStatus,
 } from './index.js';
@@ -111,5 +113,11 @@ describe('Prisma enums mirror packages/shared enums', () => {
 
   it('ConversationType matches CONVERSATION_TYPES', () => {
     expect(Object.values(ConversationType).sort()).toEqual([...CONVERSATION_TYPES].sort());
+  });
+
+  it('VerificationCaseStatus matches VERIFICATION_CASE_STATUSES', () => {
+    expect(Object.values(VerificationCaseStatus).sort()).toEqual(
+      [...VERIFICATION_CASE_STATUSES].sort(),
+    );
   });
 });

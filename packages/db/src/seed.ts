@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { createCipheriv, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -76,6 +77,40 @@ async function seedCountry(prisma: ReturnType<typeof createPrismaClient>): Promi
       defaultLocale: 'fr',
     },
   });
+}
+
+// `seedDatabase`'s production guard below means this fallback can only ever
+// be used outside production.
+const DEV_VERIFICATION_ENCRYPTION_KEY = '9DsORuh9HI1DUnXKM0DKVcgw36Y9NfbLBSlfPmQxwYs=';
+
+function getVerificationEncryptionKey(): Buffer {
+  const encoded = process.env.VERIFICATION_ENCRYPTION_KEY;
+  if (!encoded) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'db seed: VERIFICATION_ENCRYPTION_KEY is not set. Copy packages/db/.env.example to packages/db/.env and set it.',
+      );
+    }
+    return Buffer.from(DEV_VERIFICATION_ENCRYPTION_KEY, 'base64');
+  }
+  return Buffer.from(encoded, 'base64');
+}
+
+const VERIFICATION_ENCRYPTION_ALGORITHM = 'aes-256-gcm';
+const VERIFICATION_ENCRYPTION_IV_BYTES = 12;
+
+// packages/db can't depend on apps/api's code (apps depend on packages, not
+// the other way round), so this reimplements the payload format
+// (ivBase64.authTagBase64.ciphertextBase64) of
+// apps/api/src/common/crypto/aes-gcm.ts's decryptAesGcm.
+function encryptVerificationField(plaintext: string, key: Buffer): string {
+  const iv = randomBytes(VERIFICATION_ENCRYPTION_IV_BYTES);
+  const cipher = createCipheriv(VERIFICATION_ENCRYPTION_ALGORITHM, key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return [iv.toString('base64'), authTag.toString('base64'), ciphertext.toString('base64')].join(
+    '.',
+  );
 }
 
 const DEFAULT_SEED_USER_PASSWORD = 'correct-horse-battery-staple';
@@ -566,6 +601,104 @@ async function seedPhotographerProfiles(
   }
 }
 
+export const SEED_UNVERIFIED_PHOTOGRAPHER_EMAIL = 'noor.hassan@photoo.test';
+export const SEED_UNVERIFIED_PHOTOGRAPHER_SLUG = 'noor-hassan';
+
+const SEED_VERIFICATION_BUSINESS_NAME = 'Hassan Photography Sàrl';
+const SEED_VERIFICATION_VAT_NUMBER = 'LU87654321';
+const SEED_VERIFICATION_BUSINESS_REGISTRATION_NUMBER = 'B234567';
+
+// The case's country comes from the photographer profile's countryCode
+// (docs/steps/1A.9-verification.md), so this profile exists purely to give
+// the seeded case one; it stays unpublished since `pending` verification
+// can never satisfy `PublishPolicy.canPublish` (DATA-MODEL.md).
+async function seedUnverifiedPhotographerProfile(
+  prisma: ReturnType<typeof createPrismaClient>,
+  passwordHash: string,
+): Promise<{ userId: string; profileId: string }> {
+  const user = await seedUser(prisma, SEED_UNVERIFIED_PHOTOGRAPHER_EMAIL, ['photographer']);
+  await seedCredentialAccount(prisma, user.id, passwordHash);
+
+  const existingProfile = await prisma.photographerProfile.findUnique({
+    where: { userId: user.id },
+  });
+  if (existingProfile) {
+    return { userId: user.id, profileId: existingProfile.id };
+  }
+
+  const profile = await prisma.photographerProfile.create({
+    data: {
+      userId: user.id,
+      slug: SEED_UNVERIFIED_PHOTOGRAPHER_SLUG,
+      displayName: 'Noor Hassan',
+      headline: 'Portrait photographer in Luxembourg City',
+      bio: { en: 'New to the platform and awaiting verification.' },
+      links: { instagram: null, website: null, behance: null, other: [] },
+      categories: ['portrait'],
+      languages: ['en'],
+      city: 'Luxembourg City',
+      countryCode: 'LU',
+      verificationStatus: 'pending',
+      isPublished: false,
+    },
+  });
+
+  return { userId: user.id, profileId: profile.id };
+}
+
+// Skips entirely once a case exists for the seeded user, same as
+// `seedPhotographerProfile`.
+export async function seedVerificationCase(
+  prisma: ReturnType<typeof createPrismaClient>,
+): Promise<void> {
+  const passwordHash = await hash(getSeedUserPassword());
+  const { userId, profileId } = await seedUnverifiedPhotographerProfile(prisma, passwordHash);
+
+  const existingCase = await prisma.verificationCase.findFirst({ where: { userId } });
+  if (existingCase) {
+    return;
+  }
+
+  const encryptionKey = getVerificationEncryptionKey();
+
+  const verificationCase = await prisma.verificationCase.create({
+    data: {
+      userId,
+      countryCode: 'LU',
+      status: 'submitted',
+      businessName: encryptVerificationField(SEED_VERIFICATION_BUSINESS_NAME, encryptionKey),
+      vatNumber: encryptVerificationField(SEED_VERIFICATION_VAT_NUMBER, encryptionKey),
+      businessRegistrationNumber: encryptVerificationField(
+        SEED_VERIFICATION_BUSINESS_REGISTRATION_NUMBER,
+        encryptionKey,
+      ),
+      submittedAt: new Date(),
+    },
+  });
+
+  for (const document of LUXEMBOURG_REQUIRED_DOCUMENTS) {
+    const upload = await prisma.upload.create({
+      data: {
+        ownerId: userId,
+        purpose: 'verification_document',
+        status: 'clean',
+        mimeType: 'application/pdf',
+        declaredSizeBytes: 4096,
+        actualSizeBytes: 4096,
+        objectKey: `seed/verification/${profileId}/${document.key}.pdf`,
+        virusScanStatus: 'clean',
+      },
+    });
+    await prisma.verificationDocument.create({
+      data: {
+        caseId: verificationCase.id,
+        documentKey: document.key,
+        uploadId: upload.id,
+      },
+    });
+  }
+}
+
 async function seedPlatformSetting(
   prisma: ReturnType<typeof createPrismaClient>,
   key: string,
@@ -769,6 +902,7 @@ export async function seedDatabase(prisma: ReturnType<typeof createPrismaClient>
   await seedPlatformSetting(prisma, 'autoReleaseDays', 7);
   await seedRequestAndQuote(prisma);
   await seedQuoteConversation(prisma);
+  await seedVerificationCase(prisma);
 }
 
 async function main(): Promise<void> {
