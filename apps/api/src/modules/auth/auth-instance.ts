@@ -101,6 +101,14 @@ export function buildAuth({
       expiresIn: THIRTY_DAYS_SECONDS,
       updateAge: ONE_DAY_SECONDS,
       fields: { ipAddress: 'ip', token: 'tokenHash' },
+      additionalFields: {
+        // Never set by Better Auth itself (input: false, no default): only
+        // the sign-in/totp and totp/verify handlers stamp this, on the
+        // session that actually presented a second factor. A session
+        // created any other way (password-only, OAuth callback) keeps it
+        // null.
+        twoFactorVerifiedAt: { type: 'date', required: false, input: false },
+      },
     },
     user: {
       additionalFields: {

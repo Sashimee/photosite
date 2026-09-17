@@ -18,6 +18,7 @@ export interface BetterAuthUserRow {
 export interface BetterAuthSessionRow {
   id: string;
   expiresAt: string | Date;
+  twoFactorVerifiedAt?: string | Date | null;
 }
 
 export interface SessionContext {

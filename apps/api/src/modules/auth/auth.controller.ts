@@ -40,12 +40,8 @@ import { AuthRateLimitService } from './auth-rate-limit.service.js';
 import { checkPasswordCompromised } from './hibp.js';
 import { isOAuthProvider, isProviderConfigured } from './oauth-providers.js';
 import { OriginGuard } from './origin-guard.js';
-import { requireSession, type BetterAuthUserRow } from './session.js';
+import { requireSession, type BetterAuthSessionRow, type BetterAuthUserRow } from './session.js';
 import { mapUser } from './user-mapper.js';
-
-interface BetterAuthSessionRow {
-  expiresAt: string | Date;
-}
 
 function emailLocalPart(email: string): string {
   const [localPart] = email.split('@');
@@ -89,6 +85,22 @@ export class AuthController {
         expiresAt: toIsoString((session.session as unknown as BetterAuthSessionRow).expiresAt),
       },
     };
+  }
+
+  // Stamps the session that just proved a second factor, identified by its
+  // (possibly rotated, see totpVerify) token - never every session the user
+  // has open elsewhere.
+  private async stampTwoFactorVerified(token: string, headers: Headers): Promise<void> {
+    const lookupHeaders = new Headers(headers);
+    lookupHeaders.set('authorization', `Bearer ${token}`);
+    const session = await this.auth.api.getSession({ headers: lookupHeaders });
+    if (!session) {
+      return;
+    }
+    await this.prisma.client.session.update({
+      where: { id: (session.session as unknown as BetterAuthSessionRow).id },
+      data: { twoFactorVerifiedAt: new Date() },
+    });
   }
 
   private async defaultCountryCode(): Promise<string> {
@@ -202,6 +214,8 @@ export class AuthController {
             asResponse: true,
           });
       const parsed = await applyFetchResponse<{ token: string }>(response, reply);
+      const verifiedToken = response.headers.get('set-auth-token') ?? parsed.token;
+      await this.stampTwoFactorVerified(verifiedToken, headers);
       const responseBody = await this.signedInBody(parsed.token, headers);
       reply.status(200);
       reply.send(responseBody);
@@ -427,9 +441,22 @@ export class AuthController {
     @Res({ passthrough: false }) reply: FastifyReply,
   ): Promise<void> {
     const input = body as { code: string };
-    const { user } = await requireSession(this.auth, request);
+    const { user, session } = await requireSession(this.auth, request);
     await this.rateLimit.enforce('totp-verify', request.ip, user.id);
+    const isEnabling = !user.twoFactorEnabled;
     try {
+      // A session that predates 2FA must not keep admin access once it's on.
+      // Deletes the rows directly rather than calling
+      // auth.api.revokeOtherSessions: that helper lists sessions by userId,
+      // and hardened-adapter.ts only restores the raw session token on a
+      // lookup that already filters by token, so the tokens it gets back
+      // are still hashed and its own subsequent delete-by-token never
+      // matches a row.
+      if (isEnabling) {
+        await this.prisma.client.session.deleteMany({
+          where: { userId: user.id, id: { not: session.id } },
+        });
+      }
       const response = await this.auth.api.verifyTOTP({
         body: { code: input.code },
         headers: toFetchHeaders(request),
@@ -438,8 +465,19 @@ export class AuthController {
       // verifyTOTP's response embeds the pre-update `twoFactorEnabled` and,
       // on first verification, rotates the session (invalidating this
       // request's own bearer token/cookie), so the user is built from the
-      // pre-fetched value above rather than a post-call lookup.
+      // pre-fetched value above rather than a post-call lookup. The rotated
+      // token (if any) is only ever exposed via the `set-auth-token`
+      // response header, never the JSON body (see auth-instance.ts).
       await applyFetchResponse(response, reply);
+      const rotatedToken = response.headers.get('set-auth-token');
+      if (rotatedToken) {
+        await this.stampTwoFactorVerified(rotatedToken, toFetchHeaders(request));
+      } else {
+        await this.prisma.client.session.update({
+          where: { id: session.id },
+          data: { twoFactorVerifiedAt: new Date() },
+        });
+      }
       reply.status(200);
       reply.send({ user: mapUser({ ...user, twoFactorEnabled: true }) });
     } catch (error) {

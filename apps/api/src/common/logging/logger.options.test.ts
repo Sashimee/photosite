@@ -128,6 +128,53 @@ describe('buildPinoHttpOptions redaction', () => {
     expect(presignedLine.presignedUrl).toBe('[Redacted]');
     expect(presignedLine.upload.presignedUrl).toBe('[Redacted]');
   });
+
+  it('redacts VerificationCase PII and its decision, at top level and one level deep (#113)', () => {
+    const { stream, lines } = collectLogs();
+    const logger = pino({ redact: getRedact() }, stream);
+
+    logger.info({
+      businessName: 'Jane Doe Photography Sàrl',
+      vatNumber: 'LU12345678',
+      businessRegistrationNumber: 'B123456',
+      rejectionReason: 'Business registration document is illegible',
+      downloadUrl: 'https://storage.photoo.lu/photoo-private/u/abc?X-Amz-Signature=secret',
+      body: {
+        businessName: 'Jane Doe Photography Sàrl',
+        vatNumber: 'LU12345678',
+        businessRegistrationNumber: 'B123456',
+        rejectionReason: 'Business registration document is illegible',
+        downloadUrl: 'https://storage.photoo.lu/photoo-private/u/abc?X-Amz-Signature=secret',
+      },
+    });
+
+    const [line] = lines() as [
+      {
+        businessName: string;
+        vatNumber: string;
+        businessRegistrationNumber: string;
+        rejectionReason: string;
+        downloadUrl: string;
+        body: {
+          businessName: string;
+          vatNumber: string;
+          businessRegistrationNumber: string;
+          rejectionReason: string;
+          downloadUrl: string;
+        };
+      },
+    ];
+    expect(line.businessName).toBe('[Redacted]');
+    expect(line.vatNumber).toBe('[Redacted]');
+    expect(line.businessRegistrationNumber).toBe('[Redacted]');
+    expect(line.rejectionReason).toBe('[Redacted]');
+    expect(line.downloadUrl).toBe('[Redacted]');
+    expect(line.body.businessName).toBe('[Redacted]');
+    expect(line.body.vatNumber).toBe('[Redacted]');
+    expect(line.body.businessRegistrationNumber).toBe('[Redacted]');
+    expect(line.body.rejectionReason).toBe('[Redacted]');
+    expect(line.body.downloadUrl).toBe('[Redacted]');
+  });
 });
 
 describe('sanitizeLoggedUrl', () => {

@@ -27,28 +27,33 @@ const WebOriginsSchema = z
     return origins;
   });
 
-const AUTH_ENCRYPTION_KEY_BYTES = 32;
+const AES_256_KEY_BYTES = 32;
 
-const AuthEncryptionKeySchema = z
-  .string()
-  .min(1)
-  .transform((value, ctx) => {
-    let decoded: Buffer;
-    try {
-      decoded = Buffer.from(value, 'base64');
-    } catch {
-      ctx.addIssue({ code: 'custom', message: 'must be base64-encoded' });
-      return z.NEVER;
-    }
-    if (decoded.length !== AUTH_ENCRYPTION_KEY_BYTES) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `must decode to exactly ${String(AUTH_ENCRYPTION_KEY_BYTES)} bytes (got ${String(decoded.length)})`,
-      });
-      return z.NEVER;
-    }
-    return decoded;
-  });
+function base64KeySchema(byteLength: number) {
+  return z
+    .string()
+    .min(1)
+    .transform((value, ctx) => {
+      let decoded: Buffer;
+      try {
+        decoded = Buffer.from(value, 'base64');
+      } catch {
+        ctx.addIssue({ code: 'custom', message: 'must be base64-encoded' });
+        return z.NEVER;
+      }
+      if (decoded.length !== byteLength) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `must decode to exactly ${String(byteLength)} bytes (got ${String(decoded.length)})`,
+        });
+        return z.NEVER;
+      }
+      return decoded;
+    });
+}
+
+const AuthEncryptionKeySchema = base64KeySchema(AES_256_KEY_BYTES);
+const VerificationEncryptionKeySchema = base64KeySchema(AES_256_KEY_BYTES);
 
 function optionalNonEmpty() {
   return z
@@ -78,6 +83,7 @@ const EXAMPLE_AUTH_ENCRYPTION_KEYS = [
   'qA5jxlkWykGDbMKLOSqgSGG+lbzsuDkUWUS8nV9twig=',
   '2uHUiw1qPXOZEq5zpsVlwyZ4XJDaEo1no7lrqawjTxM=',
 ];
+const EXAMPLE_VERIFICATION_ENCRYPTION_KEYS = ['9DsORuh9HI1DUnXKM0DKVcgw36Y9NfbLBSlfPmQxwYs='];
 
 const EnvSchema = z
   .object({
@@ -92,6 +98,7 @@ const EnvSchema = z
 
     AUTH_SECRET: z.string().min(32, 'must be at least 32 characters'),
     AUTH_ENCRYPTION_KEY: AuthEncryptionKeySchema,
+    VERIFICATION_ENCRYPTION_KEY: VerificationEncryptionKeySchema,
 
     GOOGLE_CLIENT_ID: optionalNonEmpty(),
     GOOGLE_CLIENT_SECRET: optionalNonEmpty(),
@@ -140,6 +147,13 @@ function rejectExamplePlaceholders(source: NodeJS.ProcessEnv): string | undefine
   const encryptionKey = source.AUTH_ENCRYPTION_KEY;
   if (encryptionKey && EXAMPLE_AUTH_ENCRYPTION_KEYS.includes(encryptionKey)) {
     return 'AUTH_ENCRYPTION_KEY: refusing the .env.example placeholder value in production';
+  }
+  const verificationEncryptionKey = source.VERIFICATION_ENCRYPTION_KEY;
+  if (
+    verificationEncryptionKey &&
+    EXAMPLE_VERIFICATION_ENCRYPTION_KEYS.includes(verificationEncryptionKey)
+  ) {
+    return 'VERIFICATION_ENCRYPTION_KEY: refusing the .env.example placeholder value in production';
   }
   return undefined;
 }

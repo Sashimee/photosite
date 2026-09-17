@@ -3,6 +3,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createPrismaClient, type PrismaClient } from '@photoo/db';
 import { Redis } from 'ioredis';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { sha256Hex } from '../../common/crypto/hash.js';
 import { createTestApp } from '../../testing/create-test-app.js';
 import { waitForLinkInEmail } from '../../testing/mailpit.js';
 import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
@@ -599,7 +600,7 @@ describe('auth integration', () => {
     const twoFactorRow = await prisma.twoFactor.findFirstOrThrow({ where: { user: { email } } });
     const parts = twoFactorRow.backupCodes.split('.');
     expect(parts).toHaveLength(3);
-    const { decryptAesGcm } = await import('../../common/crypto/aes-gcm.js');
+    const { decryptAesGcm } = await import('@photoo/shared/crypto');
     const decrypted = decryptAesGcm(twoFactorRow.backupCodes, TEST_ENV.AUTH_ENCRYPTION_KEY);
     const decoded = JSON.parse(decrypted) as string[];
     expect(decoded).toEqual(backupCodes);
@@ -704,6 +705,133 @@ describe('auth integration', () => {
         headers: { cookie: revokeCookieHeader },
       });
       expect(afterRevoke.statusCode).toBe(401);
+    }, 20_000);
+
+    it('leaves twoFactorVerifiedAt null on a session that never proved a second factor', async () => {
+      const email = uniqueEmail('no-2fa-session');
+      await signUp(email);
+      await verifyByEmail(email);
+
+      const signInResponse = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const { session } = signInResponse.json<{ session: { token: string } }>();
+      const tokenHash = sha256Hex(session.token);
+      const sessionRow = await prisma.session.findUniqueOrThrow({ where: { tokenHash } });
+      // Same createSession() path an OAuth callback uses (both skip the
+      // sign-in/totp and totp/verify handlers that are the only place this
+      // field is ever stamped); no configured provider to drive a real
+      // OAuth callback in this test environment.
+      expect(sessionRow.twoFactorVerifiedAt).toBeNull();
+    }, 20_000);
+
+    it('stamps twoFactorVerifiedAt only on the session that completed sign-in/totp', async () => {
+      const email = uniqueEmail('stamp-signin-totp');
+      await signUp(email);
+      await verifyByEmail(email);
+      const firstSignIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const initialCookie = firstSignIn.cookies.find((c) => c.name === 'photoo_session');
+      if (!initialCookie) {
+        throw new Error('expected a session cookie');
+      }
+      const cookieHeader = `${initialCookie.name}=${initialCookie.value}`;
+
+      const enrollResponse = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/enroll',
+        headers: { cookie: cookieHeader, origin: 'http://localhost:3000' },
+        payload: { password: PASSWORD },
+      });
+      const { secret } = enrollResponse.json<{ secret: string }>();
+      await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/verify',
+        headers: { cookie: cookieHeader, origin: 'http://localhost:3000' },
+        payload: { code: generateTotpCode(secret) },
+      });
+
+      const secondSignIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const pendingCookieHeader = secondSignIn.cookies
+        .map((cookie) => `${cookie.name}=${cookie.value}`)
+        .join('; ');
+      const completion = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        headers: { cookie: pendingCookieHeader, origin: 'http://localhost:3000' },
+        payload: { code: generateTotpCode(secret) },
+      });
+      expect(completion.statusCode).toBe(200);
+      const { session } = completion.json<{ session: { token: string } }>();
+      const tokenHash = sha256Hex(session.token);
+      const sessionRow = await prisma.session.findUniqueOrThrow({ where: { tokenHash } });
+      const { twoFactorVerifiedAt } = sessionRow;
+      if (!twoFactorVerifiedAt) {
+        throw new Error('expected twoFactorVerifiedAt to be set');
+      }
+      expect(Date.now() - twoFactorVerifiedAt.getTime()).toBeLessThan(10_000);
+    }, 20_000);
+
+    it("revokes the user's other sessions when enabling two-factor", async () => {
+      const email = uniqueEmail('2fa-enable-revokes');
+      await signUp(email);
+      await verifyByEmail(email);
+
+      const firstSignIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const firstCookie = firstSignIn.cookies.find((c) => c.name === 'photoo_session');
+      const secondSignIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const secondCookie = secondSignIn.cookies.find((c) => c.name === 'photoo_session');
+      if (!firstCookie || !secondCookie) {
+        throw new Error('expected a session cookie from both sign-ins');
+      }
+      const firstCookieHeader = `${firstCookie.name}=${firstCookie.value}`;
+      const secondCookieHeader = `${secondCookie.name}=${secondCookie.value}`;
+
+      const beforeEnable = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { cookie: secondCookieHeader },
+      });
+      expect(beforeEnable.statusCode).toBe(200);
+
+      const enrollResponse = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/enroll',
+        headers: { cookie: firstCookieHeader, origin: 'http://localhost:3000' },
+        payload: { password: PASSWORD },
+      });
+      const { secret } = enrollResponse.json<{ secret: string }>();
+      const verifyResponse = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/verify',
+        headers: { cookie: firstCookieHeader, origin: 'http://localhost:3000' },
+        payload: { code: generateTotpCode(secret) },
+      });
+      expect(verifyResponse.statusCode).toBe(200);
+
+      const afterEnable = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { cookie: secondCookieHeader },
+      });
+      expect(afterEnable.statusCode).toBe(401);
     }, 20_000);
   });
 });

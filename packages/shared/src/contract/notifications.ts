@@ -28,6 +28,7 @@ export const NotificationPayloadSchema = z
     total: MoneySchema.optional(),
     counterpartName: z.string().min(1).max(NOTIFICATION_TEXT_MAX_LENGTH).optional(),
     conversationId: IdSchema.optional(),
+    reason: z.string().min(1).max(1000).optional(),
   })
   .strict()
   .openapi('NotificationPayload');

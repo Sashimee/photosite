@@ -5102,6 +5102,15 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
                 /** @description Not found */
                 404: {
                     headers: {
@@ -5125,11 +5134,6 @@ export interface paths {
             requestBody?: {
                 content: {
                     "application/json": {
-                        /**
-                         * @description ISO 3166-1 alpha-2 country code
-                         * @example LU
-                         */
-                        countryCode: string;
                         businessName?: string;
                         vatNumber?: string;
                         businessRegistrationNumber?: string;
@@ -5164,6 +5168,15 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
                 /** @description Conflict */
                 409: {
                     headers: {
@@ -5175,6 +5188,15 @@ export interface paths {
                 };
                 /** @description Unprocessable entity */
                 422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -5232,6 +5254,15 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
                 /** @description Not found */
                 404: {
                     headers: {
@@ -5252,6 +5283,15 @@ export interface paths {
                 };
                 /** @description Unprocessable entity */
                 422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -5322,6 +5362,15 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
                 /** @description Not found */
                 404: {
                     headers: {
@@ -5342,6 +5391,15 @@ export interface paths {
                 };
                 /** @description Unprocessable entity */
                 422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -5394,6 +5452,15 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
                 /** @description Not found */
                 404: {
                     headers: {
@@ -5414,6 +5481,15 @@ export interface paths {
                 };
                 /** @description Unprocessable entity */
                 422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -5853,6 +5929,9 @@ export interface paths {
                 query?: {
                     cursor?: string;
                     limit?: number;
+                    status?: "draft" | "submitted" | "in_review" | "approved" | "rejected" | "expired";
+                    /** @description ISO 3166-1 alpha-2 country code */
+                    countryCode?: string;
                 };
                 header?: never;
                 path?: never;
@@ -5867,9 +5946,18 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            items: components["schemas"]["AdminVerificationCase"][];
+                            items: components["schemas"]["AdminVerificationCaseSummary"][];
                             nextCursor: string | null;
                         };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5883,6 +5971,15 @@ export interface paths {
                 };
                 /** @description Forbidden */
                 403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -5966,6 +6063,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/verification-cases/{id}/start-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start reviewing a verification case */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID identifier */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Verification case moved to in_review */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminVerificationCaseSummary"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/verification-cases/{id}/approve": {
         parameters: {
             query?: never;
@@ -5994,7 +6166,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["AdminVerificationCase"];
+                        "application/json": components["schemas"]["AdminVerificationCaseSummary"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6075,7 +6247,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["AdminVerificationCase"];
+                        "application/json": components["schemas"]["AdminVerificationCaseSummary"];
                     };
                 };
                 /** @description Bad request */
@@ -8656,9 +8828,6 @@ export interface components {
             countryCode: string;
             /** @enum {string} */
             status: "draft" | "submitted" | "in_review" | "approved" | "rejected" | "expired";
-            businessName: string | null;
-            vatNumber: string | null;
-            businessRegistrationNumber: string | null;
             documents: components["schemas"]["VerificationDocument"][];
             /**
              * Format: date-time
@@ -8673,6 +8842,9 @@ export interface components {
              */
             decidedAt: string | null;
             rejectionReason: string | null;
+            businessName: string | null;
+            vatNumber: string | null;
+            businessRegistrationNumber: string | null;
         };
         VerificationDocument: {
             /**
@@ -8694,7 +8866,7 @@ export interface components {
              */
             uploadedAt: string;
         };
-        AdminVerificationCase: {
+        AdminVerificationCaseSummary: {
             /**
              * Format: uuid
              * @description UUID identifier
@@ -8708,9 +8880,6 @@ export interface components {
             countryCode: string;
             /** @enum {string} */
             status: "draft" | "submitted" | "in_review" | "approved" | "rejected" | "expired";
-            businessName: string | null;
-            vatNumber: string | null;
-            businessRegistrationNumber: string | null;
             documents: components["schemas"]["VerificationDocument"][];
             /**
              * Format: date-time
@@ -8736,7 +8905,91 @@ export interface components {
              * @description UUID identifier
              * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
              */
+            assignedAdminId: string | null;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
             decidedByAdminId: string | null;
+            photographer: components["schemas"]["AdminVerificationPhotographer"];
+        };
+        AdminVerificationPhotographer: {
+            displayName: string;
+            /** Format: email */
+            email: string;
+        };
+        AdminVerificationCase: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /**
+             * @description ISO 3166-1 alpha-2 country code
+             * @example LU
+             */
+            countryCode: string;
+            /** @enum {string} */
+            status: "draft" | "submitted" | "in_review" | "approved" | "rejected" | "expired";
+            documents: components["schemas"]["AdminVerificationDocument"][];
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            submittedAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            decidedAt: string | null;
+            rejectionReason: string | null;
+            businessName: string | null;
+            vatNumber: string | null;
+            businessRegistrationNumber: string | null;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            userId: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            assignedAdminId: string | null;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            decidedByAdminId: string | null;
+        };
+        AdminVerificationDocument: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /** @example id_card */
+            documentKey: string;
+            /** @example image/jpeg */
+            mimeType: string;
+            /** @enum {string} */
+            virusScanStatus: "pending" | "clean" | "infected" | "failed";
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            uploadedAt: string;
+            /** Format: uri */
+            downloadUrl?: string;
         };
         AdminProvenanceCheck: {
             /**
@@ -8966,7 +9219,7 @@ export interface components {
              * @example quote_received
              * @enum {string}
              */
-            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received";
+            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected";
             payload: components["schemas"]["NotificationPayload"];
             channels: ("email" | "push" | "in_app")[];
             /**
@@ -9004,6 +9257,7 @@ export interface components {
              * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
              */
             conversationId?: string;
+            reason?: string;
         };
         UnreadCount: {
             count: number;
@@ -9019,7 +9273,7 @@ export interface components {
              * @example quote_received
              * @enum {string}
              */
-            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received";
+            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected";
             /**
              * @example email
              * @enum {string}

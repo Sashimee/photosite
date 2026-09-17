@@ -4,8 +4,10 @@ import {
   AdminProvenanceCheckSchema,
   AdminReportSchema,
   AdminUserSearchQuerySchema,
+  AdminVerificationCasesQuerySchema,
   PlatformSettingsSchema,
   RefundBookingRequestSchema,
+  RejectVerificationCaseRequestSchema,
   ResolveReportRequestSchema,
   SetUserRolesRequestSchema,
   SuspendUserRequestSchema,
@@ -179,5 +181,43 @@ describe('PlatformSettingsSchema and UpdatePlatformSettingsRequestSchema', () =>
 
   it('accepts a partial update', () => {
     expect(UpdatePlatformSettingsRequestSchema.safeParse({ feePercent: 6 }).success).toBe(true);
+  });
+});
+
+describe('RejectVerificationCaseRequestSchema', () => {
+  it('accepts a reason within 1..1000 characters', () => {
+    expect(
+      RejectVerificationCaseRequestSchema.safeParse({ reason: 'Illegible document' }).success,
+    ).toBe(true);
+  });
+
+  it('rejects an empty reason', () => {
+    expect(RejectVerificationCaseRequestSchema.safeParse({ reason: '' }).success).toBe(false);
+  });
+
+  it('rejects a reason longer than 1000 characters', () => {
+    expect(
+      RejectVerificationCaseRequestSchema.safeParse({ reason: 'a'.repeat(1001) }).success,
+    ).toBe(false);
+  });
+});
+
+describe('AdminVerificationCasesQuerySchema', () => {
+  it('defaults limit to 20 with no filters', () => {
+    const result = AdminVerificationCasesQuerySchema.parse({});
+    expect(result.limit).toBe(20);
+    expect(result.status).toBeUndefined();
+    expect(result.countryCode).toBeUndefined();
+  });
+
+  it('accepts a status and countryCode filter', () => {
+    expect(
+      AdminVerificationCasesQuerySchema.safeParse({ status: 'submitted', countryCode: 'LU' })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects an unknown status', () => {
+    expect(AdminVerificationCasesQuerySchema.safeParse({ status: 'archived' }).success).toBe(false);
   });
 });

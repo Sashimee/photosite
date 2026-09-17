@@ -1,4 +1,4 @@
-import { decryptAesGcm, encryptAesGcm } from '../../../common/crypto/aes-gcm.js';
+import { decryptAesGcm, encryptAesGcm } from '@photoo/shared/crypto';
 
 export interface BackupCodesCipher {
   encrypt: (token: string) => Promise<string>;
