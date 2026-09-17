@@ -35,7 +35,7 @@ describe('processImage', () => {
     });
 
     expect(result.exif.camera).toEqual({ make: 'TestCam', model: 'X100' });
-    expect(result.exif.capturedAt).toBe('2026-01-01T11:00:00.000Z');
+    expect(result.exif.capturedAt).toBe('2026-01-01T12:00:00');
     expect(result.exif.gps?.latitude).toBeCloseTo(49.611_666_67, 5);
     expect(result.exif.gps?.longitude).toBeCloseTo(6.131_944_44, 5);
 

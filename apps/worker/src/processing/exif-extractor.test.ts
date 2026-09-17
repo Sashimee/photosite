@@ -47,4 +47,31 @@ describe('extractExif', () => {
     vi.doUnmock('exifr');
     vi.resetModules();
   });
+  it('keeps the capture time as camera wall-clock time and appends the EXIF offset when present', async () => {
+    const buffer = await sharp({ create: { width: 5, height: 5, channels: 3, background: 'red' } })
+      .withExif({
+        IFD2: { DateTimeOriginal: '2026:07:14 09:30:05', OffsetTimeOriginal: '+02:00' },
+      })
+      .jpeg()
+      .toBuffer();
+
+    expect((await extractExif(buffer)).capturedAt).toBe('2026-07-14T09:30:05+02:00');
+  });
+
+  it('drops a malformed capture time instead of guessing', async () => {
+    vi.doMock('exifr', () => ({
+      default: {
+        parse: vi
+          .fn()
+          .mockResolvedValue({ DateTimeOriginal: '0000:00:00', OffsetTimeOriginal: 'x' }),
+      },
+    }));
+    vi.resetModules();
+    const { extractExif: mockedExtractExif } = await import('./exif-extractor.js');
+
+    expect((await mockedExtractExif(Buffer.from('irrelevant'))).capturedAt).toBeNull();
+
+    vi.doUnmock('exifr');
+    vi.resetModules();
+  });
 });
