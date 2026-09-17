@@ -1,0 +1,365 @@
+# Preview environment for footoo.bas.lu, deployed by Dokploy on dok.seil.pro
+# from `main` (docs/steps/0.5-preview-deploy.md). One host, path routing:
+# Traefik sends /v1/* to `api`, /photoo-public/* to `minio`, everything else
+# to `web`. Only `web`, `api` and `minio` join `dokploy-network` (shared with
+# every other app on the host); everything else is `internal`-only.
+#
+# Copy .env.example to .env in the Dokploy project (or paste its variables
+# into Dokploy's environment editor) before the first deploy - see
+# infra/dokploy/preview/README.md.
+
+services:
+  web:
+    image: ghcr.io/sashimee/photosite-web:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # Must match the image's build args (deploy-preview.yml): read again
+      # at request time by apps/web's middleware, not just inlined at build.
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?copy infra/dokploy/preview/.env.example to .env}
+      NEXT_PUBLIC_ALLOW_INDEXING: ${NEXT_PUBLIC_ALLOW_INDEXING:-false}
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+      SENTRY_REQUIRED: ${SENTRY_REQUIRED:-false}
+    networks:
+      - dokploy-network
+    labels:
+      traefik.enable: 'true'
+      traefik.docker.network: dokploy-network
+      traefik.http.routers.photoo-preview-web.rule: Host(`${PREVIEW_HOST:-footoo.bas.lu}`)
+      traefik.http.routers.photoo-preview-web.entrypoints: websecure
+      traefik.http.routers.photoo-preview-web.tls.certresolver: letsencrypt
+      traefik.http.routers.photoo-preview-web.priority: '1'
+      traefik.http.routers.photoo-preview-web.middlewares: photoo-preview-web-noindex
+      traefik.http.services.photoo-preview-web.loadbalancer.server.port: '3000'
+      traefik.http.middlewares.photoo-preview-web-noindex.headers.customresponseheaders.X-Robots-Tag: noindex, nofollow
+      # Plain-HTTP catch-all for the host, redirected before it reaches any
+      # backend. Confirm Dokploy's Traefik actually names its entrypoints
+      # `web`/`websecure` (README.md "Traefik entrypoints") before relying
+      # on this.
+      traefik.http.routers.photoo-preview-web-insecure.rule: Host(`${PREVIEW_HOST:-footoo.bas.lu}`)
+      traefik.http.routers.photoo-preview-web-insecure.entrypoints: web
+      traefik.http.routers.photoo-preview-web-insecure.middlewares: photoo-preview-https-redirect
+      traefik.http.middlewares.photoo-preview-https-redirect.redirectscheme.scheme: https
+      traefik.http.middlewares.photoo-preview-https-redirect.redirectscheme.permanent: 'true'
+
+  api:
+    image: ghcr.io/sashimee/photosite-api:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: '4000'
+      DATABASE_URL: postgresql://${POSTGRES_USER:?set in .env}:${POSTGRES_PASSWORD:?set in .env}@postgres:5432/${POSTGRES_DB:?set in .env}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set in .env}@redis:6379
+      PUBLIC_API_URL: https://${PREVIEW_HOST:-footoo.bas.lu}
+      WEB_ORIGINS: https://${PREVIEW_HOST:-footoo.bas.lu}
+      WEB_APP_URL: https://${PREVIEW_HOST:-footoo.bas.lu}
+      # api only reaches the rest of the stack via `internal`, but any other
+      # container on shared `dokploy-network` could still spoof
+      # X-Forwarded-For, so this trusts the private range rather than "any
+      # IP" - see README.md "Rate limiting" for narrowing it further.
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+      AUTH_SECRET: ${AUTH_SECRET:?generate with `openssl rand -base64 48`}
+      AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:?generate with `openssl rand -base64 32`}
+      # See README.md "Email": not delivered yet regardless of this flag.
+      DEV_MAIL_WORKER: 'true'
+      SMTP_HOST: mailpit
+      SMTP_PORT: '1025'
+      SMTP_FROM: preview@footoo.bas.lu
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: eu-west-1
+      # Scoped MinIO user (photoo-private only), created by `minio-init`;
+      # see README.md "Object storage users" for the policy.
+      S3_ACCESS_KEY_ID: ${MINIO_API_ACCESS_KEY:?set in .env}
+      S3_SECRET_ACCESS_KEY: ${MINIO_API_SECRET_KEY:?set in .env}
+      S3_FORCE_PATH_STYLE: 'true'
+      S3_PRIVATE_BUCKET: photoo-private
+      S3_PUBLIC_BUCKET: photoo-public
+      # Routed through Traefik to minio below so public images are
+      # browser-reachable; see README.md "Public images" for what this
+      # doesn't cover (presigned PUT still targets internal minio:9000).
+      S3_PUBLIC_BASE_URL: https://${PREVIEW_HOST:-footoo.bas.lu}/photoo-public
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      APPLE_CLIENT_SECRET: ${APPLE_CLIENT_SECRET:-}
+      FACEBOOK_CLIENT_ID: ${FACEBOOK_CLIENT_ID:-}
+      FACEBOOK_CLIENT_SECRET: ${FACEBOOK_CLIENT_SECRET:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+    networks:
+      - dokploy-network
+      - internal
+    labels:
+      traefik.enable: 'true'
+      traefik.docker.network: dokploy-network
+      traefik.http.routers.photoo-preview-api.rule: Host(`${PREVIEW_HOST:-footoo.bas.lu}`) && PathPrefix(`/v1`)
+      traefik.http.routers.photoo-preview-api.entrypoints: websecure
+      traefik.http.routers.photoo-preview-api.tls.certresolver: letsencrypt
+      traefik.http.routers.photoo-preview-api.priority: '10'
+      traefik.http.routers.photoo-preview-api.middlewares: photoo-preview-api-noindex
+      traefik.http.services.photoo-preview-api.loadbalancer.server.port: '4000'
+      traefik.http.middlewares.photoo-preview-api-noindex.headers.customresponseheaders.X-Robots-Tag: noindex, nofollow
+
+  worker:
+    image: ghcr.io/sashimee/photosite-worker:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      HEALTH_PORT: '4100'
+      DATABASE_URL: postgresql://${POSTGRES_USER:?set in .env}:${POSTGRES_PASSWORD:?set in .env}@postgres:5432/${POSTGRES_DB:?set in .env}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set in .env}@redis:6379
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: eu-west-1
+      # Scoped MinIO user (read+delete photoo-private, write photoo-public),
+      # created by `minio-init`; see README.md "Object storage users".
+      S3_ACCESS_KEY_ID: ${MINIO_WORKER_ACCESS_KEY:?set in .env}
+      S3_SECRET_ACCESS_KEY: ${MINIO_WORKER_SECRET_KEY:?set in .env}
+      S3_FORCE_PATH_STYLE: 'true'
+      S3_PRIVATE_BUCKET: photoo-private
+      S3_PUBLIC_BUCKET: photoo-public
+      SMTP_HOST: mailpit
+      SMTP_PORT: '1025'
+      SMTP_FROM: preview@footoo.bas.lu
+      # See README.md "ClamAV": only reachable with that profile enabled.
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: '3310'
+    networks:
+      - internal
+
+  # One-shot: applies pending Prisma migrations, then exits; api/worker wait
+  # on it. See README.md "Rollback" for the -migrate tag.
+  migrate:
+    image: ghcr.io/sashimee/photosite-api:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}-migrate
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?set in .env}:${POSTGRES_PASSWORD:?set in .env}@postgres:5432/${POSTGRES_DB:?set in .env}
+      # Required to load prisma.config.ts at all; `migrate deploy` (unlike
+      # `migrate dev`) never actually connects to it.
+      SHADOW_DATABASE_URL: postgresql://${POSTGRES_USER:?set in .env}:${POSTGRES_PASSWORD:?set in .env}@postgres:5432/${POSTGRES_DB:?set in .env}_shadow
+    networks:
+      - internal
+
+  # Not part of the deploy graph; run manually via `--profile seed run --rm
+  # seed` (README.md "Seed"). NODE_ENV=development: packages/db/src/seed.ts's
+  # production guard has no override flag yet (README.md "Seed").
+  seed:
+    image: ghcr.io/sashimee/photosite-api:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}-migrate
+    restart: 'no'
+    profiles: [seed]
+    working_dir: /app/packages/db
+    entrypoint: ['pnpm', 'run', 'seed']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:?set in .env}:${POSTGRES_PASSWORD:?set in .env}@postgres:5432/${POSTGRES_DB:?set in .env}
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:?generate with `openssl rand -base64 24`}
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: eu-west-1
+      # The seed only ever writes placeholder images to photoo-public, so it
+      # reuses the worker user rather than root.
+      S3_ACCESS_KEY_ID: ${MINIO_WORKER_ACCESS_KEY:?set in .env}
+      S3_SECRET_ACCESS_KEY: ${MINIO_WORKER_SECRET_KEY:?set in .env}
+      S3_FORCE_PATH_STYLE: 'true'
+      S3_PRIVATE_BUCKET: photoo-private
+      S3_PUBLIC_BUCKET: photoo-public
+    networks:
+      - internal
+
+  postgres:
+    image: postgis/postgis:16-3.5@sha256:94146ac37bc61e2322f88016056c5920729cb8c64c8542ed590af8fc2abdac07
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+    restart: unless-stopped
+    command:
+      ['redis-server', '--appendonly', 'yes', '--requirepass', '${REDIS_PASSWORD:?set in .env}']
+    volumes:
+      - redis-data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a ${REDIS_PASSWORD:?set in .env} ping | grep -q PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env}
+    volumes:
+      - minio-data:/data
+    networks:
+      - dokploy-network
+      - internal
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    labels:
+      traefik.enable: 'true'
+      traefik.docker.network: dokploy-network
+      # path-style GET, so the prefix maps 1:1 onto the photoo-public bucket;
+      # see README.md "Public images" for what this doesn't cover.
+      traefik.http.routers.photoo-preview-public.rule: Host(`${PREVIEW_HOST:-footoo.bas.lu}`) && PathPrefix(`/photoo-public/`) && Method(`GET`, `HEAD`)
+      traefik.http.routers.photoo-preview-public.entrypoints: websecure
+      traefik.http.routers.photoo-preview-public.tls.certresolver: letsencrypt
+      traefik.http.routers.photoo-preview-public.priority: '20'
+      traefik.http.routers.photoo-preview-public.middlewares: photoo-preview-public-noindex,photoo-preview-public-hsts
+      traefik.http.services.photoo-preview-public.loadbalancer.server.port: '9000'
+      traefik.http.middlewares.photoo-preview-public-noindex.headers.customresponseheaders.X-Robots-Tag: noindex, nofollow
+      traefik.http.middlewares.photoo-preview-public-hsts.headers.stsSeconds: '63072000'
+      traefik.http.middlewares.photoo-preview-public-hsts.headers.stsIncludeSubdomains: 'true'
+      traefik.http.middlewares.photoo-preview-public-hsts.headers.stsPreload: 'true'
+
+  # Same bucket setup as infra/docker/compose.dev.yml, plus two
+  # least-privilege users so api/worker never hold the MinIO root
+  # credentials - see README.md "Object storage users".
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    restart: 'no'
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env}
+      MINIO_API_ACCESS_KEY: ${MINIO_API_ACCESS_KEY:?set in .env}
+      MINIO_API_SECRET_KEY: ${MINIO_API_SECRET_KEY:?set in .env}
+      MINIO_WORKER_ACCESS_KEY: ${MINIO_WORKER_ACCESS_KEY:?set in .env}
+      MINIO_WORKER_SECRET_KEY: ${MINIO_WORKER_SECRET_KEY:?set in .env}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing local/photoo-private
+        mc mb --ignore-existing local/photoo-public
+        mc anonymous set none local/photoo-private
+        cat > /tmp/photoo-public-anonymous-policy.json <<'EOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"AWS": ["*"]},
+              "Action": ["s3:GetObject"],
+              "Resource": ["arn:aws:s3:::photoo-public/*"]
+            }
+          ]
+        }
+        EOF
+        mc anonymous set-json /tmp/photoo-public-anonymous-policy.json local/photoo-public
+
+        cat > /tmp/photoo-api-policy.json <<'EOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+              "Resource": ["arn:aws:s3:::photoo-private/*"]
+            }
+          ]
+        }
+        EOF
+        mc admin user add local "$$MINIO_API_ACCESS_KEY" "$$MINIO_API_SECRET_KEY"
+        mc admin policy create local photoo-api /tmp/photoo-api-policy.json
+        mc admin policy attach local photoo-api --user "$$MINIO_API_ACCESS_KEY"
+
+        cat > /tmp/photoo-worker-policy.json <<'EOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetObject", "s3:DeleteObject"],
+              "Resource": ["arn:aws:s3:::photoo-private/*"]
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:PutObject"],
+              "Resource": ["arn:aws:s3:::photoo-public/*"]
+            }
+          ]
+        }
+        EOF
+        mc admin user add local "$$MINIO_WORKER_ACCESS_KEY" "$$MINIO_WORKER_SECRET_KEY"
+        mc admin policy create local photoo-worker /tmp/photoo-worker-policy.json
+        mc admin policy attach local photoo-worker --user "$$MINIO_WORKER_ACCESS_KEY"
+    networks:
+      - internal
+
+  # Off by default (README.md "ClamAV"): `--profile clamav up -d`.
+  clamav:
+    image: clamav/clamav:1.5.4-debian13-slim@sha256:cc16781fe005e49de6a8fc1231b63b265f74b18fc2a6347c670c35716914c3b6
+    restart: unless-stopped
+    profiles: [clamav]
+    volumes:
+      - clamav-data:/var/lib/clamav
+    networks:
+      - internal
+    healthcheck:
+      test: ['CMD', 'clamdcheck.sh']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10m
+
+  mailpit:
+    image: axllent/mailpit:v1.31.1@sha256:98b916bd3c8d61f7633a52d3ea2f58d00620cb01ca57ab59edde68c347a95365
+    restart: unless-stopped
+    networks:
+      - internal
+
+networks:
+  dokploy-network:
+    external: true
+  internal:
+    internal: true
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  clamav-data:

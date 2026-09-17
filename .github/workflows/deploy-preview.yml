@@ -1,0 +1,128 @@
+name: Deploy preview
+
+# Runs after CI has gone green on `main`, not on every push to `main`
+# directly - a red CI run must never reach footoo.bas.lu.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-preview
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    # workflow_run also fires for pull_request-triggered CI runs (including
+    # from forks), so conclusion alone isn't enough: require a push-
+    # triggered run, on this repo, on `main`.
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - id: sha
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: echo "short=sha-$(git rev-parse --short "$HEAD_SHA")" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push api (runtime)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/api.Dockerfile
+          target: runtime
+          push: true
+          tags: |
+            ghcr.io/sashimee/photosite-api:main
+            ghcr.io/sashimee/photosite-api:${{ steps.sha.outputs.short }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      # -migrate keeps devDependencies (the `prisma` CLI) the runtime target
+      # strips; see infra/docker/api.Dockerfile.
+      - name: Build and push api (migrate)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/api.Dockerfile
+          target: migrate
+          push: true
+          tags: |
+            ghcr.io/sashimee/photosite-api:main-migrate
+            ghcr.io/sashimee/photosite-api:${{ steps.sha.outputs.short }}-migrate
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build and push worker
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/worker.Dockerfile
+          target: runtime
+          push: true
+          tags: |
+            ghcr.io/sashimee/photosite-worker:main
+            ghcr.io/sashimee/photosite-worker:${{ steps.sha.outputs.short }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,mode=max,scope=worker
+
+      # Repository variables, not secrets: NEXT_PUBLIC_* is inlined into the
+      # client bundle either way. Defaulted so the build never hard-fails on
+      # missing repo config; compose.yml's `web` service must be given the
+      # same values at runtime.
+      - name: Build and push web
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/web.Dockerfile
+          target: runtime
+          push: true
+          tags: |
+            ghcr.io/sashimee/photosite-web:main
+            ghcr.io/sashimee/photosite-web:${{ steps.sha.outputs.short }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://footoo.bas.lu' }}
+            NEXT_PUBLIC_ALLOW_INDEXING=${{ vars.NEXT_PUBLIC_ALLOW_INDEXING || 'false' }}
+            NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+            SENTRY_REQUIRED=${{ vars.SENTRY_REQUIRED }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      # Only step that requires the webhook secret, so a missing one still
+      # lets the images build and push above.
+      - name: Trigger Dokploy deploy webhook
+        env:
+          WEBHOOK_URL: ${{ secrets.DOKPLOY_PREVIEW_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "::error::DOKPLOY_PREVIEW_WEBHOOK_URL repository secret is not set (docs/steps/human-followups.md)" >&2
+            exit 1
+          fi
+          status=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$WEBHOOK_URL")
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "::error::Dokploy deploy webhook returned HTTP $status" >&2
+            exit 1
+          fi
