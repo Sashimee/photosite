@@ -260,7 +260,12 @@ services:
       traefik.docker.network: dokploy-network
       # path-style GET, so the prefix maps 1:1 onto the photoo-public bucket;
       # see README.md "Public images" for what this doesn't cover.
-      traefik.http.routers.photoo-preview-public.rule: Host(`${PREVIEW_HOST:-footoo.bas.lu}`) && PathPrefix(`/photoo-public/`) && Method(`GET`, `HEAD`)
+      # Traefik v3's Method matcher takes exactly one verb, so the two are
+      # ORed rather than passed as a list: a rule that fails to parse leaves
+      # the router disabled and every request falls through to the catch-all
+      # web router, which is how this bucket spent a day being served by
+      # Next.js 404s instead of MinIO.
+      traefik.http.routers.photoo-preview-public.rule: Host(`${PREVIEW_HOST:-footoo.bas.lu}`) && PathPrefix(`/photoo-public/`) && (Method(`GET`) || Method(`HEAD`))
       traefik.http.routers.photoo-preview-public.entrypoints: websecure
       traefik.http.routers.photoo-preview-public.tls.certresolver: letsencrypt
       traefik.http.routers.photoo-preview-public.priority: '20'

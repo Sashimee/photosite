@@ -252,6 +252,21 @@ instance could spoof it. Two follow-ups, both from setup step 5:
 maps onto the bucket 1:1). This makes seeded/uploaded public image variants
 browser-reachable.
 
+**If images 404 with a Next.js page instead of MinIO's XML**, the router
+is disabled, not missing. Traefik drops a router whose rule fails to
+parse and the request falls through to the catch-all web router, which
+answers with its own 404 - so the symptom looks like a missing object.
+Check the rule, not the bucket:
+
+```bash
+sudo docker exec dokploy-traefik wget -qO- \
+  http://localhost:8080/api/http/routers/photoo-preview-public@docker
+```
+
+`status` must be `enabled`; an `error` field holds the parse failure.
+Traefik v3 matchers take exactly one parameter each, so `Method` needs
+`(Method(`GET`) || Method(`HEAD`))` rather than a two-verb list.
+
 **Browser uploads still don't work.** Presigned PUT URLs are signed against
 `S3_ENDPOINT=http://minio:9000` (the internal address, used for both
 buckets), which a browser can't resolve. Fixing this needs MinIO to be
