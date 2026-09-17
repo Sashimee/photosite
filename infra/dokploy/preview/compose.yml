@@ -159,12 +159,18 @@ services:
   # Not part of the deploy graph; run manually via `--profile seed run --rm
   # seed` (README.md "Seed"). NODE_ENV=development: packages/db/src/seed.ts's
   # production guard has no override flag yet (README.md "Seed").
+  #
+  # `dist/seed.js` is already built (the `-migrate` image is `build`'s
+  # output, and `turbo run build --filter=@photoo/api...` builds
+  # `@photoo/db` as a dependency), so this runs it directly with `node`
+  # instead of `pnpm run seed` (which would re-run `prisma generate` and
+  # `tsc` through corepack on this internal-only, no-internet network).
   seed:
     image: ghcr.io/sashimee/photosite-api:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}-migrate
     restart: 'no'
     profiles: [seed]
     working_dir: /app/packages/db
-    entrypoint: ['pnpm', 'run', 'seed']
+    entrypoint: ['node', 'dist/seed.js']
     depends_on:
       migrate:
         condition: service_completed_successfully
