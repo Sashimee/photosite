@@ -90,6 +90,8 @@ export {
   PortfolioImageCleanupJobSchema,
   QUEUE_JOB_SCHEMAS,
   QUEUE_NAMES,
+  QUOTE_EXPIRY_QUEUE_NAME,
+  QuoteExpiryJobSchema,
   UPLOADS_CLEANUP_QUEUE_NAME,
   UploadsCleanupJobSchema,
   type EmailJob,
@@ -98,6 +100,7 @@ export {
   type PortfolioImageCleanupJob,
   type QueueJobPayload,
   type QueueName,
+  type QuoteExpiryJob,
   type UploadsCleanupJob,
 } from './queues.js';
 

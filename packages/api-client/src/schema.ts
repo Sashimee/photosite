@@ -2549,8 +2549,8 @@ export interface paths {
                         dateFlexible: boolean;
                         location: components["schemas"]["LatLng"];
                         address: components["schemas"]["Address"];
-                        budgetMin: components["schemas"]["Money"];
-                        budgetMax: components["schemas"]["Money"];
+                        budgetMin: components["schemas"]["RequestBudgetMoney"];
+                        budgetMax: components["schemas"]["RequestBudgetMoney"];
                         /**
                          * @example personal
                          * @enum {string}
@@ -3194,15 +3194,6 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -7385,8 +7376,8 @@ export interface components {
             dateFlexible: boolean;
             location: components["schemas"]["LatLng"];
             address: components["schemas"]["Address"];
-            budgetMin: components["schemas"]["Money"];
-            budgetMax: components["schemas"]["Money"];
+            budgetMin: components["schemas"]["RequestBudgetMoney"];
+            budgetMax: components["schemas"]["RequestBudgetMoney"];
             /**
              * @example personal
              * @enum {string}
@@ -7411,6 +7402,14 @@ export interface components {
              * @example LU
              */
             countryCode: string;
+        };
+        RequestBudgetMoney: {
+            amountCents: number;
+            /**
+             * @description ISO 4217 currency code
+             * @example EUR
+             */
+            currency: string;
         };
         RequestSummary: {
             /**
@@ -7440,8 +7439,8 @@ export interface components {
              */
             countryCode: string;
             location: components["schemas"]["LatLng"];
-            budgetMin: components["schemas"]["Money"];
-            budgetMax: components["schemas"]["Money"];
+            budgetMin: components["schemas"]["RequestBudgetMoney"];
+            budgetMax: components["schemas"]["RequestBudgetMoney"];
             /**
              * @example personal
              * @enum {string}

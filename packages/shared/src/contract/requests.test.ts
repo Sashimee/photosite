@@ -78,6 +78,16 @@ describe('CreateRequestRequestSchema', () => {
     ).toBe(true);
   });
 
+  it('rejects a budget above the 99,999,999 cent cap', () => {
+    expect(
+      CreateRequestRequestSchema.safeParse({
+        ...validCreateRequest,
+        budgetMin: { amountCents: 100_000_000, currency: 'EUR' },
+        budgetMax: { amountCents: 100_000_000, currency: 'EUR' },
+      }).success,
+    ).toBe(false);
+  });
+
   it('rejects a request carrying a status field', () => {
     expect(
       CreateRequestRequestSchema.safeParse({ ...validCreateRequest, status: 'open' }).success,

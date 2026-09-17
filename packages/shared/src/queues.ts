@@ -7,6 +7,7 @@ export const QUEUE_NAMES = [
   'image-process',
   'uploads-cleanup',
   'portfolio-image-cleanup',
+  'quote-expiry',
 ] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];
@@ -17,6 +18,7 @@ export const IMAGE_PROCESS_QUEUE_NAME = 'image-process' as const satisfies Queue
 export const UPLOADS_CLEANUP_QUEUE_NAME = 'uploads-cleanup' as const satisfies QueueName;
 export const PORTFOLIO_IMAGE_CLEANUP_QUEUE_NAME =
   'portfolio-image-cleanup' as const satisfies QueueName;
+export const QUOTE_EXPIRY_QUEUE_NAME = 'quote-expiry' as const satisfies QueueName;
 
 export const EmailJobSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('verify-email'), to: z.email(), url: z.url() }).strict(),
@@ -49,12 +51,17 @@ export const PortfolioImageCleanupJobSchema = z
 
 export type PortfolioImageCleanupJob = z.infer<typeof PortfolioImageCleanupJobSchema>;
 
+export const QuoteExpiryJobSchema = z.object({}).strict();
+
+export type QuoteExpiryJob = z.infer<typeof QuoteExpiryJobSchema>;
+
 export const QUEUE_JOB_SCHEMAS = {
   [EMAIL_QUEUE_NAME]: EmailJobSchema,
   [FILE_SCAN_QUEUE_NAME]: FileScanJobSchema,
   [IMAGE_PROCESS_QUEUE_NAME]: ImageProcessJobSchema,
   [UPLOADS_CLEANUP_QUEUE_NAME]: UploadsCleanupJobSchema,
   [PORTFOLIO_IMAGE_CLEANUP_QUEUE_NAME]: PortfolioImageCleanupJobSchema,
+  [QUOTE_EXPIRY_QUEUE_NAME]: QuoteExpiryJobSchema,
 } as const satisfies Record<QueueName, z.ZodType>;
 
 export type QueueJobPayload<Name extends QueueName> = z.infer<(typeof QUEUE_JOB_SCHEMAS)[Name]>;

@@ -18,6 +18,14 @@ export const RequestCategorySchema = z
 
 export const RequestUsageSchema = z.enum(LICENCE_USAGES).openapi({ example: 'personal' });
 
+const MAX_BUDGET_CENTS = 99_999_999;
+
+export const RequestBudgetMoneySchema = MoneySchema.extend({
+  amountCents: z.int().nonnegative().max(MAX_BUDGET_CENTS),
+})
+  .strict()
+  .openapi('RequestBudgetMoney');
+
 export const AddressSchema = z
   .object({
     line1: z.string().min(1).max(200),
@@ -55,8 +63,8 @@ export const RequestSchema = z
     dateFlexible: z.boolean(),
     location: LatLngSchema,
     address: AddressSchema,
-    budgetMin: MoneySchema,
-    budgetMax: MoneySchema,
+    budgetMin: RequestBudgetMoneySchema,
+    budgetMax: RequestBudgetMoneySchema,
     usage: RequestUsageSchema,
     status: z.enum(REQUEST_STATUSES),
     expiresAt: IsoDateTimeSchema.nullable(),
@@ -75,8 +83,8 @@ export const RequestSummarySchema = z
     city: z.string().min(1).max(120),
     countryCode: CountryCodeSchema,
     location: LatLngSchema,
-    budgetMin: MoneySchema,
-    budgetMax: MoneySchema,
+    budgetMin: RequestBudgetMoneySchema,
+    budgetMax: RequestBudgetMoneySchema,
     usage: RequestUsageSchema,
     status: z.enum(REQUEST_STATUSES),
     expiresAt: IsoDateTimeSchema.nullable(),
@@ -98,8 +106,8 @@ export const CreateRequestRequestSchema = z
     dateFlexible: z.boolean(),
     location: LatLngSchema,
     address: AddressSchema,
-    budgetMin: MoneySchema,
-    budgetMax: MoneySchema,
+    budgetMin: RequestBudgetMoneySchema,
+    budgetMax: RequestBudgetMoneySchema,
     usage: RequestUsageSchema,
   })
   .strict()

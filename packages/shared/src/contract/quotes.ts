@@ -156,7 +156,7 @@ registry.registerPath({
       description: 'A page of quotes for the request',
       content: { 'application/json': { schema: paginatedResponseSchema(QuoteSchema) } },
     },
-    ...errorResponses([401, 403, 404]),
+    ...errorResponses([401, 404]),
   },
 });
 
