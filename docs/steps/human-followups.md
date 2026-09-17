@@ -11,7 +11,7 @@ Last updated: 2026-09-17.
 | O1 | List which external accounts already exist | 0.6, 1E.1, 2.4 | Code uses env vars with local fakes (MinIO, Mailpit, Stripe test mode once keys exist) |
 | O2 | Legal entity operating photoo.lu | 0.6 Stripe platform, store accounts, 0.7, DAC7 | None needed before Phase 1 payments |
 | O3 | Confirm auto-release delay | 1A.8 | Seeded as `autoReleaseDays = 7` in `PlatformSetting`, editable later |
-| O4 | AI detection and reverse-search vendors | 1A.10 | Vendor adapters behind an interface with a fake adapter in tests |
+| O4 | AI detection vendor (Hive vs Sightengine) and reverse-search vendor (TinEye vs Google Vision Web Detection): pick one of each, create the accounts, provide the API keys | 1A.10 real checks (the pipeline itself is not blocked) | `docs/steps/1A.10-provenance.md`: both vendors sit behind an interface whose null implementation is selected when the key is absent. The pipeline, scoring, admin queue and status effects all work without a vendor — every image simply lands in the admin queue as `review` instead of being auto-approved |
 | O5 | Brand kit | 1B.1 design tokens, 1C.9 store assets | Neutral tokens in `apps/web/src/styles/tokens.css` and a text wordmark; swap that one file when 0.8 lands. `apps/mobile/tailwind.config.js` mirrors the same neutral scale as sRGB hex (NativeWind cannot resolve `oklch()`); update it alongside. `apps/mobile/assets/icon.png` and `splash.png` are plain solid-colour placeholders generated locally; replace with real app icon/splash art in 1C.9 |
 
 ## Human-only plan steps
@@ -33,6 +33,13 @@ Last updated: 2026-09-17.
 | The preview database is empty (`GET /v1/photographers` returns no items), so profile, search and request pages have nothing to show | Run the seed once from the Dokploy terminal or a host shell: `docker compose -p compose-index-back-end-application-k6x26o -f infra/dokploy/preview/compose.yml --profile seed run --rm seed` (runbook: `infra/dokploy/preview/README.md` "Seed"; needs `SEED_USER_PASSWORD` in the Dokploy env). The Dokploy API has no run-one-off-container call and SSH to the host times out | Demo content on footoo.bas.lu | Local stack has seed data |
 | The Dokploy API token was printed once in a tool output | Rotate it in Dokploy and replace `~/.config/dokploy/seil.token` | – | – |
 | `~/.config/ghcr/read.token` is root-owned and world-readable (644), and belongs to the personal account | `chmod 600` plus chown to your user; ideally replace it with a read:packages token from a machine user and update the `ghcr-sashimee-read` registry in Dokploy | – | Works as is |
+
+## Provenance vendors (1A.10)
+
+| Issue | Needed from Alex | Blocks | Workaround meanwhile |
+|-------|------------------|--------|----------------------|
+| Turning `PROVENANCE_ENABLED=true` sends a public portfolio image to a third-party vendor, which makes that vendor a sub-processor | A signed DPA per vendor, the vendor named in the privacy policy and in `docs/COMPLIANCE.md` sub-processors, and an EU or adequacy-decision transfer basis | Automatic AI-detection and reverse-search verdicts in any real environment | The flag stays off; only EXIF and (optionally) C2PA signals are used, and nothing leaves the worker |
+| Each uploaded portfolio image costs one vendor call | Confirm the per-image price and set a monthly cap with the vendor | – | Queue concurrency is 2 and a checked image is never re-checked without an explicit admin re-check |
 
 ## Local environment
 
