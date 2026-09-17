@@ -5,8 +5,9 @@ export default [
   {
     languageOptions: {
       parserOptions: {
-        // Every other *.config.{js,ts} file is already covered by tsconfig.json.
-        projectService: { allowDefaultProject: ['eslint.config.mjs'] },
+        // *.config.ts is covered by tsconfig.json; JS config files use the default
+        // project, matching the other workspaces so a multi-package eslint run agrees.
+        projectService: { allowDefaultProject: ['*.js', '*.mjs'] },
         tsconfigRootDir: import.meta.dirname,
       },
     },
