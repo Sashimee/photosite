@@ -22,6 +22,7 @@ jobs:
     timeout-minutes: 20
     env:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:4010
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
       # Dev-only values matching infra/docker/.env.example and
       # packages/db/.env.example; never real secrets.
       DATABASE_URL: postgresql://photoo:photoo_dev_password@127.0.0.1:5432/photoo_test

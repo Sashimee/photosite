@@ -8,7 +8,21 @@
     "error": "An error occurred",
     "loading": "Loading...",
     "retry": "Retry",
-    "save": "Save"
+    "save": "Save",
+    "categories": {
+      "wedding": "Wedding",
+      "portrait": "Portrait",
+      "event": "Event",
+      "product": "Product",
+      "real-estate": "Real estate",
+      "corporate": "Corporate"
+    },
+    "licenceUsages": {
+      "personal": "Personal use",
+      "commercial": "Commercial use",
+      "editorial": "Editorial use",
+      "extended": "Extended use"
+    }
   },
   "email": {
     "verifyEmail": {
@@ -281,6 +295,32 @@
         "exportComingSoon": "Data export is coming soon.",
         "deleteAccount": "Delete account",
         "deleteComingSoon": "Account deletion is coming soon."
+      }
+    },
+    "profile": {
+      "metaTitle": "{displayName} – {city}",
+      "categoriesHeading": "Categories",
+      "portfolioHeading": "Portfolio",
+      "portfolioImageAlt": "Photo {index} by {displayName}",
+      "productsHeading": "Packages",
+      "noProducts": "No packages yet.",
+      "fromPrice": "From {price}",
+      "linksHeading": "Links",
+      "languages": "Speaks: {languages}",
+      "rating": "{ratingAvg, number, ::.0} ({ratingCount, plural, one {# review} other {# reviews}})",
+      "requestQuoteCta": "Request a quote",
+      "durationMinutes": "{minutes} min",
+      "notFound": {
+        "title": "Photographer not found",
+        "description": "This photographer profile doesn't exist, or isn't published yet.",
+        "backHome": "Back to home"
+      }
+    },
+    "requests": {
+      "placeholder": {
+        "title": "Requests are coming soon",
+        "description": "Sending booking requests isn't available yet. Check back soon.",
+        "backCta": "Go back"
       }
     }
   }
