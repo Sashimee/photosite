@@ -4,6 +4,7 @@ import { translate } from '@/testing/mock-translations';
 
 const apiGetMock = vi.fn();
 const headersMock = vi.fn();
+const countryLandingMetadataMock = vi.fn();
 
 vi.mock('@/lib/api', () => ({ api: { GET: apiGetMock } }));
 vi.mock('next/headers', () => ({ headers: headersMock }));
@@ -12,6 +13,13 @@ vi.mock('next-intl/server', () => ({
     ({ namespace }: { namespace: string }) =>
     (key: string, values?: Record<string, unknown>) =>
       translate(namespace, key, values),
+}));
+vi.mock('./country-landing', () => ({
+  CountryLandingPage: (props: { locale: string; countryCode: string }) => ({
+    type: 'country-landing-stub',
+    props,
+  }),
+  generateCountryLandingMetadata: countryLandingMetadataMock,
 }));
 
 const PROFILE = {
@@ -228,5 +236,51 @@ describe('generateMetadata', () => {
     });
 
     expect(metadata.description).toBeUndefined();
+  });
+});
+
+describe('country dispatch', () => {
+  afterEach(() => {
+    vi.resetModules();
+    apiGetMock.mockReset();
+    headersMock.mockReset();
+    countryLandingMetadataMock.mockReset();
+  });
+
+  it('renders the country landing for a 2-letter segment instead of looking up a profile', async () => {
+    const PhotographerProfilePage = await loadPage();
+    const { CountryLandingPage } = await import('./country-landing');
+
+    const element = await PhotographerProfilePage({
+      params: Promise.resolve({ locale: 'en', slug: 'lu' }),
+    });
+
+    expect(element.type).toBe(CountryLandingPage);
+    expect(element.props).toEqual({ locale: 'en', countryCode: 'LU' });
+    expect(apiGetMock).not.toHaveBeenCalled();
+  });
+
+  it('still resolves a longer slug as a profile lookup', async () => {
+    mockApi({ profile: { status: 200, data: PROFILE } });
+    mockHeaders();
+    const PhotographerProfilePage = await loadPage();
+
+    const element = await PhotographerProfilePage({
+      params: Promise.resolve({ locale: 'en', slug: 'sofia-martins' }),
+    });
+
+    expect(element.type).toBe('article');
+  });
+
+  it('delegates metadata generation for a 2-letter segment to the country landing', async () => {
+    countryLandingMetadataMock.mockResolvedValue({ title: 'Photographers in Luxembourg' });
+    const { generateMetadata } = await import('./page');
+
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ locale: 'en', slug: 'lu' }),
+    });
+
+    expect(countryLandingMetadataMock).toHaveBeenCalledWith({ locale: 'en', countryCode: 'LU' });
+    expect(metadata).toEqual({ title: 'Photographers in Luxembourg' });
   });
 });
