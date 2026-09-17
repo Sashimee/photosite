@@ -1,6 +1,7 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp } from '../testing/create-test-app.js';
+import { requireIntegrationEnv } from '../testing/require-integration-env.js';
 import { TEST_ENV, UNREACHABLE_TEST_ENV } from '../testing/test-env.js';
 
 describe('GET /health', () => {
@@ -49,11 +50,10 @@ describe('GET /ready without a reachable database or Redis', () => {
   });
 });
 
-const testDatabaseUrl = process.env.TEST_DATABASE_URL;
-const redisUrl = process.env.REDIS_URL;
+const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL', 'REDIS_URL']);
 
 describe('GET /ready with the local dev stack', () => {
-  if (!testDatabaseUrl || !redisUrl) {
+  if (!testEnv) {
     it.skip('reports ok for both checks (skipped: TEST_DATABASE_URL or REDIS_URL is not set)', () =>
       undefined);
     return;
@@ -62,7 +62,11 @@ describe('GET /ready with the local dev stack', () => {
   let app: NestFastifyApplication;
 
   beforeAll(async () => {
-    app = await createTestApp({ ...TEST_ENV, DATABASE_URL: testDatabaseUrl, REDIS_URL: redisUrl });
+    app = await createTestApp({
+      ...TEST_ENV,
+      DATABASE_URL: testEnv.TEST_DATABASE_URL,
+      REDIS_URL: testEnv.REDIS_URL,
+    });
   });
 
   afterAll(() => app.close());

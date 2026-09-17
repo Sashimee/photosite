@@ -8,18 +8,19 @@ import {
   getSeedUserPassword,
   seedDatabase,
 } from './seed.js';
+import { requireIntegrationEnv } from './testing/require-integration-env.js';
 
-const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL']);
 
 describe('seedDatabase', () => {
-  if (!testDatabaseUrl) {
+  if (!testEnv) {
     it.skip(
       'seeds Luxembourg and platform settings idempotently (skipped: TEST_DATABASE_URL is not set)',
     );
     return;
   }
 
-  const prisma = createPrismaClient(testDatabaseUrl);
+  const prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
 
   afterAll(async () => {
     await prisma.$disconnect();

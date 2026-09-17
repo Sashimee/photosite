@@ -5,6 +5,7 @@ import { Redis } from 'ioredis';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp } from '../../testing/create-test-app.js';
 import { waitForLinkInEmail } from '../../testing/mailpit.js';
+import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
 import { TEST_ENV } from '../../testing/test-env.js';
 import { generateTotpCode } from '../../testing/totp.js';
 
@@ -25,8 +26,7 @@ async function clearRateLimitKeys(redis: Redis): Promise<void> {
   }
 }
 
-const testDatabaseUrl = process.env.TEST_DATABASE_URL;
-const redisUrl = process.env.REDIS_URL;
+const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL', 'REDIS_URL']);
 
 const SEED_USER_PASSWORD = process.env.SEED_USER_PASSWORD ?? 'correct-horse-battery-staple';
 // Not "correct horse battery staple": that XKCD phrase is itself in the HIBP
@@ -45,7 +45,7 @@ interface ApiErrorBody {
 }
 
 describe('auth integration', () => {
-  if (!testDatabaseUrl || !redisUrl) {
+  if (!testEnv) {
     it.skip('skipped: TEST_DATABASE_URL or REDIS_URL is not set', () => undefined);
     return;
   }
@@ -56,9 +56,13 @@ describe('auth integration', () => {
   const createdEmails: string[] = [];
 
   beforeAll(async () => {
-    app = await createTestApp({ ...TEST_ENV, DATABASE_URL: testDatabaseUrl, REDIS_URL: redisUrl });
-    prisma = createPrismaClient(testDatabaseUrl);
-    redis = new Redis(redisUrl);
+    app = await createTestApp({
+      ...TEST_ENV,
+      DATABASE_URL: testEnv.TEST_DATABASE_URL,
+      REDIS_URL: testEnv.REDIS_URL,
+    });
+    prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
+    redis = new Redis(testEnv.REDIS_URL);
     await clearRateLimitKeys(redis);
   });
 
