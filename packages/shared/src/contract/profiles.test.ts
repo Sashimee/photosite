@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AttachPortfolioImageRequestSchema,
+  CreatePhotographerProfileRequestSchema,
   OwnPhotographerProfileSchema,
   PhotographerSearchQuerySchema,
   PhotographerSummarySchema,
@@ -183,6 +185,102 @@ describe('UpdatePhotographerProfileRequestSchema', () => {
   it('rejects unknown keys', () => {
     expect(
       UpdatePhotographerProfileRequestSchema.safeParse({ stripeAccountId: 'acct_123' }).success,
+    ).toBe(false);
+  });
+
+  it('accepts a null avatarUploadId and coverUploadId', () => {
+    expect(
+      UpdatePhotographerProfileRequestSchema.safeParse({
+        avatarUploadId: null,
+        coverUploadId: null,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts an avatarUploadId set to an upload id', () => {
+    expect(
+      UpdatePhotographerProfileRequestSchema.safeParse({
+        avatarUploadId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects an avatarUploadId that is not a uuid', () => {
+    expect(
+      UpdatePhotographerProfileRequestSchema.safeParse({ avatarUploadId: 'not-a-uuid' }).success,
+    ).toBe(false);
+  });
+});
+
+describe('CreatePhotographerProfileRequestSchema', () => {
+  const validCreate = {
+    displayName: 'Jane Doe Photography',
+    categories: ['wedding', 'portrait'],
+    languages: ['en', 'fr'],
+    location: { lat: 49.6116, lng: 6.1319 },
+    city: 'Luxembourg',
+    countryCode: 'LU',
+  };
+
+  it('accepts the required fields only', () => {
+    expect(CreatePhotographerProfileRequestSchema.safeParse(validCreate).success).toBe(true);
+  });
+
+  it('accepts optional fields alongside the required ones', () => {
+    expect(
+      CreatePhotographerProfileRequestSchema.safeParse({
+        ...validCreate,
+        headline: 'Weddings and portraits in Luxembourg',
+        bio: { en: 'Wedding and portrait photographer' },
+        links: { other: [] },
+        serviceRadiusKm: 50,
+      }).success,
+    ).toBe(true);
+  });
+
+  it.each(['displayName', 'categories', 'languages', 'location', 'city', 'countryCode'])(
+    'rejects a missing %s',
+    (field) => {
+      const rest = Object.fromEntries(Object.entries(validCreate).filter(([key]) => key !== field));
+      expect(CreatePhotographerProfileRequestSchema.safeParse(rest).success).toBe(false);
+    },
+  );
+
+  it('rejects an avatarUploadId field', () => {
+    expect(
+      CreatePhotographerProfileRequestSchema.safeParse({
+        ...validCreate,
+        avatarUploadId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an empty categories array', () => {
+    expect(
+      CreatePhotographerProfileRequestSchema.safeParse({ ...validCreate, categories: [] }).success,
+    ).toBe(false);
+  });
+});
+
+describe('AttachPortfolioImageRequestSchema', () => {
+  it('accepts a valid uploadId', () => {
+    expect(
+      AttachPortfolioImageRequestSchema.safeParse({
+        uploadId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a missing uploadId', () => {
+    expect(AttachPortfolioImageRequestSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects unknown keys', () => {
+    expect(
+      AttachPortfolioImageRequestSchema.safeParse({
+        uploadId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+        order: 0,
+      }).success,
     ).toBe(false);
   });
 });

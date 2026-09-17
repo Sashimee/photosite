@@ -120,6 +120,21 @@ export const OwnPhotographerProfileSchema = PhotographerProfileBaseSchema.extend
   .strict()
   .openapi('OwnPhotographerProfile');
 
+export const CreatePhotographerProfileRequestSchema = z
+  .object({
+    displayName: z.string().min(1).max(120),
+    categories: z.array(PhotographerCategorySchema).min(1),
+    languages: z.array(LanguageCodeSchema).min(1),
+    location: LatLngSchema,
+    city: z.string().min(1).max(120),
+    countryCode: CountryCodeSchema,
+    headline: z.string().min(1).max(200).nullable().optional(),
+    bio: LocalizedTextSchema.optional(),
+    links: ProfileLinksSchema.optional(),
+    serviceRadiusKm: z.number().positive().nullable().optional(),
+  })
+  .strict();
+
 export const UpdatePhotographerProfileRequestSchema = z
   .object({
     displayName: z.string().min(1).max(120),
@@ -132,9 +147,17 @@ export const UpdatePhotographerProfileRequestSchema = z
     serviceRadiusKm: z.number().positive().nullable(),
     city: z.string().min(1).max(120),
     countryCode: CountryCodeSchema,
+    avatarUploadId: IdSchema.nullable(),
+    coverUploadId: IdSchema.nullable(),
   })
   .strict()
   .partial();
+
+export const AttachPortfolioImageRequestSchema = z
+  .object({
+    uploadId: IdSchema,
+  })
+  .strict();
 
 export const PhotographerSearchQuerySchema = z
   .object({
@@ -223,6 +246,24 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'post',
+  path: apiPath('/me/photographer-profile'),
+  summary: 'Create the photographer profile for the current user',
+  tags: ['profiles'],
+  security: AUTH_SECURITY,
+  request: {
+    body: { content: { 'application/json': { schema: CreatePhotographerProfileRequestSchema } } },
+  },
+  responses: {
+    '201': {
+      description: 'Photographer profile created',
+      content: { 'application/json': { schema: OwnPhotographerProfileSchema } },
+    },
+    ...errorResponses([400, 401, 403, 409, 422]),
+  },
+});
+
+registry.registerPath({
   method: 'patch',
   path: apiPath('/me/photographer-profile'),
   summary: "Update the current user's photographer profile",
@@ -257,6 +298,24 @@ registry.registerPath({
       },
     },
     ...errorResponses([401, 404]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/me/photographer-profile/portfolio'),
+  summary: "Attach an uploaded image to the current user's portfolio",
+  tags: ['profiles'],
+  security: AUTH_SECURITY,
+  request: {
+    body: { content: { 'application/json': { schema: AttachPortfolioImageRequestSchema } } },
+  },
+  responses: {
+    '201': {
+      description: 'Portfolio image attached',
+      content: { 'application/json': { schema: PortfolioImageSchema } },
+    },
+    ...errorResponses([401, 403, 404, 409, 422]),
   },
 });
 
