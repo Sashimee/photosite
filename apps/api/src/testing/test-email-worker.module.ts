@@ -26,6 +26,7 @@ class TestEmailWorkerService implements OnApplicationShutdown {
       retryStrategy: () => null,
     });
     const mailTransport = createMailTransport({
+      NODE_ENV: 'test',
       SMTP_HOST: MAILPIT_SMTP_HOST,
       SMTP_PORT: MAILPIT_SMTP_PORT,
       SMTP_SECURE: false,

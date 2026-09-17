@@ -3,6 +3,7 @@ import { Prisma } from '@photoo/db';
 import {
   NOTIFICATION_CHANNELS,
   NOTIFICATION_TYPES,
+  NotificationPayloadSchema,
   resolveNotificationChannels,
   type DeviceSchema,
   type NotificationChannel,
@@ -15,6 +16,7 @@ import {
   type UnreadCountResponseSchema,
   type UpdateNotificationPreferencesRequestSchema,
 } from '@photoo/shared';
+import { Logger } from 'nestjs-pino';
 import type { z } from 'zod';
 import {
   decodeCreatedAtCursor,
@@ -23,6 +25,8 @@ import {
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { mapDevice, mapNotification } from './notification-mapper.js';
 import { NotifyQueueService } from './notify-queue.service.js';
+
+const MAX_DEVICES_PER_USER = 10;
 
 interface SessionUser {
   id: string;
@@ -45,26 +49,39 @@ export class NotificationsService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(NotifyQueueService) private readonly notifyQueue: NotifyQueueService,
+    @Inject(Logger) private readonly logger: Logger,
   ) {}
 
   // Inserts the Notification row, then enqueues with jobId = notificationId
   // (docs/steps/1A.7-notifications.md "Creation and idempotency"). Called by
-  // every producer (quote-events, and later chat/booking/verification).
+  // every producer (quote-events, and later chat/booking/verification). An
+  // enqueue failure is logged and swallowed, not surfaced to the caller:
+  // notify-sweep re-enqueues rows still pending after a few minutes, so a
+  // Redis blip here must not fail the business mutation that triggered it.
+  // A row-insert failure still throws.
   async notify(
     userId: string,
     type: NotificationType,
     payload: NotificationPayload,
   ): Promise<void> {
+    const validated = NotificationPayloadSchema.parse(payload);
     const preferences = await this.prisma.client.notificationPreference.findMany({
       where: { userId, type },
     });
     const channels = resolveNotificationChannels(type, preferences);
 
     const notification = await this.prisma.client.notification.create({
-      data: { userId, type, payload, channels },
+      data: { userId, type, payload: validated, channels },
     });
 
-    await this.notifyQueue.enqueue(notification.id);
+    try {
+      await this.notifyQueue.enqueue(notification.id);
+    } catch (error) {
+      this.logger.error(
+        { err: error, notificationId: notification.id },
+        'notifications: failed to enqueue the notify job, relying on notify-sweep',
+      );
+    }
   }
 
   async list(
@@ -153,6 +170,16 @@ export class NotificationsService {
 
   async registerDevice(user: SessionUser, input: RegisterDeviceInput): Promise<DeviceDto> {
     const now = new Date();
+    const existing = await this.prisma.client.device.findUnique({
+      where: { expoPushToken: input.expoPushToken },
+    });
+    if (existing && existing.userId !== user.id) {
+      this.logger.warn(
+        { deviceId: existing.id, fromUserId: existing.userId, toUserId: user.id },
+        'notifications: push device token changed owner',
+      );
+    }
+
     const device = await this.prisma.client.device.upsert({
       where: { expoPushToken: input.expoPushToken },
       create: {
@@ -163,7 +190,23 @@ export class NotificationsService {
       },
       update: { userId: user.id, platform: input.platform, lastSeenAt: now },
     });
+    await this.enforceDeviceCap(user.id);
     return mapDevice(device);
+  }
+
+  // S3: caps a user at MAX_DEVICES_PER_USER, dropping the least recently
+  // active ones first.
+  private async enforceDeviceCap(userId: string): Promise<void> {
+    const devices = await this.prisma.client.device.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      select: { id: true },
+    });
+    if (devices.length <= MAX_DEVICES_PER_USER) {
+      return;
+    }
+    const toRemove = devices.slice(MAX_DEVICES_PER_USER).map((device) => device.id);
+    await this.prisma.client.device.deleteMany({ where: { id: { in: toRemove } } });
   }
 
   async deleteDevice(user: SessionUser, id: string): Promise<void> {

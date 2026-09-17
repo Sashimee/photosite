@@ -9,13 +9,18 @@ export interface RenderedPush {
   url: string;
 }
 
+const PHOTOGRAPHER_FACING_TYPES: ReadonlySet<NotificationType> = new Set([
+  'quote_accepted',
+  'quote_declined',
+]);
+
 // No amounts or message text, just a localised title/body and a deep link
-// path (docs/steps/1A.7-notifications.md "Push").
+// path, not an absolute URL: the app builds its own base
+// (docs/steps/1A.7-notifications.md "Push").
 export function renderNotifyPush(
   type: NotificationType,
   payload: NotificationPayload,
   locale: string,
-  webAppUrl: string,
 ): RenderedPush {
   if (!payload.quoteId) {
     throw new Error(`renderNotifyPush: "${type}" payload is missing quoteId`);
@@ -31,12 +36,14 @@ export function renderNotifyPush(
     quote_expired: t.quoteExpired,
   };
   const template = templates[type];
-  const counterpartName =
-    payload.counterpartName ?? messages.email.notifications.unknownCounterpart;
+  const fallback = PHOTOGRAPHER_FACING_TYPES.has(type)
+    ? messages.email.notifications.unknownClient
+    : messages.email.notifications.unknownCounterpart;
+  const counterpartName = payload.counterpartName ?? fallback;
 
   return {
     title: template.title,
     body: formatText(template.body, { counterpartName }),
-    url: `${webAppUrl}${buildNotificationPath(locale, payload.quoteId)}`,
+    url: buildNotificationPath(locale, payload.quoteId),
   };
 }

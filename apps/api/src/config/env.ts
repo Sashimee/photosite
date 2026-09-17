@@ -122,6 +122,13 @@ const EnvSchema = z
         message: 'refusing the .env.example placeholder value in production',
       });
     }
+    if (!value.WEB_APP_URL.startsWith('https://')) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['WEB_APP_URL'],
+        message: 'must be an https:// URL in production',
+      });
+    }
   });
 
 export type Env = z.infer<typeof EnvSchema>;

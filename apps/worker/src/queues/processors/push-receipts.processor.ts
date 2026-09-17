@@ -1,11 +1,14 @@
-import { Prisma } from '@photoo/db';
 import type { Processor } from 'bullmq';
 import type { Logger } from 'nestjs-pino';
+import {
+  deleteDeviceIfPresent,
+  type DeviceDeleteClient,
+} from '../../push/delete-device-if-present.js';
 import type { PushSender } from '../../push/push-sender.js';
 import type { PushTicketStore } from '../../push/push-ticket-store.js';
 
 export interface PushReceiptsDeps {
-  prisma: { client: { device: { delete(args: { where: { id: string } }): Promise<unknown> } } };
+  prisma: { client: { device: DeviceDeleteClient } };
   pushSender: PushSender;
   pushTicketStore: PushTicketStore;
   logger: Logger;
@@ -15,20 +18,6 @@ export interface PushReceiptsDeps {
 // available "approximately a day" but are usually ready well before that
 // (docs/steps/1A.7-notifications.md "Push").
 const RECEIPT_DELAY_MS = 15 * 60 * 1000;
-
-async function deleteDeviceIfPresent(
-  device: PushReceiptsDeps['prisma']['client']['device'],
-  deviceId: string,
-): Promise<void> {
-  try {
-    await device.delete({ where: { id: deviceId } });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-      return;
-    }
-    throw error;
-  }
-}
 
 export function createPushReceiptsProcessor(deps: PushReceiptsDeps): Processor {
   return async () => {
@@ -40,15 +29,32 @@ export function createPushReceiptsProcessor(deps: PushReceiptsDeps): Processor {
 
     const receipts = await deps.pushSender.getReceipts(due.map((ticket) => ticket.ticketId));
     let removedDevices = 0;
+    // Only tickets with a resolved receipt are cleared here; an
+    // unresolved one is left in the store (takeDue only re-surfaces it
+    // once it is due again) until its hash key expires (~24h), at which
+    // point takeDue treats it as orphaned and drops it.
+    const resolvedTicketIds: string[] = [];
     for (const ticket of due) {
       const receipt = receipts[ticket.ticketId];
-      if (receipt?.deviceNotRegistered) {
+      if (!receipt) {
+        continue;
+      }
+      resolvedTicketIds.push(ticket.ticketId);
+      if (receipt.deviceNotRegistered) {
         await deleteDeviceIfPresent(deps.prisma.client.device, ticket.deviceId);
         removedDevices += 1;
+      } else if (!receipt.ok) {
+        deps.logger.warn(
+          { ticketId: ticket.ticketId, error: receipt.error },
+          'push-receipts: delivery failed',
+        );
       }
     }
-    await deps.pushTicketStore.clear(due.map((ticket) => ticket.ticketId));
+    await deps.pushTicketStore.clear(resolvedTicketIds);
 
-    deps.logger.log({ count: due.length, removedDevices }, 'push-receipts: processed due tickets');
+    deps.logger.log(
+      { count: due.length, resolved: resolvedTicketIds.length, removedDevices },
+      'push-receipts: processed due tickets',
+    );
   };
 }

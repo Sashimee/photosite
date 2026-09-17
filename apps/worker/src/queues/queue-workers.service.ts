@@ -62,6 +62,19 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
     return connection;
   }
 
+  // notifyQueue's producer connection must reconnect after a Redis blip
+  // instead of giving up permanently, or enqueues silently stop working
+  // until the process restarts. Other queues share the give-up-once
+  // strategy, a known wider issue tracked separately.
+  private newRecoveringConnection(): Redis {
+    const connection = new Redis(this.config.REDIS_URL, {
+      maxRetriesPerRequest: null,
+      retryStrategy: (times) => Math.min(times * 200, 5000),
+    });
+    this.connections.push(connection);
+    return connection;
+  }
+
   async onApplicationBootstrap(): Promise<void> {
     const imageProcessQueue = new Queue(IMAGE_PROCESS_QUEUE_NAME, {
       connection: this.newConnection(),
@@ -72,7 +85,9 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
     const quoteExpiryQueue = new Queue(QUOTE_EXPIRY_QUEUE_NAME, {
       connection: this.newConnection(),
     });
-    const notifyQueue = new Queue(NOTIFY_QUEUE_NAME, { connection: this.newConnection() });
+    const notifyQueue = new Queue(NOTIFY_QUEUE_NAME, {
+      connection: this.newRecoveringConnection(),
+    });
     const notifySweepQueue = new Queue(NOTIFY_SWEEP_QUEUE_NAME, {
       connection: this.newConnection(),
     });
@@ -145,10 +160,20 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       this.logger.warn({ err: error }, 'queue-workers: failed to schedule notifications-cleanup');
     }
 
+    if (this.config.NODE_ENV === 'production' && !this.config.EXPO_ACCESS_TOKEN) {
+      this.logger.warn(
+        'queue-workers: EXPO_ACCESS_TOKEN is not set in production; push notifications will use the unauthenticated Expo rate limit',
+      );
+    }
+    if (this.config.SMTP_INSECURE_INTERNAL_RELAY) {
+      this.logger.warn(
+        'queue-workers: SMTP_INSECURE_INTERNAL_RELAY is set; TLS enforcement for the SMTP relay is disabled',
+      );
+    }
+
     const mailTransport = createMailTransport(this.config);
     const pushSender = createExpoPushSender(this.config.EXPO_ACCESS_TOKEN);
     const pushTicketStore = createRedisPushTicketStore(this.newConnection());
-    const notify = { prisma: this.prisma, notifyQueue };
 
     const fileScanWorker = new Worker(
       FILE_SCAN_QUEUE_NAME,
@@ -199,7 +224,7 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       QUOTE_EXPIRY_QUEUE_NAME,
       createQuoteExpiryProcessor({
         prisma: this.prisma,
-        notify,
+        notifyQueue,
         logger: this.logger,
       }),
       {

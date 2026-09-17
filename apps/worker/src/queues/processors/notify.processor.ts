@@ -9,6 +9,10 @@ import type { Logger } from 'nestjs-pino';
 import type { MailTransport } from '../../email/mail-transport.js';
 import { renderNotifyEmail } from '../../email/templates/notify-email.js';
 import { renderNotifyPush } from '../../email/templates/notify-push.js';
+import {
+  deleteDeviceIfPresent,
+  type DeviceDeleteClient,
+} from '../../push/delete-device-if-present.js';
 import type { PushSender } from '../../push/push-sender.js';
 import type { PushTicketStore } from '../../push/push-ticket-store.js';
 
@@ -42,8 +46,7 @@ export interface NotifyRepository {
   user: { findUnique(args: { where: { id: string } }): Promise<UserRow | null> };
   device: {
     findMany(args: { where: { userId: string } }): Promise<DeviceRow[]>;
-    delete(args: { where: { id: string } }): Promise<unknown>;
-  };
+  } & DeviceDeleteClient;
 }
 
 export interface NotifyProcessorDeps {
@@ -93,7 +96,7 @@ export function createNotifyProcessor(deps: NotifyProcessorDeps): Processor<Noti
     if (notification.channels.includes('push') && !notification.pushSentAt) {
       const devices = await deps.prisma.client.device.findMany({ where: { userId: user.id } });
       if (devices.length > 0) {
-        const rendered = renderNotifyPush(type, payload, user.locale, deps.webAppUrl);
+        const rendered = renderNotifyPush(type, payload, user.locale);
         const results = await deps.pushSender.send(
           devices.map((device) => ({
             to: device.expoPushToken,
@@ -108,9 +111,14 @@ export function createNotifyProcessor(deps: NotifyProcessorDeps): Processor<Noti
             continue;
           }
           if (result.deviceNotRegistered) {
-            await deps.prisma.client.device.delete({ where: { id: device.id } });
+            await deleteDeviceIfPresent(deps.prisma.client.device, device.id);
           } else if (result.ticketId) {
             await deps.pushTicketStore.store(result.ticketId, device.id);
+          } else if (result.error) {
+            deps.logger.warn(
+              { deviceId: device.id, error: result.error },
+              'notify: push send failed',
+            );
           }
         }
       }

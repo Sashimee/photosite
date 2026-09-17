@@ -79,6 +79,29 @@ describe('loadEnv', () => {
     expect(env.AUTH_SECRET).toBe('dev-only-auth-secret-change-me-please-32-chars-min');
   });
 
+  it('rejects a non-https WEB_APP_URL in production (S2)', () => {
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: 'production',
+        AUTH_SECRET: 'b'.repeat(32),
+        AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+        WEB_APP_URL: 'http://photoo.lu',
+      }),
+    ).toThrow(/WEB_APP_URL/);
+  });
+
+  it('accepts an https WEB_APP_URL in production', () => {
+    const env = loadEnv({
+      ...validEnv,
+      NODE_ENV: 'production',
+      AUTH_SECRET: 'b'.repeat(32),
+      AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+      WEB_APP_URL: 'https://photoo.lu',
+    });
+    expect(env.WEB_APP_URL).toBe('https://photoo.lu');
+  });
+
   it('splits and trims a comma-separated WEB_ORIGINS', () => {
     const env = loadEnv({
       ...validEnv,

@@ -20,7 +20,7 @@ describe('createNotification', () => {
       },
       'user-1',
       'quote_expired',
-      { quoteId: 'quote-1' },
+      { quoteId: '018f2e1a-0000-7000-8000-000000000001' },
     );
 
     expect(findMany).toHaveBeenCalledWith({ where: { userId: 'user-1', type: 'quote_expired' } });
@@ -28,7 +28,7 @@ describe('createNotification', () => {
       data: {
         userId: 'user-1',
         type: 'quote_expired',
-        payload: { quoteId: 'quote-1' },
+        payload: { quoteId: '018f2e1a-0000-7000-8000-000000000001' },
         channels: ['push', 'in_app'],
       },
     });
@@ -60,7 +60,7 @@ describe('createNotification', () => {
       },
       'user-1',
       'quote_received',
-      { quoteId: 'quote-1' },
+      { quoteId: '018f2e1a-0000-7000-8000-000000000001' },
     );
 
     expect(create).toHaveBeenCalledWith(

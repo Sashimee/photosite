@@ -9,9 +9,7 @@ export interface DueTicket {
   deviceId: string;
 }
 
-// Tickets are stored briefly in Redis so the push-receipts sweep can check
-// them ~15 minutes later without holding notify.processor open
-// (docs/steps/1A.7-notifications.md "Push").
+// Backs the push-receipts sweep (checks each ticket ~15 minutes later).
 export interface PushTicketStore {
   store(ticketId: string, deviceId: string): Promise<void>;
   takeDue(olderThanMs: number, now?: number): Promise<DueTicket[]>;
@@ -31,11 +29,17 @@ export function createRedisPushTicketStore(redis: Redis): PushTicketStore {
     async takeDue(olderThanMs, now = Date.now()) {
       const ticketIds = await redis.zrangebyscore(PENDING_TICKETS_KEY, 0, now - olderThanMs);
       const due: DueTicket[] = [];
+      const orphaned: string[] = [];
       for (const ticketId of ticketIds) {
         const deviceId = await redis.get(`${TICKET_KEY_PREFIX}${ticketId}`);
         if (deviceId) {
           due.push({ ticketId, deviceId });
+        } else {
+          orphaned.push(ticketId);
         }
+      }
+      if (orphaned.length > 0) {
+        await redis.zrem(PENDING_TICKETS_KEY, ...orphaned);
       }
       return due;
     },

@@ -30,6 +30,7 @@ export const TEST_ENV: Env = {
   SMTP_USER: undefined,
   SMTP_PASSWORD: undefined,
   SMTP_FROM: 'dev@photoo.test',
+  SMTP_INSECURE_INTERNAL_RELAY: false,
   EXPO_ACCESS_TOKEN: undefined,
   WORKER_CONCURRENCY_EMAIL: 3,
   WORKER_CONCURRENCY_NOTIFY: 3,

@@ -90,8 +90,12 @@ export {
   ImageProcessJobSchema,
   NOTIFICATIONS_CLEANUP_QUEUE_NAME,
   NotificationsCleanupJobSchema,
+  NOTIFY_JOB_ATTEMPTS,
+  NOTIFY_JOB_BACKOFF_DELAY_MS,
+  NOTIFY_JOB_FAILED_RETENTION_SECONDS,
   NOTIFY_QUEUE_NAME,
   NOTIFY_SWEEP_QUEUE_NAME,
+  notifyJobOptions,
   NotifyJobSchema,
   NotifySweepJobSchema,
   PORTFOLIO_IMAGE_CLEANUP_QUEUE_NAME,
@@ -109,6 +113,7 @@ export {
   type ImageProcessJob,
   type NotificationsCleanupJob,
   type NotifyJob,
+  type NotifyJobOptions,
   type NotifySweepJob,
   type PortfolioImageCleanupJob,
   type PushReceiptsJob,
@@ -274,6 +279,7 @@ export {
   DeviceSchema,
   ExpoPushTokenSchema,
   MarkAllNotificationsReadResponseSchema,
+  NOTIFICATION_TEXT_MAX_LENGTH,
   NotificationChannelSchema,
   type NotificationPayload,
   NotificationPayloadSchema,
@@ -291,3 +297,5 @@ export {
   resolveNotificationChannels,
   type NotificationPreferenceOverride,
 } from './notification-channels.js';
+
+export { truncateNotificationText } from './notification-text.js';

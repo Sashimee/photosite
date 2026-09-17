@@ -55,11 +55,16 @@ describe('createExpoPushSender', () => {
     ]);
 
     expect(results).toEqual([
-      { to: 'ExponentPushToken[abc]', ticketId: null, deviceNotRegistered: true },
+      {
+        to: 'ExponentPushToken[abc]',
+        ticketId: null,
+        deviceNotRegistered: true,
+        error: 'DeviceNotRegistered',
+      },
     ]);
   });
 
-  it('does not flag a non-DeviceNotRegistered error ticket', async () => {
+  it('does not flag a non-DeviceNotRegistered error ticket, but surfaces the error code', async () => {
     sendPushNotificationsAsync.mockResolvedValueOnce([
       { status: 'error', message: 'oops', details: { error: 'MessageRateExceeded' } },
     ]);
@@ -71,6 +76,7 @@ describe('createExpoPushSender', () => {
     ]);
 
     expect(results[0]?.deviceNotRegistered).toBe(false);
+    expect(results[0]?.error).toBe('MessageRateExceeded');
   });
 
   it('maps receipts to ok/deviceNotRegistered flags', async () => {
@@ -84,8 +90,8 @@ describe('createExpoPushSender', () => {
     const receipts = await sender.getReceipts(['ticket-1', 'ticket-2']);
 
     expect(receipts).toEqual({
-      'ticket-1': { ok: true, deviceNotRegistered: false },
-      'ticket-2': { ok: false, deviceNotRegistered: true },
+      'ticket-1': { ok: true, deviceNotRegistered: false, error: undefined },
+      'ticket-2': { ok: false, deviceNotRegistered: true, error: 'DeviceNotRegistered' },
     });
   });
 });

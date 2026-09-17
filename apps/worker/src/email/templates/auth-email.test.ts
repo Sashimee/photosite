@@ -14,7 +14,9 @@ describe('renderAuthEmail', () => {
     expect(message.to).toBe('jane@example.com');
     expect(message.subject).toMatch(/Verify your/);
     expect(message.text).toContain('https://photoo.lu/en/verify-email#token=abc');
-    expect(message.html).toContain('https://photoo.lu/en/verify-email#token=abc');
+    expect(message.html).toContain(
+      '<a href="https://photoo.lu/en/verify-email#token=abc">https://photoo.lu/en/verify-email#token=abc</a>',
+    );
   });
 
   it('renders a reset-password job', () => {

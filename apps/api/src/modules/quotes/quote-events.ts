@@ -1,5 +1,6 @@
 import { Inject, Injectable, type Provider } from '@nestjs/common';
 import type { Quote } from '@photoo/db';
+import { truncateNotificationText } from '@photoo/shared';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 
@@ -29,7 +30,7 @@ export class NotificationQuoteEvents implements QuoteEvents {
       requestId: quote.requestId ?? undefined,
       requestTitle,
       total: { amountCents: quote.totalCents, currency: quote.currency },
-      counterpartName: profile?.displayName,
+      counterpartName: profile ? truncateNotificationText(profile.displayName) : undefined,
     });
   }
 
@@ -51,20 +52,20 @@ export class NotificationQuoteEvents implements QuoteEvents {
       requestId: quote.requestId ?? undefined,
       requestTitle,
       total: { amountCents: quote.totalCents, currency: quote.currency },
-      counterpartName: profile?.displayName,
+      counterpartName: profile ? truncateNotificationText(profile.displayName) : undefined,
     });
   }
 
-  // The photographer is notified on their own account, not their profile,
-  // so the profile lookup only resolves the userId and the display name of
-  // the counterpart shown to them is the client's.
+  // The photographer is notified on their own account, not their profile.
+  // counterpartName is omitted rather than set from the client's User.name
+  // (S6/compliance): that field defaults to the client's email local part
+  // and is never shown to another party.
   private async notifyPhotographer(
     quote: Quote,
     type: 'quote_accepted' | 'quote_declined',
   ): Promise<void> {
-    const [profile, client, requestTitle] = await Promise.all([
+    const [profile, requestTitle] = await Promise.all([
       this.loadProfile(quote.photographerId),
-      this.prisma.client.user.findUnique({ where: { id: quote.clientId } }),
       this.loadRequestTitle(quote.requestId),
     ]);
     if (!profile) {
@@ -75,7 +76,6 @@ export class NotificationQuoteEvents implements QuoteEvents {
       requestId: quote.requestId ?? undefined,
       requestTitle,
       total: { amountCents: quote.totalCents, currency: quote.currency },
-      counterpartName: client?.name ?? undefined,
     });
   }
 
@@ -88,7 +88,7 @@ export class NotificationQuoteEvents implements QuoteEvents {
       return undefined;
     }
     const request = await this.prisma.client.request.findUnique({ where: { id: requestId } });
-    return request?.title;
+    return request ? truncateNotificationText(request.title) : undefined;
   }
 }
 

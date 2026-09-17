@@ -117,6 +117,7 @@ describe('loadEnv', () => {
     const env = loadEnv({
       ...validEnv,
       NODE_ENV: 'production',
+      WEB_APP_URL: 'https://photoo.lu',
       SMTP_HOST: 'smtp-relay.brevo.com',
       SMTP_PORT: '587',
       SMTP_SECURE: 'false',
@@ -126,5 +127,62 @@ describe('loadEnv', () => {
     });
     expect(env.SMTP_HOST).toBe('smtp-relay.brevo.com');
     expect(env.SMTP_SECURE).toBe(false);
+  });
+
+  it('rejects a non-strict SMTP_SECURE value', () => {
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: 'production',
+        WEB_APP_URL: 'https://photoo.lu',
+        SMTP_HOST: 'smtp-relay.brevo.com',
+        SMTP_PORT: '587',
+        SMTP_SECURE: 'yes',
+        SMTP_USER: 'apikey',
+        SMTP_PASSWORD: 'secret',
+        SMTP_FROM: 'no-reply@photoo.lu',
+      }),
+    ).toThrow(/SMTP_SECURE/);
+  });
+
+  it('rejects a non-https WEB_APP_URL in production (S2)', () => {
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: 'production',
+        WEB_APP_URL: 'http://photoo.lu',
+        SMTP_HOST: 'smtp-relay.brevo.com',
+        SMTP_PORT: '587',
+        SMTP_SECURE: 'true',
+        SMTP_USER: 'apikey',
+        SMTP_PASSWORD: 'secret',
+        SMTP_FROM: 'no-reply@photoo.lu',
+      }),
+    ).toThrow(/WEB_APP_URL/);
+  });
+
+  it('accepts an https WEB_APP_URL in production', () => {
+    const env = loadEnv({
+      ...validEnv,
+      NODE_ENV: 'production',
+      WEB_APP_URL: 'https://photoo.lu',
+      SMTP_HOST: 'smtp-relay.brevo.com',
+      SMTP_PORT: '587',
+      SMTP_SECURE: 'true',
+      SMTP_USER: 'apikey',
+      SMTP_PASSWORD: 'secret',
+      SMTP_FROM: 'no-reply@photoo.lu',
+    });
+    expect(env.WEB_APP_URL).toBe('https://photoo.lu');
+  });
+
+  it('defaults SMTP_INSECURE_INTERNAL_RELAY to false', () => {
+    expect(loadEnv(validEnv).SMTP_INSECURE_INTERNAL_RELAY).toBe(false);
+  });
+
+  it('parses SMTP_INSECURE_INTERNAL_RELAY=true', () => {
+    expect(
+      loadEnv({ ...validEnv, SMTP_INSECURE_INTERNAL_RELAY: 'true' }).SMTP_INSECURE_INTERNAL_RELAY,
+    ).toBe(true);
   });
 });

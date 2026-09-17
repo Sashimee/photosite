@@ -10,8 +10,8 @@ function fakeLogger() {
   return { log: () => undefined, warn: () => undefined, error: () => undefined };
 }
 
-function notifyDeps(prisma: PrismaClient) {
-  return { prisma: { client: prisma }, notifyQueue: { add: () => Promise.resolve(undefined) } };
+function fakeNotifyQueue() {
+  return { add: () => Promise.resolve(undefined) };
 }
 
 describe('createQuoteExpiryProcessor against a real database', () => {
@@ -238,7 +238,7 @@ describe('createQuoteExpiryProcessor against a real database', () => {
   it('expires the quote, closes the request, and is idempotent on a second run', async () => {
     const processor = createQuoteExpiryProcessor({
       prisma: { client: prisma },
-      notify: notifyDeps(prisma),
+      notifyQueue: fakeNotifyQueue(),
       logger: fakeLogger() as never,
     });
 
@@ -282,7 +282,7 @@ describe('createQuoteExpiryProcessor against a real database', () => {
   it('expires a sent quote whose request is already cancelled, without touching the request', async () => {
     const processor = createQuoteExpiryProcessor({
       prisma: { client: prisma },
-      notify: notifyDeps(prisma),
+      notifyQueue: fakeNotifyQueue(),
       logger: fakeLogger() as never,
     });
 
@@ -296,10 +296,10 @@ describe('createQuoteExpiryProcessor against a real database', () => {
     expect(request.status).toBe('cancelled');
   });
 
-  it('leaves a booked request and its accepted quote alone', async () => {
+  it('leaves an already-accepted quote alone and creates no notification for it, closing the accept-vs-expiry race', async () => {
     const processor = createQuoteExpiryProcessor({
       prisma: { client: prisma },
-      notify: notifyDeps(prisma),
+      notifyQueue: fakeNotifyQueue(),
       logger: fakeLogger() as never,
     });
 
@@ -309,12 +309,19 @@ describe('createQuoteExpiryProcessor against a real database', () => {
     const request = await prisma.request.findUniqueOrThrow({ where: { id: bookedRequestId } });
     expect(quote.status).toBe('accepted');
     expect(request.status).toBe('booked');
+
+    const notifications = await prisma.notification.findMany({
+      where: { userId: { in: [clientId, photographerUserId] }, type: 'quote_expired' },
+    });
+    expect(
+      notifications.some((n) => (n.payload as { quoteId?: string }).quoteId === bookedQuoteId),
+    ).toBe(false);
   });
 
   it('leaves a soft-deleted, expired request open instead of closing it', async () => {
     const processor = createQuoteExpiryProcessor({
       prisma: { client: prisma },
-      notify: notifyDeps(prisma),
+      notifyQueue: fakeNotifyQueue(),
       logger: fakeLogger() as never,
     });
 

@@ -36,7 +36,7 @@ export class DevicesController {
     @Req() request: FastifyRequest,
   ) {
     const { user } = await requireSession(this.auth, request);
-    await this.rateLimit.enforceRegister(user.id);
+    await this.rateLimit.enforceRegister(request.ip, user.id);
     return this.notifications.registerDevice(user, body);
   }
 

@@ -28,6 +28,7 @@
     },
     "notifications": {
       "unknownCounterpart": "Someone",
+      "unknownClient": "A client",
       "directQuoteLabel": "your booking",
       "quoteReceived": {
         "subject": "New quote from {counterpartName}",

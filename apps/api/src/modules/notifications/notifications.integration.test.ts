@@ -113,10 +113,14 @@ describe('notifications integration', () => {
   }
 
   async function clearRateLimitKeys(): Promise<void> {
-    const exact = createdUserIds.flatMap((id) => [
-      `rate-limit:devices:register:account:${id}`,
-      `lockout:devices:register:account:${id}`,
-    ]);
+    const exact = [
+      ...createdUserIds.flatMap((id) => [
+        `rate-limit:devices:register:account:${id}`,
+        `lockout:devices:register:account:${id}`,
+      ]),
+      `rate-limit:devices:register:ip:${AUTH_FAKE_IP}`,
+      `lockout:devices:register:ip:${AUTH_FAKE_IP}`,
+    ];
     const patterns = [`rate-limit:auth:*:${AUTH_FAKE_IP}`, `lockout:auth:*:${AUTH_FAKE_IP}`];
     const globbed = (await Promise.all(patterns.map((pattern) => redis.keys(pattern)))).flat();
     const all = [...exact, ...globbed];
@@ -351,6 +355,7 @@ describe('notifications integration', () => {
       const response = await fastify().inject({
         method: 'POST',
         url: '/v1/me/devices',
+        remoteAddress: AUTH_FAKE_IP,
         headers: authHeaders(user.token),
         payload: { expoPushToken: `ExponentPushToken[${randomUUID()}]`, platform: 'ios' },
       });
@@ -364,6 +369,7 @@ describe('notifications integration', () => {
       const response = await fastify().inject({
         method: 'POST',
         url: '/v1/me/devices',
+        remoteAddress: AUTH_FAKE_IP,
         headers: authHeaders(user.token),
         payload: { expoPushToken: 'not-a-token', platform: 'ios' },
       });
@@ -378,12 +384,14 @@ describe('notifications integration', () => {
       await fastify().inject({
         method: 'POST',
         url: '/v1/me/devices',
+        remoteAddress: AUTH_FAKE_IP,
         headers: authHeaders(first.token),
         payload: { expoPushToken: token, platform: 'android' },
       });
       const reassign = await fastify().inject({
         method: 'POST',
         url: '/v1/me/devices',
+        remoteAddress: AUTH_FAKE_IP,
         headers: authHeaders(second.token),
         payload: { expoPushToken: token, platform: 'android' },
       });
@@ -400,6 +408,7 @@ describe('notifications integration', () => {
         const response = await fastify().inject({
           method: 'POST',
           url: '/v1/me/devices',
+          remoteAddress: AUTH_FAKE_IP,
           headers: authHeaders(user.token),
           payload: { expoPushToken: `ExponentPushToken[${randomUUID()}]`, platform: 'ios' },
         });
@@ -409,10 +418,39 @@ describe('notifications integration', () => {
       const overflow = await fastify().inject({
         method: 'POST',
         url: '/v1/me/devices',
+        remoteAddress: AUTH_FAKE_IP,
         headers: authHeaders(user.token),
         payload: { expoPushToken: `ExponentPushToken[${randomUUID()}]`, platform: 'ios' },
       });
       expect(overflow.statusCode).toBe(429);
+    });
+
+    it('caps a user at 10 devices, dropping the least recently active one (S3)', async () => {
+      const user = await signUpAndSignIn();
+      const firstToken = `ExponentPushToken[${randomUUID()}]`;
+      const lastToken = `ExponentPushToken[${randomUUID()}]`;
+      const tokens = [
+        firstToken,
+        ...Array.from({ length: 9 }, () => `ExponentPushToken[${randomUUID()}]`),
+        lastToken,
+      ];
+
+      for (const token of tokens) {
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/me/devices',
+          remoteAddress: AUTH_FAKE_IP,
+          headers: authHeaders(user.token),
+          payload: { expoPushToken: token, platform: 'ios' },
+        });
+        expect(response.statusCode).toBe(201);
+      }
+
+      const devices = await prisma.device.findMany({ where: { userId: user.id } });
+      expect(devices).toHaveLength(10);
+      const remainingTokens = new Set(devices.map((device) => device.expoPushToken));
+      expect(remainingTokens.has(firstToken)).toBe(false);
+      expect(remainingTokens.has(lastToken)).toBe(true);
     });
   });
 
@@ -422,6 +460,7 @@ describe('notifications integration', () => {
       const create = await fastify().inject({
         method: 'POST',
         url: '/v1/me/devices',
+        remoteAddress: AUTH_FAKE_IP,
         headers: authHeaders(user.token),
         payload: { expoPushToken: `ExponentPushToken[${randomUUID()}]`, platform: 'web' },
       });
@@ -444,6 +483,7 @@ describe('notifications integration', () => {
       const create = await fastify().inject({
         method: 'POST',
         url: '/v1/me/devices',
+        remoteAddress: AUTH_FAKE_IP,
         headers: authHeaders(owner.token),
         payload: { expoPushToken: `ExponentPushToken[${randomUUID()}]`, platform: 'web' },
       });

@@ -8,9 +8,11 @@ function optionalNonEmpty() {
     .transform((value) => (value && value.length > 0 ? value : undefined));
 }
 
-function optionalBoolean() {
+// Rejects any value other than the literal strings "true"/"false" instead
+// of silently treating garbage as false.
+function optionalStrictBoolean() {
   return z
-    .string()
+    .enum(['true', 'false'])
     .optional()
     .transform((value) => (value === undefined ? undefined : value === 'true'));
 }
@@ -61,10 +63,17 @@ const BaseEnvSchema = z.object({
 
   SMTP_HOST: z.string().min(1).optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),
-  SMTP_SECURE: optionalBoolean(),
+  SMTP_SECURE: optionalStrictBoolean(),
   SMTP_USER: optionalNonEmpty(),
   SMTP_PASSWORD: optionalNonEmpty(),
   SMTP_FROM: z.email().optional(),
+  // Opt-out of production TLS enforcement (S1, issue #68) for a relay that
+  // is only reachable on a private network (e.g. the preview's Mailpit
+  // container). Defaults to false; every boot with it set logs a warning.
+  SMTP_INSECURE_INTERNAL_RELAY: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
 
   EXPO_ACCESS_TOKEN: optionalNonEmpty(),
 
@@ -106,6 +115,13 @@ const EnvSchema = BaseEnvSchema.superRefine((value, ctx) => {
     if (value[key] === undefined) {
       ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required in production` });
     }
+  }
+  if (!value.WEB_APP_URL.startsWith('https://')) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['WEB_APP_URL'],
+      message: 'must be an https:// URL in production',
+    });
   }
 }).transform((value) => ({
   ...value,

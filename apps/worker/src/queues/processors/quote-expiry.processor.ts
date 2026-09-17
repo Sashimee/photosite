@@ -1,10 +1,11 @@
+import { notifyJobOptions, truncateNotificationText } from '@photoo/shared';
 import type { Processor } from 'bullmq';
 import type { Logger } from 'nestjs-pino';
 import {
-  createNotification,
-  type CreateNotificationDeps,
+  insertNotification,
+  type NotifyInsertClient,
 } from '../../notifications/create-notification.js';
-import type { UpdateManyRepository } from './types.js';
+import type { JobQueueLike, UpdateManyRepository } from './types.js';
 
 type RequestLifecycleStatus = 'open' | 'quoted' | 'closed' | 'cancelled';
 
@@ -36,43 +37,42 @@ export interface ExpiredQuoteRow {
   currency: string;
 }
 
-export interface QuoteExpiryTransactionClient {
-  quote: {
-    findMany(args: { where: QuoteExpiryWhere }): Promise<ExpiredQuoteRow[]>;
-    updateMany(args: {
-      where: { id: { in: string[] } };
-      data: QuoteExpiryData;
-    }): Promise<{ count: number }>;
-  };
-  request: UpdateManyRepository<RequestExpiryWhere, RequestExpiryData>;
-  auditLog: { create(args: { data: Record<string, unknown> }): Promise<unknown> };
-}
-
 export interface PhotographerProfileRow {
   userId: string;
   displayName: string;
-}
-
-export interface UserNameRow {
-  name: string | null;
 }
 
 export interface RequestTitleRow {
   title: string;
 }
 
+// Everything the transaction needs, including notification inserts: a
+// concurrent accept() is closed off by the `status: 'sent'` guard staying
+// in the same atomic `updateManyAndReturn`, and inserting the Notification
+// rows here means they only exist if the expiry itself committed.
+export interface QuoteExpiryTransactionClient extends NotifyInsertClient {
+  quote: {
+    updateManyAndReturn(args: {
+      where: QuoteExpiryWhere;
+      data: QuoteExpiryData;
+    }): Promise<ExpiredQuoteRow[]>;
+  };
+  request: UpdateManyRepository<RequestExpiryWhere, RequestExpiryData> & {
+    findUnique(args: { where: { id: string } }): Promise<RequestTitleRow | null>;
+  };
+  photographerProfile: {
+    findUnique(args: { where: { id: string } }): Promise<PhotographerProfileRow | null>;
+  };
+  auditLog: { create(args: { data: Record<string, unknown> }): Promise<unknown> };
+}
+
 export interface QuoteExpiryDeps {
   prisma: {
     client: {
       $transaction<T>(fn: (tx: QuoteExpiryTransactionClient) => Promise<T>): Promise<T>;
-      photographerProfile: {
-        findUnique(args: { where: { id: string } }): Promise<PhotographerProfileRow | null>;
-      };
-      user: { findUnique(args: { where: { id: string } }): Promise<UserNameRow | null> };
-      request: { findUnique(args: { where: { id: string } }): Promise<RequestTitleRow | null> };
     };
   };
-  notify: CreateNotificationDeps;
+  notifyQueue: JobQueueLike;
   logger: Logger;
 }
 
@@ -83,59 +83,72 @@ function quoteExpiryWhere(now: Date): QuoteExpiryWhere {
   };
 }
 
-async function notifyExpiredQuote(deps: QuoteExpiryDeps, quote: ExpiredQuoteRow): Promise<void> {
-  const [profile, client, request] = await Promise.all([
-    deps.prisma.client.photographerProfile.findUnique({ where: { id: quote.photographerId } }),
-    deps.prisma.client.user.findUnique({ where: { id: quote.clientId } }),
+// Inserts the quote_expired row(s) for one expired quote inside the caller's
+// transaction; returns the ids to enqueue once that transaction commits.
+async function insertExpiredQuoteNotifications(
+  tx: QuoteExpiryTransactionClient,
+  quote: ExpiredQuoteRow,
+): Promise<string[]> {
+  const [profile, request] = await Promise.all([
+    tx.photographerProfile.findUnique({ where: { id: quote.photographerId } }),
     quote.requestId
-      ? deps.prisma.client.request.findUnique({ where: { id: quote.requestId } })
+      ? tx.request.findUnique({ where: { id: quote.requestId } })
       : Promise.resolve(null),
   ]);
 
   const total = { amountCents: quote.totalCents, currency: quote.currency };
-  const requestTitle = request?.title;
+  const requestTitle = request?.title ? truncateNotificationText(request.title) : undefined;
+  const ids: string[] = [];
 
-  await createNotification(deps.notify, quote.clientId, 'quote_expired', {
-    quoteId: quote.id,
-    requestId: quote.requestId ?? undefined,
-    requestTitle,
-    total,
-    counterpartName: profile?.displayName,
-  });
-
-  if (profile) {
-    await createNotification(deps.notify, profile.userId, 'quote_expired', {
+  ids.push(
+    await insertNotification(tx, quote.clientId, 'quote_expired', {
       quoteId: quote.id,
       requestId: quote.requestId ?? undefined,
       requestTitle,
       total,
-      counterpartName: client?.name ?? undefined,
-    });
+      counterpartName: profile ? truncateNotificationText(profile.displayName) : undefined,
+    }),
+  );
+
+  // counterpartName is omitted for the photographer's copy rather than set
+  // from the client's User.name (S6/compliance): that field defaults to the
+  // client's email local part and is never shown to another party.
+  if (profile) {
+    ids.push(
+      await insertNotification(tx, profile.userId, 'quote_expired', {
+        quoteId: quote.id,
+        requestId: quote.requestId ?? undefined,
+        requestTitle,
+        total,
+      }),
+    );
   }
+
+  return ids;
 }
 
 export function createQuoteExpiryProcessor(deps: QuoteExpiryDeps): Processor {
   return async () => {
     const now = new Date();
 
-    const { expiredQuotes, closedRequests, expiring } = await deps.prisma.client.$transaction(
-      async (tx) => {
+    const { expiredQuotes, closedRequests, notificationIds } =
+      await deps.prisma.client.$transaction(async (tx) => {
         const closedRequests = await tx.request.updateMany({
           where: { status: { in: ['open', 'quoted'] }, expiresAt: { lt: now }, deletedAt: null },
           data: { status: 'closed' },
         });
 
-        const expiring = await tx.quote.findMany({ where: quoteExpiryWhere(now) });
+        const expiredQuotes = await tx.quote.updateManyAndReturn({
+          where: quoteExpiryWhere(now),
+          data: { status: 'expired' },
+        });
 
-        let expiredQuotes = { count: 0 };
-        if (expiring.length > 0) {
-          expiredQuotes = await tx.quote.updateMany({
-            where: { id: { in: expiring.map((quote) => quote.id) } },
-            data: { status: 'expired' },
-          });
+        const notificationIds: string[] = [];
+        for (const quote of expiredQuotes) {
+          notificationIds.push(...(await insertExpiredQuoteNotifications(tx, quote)));
         }
 
-        if (expiredQuotes.count > 0 || closedRequests.count > 0) {
+        if (expiredQuotes.length > 0 || closedRequests.count > 0) {
           await tx.auditLog.create({
             data: {
               actorType: 'system',
@@ -143,28 +156,27 @@ export function createQuoteExpiryProcessor(deps: QuoteExpiryDeps): Processor {
               action: 'quote_expiry.swept',
               targetType: 'System',
               targetId: null,
-              after: { expiredQuotes: expiredQuotes.count, closedRequests: closedRequests.count },
+              after: { expiredQuotes: expiredQuotes.length, closedRequests: closedRequests.count },
             },
           });
         }
 
-        return { expiredQuotes, closedRequests, expiring };
-      },
-    );
+        return { expiredQuotes, closedRequests, notificationIds };
+      });
 
-    for (const quote of expiring) {
+    for (const notificationId of notificationIds) {
       try {
-        await notifyExpiredQuote(deps, quote);
+        await deps.notifyQueue.add('notify', { notificationId }, notifyJobOptions(notificationId));
       } catch (error) {
         deps.logger.error(
-          { err: error, quoteId: quote.id },
-          'quote-expiry: failed to create quote_expired notifications',
+          { err: error, notificationId },
+          'quote-expiry: failed to enqueue a quote_expired notification',
         );
       }
     }
 
     deps.logger.log(
-      { expiredQuotes: expiredQuotes.count, closedRequests: closedRequests.count },
+      { expiredQuotes: expiredQuotes.length, closedRequests: closedRequests.count },
       'quote-expiry: swept expired quotes and requests',
     );
   };

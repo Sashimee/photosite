@@ -11,8 +11,8 @@ import {
 const FAKE_JOB = {} as Job;
 
 const FIXTURE_QUOTE: ExpiredQuoteRow = {
-  id: 'quote-1',
-  requestId: 'request-1',
+  id: '018f2e1a-0000-7000-8000-000000000001',
+  requestId: '018f2e1a-0000-7000-8000-000000000002',
   photographerId: 'profile-1',
   clientId: 'client-1',
   totalCents: 50000,
@@ -26,72 +26,63 @@ function fakeLogger(): Logger {
 function deps(overrides: { expiring?: ExpiredQuoteRow[]; requestCount?: number } = {}) {
   const expiring = overrides.expiring ?? [];
   const auditLogCreate = vi.fn(() => Promise.resolve());
-  const quoteFindMany = vi.fn(() => Promise.resolve(expiring));
-  const quoteUpdateMany = vi.fn(() => Promise.resolve({ count: expiring.length }));
+  const quoteUpdateManyAndReturn = vi.fn(() => Promise.resolve(expiring));
   const requestUpdateMany = vi.fn(() => Promise.resolve({ count: overrides.requestCount ?? 0 }));
-  const tx: QuoteExpiryTransactionClient = {
-    quote: { findMany: quoteFindMany, updateMany: quoteUpdateMany },
-    request: { updateMany: requestUpdateMany },
-    auditLog: { create: auditLogCreate },
-  };
-
-  const notificationCreate = vi.fn<
-    (args: { data: Record<string, unknown> }) => Promise<{ id: string }>
-  >(() => Promise.resolve({ id: 'notification-1' }));
-  const notificationPreferenceFindMany = vi.fn(() => Promise.resolve([]));
-  const notifyQueueAdd = vi.fn<
-    (name: string, data: unknown, opts?: Record<string, unknown>) => Promise<void>
-  >(() => Promise.resolve());
-
+  const requestFindUnique = vi.fn(() => Promise.resolve({ title: 'Fixture Request' }));
   const photographerProfileFindUnique = vi.fn(() =>
     Promise.resolve({ userId: 'photographer-user-1', displayName: 'Fixture Photographer' }),
   );
-  const userFindUnique = vi.fn(() => Promise.resolve({ name: 'Fixture Client' }));
-  const requestFindUnique = vi.fn(() => Promise.resolve({ title: 'Fixture Request' }));
+  let notificationCounter = 0;
+  const notificationCreate = vi.fn<
+    (args: { data: Record<string, unknown> }) => Promise<{ id: string }>
+  >(() => {
+    notificationCounter += 1;
+    return Promise.resolve({ id: `notification-${String(notificationCounter)}` });
+  });
+  const notificationPreferenceFindMany = vi.fn(() => Promise.resolve([]));
+
+  const tx: QuoteExpiryTransactionClient = {
+    quote: { updateManyAndReturn: quoteUpdateManyAndReturn },
+    request: { updateMany: requestUpdateMany, findUnique: requestFindUnique },
+    photographerProfile: { findUnique: photographerProfileFindUnique },
+    auditLog: { create: auditLogCreate },
+    notification: { create: notificationCreate },
+    notificationPreference: { findMany: notificationPreferenceFindMany },
+  };
+
+  const notifyQueueAdd = vi.fn<(name: string, data: unknown, opts?: object) => Promise<void>>(() =>
+    Promise.resolve(),
+  );
 
   const d: QuoteExpiryDeps = {
-    prisma: {
-      client: {
-        $transaction: (fn) => fn(tx),
-        photographerProfile: { findUnique: photographerProfileFindUnique },
-        user: { findUnique: userFindUnique },
-        request: { findUnique: requestFindUnique },
-      },
-    },
-    notify: {
-      prisma: {
-        client: {
-          notification: { create: notificationCreate },
-          notificationPreference: { findMany: notificationPreferenceFindMany },
-        },
-      },
-      notifyQueue: { add: notifyQueueAdd },
-    },
+    prisma: { client: { $transaction: (fn) => fn(tx) } },
+    notifyQueue: { add: notifyQueueAdd },
     logger: fakeLogger(),
   };
 
   return {
     deps: d,
+    tx,
     auditLogCreate,
-    quoteFindMany,
-    quoteUpdateMany,
+    quoteUpdateManyAndReturn,
     requestUpdateMany,
+    requestFindUnique,
+    photographerProfileFindUnique,
     notificationCreate,
     notifyQueueAdd,
-    photographerProfileFindUnique,
-    userFindUnique,
-    requestFindUnique,
   };
 }
 
 describe('createQuoteExpiryProcessor', () => {
-  it('closes open/quoted requests past expiresAt and expires sent quotes past validUntil', async () => {
+  it('closes open/quoted requests past expiresAt and expires sent quotes past validUntil, in one atomic update', async () => {
     const {
       deps: d,
-      quoteFindMany,
-      quoteUpdateMany,
+      quoteUpdateManyAndReturn,
       requestUpdateMany,
-    } = deps({ expiring: [FIXTURE_QUOTE], requestCount: 1 });
+    } = deps({
+      expiring: [FIXTURE_QUOTE],
+      requestCount: 1,
+    });
 
     await createQuoteExpiryProcessor(d)(FAKE_JOB, undefined, undefined);
 
@@ -103,7 +94,7 @@ describe('createQuoteExpiryProcessor', () => {
       },
       data: { status: 'closed' },
     });
-    expect(quoteFindMany).toHaveBeenCalledWith({
+    expect(quoteUpdateManyAndReturn).toHaveBeenCalledWith({
       where: {
         status: 'sent',
         OR: [
@@ -111,40 +102,37 @@ describe('createQuoteExpiryProcessor', () => {
           { request: { status: { in: ['closed', 'cancelled'] } } },
         ],
       },
-    });
-    expect(quoteUpdateMany).toHaveBeenCalledWith({
-      where: { id: { in: [FIXTURE_QUOTE.id] } },
       data: { status: 'expired' },
     });
   });
 
-  it('skips the quote update entirely when nothing is expiring', async () => {
-    const { deps: d, quoteUpdateMany } = deps({ expiring: [] });
+  it('keeps the status: sent guard in the same atomic query, so a quote accepted concurrently is never expired or notified', async () => {
+    const { deps: d, notificationCreate } = deps({ expiring: [] });
 
     await createQuoteExpiryProcessor(d)(FAKE_JOB, undefined, undefined);
 
-    expect(quoteUpdateMany).not.toHaveBeenCalled();
+    expect(notificationCreate).not.toHaveBeenCalled();
   });
 
-  it('runs the request close before the quote lookup, in the same transaction', async () => {
+  it('runs the request close before the quote update, in the same transaction', async () => {
     const order: string[] = [];
     const requestUpdateMany = vi.fn(() => {
       order.push('request');
       return Promise.resolve({ count: 0 });
     });
-    const quoteFindMany = vi.fn(() => {
+    const quoteUpdateManyAndReturn = vi.fn(() => {
       order.push('quote');
       return Promise.resolve([]);
     });
-    const tx: QuoteExpiryTransactionClient = {
-      quote: { findMany: quoteFindMany, updateMany: vi.fn(() => Promise.resolve({ count: 0 })) },
-      request: { updateMany: requestUpdateMany },
-      auditLog: { create: vi.fn(() => Promise.resolve()) },
+    const { deps: base, tx } = deps();
+    const patchedTx: QuoteExpiryTransactionClient = {
+      ...tx,
+      quote: { updateManyAndReturn: quoteUpdateManyAndReturn },
+      request: { ...tx.request, updateMany: requestUpdateMany },
     };
-    const { deps: base } = deps();
     const d: QuoteExpiryDeps = {
       ...base,
-      prisma: { client: { ...base.prisma.client, $transaction: (fn) => fn(tx) } },
+      prisma: { client: { $transaction: (fn) => fn(patchedTx) } },
     };
 
     await createQuoteExpiryProcessor(d)(FAKE_JOB, undefined, undefined);
@@ -177,7 +165,7 @@ describe('createQuoteExpiryProcessor', () => {
     expect(auditLogCreate).not.toHaveBeenCalled();
   });
 
-  it('creates a quote_expired notification for the client and the photographer', async () => {
+  it('inserts a quote_expired notification row for the client and the photographer, then enqueues each after the transaction', async () => {
     const { deps: d, notificationCreate, notifyQueueAdd } = deps({ expiring: [FIXTURE_QUOTE] });
 
     await createQuoteExpiryProcessor(d)(FAKE_JOB, undefined, undefined);
@@ -192,9 +180,21 @@ describe('createQuoteExpiryProcessor', () => {
     expect(notifyQueueAdd).toHaveBeenCalledTimes(2);
   });
 
-  it('does not fail the sweep when notification creation throws', async () => {
+  it('omits counterpartName from the photographer copy (S6: never the client User.name)', async () => {
     const { deps: d, notificationCreate } = deps({ expiring: [FIXTURE_QUOTE] });
-    notificationCreate.mockRejectedValueOnce(new Error('db down'));
+
+    await createQuoteExpiryProcessor(d)(FAKE_JOB, undefined, undefined);
+
+    const photographerCall = notificationCreate.mock.calls.find(
+      (call) => call[0].data.userId === 'photographer-user-1',
+    );
+    const payload = photographerCall?.[0].data.payload as { counterpartName?: string };
+    expect(payload.counterpartName).toBeUndefined();
+  });
+
+  it('does not fail the sweep when a notify enqueue fails', async () => {
+    const { deps: d, notifyQueueAdd } = deps({ expiring: [FIXTURE_QUOTE] });
+    notifyQueueAdd.mockRejectedValueOnce(new Error('redis down'));
 
     await expect(
       createQuoteExpiryProcessor(d)(FAKE_JOB, undefined, undefined),

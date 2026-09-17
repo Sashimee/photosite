@@ -11,11 +11,13 @@ export interface PushSendResult {
   to: string;
   ticketId: string | null;
   deviceNotRegistered: boolean;
+  error?: string | undefined;
 }
 
 export interface PushReceiptResult {
   ok: boolean;
   deviceNotRegistered: boolean;
+  error?: string | undefined;
 }
 
 export interface PushSender {
@@ -53,6 +55,7 @@ export function createExpoPushSender(accessToken: string | undefined): PushSende
               to,
               ticketId: null,
               deviceNotRegistered: ticket.details?.error === 'DeviceNotRegistered',
+              error: ticket.details?.error ?? ticket.message,
             });
           }
         }
@@ -72,6 +75,8 @@ export function createExpoPushSender(accessToken: string | undefined): PushSende
             ok: receipt.status === 'ok',
             deviceNotRegistered:
               receipt.status === 'error' && receipt.details?.error === 'DeviceNotRegistered',
+            error:
+              receipt.status === 'error' ? (receipt.details?.error ?? receipt.message) : undefined,
           },
         ]),
       );

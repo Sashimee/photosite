@@ -60,6 +60,30 @@ describe('renderNotifyEmail', () => {
     expect(message.text).toContain('your booking');
   });
 
+  it('falls back to "A client" for a photographer-facing type when counterpartName is absent (S6)', () => {
+    const message = renderNotifyEmail(
+      'quote_accepted',
+      { quoteId: 'quote-1' },
+      'en',
+      'jane@example.com',
+      'https://photoo.lu',
+    );
+    expect(message.text).toContain('A client');
+    expect(message.text).not.toContain('Someone');
+  });
+
+  it('renders a real <a href> link for the quote url and the preferences url, with escaped attribute values', () => {
+    const message = renderNotifyEmail(
+      'quote_received',
+      { ...PAYLOAD, requestTitle: 'Tom & Jerry' },
+      'en',
+      'jane@example.com',
+      'https://photoo.lu',
+    );
+    expect(message.html).toContain('<a href="https://photoo.lu/en/quotes/quote-1">');
+    expect(message.html).toContain('<a href="https://photoo.lu/en/account/notifications">');
+  });
+
   it('renders every notification type without throwing', () => {
     const types = [
       'quote_received',
