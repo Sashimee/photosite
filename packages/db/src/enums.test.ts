@@ -2,12 +2,16 @@ import {
   AUDIT_ACTOR_TYPES,
   CONSENT_PURPOSES,
   DEVICE_PLATFORMS,
+  LICENCE_USAGES,
   NOTIFICATION_CHANNELS,
+  PHOTOGRAPHER_CATEGORIES,
+  PORTFOLIO_IMAGE_STATUSES,
   SUPPORTED_LOCALES,
   UPLOAD_PURPOSES,
   UPLOAD_STATUSES,
   USER_ROLES,
   USER_STATUSES,
+  VERIFICATION_STATUSES,
   VIRUS_SCAN_STATUSES,
 } from '@photoo/shared';
 import { describe, expect, it } from 'vitest';
@@ -15,12 +19,16 @@ import {
   AuditActorType,
   ConsentPurpose,
   DevicePlatform,
+  LicenceUsage,
   Locale,
   NotificationChannel,
+  PhotographerCategory,
+  PortfolioImageStatus,
   UploadPurpose,
   UploadStatus,
   UserRole,
   UserStatus,
+  VerificationStatus,
   VirusScanStatus,
 } from './index.js';
 
@@ -63,5 +71,27 @@ describe('Prisma enums mirror packages/shared enums', () => {
 
   it('VirusScanStatus matches VIRUS_SCAN_STATUSES', () => {
     expect(Object.values(VirusScanStatus).sort()).toEqual([...VIRUS_SCAN_STATUSES].sort());
+  });
+
+  // Prisma enum values can't contain a hyphen, so 'real-estate' is mapped to
+  // the `real_estate` identifier (schema.prisma `@map`) and stored as
+  // 'real-estate' in Postgres; only the Prisma Client-facing name differs.
+  it('PhotographerCategory matches PHOTOGRAPHER_CATEGORIES', () => {
+    const dbFacing = Object.values(PhotographerCategory).map((value) => value.replace('_', '-'));
+    expect(dbFacing.sort()).toEqual([...PHOTOGRAPHER_CATEGORIES].sort());
+  });
+
+  it('VerificationStatus matches VERIFICATION_STATUSES', () => {
+    expect(Object.values(VerificationStatus).sort()).toEqual([...VERIFICATION_STATUSES].sort());
+  });
+
+  it('PortfolioImageStatus matches PORTFOLIO_IMAGE_STATUSES', () => {
+    expect(Object.values(PortfolioImageStatus).sort()).toEqual(
+      [...PORTFOLIO_IMAGE_STATUSES].sort(),
+    );
+  });
+
+  it('LicenceUsage matches LICENCE_USAGES', () => {
+    expect(Object.values(LicenceUsage).sort()).toEqual([...LICENCE_USAGES].sort());
   });
 });

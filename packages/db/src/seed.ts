@@ -1,7 +1,10 @@
 import 'dotenv/config';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { hash } from '@node-rs/argon2';
 import type { UserRole } from '@photoo/shared';
-import { createPrismaClient } from './index.js';
+import { createS3Client, putPublicObject } from '@photoo/shared/storage';
+import { createPrismaClient, type LicenceUsage, type PhotographerCategory } from './index.js';
 
 function getDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
@@ -152,6 +155,397 @@ async function seedUsers(prisma: ReturnType<typeof createPrismaClient>): Promise
   }
 }
 
+interface SeedProductTierSpec {
+  usage: LicenceUsage;
+  priceCents: number;
+}
+
+interface SeedProductSpec {
+  title: string;
+  category: PhotographerCategory;
+  durationMinutes: number;
+  basePriceCents: number;
+  deliverables: Record<string, string | number | boolean>;
+  tiers: readonly SeedProductTierSpec[];
+}
+
+interface SeedPortfolioImageSpec {
+  order: number;
+  width: number;
+  height: number;
+}
+
+export interface SeedPhotographerProfileSpec {
+  email: string;
+  slug: string;
+  displayName: string;
+  headline: string;
+  bio: string;
+  city: string;
+  lat: number;
+  lng: number;
+  serviceRadiusKm: number;
+  categories: readonly PhotographerCategory[];
+  languages: readonly string[];
+  products: readonly SeedProductSpec[];
+  portfolioImages: readonly SeedPortfolioImageSpec[];
+}
+
+// Luxembourg City, Esch-sur-Alzette and Ettelbruck: one demo, published and
+// verified profile per city so search (1A.4b) has real spread to query
+// against. Real profiles cannot reach `isPublished` this way; see
+// docs/steps/1A.4-profiles-products.md.
+export const SEED_PHOTOGRAPHER_PROFILES: readonly SeedPhotographerProfileSpec[] = [
+  {
+    email: 'sofia.martins@photoo.test',
+    slug: 'sofia-martins',
+    displayName: 'Sofia Martins',
+    headline: 'Wedding and portrait photographer in Luxembourg City',
+    bio: 'Documentary-style wedding and portrait photography across Luxembourg City and the surrounding communes.',
+    city: 'Luxembourg City',
+    lat: 49.6116,
+    lng: 6.1319,
+    serviceRadiusKm: 30,
+    categories: ['wedding', 'portrait'],
+    languages: ['fr', 'en', 'pt'],
+    products: [
+      {
+        title: 'Wedding day coverage',
+        category: 'wedding',
+        durationMinutes: 480,
+        basePriceCents: 250000,
+        deliverables: { photos: 400, editedPhotos: 150, turnaroundDays: 21, onlineGallery: true },
+        tiers: [
+          { usage: 'personal', priceCents: 250000 },
+          { usage: 'commercial', priceCents: 400000 },
+        ],
+      },
+      {
+        title: 'Portrait session',
+        category: 'portrait',
+        durationMinutes: 60,
+        basePriceCents: 15000,
+        deliverables: { photos: 40, editedPhotos: 15, turnaroundDays: 7, onlineGallery: true },
+        tiers: [
+          { usage: 'personal', priceCents: 15000 },
+          { usage: 'extended', priceCents: 30000 },
+        ],
+      },
+    ],
+    portfolioImages: [
+      { order: 1, width: 2560, height: 1707 },
+      { order: 2, width: 2560, height: 1707 },
+      { order: 3, width: 1707, height: 2560 },
+    ],
+  },
+  {
+    email: 'karim.diallo@photoo.test',
+    slug: 'karim-diallo',
+    displayName: 'Karim Diallo',
+    headline: 'Event and corporate photographer in Esch-sur-Alzette',
+    bio: 'Corporate events, conferences and headshots for companies across the south of Luxembourg.',
+    city: 'Esch-sur-Alzette',
+    lat: 49.4958,
+    lng: 5.9806,
+    serviceRadiusKm: 25,
+    categories: ['event', 'corporate'],
+    languages: ['fr', 'de', 'en'],
+    products: [
+      {
+        title: 'Corporate event coverage',
+        category: 'event',
+        durationMinutes: 240,
+        basePriceCents: 60000,
+        deliverables: { photos: 200, editedPhotos: 80, turnaroundDays: 10, onlineGallery: true },
+        tiers: [
+          { usage: 'commercial', priceCents: 90000 },
+          { usage: 'editorial', priceCents: 70000 },
+        ],
+      },
+      {
+        title: 'Corporate headshot session',
+        category: 'corporate',
+        durationMinutes: 30,
+        basePriceCents: 12000,
+        deliverables: { photos: 15, editedPhotos: 5, turnaroundDays: 5, onlineGallery: true },
+        tiers: [
+          { usage: 'personal', priceCents: 12000 },
+          { usage: 'commercial', priceCents: 20000 },
+        ],
+      },
+    ],
+    portfolioImages: [
+      { order: 1, width: 2560, height: 1707 },
+      { order: 2, width: 2560, height: 1707 },
+      { order: 3, width: 2560, height: 1707 },
+    ],
+  },
+  {
+    email: 'lena.weber@photoo.test',
+    slug: 'lena-weber',
+    displayName: 'Lena Weber',
+    headline: 'Real estate and product photographer in Ettelbruck',
+    bio: 'Real estate and product photography for agencies and small businesses in the north of Luxembourg.',
+    city: 'Ettelbruck',
+    lat: 49.8479,
+    lng: 6.1044,
+    serviceRadiusKm: 35,
+    categories: ['real_estate', 'product'],
+    languages: ['de', 'fr', 'en'],
+    products: [
+      {
+        title: 'Real estate photography',
+        category: 'real_estate',
+        durationMinutes: 90,
+        basePriceCents: 20000,
+        deliverables: { photos: 30, editedPhotos: 25, turnaroundDays: 3, onlineGallery: true },
+        tiers: [
+          { usage: 'commercial', priceCents: 20000 },
+          { usage: 'extended', priceCents: 35000 },
+        ],
+      },
+      {
+        title: 'Product photography',
+        category: 'product',
+        durationMinutes: 120,
+        basePriceCents: 30000,
+        deliverables: { photos: 25, editedPhotos: 25, turnaroundDays: 5, onlineGallery: true },
+        tiers: [
+          { usage: 'commercial', priceCents: 30000 },
+          { usage: 'editorial', priceCents: 25000 },
+        ],
+      },
+    ],
+    portfolioImages: [
+      { order: 1, width: 2560, height: 1707 },
+      { order: 2, width: 2560, height: 1707 },
+      { order: 3, width: 2560, height: 1707 },
+    ],
+  },
+];
+
+// Matches the `${name}_${format}` shape the worker's image-process job
+// writes to `Upload.variants` (apps/worker/src/queues/processors/image-process.processor.ts).
+function placeholderVariants(prefix: string): Record<string, string> {
+  const variants: Record<string, string> = {};
+  for (const name of ['thumb', 'medium', 'large']) {
+    for (const [format, extension] of [
+      ['jpeg', 'jpg'],
+      ['webp', 'webp'],
+    ] as const) {
+      variants[`${name}_${format}`] = `v/${prefix}/${name}.${extension}`;
+    }
+  }
+  return variants;
+}
+
+const PLACEHOLDER_IMAGE_PATH = join(import.meta.dirname, '../assets/placeholder.jpg');
+
+interface SeedStorage {
+  client: ReturnType<typeof createS3Client>;
+  bucket: string;
+}
+
+// Kept optional so CI can run `pnpm db:seed` without MinIO reachable: without
+// every S3_* var set, seedPhotographerProfile still creates Upload rows
+// pointing at variant keys, just with no backing object in MinIO.
+function seedStorageFromEnv(): SeedStorage | null {
+  const endpoint = process.env.S3_ENDPOINT;
+  const region = process.env.S3_REGION;
+  const accessKeyId = process.env.S3_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
+  const publicBucket = process.env.S3_PUBLIC_BUCKET;
+  if (!endpoint || !region || !accessKeyId || !secretAccessKey || !publicBucket) {
+    console.log('db seed: S3 env vars not set, skipping placeholder image uploads');
+    return null;
+  }
+  return {
+    client: createS3Client({
+      endpoint,
+      region,
+      accessKeyId,
+      secretAccessKey,
+      forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+      privateBucket: process.env.S3_PRIVATE_BUCKET ?? publicBucket,
+      publicBucket,
+    }),
+    bucket: publicBucket,
+  };
+}
+
+async function uploadPlaceholderVariants(
+  storage: SeedStorage | null,
+  variants: Record<string, string>,
+): Promise<void> {
+  if (!storage) {
+    return;
+  }
+  const body = readFileSync(PLACEHOLDER_IMAGE_PATH);
+  for (const key of Object.values(variants)) {
+    const contentType = key.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+    await putPublicObject(storage.client, storage.bucket, key, body, contentType);
+  }
+}
+
+// Demo profiles are seeded published and verified directly: real profiles
+// cannot reach that state before 1A.8 (verification) and 1A.9 (Stripe
+// Connect) land (docs/steps/1A.4-profiles-products.md). Idempotent: skips
+// entirely once the profile exists, so it never duplicates or updates
+// products, tiers or portfolio images on a second run. `location` is set
+// with a raw query since it is an `Unsupported` Prisma type.
+async function seedPhotographerProfile(
+  prisma: ReturnType<typeof createPrismaClient>,
+  spec: SeedPhotographerProfileSpec,
+  passwordHash: string,
+  storage: SeedStorage | null,
+): Promise<void> {
+  const user = await seedUser(prisma, spec.email, ['photographer']);
+  await seedCredentialAccount(prisma, user.id, passwordHash);
+
+  const existingProfile = await prisma.photographerProfile.findUnique({
+    where: { userId: user.id },
+  });
+  if (existingProfile) {
+    return;
+  }
+
+  const avatarVariants = placeholderVariants(`seed/${spec.slug}/avatar`);
+  const avatarUpload = await prisma.upload.create({
+    data: {
+      ownerId: user.id,
+      purpose: 'avatar',
+      status: 'processed',
+      mimeType: 'image/jpeg',
+      declaredSizeBytes: 2048,
+      actualSizeBytes: 2048,
+      width: 512,
+      height: 512,
+      objectKey: `seed/${spec.slug}/avatar/original.jpg`,
+      variants: avatarVariants,
+      virusScanStatus: 'clean',
+    },
+  });
+  await uploadPlaceholderVariants(storage, avatarVariants);
+
+  const coverVariants = placeholderVariants(`seed/${spec.slug}/cover`);
+  const coverUpload = await prisma.upload.create({
+    data: {
+      ownerId: user.id,
+      purpose: 'cover',
+      status: 'processed',
+      mimeType: 'image/jpeg',
+      declaredSizeBytes: 4096,
+      actualSizeBytes: 4096,
+      width: 2560,
+      height: 853,
+      objectKey: `seed/${spec.slug}/cover/original.jpg`,
+      variants: coverVariants,
+      virusScanStatus: 'clean',
+    },
+  });
+  await uploadPlaceholderVariants(storage, coverVariants);
+
+  const profile = await prisma.photographerProfile.create({
+    data: {
+      userId: user.id,
+      slug: spec.slug,
+      displayName: spec.displayName,
+      headline: spec.headline,
+      bio: { en: spec.bio },
+      avatarUploadId: avatarUpload.id,
+      coverUploadId: coverUpload.id,
+      links: { instagram: null, website: null, behance: null, other: [] },
+      categories: [...spec.categories],
+      languages: [...spec.languages],
+      serviceRadiusKm: spec.serviceRadiusKm,
+      city: spec.city,
+      countryCode: 'LU',
+      verificationStatus: 'verified',
+      stripeAccountId: `acct_seed_${spec.slug}`,
+      stripeOnboardingComplete: true,
+      stripePayoutsEnabled: true,
+      ratingAvg: 4.8,
+      ratingCount: 12,
+      isPublished: true,
+    },
+  });
+
+  await prisma.$executeRaw`
+    UPDATE "PhotographerProfile"
+    SET location = ST_SetSRID(ST_MakePoint(${spec.lng}, ${spec.lat}), 4326)::geography
+    WHERE id = ${profile.id}
+  `;
+
+  for (const image of spec.portfolioImages) {
+    const portfolioVariants = placeholderVariants(
+      `seed/${spec.slug}/portfolio-${String(image.order)}`,
+    );
+    const upload = await prisma.upload.create({
+      data: {
+        ownerId: user.id,
+        purpose: 'portfolio',
+        status: 'processed',
+        mimeType: 'image/jpeg',
+        declaredSizeBytes: 8192,
+        actualSizeBytes: 8192,
+        width: image.width,
+        height: image.height,
+        objectKey: `seed/${spec.slug}/portfolio-${String(image.order)}/original.jpg`,
+        variants: portfolioVariants,
+        virusScanStatus: 'clean',
+      },
+    });
+    await uploadPlaceholderVariants(storage, portfolioVariants);
+    await prisma.portfolioImage.create({
+      data: {
+        profileId: profile.id,
+        uploadId: upload.id,
+        width: image.width,
+        height: image.height,
+        order: image.order,
+        status: 'approved',
+      },
+    });
+  }
+
+  for (const [index, product] of spec.products.entries()) {
+    const createdProduct = await prisma.product.create({
+      data: {
+        profileId: profile.id,
+        title: { en: product.title },
+        category: product.category,
+        durationMinutes: product.durationMinutes,
+        deliverables: product.deliverables,
+        basePriceCents: product.basePriceCents,
+        currency: 'EUR',
+        isActive: true,
+        order: index + 1,
+      },
+    });
+    for (const tier of product.tiers) {
+      await prisma.productTier.create({
+        data: {
+          productId: createdProduct.id,
+          usage: tier.usage,
+          priceCents: tier.priceCents,
+          currency: 'EUR',
+          licenceTextVersion: 'v1',
+        },
+      });
+    }
+  }
+}
+
+async function seedPhotographerProfiles(
+  prisma: ReturnType<typeof createPrismaClient>,
+): Promise<void> {
+  const passwordHash = await hash(getSeedUserPassword());
+  const storage = seedStorageFromEnv();
+  for (const spec of SEED_PHOTOGRAPHER_PROFILES) {
+    await seedPhotographerProfile(prisma, spec, passwordHash, storage);
+  }
+}
+
 async function seedPlatformSetting(
   prisma: ReturnType<typeof createPrismaClient>,
   key: string,
@@ -176,6 +570,7 @@ export async function seedDatabase(prisma: ReturnType<typeof createPrismaClient>
   }
   await seedCountry(prisma);
   await seedUsers(prisma);
+  await seedPhotographerProfiles(prisma);
   await seedPlatformSetting(prisma, 'feePercent', 5);
   await seedPlatformSetting(prisma, 'autoReleaseDays', 7);
 }
