@@ -39,23 +39,37 @@ function useMyLocation() {
   });
 }
 
-async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText('Title'), 'Wedding photographer needed');
-  await user.selectOptions(screen.getByLabelText('Category'), 'wedding');
-  await user.type(screen.getByLabelText('Description'), 'Full day coverage for our wedding');
+// Fills every field with a single `fireEvent.change` instead of
+// `userEvent.type`/`selectOptions`: those simulate one DOM event per
+// keystroke, which is the dominant cost of this form's tests (many long
+// text fields) and made three of them flaky-slow on a throttled CI runner
+// (they passed locally, timed out at 5000ms in CI). None of these fields
+// have per-keystroke behaviour (masking, autocomplete-as-you-type) that
+// depends on individual key events, so a single change event is equivalent.
+function fillRequiredFields() {
+  fireEvent.change(screen.getByLabelText('Title'), {
+    target: { value: 'Wedding photographer needed' },
+  });
+  fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'wedding' } });
+  fireEvent.change(screen.getByLabelText('Description'), {
+    target: { value: 'Full day coverage for our wedding' },
+  });
   fireEvent.change(screen.getByLabelText('Event date and time'), {
     target: { value: futureDatetimeLocal() },
   });
-  await user.type(screen.getByLabelText('Address line 1'), '10 rue de la Gare');
-  await user.type(
-    screen.getByLabelText('City', { selector: '#request-address-city' }),
-    'Luxembourg',
-  );
-  await user.type(screen.getByLabelText('Postal code'), 'L-1611');
-  await user.selectOptions(screen.getByLabelText('Country'), 'LU');
-  await user.type(screen.getByLabelText('Minimum'), '1000');
-  await user.type(screen.getByLabelText('Maximum'), '2000');
-  await user.selectOptions(screen.getByLabelText('How will you use the photos?'), 'personal');
+  fireEvent.change(screen.getByLabelText('Address line 1'), {
+    target: { value: '10 rue de la Gare' },
+  });
+  fireEvent.change(screen.getByLabelText('City', { selector: '#request-address-city' }), {
+    target: { value: 'Luxembourg' },
+  });
+  fireEvent.change(screen.getByLabelText('Postal code'), { target: { value: 'L-1611' } });
+  fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'LU' } });
+  fireEvent.change(screen.getByLabelText('Minimum'), { target: { value: '1000' } });
+  fireEvent.change(screen.getByLabelText('Maximum'), { target: { value: '2000' } });
+  fireEvent.change(screen.getByLabelText('How will you use the photos?'), {
+    target: { value: 'personal' },
+  });
 }
 
 describe('RequestForm', () => {
@@ -76,10 +90,10 @@ describe('RequestForm', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     const RequestForm = await loadRequestForm();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     render(<RequestForm locale="en" countries={countries} />);
-    await fillRequiredFields(user);
+    fillRequiredFields();
     await user.click(screen.getByRole('button', { name: 'Send request' }));
 
     expect(
@@ -95,10 +109,10 @@ describe('RequestForm', () => {
       .mockResolvedValue(new Response(JSON.stringify({ id: 'req-1' }), { status: 201 }));
     vi.stubGlobal('fetch', fetchMock);
     const RequestForm = await loadRequestForm();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     render(<RequestForm locale="en" countries={countries} />);
-    await fillRequiredFields(user);
+    fillRequiredFields();
     await user.click(screen.getByRole('button', { name: 'Use my location' }));
     await user.click(screen.getByRole('button', { name: 'Send request' }));
 
@@ -119,10 +133,10 @@ describe('RequestForm', () => {
       .mockResolvedValue(new Response(JSON.stringify({ code: 'CONFLICT' }), { status: 409 }));
     vi.stubGlobal('fetch', fetchMock);
     const RequestForm = await loadRequestForm();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     render(<RequestForm locale="en" countries={countries} />);
-    await fillRequiredFields(user);
+    fillRequiredFields();
     await user.click(screen.getByRole('button', { name: 'Use my location' }));
     await user.click(screen.getByRole('button', { name: 'Send request' }));
 
@@ -144,10 +158,10 @@ describe('RequestForm', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
     const RequestForm = await loadRequestForm();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     render(<RequestForm locale="en" countries={countries} />);
-    await fillRequiredFields(user);
+    fillRequiredFields();
     await user.click(screen.getByRole('button', { name: 'Use my location' }));
     await user.click(screen.getByRole('button', { name: 'Send request' }));
 
@@ -167,10 +181,10 @@ describe('RequestForm', () => {
       );
     vi.stubGlobal('fetch', fetchMock);
     const RequestForm = await loadRequestForm();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     render(<RequestForm locale="en" countries={countries} />);
-    await fillRequiredFields(user);
+    fillRequiredFields();
     await user.click(screen.getByRole('button', { name: 'Use my location' }));
     await user.click(screen.getByRole('button', { name: 'Send request' }));
 
@@ -185,12 +199,12 @@ describe('RequestForm', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     const RequestForm = await loadRequestForm();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     render(<RequestForm locale="en" countries={countries} />);
-    await fillRequiredFields(user);
+    fillRequiredFields();
     await user.click(screen.getByRole('button', { name: 'Use my location' }));
-    await user.clear(screen.getByLabelText('Minimum'));
+    fireEvent.change(screen.getByLabelText('Minimum'), { target: { value: '' } });
     await user.click(screen.getByRole('button', { name: 'Send request' }));
 
     expect(await screen.findByText('This field is required.')).toBeInTheDocument();
@@ -202,13 +216,12 @@ describe('RequestForm', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     const RequestForm = await loadRequestForm();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     render(<RequestForm locale="en" countries={countries} />);
-    await fillRequiredFields(user);
+    fillRequiredFields();
     await user.click(screen.getByRole('button', { name: 'Use my location' }));
-    await user.clear(screen.getByLabelText('Minimum'));
-    await user.type(screen.getByLabelText('Minimum'), '5000');
+    fireEvent.change(screen.getByLabelText('Minimum'), { target: { value: '5000' } });
     await user.click(screen.getByRole('button', { name: 'Send request' }));
 
     expect(
@@ -234,10 +247,10 @@ describe('RequestForm', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
     const RequestForm = await loadRequestForm();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     render(<RequestForm locale="en" countries={countries} />);
-    await fillRequiredFields(user);
+    fillRequiredFields();
     await user.click(screen.getByRole('button', { name: 'Use my location' }));
     await user.click(screen.getByRole('button', { name: 'Send request' }));
 
