@@ -127,14 +127,48 @@ photographer profiles, a request/quote pair) local dev gets from
 `pnpm db:seed`. Run it once after the first successful deploy (and again
 any time the schema/seed data changes in a way you want reflected):
 
-```
-docker compose -f infra/dokploy/preview/compose.yml --profile seed run --rm seed
+The `seed` profile below is the shape of the job, but `docker compose
+--profile seed run` cannot be used on the Dokploy host: Dokploy keeps the
+project env in its own database and writes no `.env` beside the checkout
+in `/etc/dokploy/compose/<appName>/code`, and compose refuses to parse
+this file while any `${VAR:?}` is unset. So run the one-shot container
+directly, taking the already-resolved connection strings out of the
+running `api` container. Only `SEED_USER_PASSWORD` has to be typed (copy
+it from the compose service's Environment tab), because the seed is its
+only consumer and no running container carries it:
+
+```bash
+proj=compose-index-back-end-application-k6x26o
+api=$(docker ps -q -f "label=com.docker.compose.project=$proj" \
+                  -f "label=com.docker.compose.service=api" | head -1)
+getenv() { docker inspect "$1" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n "s/^$2=//p"; }
+net=$(docker inspect "$api" --format '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' | grep internal)
+
+read -rsp 'SEED_USER_PASSWORD: ' seedpw; echo
+
+docker run --rm --network "$net" -w /app/packages/db --entrypoint node \
+  -e NODE_ENV=development \
+  -e DATABASE_URL="$(getenv "$api" DATABASE_URL)" \
+  -e SEED_USER_PASSWORD="$seedpw" \
+  -e S3_ENDPOINT=http://minio:9000 \
+  -e S3_REGION=eu-west-1 \
+  -e S3_ACCESS_KEY_ID="$(getenv "$api" S3_ACCESS_KEY_ID)" \
+  -e S3_SECRET_ACCESS_KEY="$(getenv "$api" S3_SECRET_ACCESS_KEY)" \
+  -e S3_FORCE_PATH_STYLE=true \
+  -e S3_PRIVATE_BUCKET=photoo-private \
+  -e S3_PUBLIC_BUCKET=photoo-public \
+  ghcr.io/sashimee/photosite-api:main-migrate dist/seed.js
+
+unset seedpw
 ```
 
-(From the Dokploy host or terminal - this is not part of the automatic
-deploy graph, so it never re-runs on its own. It is idempotent: re-running
-it against an already-seeded database is a no-op for every row it already
-created.)
+`read -rsp` does not echo, and `$net` is the project's `internal`
+network, where `postgres` and `minio` resolve by name. Verify with
+`curl -s https://footoo.bas.lu/v1/photographers | head -c 200`.
+
+This is not part of the automatic deploy graph, so it never re-runs on
+its own. It is idempotent: re-running it against an already-seeded
+database is a no-op for every row it already created.
 
 ### Known limitation
 
