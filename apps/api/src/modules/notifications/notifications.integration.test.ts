@@ -278,8 +278,56 @@ describe('notifications integration', () => {
       });
       expect(response.statusCode).toBe(200);
       const body = response.json<PreferencesBody>();
-      expect(body.preferences.every((entry) => entry.enabled)).toBe(true);
+      // message_received has no email delivery path at all (isChannelAvailable),
+      // so it defaults off rather than on like every other type/channel pair.
+      const notMessageReceivedEmail = body.preferences.filter(
+        (entry) => !(entry.type === 'message_received' && entry.channel === 'email'),
+      );
+      expect(notMessageReceivedEmail.every((entry) => entry.enabled)).toBe(true);
+      const messageReceivedEmail = body.preferences.find(
+        (entry) => entry.type === 'message_received' && entry.channel === 'email',
+      );
+      expect(messageReceivedEmail?.enabled).toBe(false);
       expect(body.preferences.length).toBeGreaterThan(0);
+    });
+
+    it('keeps message_received email excluded across a GET, then a PUT of the exact same matrix', async () => {
+      const user = await signUpAndSignIn();
+      const getResponse = await fastify().inject({
+        method: 'GET',
+        url: '/v1/me/notification-preferences',
+        headers: authHeaders(user.token),
+      });
+      const current = getResponse.json<PreferencesBody>();
+      const attemptToEnable = current.preferences.map((entry) =>
+        entry.type === 'message_received' && entry.channel === 'email'
+          ? { ...entry, enabled: true }
+          : entry,
+      );
+
+      const putResponse = await fastify().inject({
+        method: 'PUT',
+        url: '/v1/me/notification-preferences',
+        headers: authHeaders(user.token),
+        payload: { preferences: attemptToEnable },
+      });
+      expect(putResponse.statusCode).toBe(200);
+      const putBody = putResponse.json<PreferencesBody>();
+      const putEntry = putBody.preferences.find(
+        (entry) => entry.type === 'message_received' && entry.channel === 'email',
+      );
+      expect(putEntry?.enabled).toBe(false);
+
+      const afterGet = await fastify().inject({
+        method: 'GET',
+        url: '/v1/me/notification-preferences',
+        headers: authHeaders(user.token),
+      });
+      const afterBody = afterGet.json<PreferencesBody>();
+      const afterEntry = afterBody.preferences.find(
+        (entry) => entry.type === 'message_received' && entry.channel === 'email',
+      );
+      expect(afterEntry?.enabled).toBe(false);
     });
 
     it('suppresses a channel after a PUT, and keeps it suppressed on the next GET', async () => {

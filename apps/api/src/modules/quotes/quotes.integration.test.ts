@@ -330,6 +330,12 @@ describe('quotes integration', () => {
 
   afterAll(async () => {
     if (createdUserIds.length > 0 || createdProfileIds.length > 0) {
+      // Quote creation also creates a quote Conversation (docs/steps/1A.6-chat.md);
+      // its ConversationParticipant rows must go before the users, since
+      // that FK is Restrict.
+      await prisma.conversation.deleteMany({
+        where: { type: 'quote', participants: { some: { userId: { in: createdUserIds } } } },
+      });
       await prisma.quote.deleteMany({
         where: {
           OR: [{ clientId: { in: createdUserIds } }, { photographerId: { in: createdProfileIds } }],
@@ -372,6 +378,25 @@ describe('quotes integration', () => {
       });
       expect(createLog).not.toBeNull();
       expect((createLog?.after as { totalCents?: number } | null)?.totalCents).toBe(25050);
+    });
+
+    it('creates a quote conversation with both participants (docs/steps/1A.6-chat.md)', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const request = await createRequestAs(client.token);
+      const photographer = await createPublishedPhotographer('conversation');
+
+      const response = await sendQuote(photographer.token, request.id);
+      expect(response.statusCode).toBe(201);
+      const body = response.json<QuoteBody>();
+
+      const conversation = await prisma.conversation.findUnique({
+        where: { type_subjectId: { type: 'quote', subjectId: body.id } },
+        include: { participants: true },
+      });
+      expect(conversation).not.toBeNull();
+      expect(conversation?.participants.map((p) => p.userId).sort()).toEqual(
+        [client.id, photographer.userId].sort(),
+      );
     });
 
     it('computes totals for several line-item sets, including half-cent rounding', async () => {
@@ -571,6 +596,15 @@ describe('quotes integration', () => {
       expect(body.total).toEqual({ amountCents: 80000, currency: 'EUR' });
       expect(body.requestId).toBeNull();
       expect(body.productTierId).toBe(tier.id);
+
+      const conversation = await prisma.conversation.findUnique({
+        where: { type_subjectId: { type: 'quote', subjectId: body.id } },
+        include: { participants: true },
+      });
+      expect(conversation).not.toBeNull();
+      expect(conversation?.participants.map((p) => p.userId).sort()).toEqual(
+        [client.id, photographer.userId].sort(),
+      );
     });
 
     it('rejects requesting a quote from your own profile with 422', async () => {

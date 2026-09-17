@@ -27,6 +27,7 @@ export const NotificationPayloadSchema = z
     requestTitle: z.string().min(1).max(NOTIFICATION_TEXT_MAX_LENGTH).optional(),
     total: MoneySchema.optional(),
     counterpartName: z.string().min(1).max(NOTIFICATION_TEXT_MAX_LENGTH).optional(),
+    conversationId: IdSchema.optional(),
   })
   .strict()
   .openapi('NotificationPayload');

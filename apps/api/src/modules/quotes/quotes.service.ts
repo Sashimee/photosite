@@ -17,6 +17,7 @@ import {
   encodeCreatedAtCursor,
 } from '../../common/pagination/created-at-cursor.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { ChatService } from '../chat/chat.service.js';
 import { mapQuote } from './quote-mapper.js';
 import { QUOTE_EVENTS, type QuoteEvents } from './quote-events.js';
 import { QuotesRateLimitService } from './quotes-rate-limit.service.js';
@@ -65,6 +66,7 @@ export class QuotesService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(QuotesRateLimitService) private readonly rateLimit: QuotesRateLimitService,
     @Inject(QUOTE_EVENTS) private readonly events: QuoteEvents,
+    @Inject(ChatService) private readonly chat: ChatService,
     @Inject(Logger) private readonly logger: Logger,
   ) {}
 
@@ -163,6 +165,8 @@ export class QuotesService {
         },
       });
 
+      await this.chat.createQuoteConversation(tx, quote.id, [request.clientId, profile.userId]);
+
       return quote;
     });
 
@@ -244,6 +248,8 @@ export class QuotesService {
           after: { productId: quote.productId, totalCents: quote.totalCents },
         },
       });
+
+      await this.chat.createQuoteConversation(tx, quote.id, [user.id, profile.userId]);
 
       return quote;
     });

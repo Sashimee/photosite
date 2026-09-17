@@ -7,6 +7,7 @@ import {
   paginatedResponseSchema,
 } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
+import { UploadDownloadResponseSchema } from './uploads.js';
 import { z } from './zod.js';
 
 export const MessageAttachmentSchema = z
@@ -24,25 +25,53 @@ export const MessageSchema = z
     senderId: IdSchema,
     body: z.string().max(4000).nullable(),
     attachments: z.array(MessageAttachmentSchema),
-    readBy: z.array(IdSchema),
     editedAt: IsoDateTimeSchema.nullable(),
+    deletedAt: IsoDateTimeSchema.nullable(),
     createdAt: IsoDateTimeSchema,
   })
   .strict()
   .openapi('Message');
+
+export const ConversationParticipantSchema = z
+  .object({
+    userId: IdSchema,
+    lastReadAt: IsoDateTimeSchema.nullable(),
+  })
+  .strict()
+  .openapi('ConversationParticipant');
 
 export const ConversationSchema = z
   .object({
     id: IdSchema,
     type: z.enum(CONVERSATION_TYPES),
     subjectId: IdSchema.nullable(),
-    participantIds: z.array(IdSchema).min(1),
+    participants: z.array(ConversationParticipantSchema).min(1),
     lastMessageAt: IsoDateTimeSchema.nullable(),
+    lastMessagePreview: z.string().max(4000).nullable(),
     unreadCount: z.int().nonnegative(),
     archivedByMe: z.boolean(),
   })
   .strict()
   .openapi('Conversation');
+
+export const MAX_ATTACHMENTS_PER_MESSAGE = 10;
+export const MAX_MESSAGE_BODY_LENGTH = 4000;
+
+// Every C0/C1 control byte except tab and newline: chat is plain text
+// (docs/steps/1A.6-chat.md "Plain text only"), so nothing a terminal or a
+// client's renderer could misinterpret (CR, NUL, escape sequences, ...)
+// belongs in a message body.
+// eslint-disable-next-line no-control-regex -- rejecting control characters is the point.
+const DISALLOWED_CONTROL_CHARS = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/;
+
+export const MessageBodySchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_MESSAGE_BODY_LENGTH)
+  .refine((value) => !DISALLOWED_CONTROL_CHARS.test(value), {
+    message: 'body must not contain control characters other than newline and tab',
+  });
 
 export function atLeastOneOfBodyOrAttachments(data: {
   body?: string | undefined;
@@ -55,8 +84,8 @@ export function atLeastOneOfBodyOrAttachments(data: {
 
 export const SendMessageRequestSchema = z
   .object({
-    body: z.string().min(1).max(4000).optional(),
-    attachmentIds: z.array(IdSchema).min(1).optional(),
+    body: MessageBodySchema.optional(),
+    attachmentIds: z.array(IdSchema).min(1).max(MAX_ATTACHMENTS_PER_MESSAGE).optional(),
   })
   .strict()
   .refine(atLeastOneOfBodyOrAttachments, {
@@ -70,9 +99,14 @@ export const MarkConversationReadRequestSchema = z
   })
   .strict();
 
-export const ArchiveConversationRequestSchema = z
+export const ConversationsQuerySchema = CursorPaginationQuerySchema.extend({
+  archived: z.stringbool().optional(),
+}).strict();
+
+export const ReportConversationRequestSchema = z
   .object({
-    archived: z.boolean().default(true),
+    reason: z.string().min(1).max(500),
+    messageId: IdSchema.optional(),
   })
   .strict();
 
@@ -83,14 +117,14 @@ registry.registerPath({
   tags: ['chat'],
   security: AUTH_SECURITY,
   request: {
-    query: CursorPaginationQuerySchema,
+    query: ConversationsQuerySchema,
   },
   responses: {
     '200': {
       description: 'A page of conversations',
       content: { 'application/json': { schema: paginatedResponseSchema(ConversationSchema) } },
     },
-    ...errorResponses([401]),
+    ...errorResponses([400, 401]),
   },
 });
 
@@ -108,7 +142,7 @@ registry.registerPath({
       description: 'The conversation',
       content: { 'application/json': { schema: ConversationSchema } },
     },
-    ...errorResponses([401, 403, 404]),
+    ...errorResponses([401, 404]),
   },
 });
 
@@ -127,7 +161,7 @@ registry.registerPath({
       description: 'A page of messages',
       content: { 'application/json': { schema: paginatedResponseSchema(MessageSchema) } },
     },
-    ...errorResponses([401, 403, 404]),
+    ...errorResponses([400, 401, 404]),
   },
 });
 
@@ -146,7 +180,43 @@ registry.registerPath({
       description: 'Message sent',
       content: { 'application/json': { schema: MessageSchema } },
     },
-    ...errorResponses([400, 401, 403, 404, 422, 429]),
+    ...errorResponses([400, 401, 404, 422, 429]),
+  },
+});
+
+registry.registerPath({
+  method: 'delete',
+  path: apiPath('/conversations/{id}/messages/{messageId}'),
+  summary: "Soft-delete the caller's own message within the edit window",
+  tags: ['chat'],
+  security: AUTH_SECURITY,
+  request: {
+    params: z.object({ id: IdSchema, messageId: IdSchema }).strict(),
+  },
+  responses: {
+    '200': {
+      description: 'Message deleted',
+      content: { 'application/json': { schema: MessageSchema } },
+    },
+    ...errorResponses([401, 403, 404, 409]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/conversations/{id}/messages/{messageId}/attachments/{attachmentId}/download'),
+  summary: 'Get a short-lived presigned download URL for a message attachment',
+  tags: ['chat'],
+  security: AUTH_SECURITY,
+  request: {
+    params: z.object({ id: IdSchema, messageId: IdSchema, attachmentId: IdSchema }).strict(),
+  },
+  responses: {
+    '200': {
+      description: 'Presigned download URL issued',
+      content: { 'application/json': { schema: UploadDownloadResponseSchema } },
+    },
+    ...errorResponses([401, 404, 409]),
   },
 });
 
@@ -165,25 +235,58 @@ registry.registerPath({
       description: 'Conversation marked as read',
       content: { 'application/json': { schema: ConversationSchema } },
     },
-    ...errorResponses([400, 401, 403, 404]),
+    ...errorResponses([400, 401, 404]),
   },
 });
 
 registry.registerPath({
   method: 'post',
   path: apiPath('/conversations/{id}/archive'),
-  summary: 'Archive or unarchive a conversation for the current user',
+  summary: 'Archive a conversation for the current user',
   tags: ['chat'],
   security: AUTH_SECURITY,
   request: {
     params: z.object({ id: IdSchema }).strict(),
-    body: { content: { 'application/json': { schema: ArchiveConversationRequestSchema } } },
   },
   responses: {
     '200': {
-      description: 'Conversation archive state updated',
+      description: 'Conversation archived',
       content: { 'application/json': { schema: ConversationSchema } },
     },
-    ...errorResponses([400, 401, 403, 404]),
+    ...errorResponses([401, 404]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/conversations/{id}/unarchive'),
+  summary: 'Unarchive a conversation for the current user',
+  tags: ['chat'],
+  security: AUTH_SECURITY,
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+  },
+  responses: {
+    '200': {
+      description: 'Conversation unarchived',
+      content: { 'application/json': { schema: ConversationSchema } },
+    },
+    ...errorResponses([401, 404]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/conversations/{id}/report'),
+  summary: 'Report a conversation for abuse',
+  tags: ['chat'],
+  security: AUTH_SECURITY,
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+    body: { content: { 'application/json': { schema: ReportConversationRequestSchema } } },
+  },
+  responses: {
+    '204': { description: 'Report recorded' },
+    ...errorResponses([400, 401, 404, 429]),
   },
 });

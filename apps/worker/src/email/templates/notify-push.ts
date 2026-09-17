@@ -1,7 +1,12 @@
 import { getMessages } from '@photoo/i18n';
 import type { NotificationPayload, NotificationType } from '@photoo/shared';
 import { formatText } from '../format-message.js';
-import { buildNotificationPath } from './notify-email.js';
+import {
+  buildConversationPath,
+  buildNotificationPath,
+  requireConversationId,
+  requireQuoteId,
+} from './notify-email.js';
 
 export interface RenderedPush {
   title: string;
@@ -12,6 +17,7 @@ export interface RenderedPush {
 const PHOTOGRAPHER_FACING_TYPES: ReadonlySet<NotificationType> = new Set([
   'quote_accepted',
   'quote_declined',
+  'message_received',
 ]);
 
 // No amounts or message text, just a localised title/body and a deep link
@@ -22,10 +28,6 @@ export function renderNotifyPush(
   payload: NotificationPayload,
   locale: string,
 ): RenderedPush {
-  if (!payload.quoteId) {
-    throw new Error(`renderNotifyPush: "${type}" payload is missing quoteId`);
-  }
-
   const messages = getMessages(locale);
   const t = messages.push.notifications;
   const templates: Record<NotificationType, { title: string; body: string }> = {
@@ -34,6 +36,7 @@ export function renderNotifyPush(
     quote_declined: t.quoteDeclined,
     quote_withdrawn: t.quoteWithdrawn,
     quote_expired: t.quoteExpired,
+    message_received: t.messageReceived,
   };
   const template = templates[type];
   const fallback = PHOTOGRAPHER_FACING_TYPES.has(type)
@@ -41,9 +44,14 @@ export function renderNotifyPush(
     : messages.email.notifications.unknownCounterpart;
   const counterpartName = payload.counterpartName ?? fallback;
 
+  const url =
+    type === 'message_received'
+      ? buildConversationPath(locale, requireConversationId(type, payload))
+      : buildNotificationPath(locale, requireQuoteId(type, payload));
+
   return {
     title: template.title,
     body: formatText(template.body, { counterpartName }),
-    url: buildNotificationPath(locale, payload.quoteId),
+    url,
   };
 }

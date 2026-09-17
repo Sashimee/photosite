@@ -32,6 +32,7 @@ import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe.j
 import type { Env } from '../../config/env.js';
 import { APP_CONFIG } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { ChatSocketBridge } from '../chat/chat-socket-bridge.js';
 import { applyFetchResponse, rethrowAsHttpException, toFetchHeaders } from './auth-http.js';
 import { AUTH_INSTANCE } from './auth-instance.provider.js';
 import type { Auth } from './auth-instance.js';
@@ -64,6 +65,7 @@ export class AuthController {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AuditLogService) private readonly auditLog: AuditLogService,
     @Inject(AuthRateLimitService) private readonly rateLimit: AuthRateLimitService,
+    @Inject(ChatSocketBridge) private readonly chatSocketBridge: ChatSocketBridge,
     @Inject(Logger) private readonly logger: Logger,
   ) {}
 
@@ -213,13 +215,16 @@ export class AuthController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: false }) reply: FastifyReply,
   ): Promise<void> {
-    await requireSession(this.auth, request);
+    const { user } = await requireSession(this.auth, request);
     try {
       const response = await this.auth.api.signOut({
         headers: toFetchHeaders(request),
         asResponse: true,
       });
       await applyFetchResponse(response, reply);
+      // Sockets only carry a userId (M1), so this drops every chat socket
+      // for the user rather than the single revoked session.
+      this.chatSocketBridge.disconnectUser(user.id);
       reply.status(204);
       reply.send();
     } catch (error) {
@@ -232,10 +237,11 @@ export class AuthController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: false }) reply: FastifyReply,
   ): Promise<void> {
-    const { headers } = await requireSession(this.auth, request);
+    const { user, headers } = await requireSession(this.auth, request);
     try {
       const response = await this.auth.api.revokeSessions({ headers, asResponse: true });
       await applyFetchResponse(response, reply);
+      this.chatSocketBridge.disconnectUser(user.id);
       reply.status(204);
       reply.send();
     } catch (error) {
