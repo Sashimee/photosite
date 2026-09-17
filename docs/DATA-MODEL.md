@@ -4,9 +4,11 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 
 ## Identity and roles
 
-- **User** – id, email (unique, citext), emailVerifiedAt, locale, country, roles (`client`, `photographer`, `professional`, `admin` as a set), status (`active`, `suspended`, `deleted`), twoFactorEnabled, lastLoginAt, deletedAt.
+- **User** – id, email (unique, citext), emailVerifiedAt, name (nullable display name, required by Better Auth, defaulted from the email local part at sign-up, editable later), locale, country, roles (`client`, `photographer`, `professional`, `admin` as a set), status (`active`, `suspended`, `deleted`), twoFactorEnabled, lastLoginAt, deletedAt.
 - **Account** – OAuth links (provider, providerAccountId, tokens) – shape dictated by the auth library. The Argon2id password hash for email+password sign-in lives on the credential row (`providerId = 'credential'`, `accountId = user.id`) in `Account.password`, not on `User`, per D20 (Better Auth verifies logins against this row).
 - **Session** – token hash, userId, device info, ip, expiresAt.
+- **Verification** – Better Auth email verification / password reset tokens: identifier, value (hash, never the raw token), expiresAt.
+- **TwoFactor** – Better Auth two-factor plugin: userId, secret and backupCodes encrypted at rest (AES-256-GCM, key from `AUTH_ENCRYPTION_KEY`), verified, failedVerificationCount, lockedUntil.
 - **Device** – userId, expoPushToken, platform, lastSeenAt.
 - **ConsentRecord** – userId or anonymousId, purpose (`analytics`, `ads`, `marketing`), granted, version of the policy, ip, userAgent, recordedAt. Append-only.
 

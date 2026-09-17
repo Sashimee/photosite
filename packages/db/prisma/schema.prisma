@@ -86,6 +86,7 @@ model User {
   id               String     @id @default(uuid(7))
   email            String     @unique @db.Citext
   emailVerifiedAt  DateTime?
+  name             String?
   locale           Locale
   countryCode      String     @db.Char(2)
   country          Country    @relation(fields: [countryCode], references: [code])
