@@ -11,6 +11,8 @@
 services:
   web:
     image: ghcr.io/sashimee/photosite-web:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}
+    # `main` is a moving tag: without this, compose reuses the previously pulled image.
+    pull_policy: always
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -46,6 +48,7 @@ services:
 
   api:
     image: ghcr.io/sashimee/photosite-api:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       migrate:
@@ -69,11 +72,6 @@ services:
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
       AUTH_SECRET: ${AUTH_SECRET:?generate with `openssl rand -base64 48`}
       AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:?generate with `openssl rand -base64 32`}
-      # See README.md "Email": not delivered yet regardless of this flag.
-      DEV_MAIL_WORKER: 'true'
-      SMTP_HOST: mailpit
-      SMTP_PORT: '1025'
-      SMTP_FROM: preview@footoo.bas.lu
       S3_ENDPOINT: http://minio:9000
       S3_REGION: eu-west-1
       # Scoped MinIO user (photoo-private only), created by `minio-init`;
@@ -111,6 +109,7 @@ services:
 
   worker:
     image: ghcr.io/sashimee/photosite-worker:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       migrate:
@@ -124,6 +123,7 @@ services:
       HEALTH_PORT: '4100'
       DATABASE_URL: postgresql://${POSTGRES_USER:?set in .env}:${POSTGRES_PASSWORD:?set in .env}@postgres:5432/${POSTGRES_DB:?set in .env}
       REDIS_URL: redis://:${REDIS_PASSWORD:?set in .env}@redis:6379
+      WEB_APP_URL: https://${PREVIEW_HOST:-footoo.bas.lu}
       S3_ENDPOINT: http://minio:9000
       S3_REGION: eu-west-1
       # Scoped MinIO user (read+delete photoo-private, write photoo-public),
@@ -135,7 +135,17 @@ services:
       S3_PUBLIC_BUCKET: photoo-public
       SMTP_HOST: mailpit
       SMTP_PORT: '1025'
+      SMTP_SECURE: 'false'
+      # Mailpit on the internal-only network has no TLS; the worker logs a warning at boot.
+      SMTP_INSECURE_INTERNAL_RELAY: 'true'
+      # Mailpit doesn't have real accounts (see `mailpit`'s
+      # MP_SMTP_AUTH_ACCEPT_ANY/MP_SMTP_AUTH_ALLOW_INSECURE below) - the
+      # worker's production env validation still requires *some* SMTP_USER/
+      # SMTP_PASSWORD, so these are placeholders, not secrets.
+      SMTP_USER: preview
+      SMTP_PASSWORD: preview
       SMTP_FROM: preview@footoo.bas.lu
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
       # See README.md "ClamAV": only reachable with that profile enabled.
       CLAMAV_HOST: clamav
       CLAMAV_PORT: '3310'
@@ -146,6 +156,7 @@ services:
   # on it. See README.md "Rollback" for the -migrate tag.
   migrate:
     image: ghcr.io/sashimee/photosite-api:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}-migrate
+    pull_policy: always
     restart: 'no'
     depends_on:
       postgres:
@@ -169,6 +180,7 @@ services:
   # `tsc` through corepack on this internal-only, no-internet network).
   seed:
     image: ghcr.io/sashimee/photosite-api:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}-migrate
+    pull_policy: always
     restart: 'no'
     profiles: [seed]
     working_dir: /app/packages/db
@@ -357,6 +369,14 @@ services:
   mailpit:
     image: axllent/mailpit:v1.31.1@sha256:98b916bd3c8d61f7633a52d3ea2f58d00620cb01ca57ab59edde68c347a95365
     restart: unless-stopped
+    environment:
+      # `api`/`worker`'s SMTP config always sends AUTH (see `worker`'s
+      # SMTP_USER/SMTP_PASSWORD above), and it's plaintext since SMTP_SECURE
+      # is false - Mailpit has no real accounts, and `internal` is not
+      # internet-reachable, so accepting any credentials over plain auth
+      # here is fine.
+      MP_SMTP_AUTH_ACCEPT_ANY: '1'
+      MP_SMTP_AUTH_ALLOW_INSECURE: '1'
     networks:
       - internal
 

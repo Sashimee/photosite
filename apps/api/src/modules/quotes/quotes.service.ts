@@ -9,6 +9,7 @@ import {
   type QuotesMineQuerySchema,
   type QuoteSchema,
 } from '@photoo/shared';
+import { Logger } from 'nestjs-pino';
 import type { z } from 'zod';
 import { requireRole } from '../../common/auth/require-role.js';
 import {
@@ -64,6 +65,7 @@ export class QuotesService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(QuotesRateLimitService) private readonly rateLimit: QuotesRateLimitService,
     @Inject(QUOTE_EVENTS) private readonly events: QuoteEvents,
+    @Inject(Logger) private readonly logger: Logger,
   ) {}
 
   async createForRequest(
@@ -391,16 +393,14 @@ export class QuotesService {
         throw conflict('Quote is no longer available');
       }
 
-      let declinedQuoteIds: string[] = [];
+      let siblings: Quote[] = [];
       if (quote.requestId) {
-        const siblings = await tx.quote.findMany({
+        siblings = await tx.quote.findMany({
           where: { requestId: quote.requestId, status: 'sent' },
-          select: { id: true },
         });
-        declinedQuoteIds = siblings.map((sibling) => sibling.id);
-        if (declinedQuoteIds.length > 0) {
+        if (siblings.length > 0) {
           await tx.quote.updateMany({
-            where: { id: { in: declinedQuoteIds } },
+            where: { id: { in: siblings.map((sibling) => sibling.id) } },
             data: { status: 'declined' },
           });
         }
@@ -414,11 +414,15 @@ export class QuotesService {
           targetType: 'Quote',
           targetId: id,
           before: { status: 'sent' },
-          after: { status: 'accepted', declinedQuoteIds },
+          after: { status: 'accepted', declinedQuoteIds: siblings.map((sibling) => sibling.id) },
         },
       });
 
-      return { ok: true as const, quote: await tx.quote.findUniqueOrThrow({ where: { id } }) };
+      return {
+        ok: true as const,
+        quote: await tx.quote.findUniqueOrThrow({ where: { id } }),
+        siblings,
+      };
     });
 
     if (!result.ok) {
@@ -426,6 +430,16 @@ export class QuotesService {
     }
 
     await this.events.onAccepted(result.quote);
+    for (const sibling of result.siblings) {
+      try {
+        await this.events.onDeclined({ ...sibling, status: 'declined' });
+      } catch (error) {
+        this.logger.error(
+          { err: error, quoteId: sibling.id },
+          'quotes: failed to notify a sibling quote decline',
+        );
+      }
+    }
     return mapQuote(result.quote);
   }
 

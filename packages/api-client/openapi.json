@@ -12315,6 +12315,8 @@
                 "properties": {
                   "expoPushToken": {
                     "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
                     "pattern": "^Expo(nent)?PushToken\\[[^\\]]+\\]$",
                     "description": "Expo push token",
                     "example": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
@@ -12426,16 +12428,6 @@
           },
           "401": {
             "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {

@@ -95,12 +95,8 @@ SSH access to the VPS (not available from this workstation as of
 2026-09-17 - see `docs/steps/human-followups.md`): `docker compose -f
 infra/dokploy/preview/compose.yml logs -f api worker web`.
 
-Mail sent by the API/worker goes to the internal `mailpit` container, not a
-public inbox. To read a verification/reset link: Dokploy's container
-terminal or an SSH tunnel to `mailpit:8025`, e.g.
-`ssh -L 8025:mailpit:8025 <vps-user>@dok.seil.pro` then open
-`http://localhost:8025`. **This currently won't have anything in it - see
-"Email" below.**
+Mail sent by the worker goes to the internal `mailpit` container, not a
+public inbox - see "Email" below for how to read it.
 
 ## Rollback
 
@@ -154,17 +150,26 @@ buckets. Filed for the schema-migrator agent: add an explicit
 
 ## Email
 
-Verification/reset emails are not delivered on this preview yet: the
-worker has no email queue processor until step 1A.7 (Notifications: email
-via the worker queue), and the API's own `DevMailWorker`
-(`apps/api/src/modules/auth/mailer/email-queue.module.ts`) is
-unconditionally disabled whenever `NODE_ENV=production`, which both `api`
-and `worker` run here. Enqueued mail just sits in the queue; Mailpit stays
-empty. Sign-up itself still succeeds - it's only the verification step that
-has nothing to consume it. The seeded demo users
-(`packages/db/src/seed.ts`, e.g. `client@photoo.test`) are pre-verified, so
-signing in as one of them works today; use that for anything past sign-up
-until 1A.7 lands.
+The worker delivers all mail (auth verification/reset, and notifications)
+through nodemailer against the internal `mailpit` container - `api` only
+enqueues jobs, it holds no SMTP config of its own. Mailpit has no real
+accounts, so `worker`'s SMTP_USER/SMTP_PASSWORD are just placeholders;
+`mailpit` accepts them via `MP_SMTP_AUTH_ACCEPT_ANY`/
+`MP_SMTP_AUTH_ALLOW_INSECURE` (safe here since `internal` never reaches the
+internet).
+
+Mailpit isn't exposed publicly (`mailpit` only joins the project's
+`internal` network, not `dokploy-network`), so reading a verification/reset
+link means reaching its UI (port 8025) from inside the stack:
+
+- Dokploy's container terminal/exec on the `mailpit` service, then `curl
+  http://localhost:8025/api/v1/messages` for the raw JSON; or
+- an SSH tunnel to the VPS once SSH access exists
+  (`docs/steps/human-followups.md`): `ssh -L 8025:mailpit:8025
+  <vps-user>@dok.seil.pro`, then open `http://localhost:8025` in a browser.
+
+The seeded demo users (`packages/db/src/seed.ts`, e.g. `client@photoo.test`)
+are pre-verified, so signing in as one of them never needs Mailpit at all.
 
 ## Rate limiting
 

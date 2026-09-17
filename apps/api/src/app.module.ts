@@ -8,6 +8,7 @@ import { EnvModule } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { CitiesModule } from './modules/cities/cities.module.js';
+import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { ProductsModule } from './modules/products/products.module.js';
 import { ProfilesModule } from './modules/profiles/profiles.module.js';
 import { QuotesModule } from './modules/quotes/quotes.module.js';
@@ -34,6 +35,7 @@ import { StorageModule } from './storage/storage.module.js';
     CitiesModule,
     RequestsModule,
     QuotesModule,
+    NotificationsModule,
     OpenapiModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],

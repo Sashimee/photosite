@@ -24,6 +24,48 @@
       "extended": "Extended use"
     }
   },
+  "email": {
+    "verifyEmail": {
+      "subject": "Verify your {appName} email",
+      "body": "Confirm your email by opening this link: {url}"
+    },
+    "resetPassword": {
+      "subject": "Reset your {appName} password",
+      "body": "Reset your password by opening this link: {url}"
+    },
+    "accountExists": {
+      "subject": "Someone tried to sign up with your {appName} email",
+      "body": "Someone tried to create a {appName} account with this email address. If that was you, sign in instead; if not, you can ignore this message."
+    },
+    "footer": {
+      "preferences": "Manage your notification preferences: {url}"
+    },
+    "notifications": {
+      "unknownCounterpart": "Someone",
+      "unknownClient": "A client",
+      "directQuoteLabel": "your booking",
+      "quoteReceived": {
+        "subject": "New quote from {counterpartName}",
+        "body": "{counterpartName} sent you a quote for {requestTitle}, totalling {total}. View it here: {url}"
+      },
+      "quoteAccepted": {
+        "subject": "{counterpartName} accepted your quote",
+        "body": "{counterpartName} accepted your quote for {requestTitle}, totalling {total}. View it here: {url}"
+      },
+      "quoteDeclined": {
+        "subject": "{counterpartName} declined your quote",
+        "body": "{counterpartName} declined your quote for {requestTitle}. View it here: {url}"
+      },
+      "quoteWithdrawn": {
+        "subject": "A quote was withdrawn",
+        "body": "{counterpartName} withdrew their quote for {requestTitle}. View it here: {url}"
+      },
+      "quoteExpired": {
+        "subject": "A quote has expired",
+        "body": "Your quote for {requestTitle} with {counterpartName} has expired. View it here: {url}"
+      }
+    }
+  },
   "locale": {
     "de": "German",
     "en": "English",
@@ -42,6 +84,27 @@
       "title": "Page not found",
       "description": "This screen does not exist.",
       "backHome": "Go to home screen"
+    }
+  },
+  "push": {
+    "notifications": {
+      "quoteReceived": { "title": "New quote", "body": "{counterpartName} sent you a quote" },
+      "quoteAccepted": {
+        "title": "Quote accepted",
+        "body": "{counterpartName} accepted your quote"
+      },
+      "quoteDeclined": {
+        "title": "Quote declined",
+        "body": "{counterpartName} declined your quote"
+      },
+      "quoteWithdrawn": {
+        "title": "Quote withdrawn",
+        "body": "{counterpartName} withdrew their quote"
+      },
+      "quoteExpired": {
+        "title": "Quote expired",
+        "body": "Your quote with {counterpartName} has expired"
+      }
     }
   },
   "web": {

@@ -26,6 +26,12 @@ export const REDACT_PATHS = [
   'body.otpauthUrl',
   'err.url',
   'err.otpauthUrl',
+  // nodemailer's SMTP error carries recipient addresses and the raw server
+  // response in these fields.
+  'err.rejected',
+  'err.response',
+  'err.envelope',
+  'err.accepted',
 ];
 
 export const REDACT_CENSOR = '[Redacted]';
