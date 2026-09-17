@@ -11,6 +11,8 @@
 services:
   web:
     image: ghcr.io/sashimee/photosite-web:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}
+    # `main` is a moving tag: without this, compose reuses the previously pulled image.
+    pull_policy: always
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -46,6 +48,7 @@ services:
 
   api:
     image: ghcr.io/sashimee/photosite-api:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       migrate:
@@ -111,6 +114,7 @@ services:
 
   worker:
     image: ghcr.io/sashimee/photosite-worker:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       migrate:
@@ -146,6 +150,7 @@ services:
   # on it. See README.md "Rollback" for the -migrate tag.
   migrate:
     image: ghcr.io/sashimee/photosite-api:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}-migrate
+    pull_policy: always
     restart: 'no'
     depends_on:
       postgres:
@@ -169,6 +174,7 @@ services:
   # `tsc` through corepack on this internal-only, no-internet network).
   seed:
     image: ghcr.io/sashimee/photosite-api:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}-migrate
+    pull_policy: always
     restart: 'no'
     profiles: [seed]
     working_dir: /app/packages/db
