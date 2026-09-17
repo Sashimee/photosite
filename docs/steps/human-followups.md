@@ -49,6 +49,14 @@ Last updated: 2026-09-17.
 | The deletion confirmation and grace-period notice must state what survives deletion and for how long | Approve the wording | Real user-facing copy | Placeholder English copy in `packages/i18n`, translations after approval |
 | A subject who insists on copies of their verification documents needs a manual process (identity check before release) | Define the support process | – | Nothing is built for this in Phase 1; the export README points at support |
 
+## Job board (1A.13)
+
+| Issue | Needed from Alex | Blocks | Workaround meanwhile |
+|-------|------------------|--------|----------------------|
+| Do professionals need document-based verification like photographers (1A.9), or is a manual `verified` flag enough for launch? | A decision, with the lawyer if it touches liability for who may post work offers | Nothing — the flag ships either way | 1A.13 ships the manual admin flag and no self-service flow |
+| Must a job offer carry a compensation range to be published? Pay-transparency rules are moving, and Luxembourg's position should be checked before the board is public | Confirm with the lawyer | Making the field required (a one-line contract change) | `compensation` is optional in Phase 1 |
+| Job board terms: what a professional warrants when posting, and the takedown process | Folded into the Phase 2 ToS work already listed | Public launch of the board | Offers are reportable by id; moderation queue is 1A.11 |
+
 ## Local environment
 
 | Issue | Needed from Alex | Why deferred |
