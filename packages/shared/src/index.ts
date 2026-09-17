@@ -86,6 +86,8 @@ export {
   FileScanJobSchema,
   IMAGE_PROCESS_QUEUE_NAME,
   ImageProcessJobSchema,
+  PORTFOLIO_IMAGE_CLEANUP_QUEUE_NAME,
+  PortfolioImageCleanupJobSchema,
   QUEUE_JOB_SCHEMAS,
   QUEUE_NAMES,
   UPLOADS_CLEANUP_QUEUE_NAME,
@@ -93,6 +95,7 @@ export {
   type EmailJob,
   type FileScanJob,
   type ImageProcessJob,
+  type PortfolioImageCleanupJob,
   type QueueJobPayload,
   type QueueName,
   type UploadsCleanupJob,
@@ -126,6 +129,8 @@ export {
 } from './contract/auth.js';
 
 export {
+  AttachPortfolioImageRequestSchema,
+  CreatePhotographerProfileRequestSchema,
   LocalizedTextSchema,
   OwnPhotographerProfileSchema,
   PhotographerCategorySchema,

@@ -160,6 +160,13 @@ interface SeedProductTierSpec {
   priceCents: number;
 }
 
+const TIER_USAGE_DESCRIPTIONS: Record<LicenceUsage, string> = {
+  personal: 'For personal, non-commercial use only.',
+  commercial: 'Licensed for commercial and marketing use.',
+  editorial: 'Licensed for editorial and press use.',
+  extended: 'Extended licence covering large-scale and resale use.',
+};
+
 interface SeedProductSpec {
   title: string;
   category: PhotographerCategory;
@@ -393,7 +400,7 @@ async function uploadPlaceholderVariants(
 // entirely once the profile exists, so it never duplicates or updates
 // products, tiers or portfolio images on a second run. `location` is set
 // with a raw query since it is an `Unsupported` Prisma type.
-async function seedPhotographerProfile(
+export async function seedPhotographerProfile(
   prisma: ReturnType<typeof createPrismaClient>,
   spec: SeedPhotographerProfileSpec,
   passwordHash: string,
@@ -529,6 +536,7 @@ async function seedPhotographerProfile(
           usage: tier.usage,
           priceCents: tier.priceCents,
           currency: 'EUR',
+          description: TIER_USAGE_DESCRIPTIONS[tier.usage],
           licenceTextVersion: 'v1',
         },
       });

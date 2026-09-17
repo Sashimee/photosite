@@ -22,6 +22,7 @@ Last updated: 2026-09-17.
 | 0.6 | Create accounts: Apple Developer, Google Play Console, Stripe + Connect, GA4/GTM/Ads/Search Console, Brevo, EU object storage, Sentry, AI-detection and reverse-search vendors, OAuth apps (Google, Apple, Facebook, Microsoft) | 1A.2 OAuth, 1A.7 email, 1A.8 payments, 1C.9 stores |
 | 0.7 | Choose entity, brief a lawyer (ToS, photographer agreement, privacy policy, DPIA), ask the accountant about VAT on the fee and DAC7 | 2.2 compliance sign-off |
 | 0.8 | Logo, colours, type, app icons, store screenshot template | O5 |
+| 1E.1 | Configure the production `photoo-public` bucket's read policy (anonymous/CDN `s3:GetObject` only, no `ListBucket`) with the EU object storage provider at deploy time; dev MinIO uses a custom bucket policy for this (`infra/docker/compose.dev.yml`) but production is provider-specific | 1E.1 staging/prod public image serving |
 
 ## Local environment
 

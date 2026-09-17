@@ -18,10 +18,10 @@ const validProduct = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   profileId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   title: { en: 'Wedding package' },
-  description: 'Full day wedding coverage',
+  description: { en: 'Full day wedding coverage' },
   category: 'wedding',
   durationMinutes: 480,
-  deliverables: ['200 edited photos', 'online gallery'],
+  deliverables: { photos: 200, editedPhotos: 80, turnaroundDays: 14, onlineGallery: true },
   basePrice: { amountCents: 150000, currency: 'EUR' },
   isActive: true,
   order: 0,
@@ -59,6 +59,31 @@ describe('ProductSchema', () => {
     expect(ProductSchema.safeParse({ ...validProduct, stripeAccountId: 'acct_123' }).success).toBe(
       false,
     );
+  });
+
+  it('accepts a null description', () => {
+    expect(ProductSchema.safeParse({ ...validProduct, description: null }).success).toBe(true);
+  });
+
+  it('rejects an unsupported locale key in description', () => {
+    expect(ProductSchema.safeParse({ ...validProduct, description: { it: 'Ciao' } }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects a deliverables array (must be a structured record)', () => {
+    expect(
+      ProductSchema.safeParse({ ...validProduct, deliverables: ['200 edited photos'] }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a deliverables value that is not a string, number or boolean', () => {
+    expect(
+      ProductSchema.safeParse({
+        ...validProduct,
+        deliverables: { photos: { nested: true } },
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -101,6 +126,13 @@ describe('CreateProductRequestSchema', () => {
 
   it('rejects a request with no tiers', () => {
     expect(CreateProductRequestSchema.safeParse({ ...validCreate, tiers: [] }).success).toBe(false);
+  });
+
+  it('accepts a request without a description', () => {
+    const withoutDescription = Object.fromEntries(
+      Object.entries(validCreate).filter(([key]) => key !== 'description'),
+    );
+    expect(CreateProductRequestSchema.safeParse(withoutDescription).success).toBe(true);
   });
 });
 

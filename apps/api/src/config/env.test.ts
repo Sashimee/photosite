@@ -18,6 +18,7 @@ const validEnv = {
   S3_FORCE_PATH_STYLE: 'true',
   S3_PRIVATE_BUCKET: 'photoo-private',
   S3_PUBLIC_BUCKET: 'photoo-public',
+  S3_PUBLIC_BASE_URL: 'http://127.0.0.1:9000/photoo-public',
 };
 
 describe('loadEnv', () => {
@@ -173,6 +174,7 @@ describe('loadEnv', () => {
     expect(env.S3_FORCE_PATH_STYLE).toBe(true);
     expect(env.S3_PRIVATE_BUCKET).toBe('photoo-private');
     expect(env.S3_PUBLIC_BUCKET).toBe('photoo-public');
+    expect(env.S3_PUBLIC_BASE_URL).toBe('http://127.0.0.1:9000/photoo-public');
   });
 
   it('defaults S3_FORCE_PATH_STYLE to false when unset', () => {
@@ -191,5 +193,11 @@ describe('loadEnv', () => {
     const withoutBucket: Record<string, string> = { ...validEnv };
     delete withoutBucket.S3_PRIVATE_BUCKET;
     expect(() => loadEnv(withoutBucket)).toThrow(/S3_PRIVATE_BUCKET/);
+  });
+
+  it('rejects a missing S3_PUBLIC_BASE_URL', () => {
+    const withoutBaseUrl: Record<string, string> = { ...validEnv };
+    delete withoutBaseUrl.S3_PUBLIC_BASE_URL;
+    expect(() => loadEnv(withoutBaseUrl)).toThrow(/S3_PUBLIC_BASE_URL/);
   });
 });

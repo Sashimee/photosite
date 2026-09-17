@@ -64,10 +64,10 @@ describe('createApiClient', () => {
     const { response } = await client.POST('/v1/me/products', {
       body: {
         title: { en: 'Wedding package' },
-        description: 'Full day coverage',
+        description: { en: 'Full day coverage' },
         category: 'wedding',
         durationMinutes: 480,
-        deliverables: ['200 edited photos'],
+        deliverables: { photos: 200, editedPhotos: 80, turnaroundDays: 14, onlineGallery: true },
         basePrice: { amountCents: 150000, currency: 'EUR' },
         tiers,
       },
@@ -76,10 +76,10 @@ describe('createApiClient', () => {
     await client.POST('/v1/me/products', {
       body: {
         title: { en: 'Wedding package' },
-        description: 'Full day coverage',
+        description: { en: 'Full day coverage' },
         category: 'wedding',
         durationMinutes: 480,
-        deliverables: ['200 edited photos'],
+        deliverables: { photos: 200, editedPhotos: 80, turnaroundDays: 14, onlineGallery: true },
         basePrice: { amountCents: 150000, currency: 'EUR' },
         tiers,
         // @ts-expect-error request bodies never accept a platform fee

@@ -30,6 +30,7 @@
         "S3_FORCE_PATH_STYLE",
         "S3_PRIVATE_BUCKET",
         "S3_PUBLIC_BUCKET",
+        "S3_PUBLIC_BASE_URL",
         "CLAMAV_INTEGRATION_TEST"
       ]
     },

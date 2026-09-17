@@ -29,17 +29,21 @@ export const LocalizedTextSchema = z
     example: { en: 'Wedding and portrait photographer in Luxembourg' },
   });
 
+const HTTP_URL_PROTOCOL = /^https?$/;
+
+const HttpUrlSchema = z.url({ protocol: HTTP_URL_PROTOCOL });
+
 export const ProfileLinksSchema = z
   .object({
-    instagram: z.url().optional(),
-    website: z.url().optional(),
-    behance: z.url().optional(),
+    instagram: HttpUrlSchema.nullable().optional(),
+    website: HttpUrlSchema.nullable().optional(),
+    behance: HttpUrlSchema.nullable().optional(),
     other: z
       .array(
         z
           .object({
             label: z.string().min(1).max(60),
-            url: z.url(),
+            url: HttpUrlSchema,
           })
           .strict(),
       )
@@ -48,12 +52,17 @@ export const ProfileLinksSchema = z
   .strict()
   .openapi('ProfileLinks');
 
+// `url`/`width`/`height` are nullable on the owner-facing schema: a
+// freshly attached image is `processing` until the worker's image-process
+// job finishes, and `Upload.variants`/width/height are only set then. The
+// public schema only ever shows `approved` images, which are always
+// processed, so it keeps these fields required.
 export const PortfolioImageSchema = z
   .object({
     id: IdSchema,
-    url: z.url().openapi({ example: 'https://cdn.photoo.lu/portfolio/abc123.jpg' }),
-    width: z.int().positive(),
-    height: z.int().positive(),
+    url: z.url().nullable().openapi({ example: 'https://cdn.photoo.lu/portfolio/abc123.jpg' }),
+    width: z.int().positive().nullable(),
+    height: z.int().positive().nullable(),
     order: z.int().nonnegative(),
     status: z.enum(PORTFOLIO_IMAGE_STATUSES),
   })
@@ -61,6 +70,11 @@ export const PortfolioImageSchema = z
   .openapi('PortfolioImage');
 
 export const PublicPortfolioImageSchema = PortfolioImageSchema.omit({ status: true })
+  .extend({
+    url: z.url(),
+    width: z.int().positive(),
+    height: z.int().positive(),
+  })
   .strict()
   .openapi('PublicPortfolioImage');
 
@@ -163,7 +177,7 @@ export const PhotographerSearchQuerySchema = z
   .object({
     lat: z.coerce.number().min(-90).max(90).optional(),
     lng: z.coerce.number().min(-180).max(180).optional(),
-    radiusKm: z.coerce.number().positive().optional(),
+    radiusKm: z.coerce.number().int().min(1).max(200).optional(),
     city: z.string().min(1).max(120).optional(),
     category: PhotographerCategorySchema.optional(),
     language: LanguageCodeSchema.optional(),
@@ -241,7 +255,7 @@ registry.registerPath({
       description: "The current user's photographer profile",
       content: { 'application/json': { schema: OwnPhotographerProfileSchema } },
     },
-    ...errorResponses([401, 404]),
+    ...errorResponses([401, 403, 404]),
   },
 });
 
@@ -277,7 +291,7 @@ registry.registerPath({
       description: 'Profile updated',
       content: { 'application/json': { schema: OwnPhotographerProfileSchema } },
     },
-    ...errorResponses([400, 401, 404, 409, 422]),
+    ...errorResponses([400, 401, 403, 404, 409, 422]),
   },
 });
 
@@ -297,7 +311,7 @@ registry.registerPath({
         'application/json': { schema: paginatedResponseSchema(PortfolioImageSchema) },
       },
     },
-    ...errorResponses([401, 404]),
+    ...errorResponses([401, 403, 404]),
   },
 });
 
@@ -335,7 +349,7 @@ registry.registerPath({
         'application/json': { schema: paginatedResponseSchema(PortfolioImageSchema) },
       },
     },
-    ...errorResponses([400, 401, 404, 422]),
+    ...errorResponses([400, 401, 403, 404, 422]),
   },
 });
 
