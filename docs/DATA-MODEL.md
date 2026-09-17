@@ -28,8 +28,8 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 ## Verification
 
 - **Country** – code (PK), name, enabled, currency, vatRate, requiredDocuments (JSON list: key, label per locale, description, accepted types), legalTexts (JSON), defaultLocale.
-- **VerificationCase** – userId, countryCode, status (`draft`, `submitted`, `in_review`, `approved`, `rejected`, `expired`), businessName, vatNumber, businessRegistrationNumber, submittedAt, decidedAt, decidedByAdminId, rejectionReason.
-- **VerificationDocument** – caseId, documentKey (from Country.requiredDocuments), storageKey (private bucket, server-side encrypted), mime, size, virusScanStatus, uploadedAt.
+- **VerificationCase** – userId, countryCode, status (`draft`, `submitted`, `in_review`, `approved`, `rejected`, `expired`), businessName, vatNumber and businessRegistrationNumber (encrypted at the application level, AES-256-GCM, key from `VERIFICATION_ENCRYPTION_KEY`, separate from `AUTH_ENCRYPTION_KEY` so they rotate independently), submittedAt, decidedAt, assignedAdminId (nullable, set when an admin starts review), decidedByAdminId (nullable, the admin who approved or rejected), rejectionReason (nullable, 1–1000 chars, set on reject).
+- **VerificationDocument** – caseId, documentKey (from Country.requiredDocuments), uploadId (unique, references `Upload` in place of raw storage keys; `Upload.objectKey`/`mimeType`/`actualSizeBytes`/`virusScanStatus` are read from the upload instead of being duplicated), createdAt. Unique on `(caseId, documentKey)`; re-attaching the same key while the case is `draft` replaces the previous document row.
 
 ## Marketplace
 
@@ -80,4 +80,5 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 - `Quote.requestId IS NOT NULL OR Quote.productId IS NOT NULL` (CHECK constraint): every quote is either for a request or built from a product.
 - The `notify-sweep` job's query (`channels` wants a channel AND that channel's sent-at is still null AND `createdAt` older than the sweep window) is served by a partial index on rows where `emailSentAt IS NULL OR pushSentAt IS NULL`, since that predicate is implied by the per-channel condition for either channel; the query still filters `channels` and the specific sent-at column, but only against the already-narrow set of undelivered rows.
 - Deleting a `Conversation` cascades to its `ConversationParticipant` and `Message` rows; deleting a `Message` cascades to its `MessageAttachment` rows. `MessageAttachment.uploadId` is `Restrict`: an `Upload` still attached to a message can't be deleted.
+- At most one active `VerificationCase` per `userId` (partial unique index on `status IN (draft, submitted, in_review)`); a rejected or expired case stays for history and a new case starts a fresh `draft`. `VerificationDocument.uploadId` is `Restrict`, like `MessageAttachment`: an `Upload` still attached to a verification document can't be deleted.
 - `Message.body IS NOT NULL OR EXISTS (attachments)` at creation time (application-enforced, not a CHECK constraint, since the attachment count is a join): a message needs a body or at least one attachment, capped at 10 attachments.
