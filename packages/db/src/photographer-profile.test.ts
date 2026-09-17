@@ -1,11 +1,48 @@
+import { hash } from '@node-rs/argon2';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createPrismaClient } from './index.js';
-import { SEED_PHOTOGRAPHER_PROFILES, seedDatabase } from './seed.js';
+import {
+  SEED_PHOTOGRAPHER_PROFILES,
+  getSeedUserPassword,
+  seedDatabase,
+  seedPhotographerProfile,
+  type SeedPhotographerProfileSpec,
+} from './seed.js';
 import { requireIntegrationEnv } from './testing/require-integration-env.js';
 
 const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL']);
 
 const LUXEMBOURG_CITY = { lat: 49.6116, lng: 6.1319 };
+
+// Own slug/email/coordinates, disjoint from SEED_PHOTOGRAPHER_PROFILES and
+// far from every seed city, so this fixture never collides with the seeded
+// demo rows the api integration suite reads concurrently (turbo runs both
+// against the same TEST_DATABASE_URL) and never shows up in the radius
+// searches below.
+const TEST_FIXTURE_PROFILE: SeedPhotographerProfileSpec = {
+  email: 'test-fixture.photographer-profile@photoo.test',
+  slug: 'test-fixture-photographer-profile',
+  displayName: 'Test Fixture Photographer',
+  headline: 'Fixture profile for photographer-profile.test.ts',
+  bio: 'Created and torn down by photographer-profile.test.ts only; never part of SEED_PHOTOGRAPHER_PROFILES.',
+  city: 'Reykjavik',
+  lat: 64.1466,
+  lng: -21.9426,
+  serviceRadiusKm: 15,
+  categories: ['portrait'],
+  languages: ['en'],
+  products: [
+    {
+      title: 'Fixture session',
+      category: 'portrait',
+      durationMinutes: 60,
+      basePriceCents: 10000,
+      deliverables: { photos: 10, editedPhotos: 5, turnaroundDays: 5, onlineGallery: true },
+      tiers: [{ usage: 'personal', priceCents: 10000 }],
+    },
+  ],
+  portfolioImages: [{ order: 1, width: 2560, height: 1707 }],
+};
 
 describe('photographer profile schema', () => {
   if (!testEnv) {
@@ -17,29 +54,28 @@ describe('photographer profile schema', () => {
 
   const prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
 
+  // Deletes only the rows this fixture itself created, in the same order
+  // seed data is torn down elsewhere: the profile first (cascades its
+  // portfolio images, products and tiers), then its uploads, then its user.
+  async function deleteFixtureProfile(): Promise<void> {
+    const profile = await prisma.photographerProfile.findUnique({
+      where: { slug: TEST_FIXTURE_PROFILE.slug },
+    });
+    if (profile) {
+      await prisma.photographerProfile.delete({ where: { id: profile.id } });
+    }
+    await prisma.upload.deleteMany({
+      where: { objectKey: { startsWith: `seed/${TEST_FIXTURE_PROFILE.slug}/` } },
+    });
+    await prisma.user.deleteMany({ where: { email: TEST_FIXTURE_PROFILE.email } });
+  }
+
   afterAll(async () => {
+    await deleteFixtureProfile();
     await prisma.$disconnect();
   });
 
-  // A prior `pnpm db:seed` run (CI seeds before running this suite) already
-  // leaves these demo profiles in place, which would otherwise make
-  // `seedPhotographerProfile`'s creation path un-exercised by this suite.
-  // Tearing a profile down first forces `seedDatabase` to recreate it.
-  async function resetSeedPhotographerProfiles(): Promise<void> {
-    for (const spec of SEED_PHOTOGRAPHER_PROFILES) {
-      const profile = await prisma.photographerProfile.findUnique({ where: { slug: spec.slug } });
-      if (profile) {
-        await prisma.photographerProfile.delete({ where: { id: profile.id } });
-      }
-      await prisma.upload.deleteMany({
-        where: { objectKey: { startsWith: `seed/${spec.slug}/` } },
-      });
-      await prisma.user.deleteMany({ where: { email: spec.email } });
-    }
-  }
-
   it('seeds one published, verified profile per SEED_PHOTOGRAPHER_PROFILES entry', async () => {
-    await resetSeedPhotographerProfiles();
     await seedDatabase(prisma);
 
     for (const spec of SEED_PHOTOGRAPHER_PROFILES) {
@@ -101,6 +137,68 @@ describe('photographer profile schema', () => {
     };
 
     expect(after).toEqual(before);
+  });
+
+  // Exercises seedPhotographerProfile's create path directly against its own
+  // fixture, rather than deleting and recreating the seeded demo profiles
+  // (a cross-package race: turbo runs the api integration suite against the
+  // same TEST_DATABASE_URL concurrently).
+  it('seedPhotographerProfile creates a profile and is idempotent on a second run', async () => {
+    await deleteFixtureProfile();
+    const passwordHash = await hash(getSeedUserPassword());
+
+    await seedPhotographerProfile(prisma, TEST_FIXTURE_PROFILE, passwordHash, null);
+
+    const created = await prisma.photographerProfile.findUniqueOrThrow({
+      where: { slug: TEST_FIXTURE_PROFILE.slug },
+      include: { portfolioImages: true, products: { include: { tiers: true } } },
+    });
+
+    expect(created.displayName).toBe(TEST_FIXTURE_PROFILE.displayName);
+    expect(created.city).toBe(TEST_FIXTURE_PROFILE.city);
+    expect(created.countryCode).toBe('LU');
+    expect(created.verificationStatus).toBe('verified');
+    expect(created.stripePayoutsEnabled).toBe(true);
+    expect(created.isPublished).toBe(true);
+    expect(created.avatarUploadId).not.toBeNull();
+    expect(created.coverUploadId).not.toBeNull();
+    expect(created.portfolioImages).toHaveLength(TEST_FIXTURE_PROFILE.portfolioImages.length);
+    for (const image of created.portfolioImages) {
+      expect(image.status).toBe('approved');
+    }
+    expect(created.products).toHaveLength(TEST_FIXTURE_PROFILE.products.length);
+    for (const [index, product] of created.products.entries()) {
+      const productSpec = TEST_FIXTURE_PROFILE.products[index];
+      if (!productSpec) {
+        throw new Error(`no product spec at index ${String(index)}`);
+      }
+      expect(product.tiers).toHaveLength(productSpec.tiers.length);
+      expect(product.currency).toBe('EUR');
+    }
+
+    await seedPhotographerProfile(prisma, TEST_FIXTURE_PROFILE, passwordHash, null);
+
+    const after = {
+      profiles: await prisma.photographerProfile.count({
+        where: { slug: TEST_FIXTURE_PROFILE.slug },
+      }),
+      portfolioImages: await prisma.portfolioImage.count({
+        where: { profile: { slug: TEST_FIXTURE_PROFILE.slug } },
+      }),
+      products: await prisma.product.count({
+        where: { profile: { slug: TEST_FIXTURE_PROFILE.slug } },
+      }),
+      tiers: await prisma.productTier.count({
+        where: { product: { profile: { slug: TEST_FIXTURE_PROFILE.slug } } },
+      }),
+    };
+
+    expect(after).toEqual({
+      profiles: 1,
+      portfolioImages: TEST_FIXTURE_PROFILE.portfolioImages.length,
+      products: TEST_FIXTURE_PROFILE.products.length,
+      tiers: TEST_FIXTURE_PROFILE.products.reduce((sum, product) => sum + product.tiers.length, 0),
+    });
   });
 
   describe('location ST_DWithin radius search', () => {
