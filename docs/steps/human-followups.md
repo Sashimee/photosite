@@ -34,4 +34,5 @@ Last updated: 2026-09-17.
 | Service | Placeholder until Alex provides it |
 |---------|------------------------------------|
 | Sentry | `@sentry/nextjs` is a no-op without `SENTRY_DSN`; staging/prod set `SENTRY_REQUIRED=true` so a missing DSN fails the build |
+| Expo account + EAS project | `eas.json` and `app.config.ts` are committed; `extra.eas.projectId` comes from `EAS_PROJECT_ID`. Alex creates the Expo project, sets the variable, then the first development builds run (1C.1 follow-up) |
 | OAuth apps (Google, Apple, Facebook, Microsoft) | 1A.2 enables a provider only when its client id/secret env vars are set; email + password works without them |
