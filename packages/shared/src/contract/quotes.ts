@@ -4,17 +4,22 @@ import {
   IdSchema,
   IsoDateTimeSchema,
   MoneySchema,
+  SlugSchema,
   errorResponses,
   paginatedResponseSchema,
 } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
 
+const MAX_LINE_ITEM_QTY = 1000;
+const MAX_LINE_ITEM_UNIT_CENTS = 99_999_999;
+const MAX_LINE_ITEMS = 50;
+
 export const LineItemSchema = z
   .object({
     label: z.string().min(1).max(150),
-    qty: z.int().min(1),
-    unitCents: z.int().nonnegative(),
+    qty: z.int().min(1).max(MAX_LINE_ITEM_QTY),
+    unitCents: z.int().nonnegative().max(MAX_LINE_ITEM_UNIT_CENTS),
   })
   .strict()
   .openapi('LineItem');
@@ -32,7 +37,7 @@ export const QuoteSchema = z
     clientId: IdSchema,
     productId: IdSchema.nullable(),
     productTierId: IdSchema.nullable(),
-    lineItems: z.array(LineItemSchema).min(1),
+    lineItems: z.array(LineItemSchema).min(1).max(MAX_LINE_ITEMS),
     subtotal: MoneySchema,
     platformFee: MoneySchema,
     total: MoneySchema,
@@ -43,38 +48,30 @@ export const QuoteSchema = z
   .strict()
   .openapi('Quote');
 
-function exactlyOneQuoteTarget(data: {
-  requestId?: string | undefined;
-  productId?: string | undefined;
-  productTierId?: string | undefined;
-}) {
-  const forRequest = data.requestId !== undefined;
-  const forProduct = data.productId !== undefined && data.productTierId !== undefined;
-  const partialProduct = (data.productId !== undefined) !== (data.productTierId !== undefined);
-
-  if (partialProduct) return false;
-  return forRequest !== forProduct;
-}
-
 export const CreateQuoteRequestSchema = z
   .object({
-    requestId: IdSchema.optional(),
-    productId: IdSchema.optional(),
-    productTierId: IdSchema.optional(),
-    lineItems: z.array(LineItemSchema).min(1),
+    requestId: IdSchema,
+    lineItems: z.array(LineItemSchema).min(1).max(MAX_LINE_ITEMS),
     validUntil: FutureIsoDateTimeSchema,
     message: z.string().max(2000).optional(),
   })
-  .strict()
-  .refine(exactlyOneQuoteTarget, {
-    message: 'provide either requestId, or productId and productTierId together, but not both',
-    path: ['requestId'],
-  });
+  .strict();
+
+export const DirectQuoteRequestSchema = z
+  .object({
+    productTierId: IdSchema,
+    message: z.string().max(2000).optional(),
+  })
+  .strict();
+
+export const QuotesMineQuerySchema = CursorPaginationQuerySchema.extend({
+  role: z.enum(['photographer', 'client']).optional(),
+}).strict();
 
 registry.registerPath({
   method: 'post',
   path: apiPath('/quotes'),
-  summary: 'Create a quote for a request or a direct product tier',
+  summary: 'Create a quote for a request',
   tags: ['quotes'],
   security: AUTH_SECURITY,
   request: {
@@ -85,25 +82,62 @@ registry.registerPath({
       description: 'Quote created',
       content: { 'application/json': { schema: QuoteSchema } },
     },
-    ...errorResponses([400, 401, 403, 404, 422]),
+    ...errorResponses([400, 401, 403, 404, 409, 422, 429]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/photographers/{slug}/products/{productId}/quotes'),
+  summary: 'Request a direct quote from a product tier',
+  tags: ['quotes'],
+  security: AUTH_SECURITY,
+  request: {
+    params: z.object({ slug: SlugSchema, productId: IdSchema }).strict(),
+    body: { content: { 'application/json': { schema: DirectQuoteRequestSchema } } },
+  },
+  responses: {
+    '201': {
+      description: 'Quote created',
+      content: { 'application/json': { schema: QuoteSchema } },
+    },
+    ...errorResponses([400, 401, 403, 404, 409, 422, 429]),
   },
 });
 
 registry.registerPath({
   method: 'get',
   path: apiPath('/quotes/mine'),
-  summary: "List the current photographer's quotes",
+  summary: "List the current user's quotes",
   tags: ['quotes'],
   security: AUTH_SECURITY,
   request: {
-    query: CursorPaginationQuerySchema,
+    query: QuotesMineQuerySchema,
   },
   responses: {
     '200': {
       description: 'A page of quotes',
       content: { 'application/json': { schema: paginatedResponseSchema(QuoteSchema) } },
     },
-    ...errorResponses([401]),
+    ...errorResponses([400, 401]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/quotes/{id}'),
+  summary: 'Get a quote',
+  tags: ['quotes'],
+  security: AUTH_SECURITY,
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+  },
+  responses: {
+    '200': {
+      description: 'The quote',
+      content: { 'application/json': { schema: QuoteSchema } },
+    },
+    ...errorResponses([401, 404]),
   },
 });
 

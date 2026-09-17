@@ -2466,7 +2466,61 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List open requests matching the current photographer profile */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                    limit?: number;
+                    radiusKm?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A page of matching requests */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: components["schemas"]["RequestSummary"][];
+                            nextCursor: string | null;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
         put?: never;
         /** Create a request */
         post: {
@@ -2535,6 +2589,15 @@ export interface paths {
                 };
                 /** @description Unprocessable entity */
                 422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2751,7 +2814,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create a quote for a request or a direct product tier */
+        /** Create a quote for a request */
         post: {
             parameters: {
                 query?: never;
@@ -2767,19 +2830,7 @@ export interface paths {
                          * @description UUID identifier
                          * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
                          */
-                        requestId?: string;
-                        /**
-                         * Format: uuid
-                         * @description UUID identifier
-                         * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
-                         */
-                        productId?: string;
-                        /**
-                         * Format: uuid
-                         * @description UUID identifier
-                         * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
-                         */
-                        productTierId?: string;
+                        requestId: string;
                         lineItems: components["schemas"]["LineItem"][];
                         /**
                          * Format: date-time
@@ -2837,8 +2888,142 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
                 /** @description Unprocessable entity */
                 422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/photographers/{slug}/products/{productId}/quotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request a direct quote from a product tier */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description URL-safe profile slug */
+                    slug: string;
+                    /** @description UUID identifier */
+                    productId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: uuid
+                         * @description UUID identifier
+                         * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                         */
+                        productTierId: string;
+                        message?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Quote created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Quote"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2861,12 +3046,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the current photographer's quotes */
+        /** List the current user's quotes */
         get: {
             parameters: {
                 query?: {
                     cursor?: string;
                     limit?: number;
+                    role?: "photographer" | "client";
                 };
                 header?: never;
                 path?: never;
@@ -2886,8 +3072,74 @@ export interface paths {
                         };
                     };
                 };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/quotes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a quote */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID identifier */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The quote */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Quote"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -7159,6 +7411,51 @@ export interface components {
              * @example LU
              */
             countryCode: string;
+        };
+        RequestSummary: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            title: string;
+            /**
+             * @example wedding
+             * @enum {string}
+             */
+            category: "wedding" | "portrait" | "event" | "product" | "real-estate" | "corporate";
+            description: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            eventDate: string;
+            dateFlexible: boolean;
+            city: string;
+            /**
+             * @description ISO 3166-1 alpha-2 country code
+             * @example LU
+             */
+            countryCode: string;
+            location: components["schemas"]["LatLng"];
+            budgetMin: components["schemas"]["Money"];
+            budgetMax: components["schemas"]["Money"];
+            /**
+             * @example personal
+             * @enum {string}
+             */
+            usage: "personal" | "commercial" | "editorial" | "extended";
+            /** @enum {string} */
+            status: "open" | "quoted" | "booked" | "closed" | "cancelled";
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            expiresAt: string | null;
+            hasQuoted: boolean;
         };
         Quote: {
             /**
