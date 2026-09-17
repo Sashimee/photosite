@@ -1,0 +1,36 @@
+{
+  "name": "@photoo/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./storage": {
+      "types": "./dist/storage.d.ts",
+      "default": "./dist/storage.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "openapi:generate": "tsc -p tsconfig.build.json && node dist/scripts/generate-openapi.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@photoo/config": "workspace:*",
+    "@types/node": "24.13.5",
+    "@vitest/coverage-v8": "5.0.1",
+    "eslint": "9.39.5",
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  },
+  "dependencies": {
+    "@asteasolutions/zod-to-openapi": "9.1.0",
+    "@aws-sdk/client-s3": "3.1132.0",
+    "zod": "4.6.5"
+  }
+}

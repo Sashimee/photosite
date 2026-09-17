@@ -1,0 +1,572 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [postgis, citext]
+}
+
+enum Locale {
+  en
+  fr
+  de
+  pt
+  es
+}
+
+enum UserRole {
+  client
+  photographer
+  professional
+  admin
+}
+
+enum UserStatus {
+  active
+  suspended
+  deleted
+}
+
+enum DevicePlatform {
+  ios
+  android
+  web
+}
+
+enum ConsentPurpose {
+  analytics
+  ads
+  marketing
+}
+
+enum AuditActorType {
+  user
+  admin
+  system
+}
+
+enum NotificationChannel {
+  email
+  push
+  in_app
+}
+
+enum UploadPurpose {
+  portfolio
+  avatar
+  cover
+  chat_attachment
+  verification_document
+  delivery_file
+}
+
+enum UploadStatus {
+  pending_upload
+  uploaded
+  scanning
+  clean
+  infected
+  failed
+  processed
+}
+
+enum VirusScanStatus {
+  pending
+  clean
+  infected
+  failed
+}
+
+enum PhotographerCategory {
+  wedding
+  portrait
+  event
+  product
+  real_estate @map("real-estate")
+  corporate
+}
+
+enum VerificationStatus {
+  unverified
+  pending
+  verified
+  rejected
+}
+
+enum PortfolioImageStatus {
+  processing
+  pending_review
+  approved
+  flagged
+  rejected
+}
+
+enum LicenceUsage {
+  personal
+  commercial
+  editorial
+  extended
+}
+
+enum RequestStatus {
+  open
+  quoted
+  booked
+  closed
+  cancelled
+}
+
+enum QuoteStatus {
+  draft
+  sent
+  accepted
+  declined
+  expired
+  withdrawn
+}
+
+model Country {
+  code              String   @id @db.Char(2)
+  name              String
+  enabled           Boolean  @default(true)
+  currency          String   @db.Char(3)
+  vatRate           Decimal  @db.Decimal(5, 2)
+  requiredDocuments Json
+  legalTexts        Json
+  defaultLocale     String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  users                User[]
+  photographerProfiles PhotographerProfile[]
+  requests             Request[]
+}
+
+model PlatformSetting {
+  key              String   @id
+  value            Json
+  updatedByAdminId String?
+  updatedByAdmin   User?    @relation(fields: [updatedByAdminId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([updatedByAdminId])
+}
+
+// Shape driven by Better Auth 1.7 (D20); see docs/steps/1A.1-identity-schema.md
+// "Field mapping" for how each column corresponds to the library's schema.
+model User {
+  id               String     @id @default(uuid(7))
+  email            String     @unique @db.Citext
+  emailVerifiedAt  DateTime?
+  name             String?
+  locale           Locale
+  countryCode      String     @db.Char(2)
+  country          Country    @relation(fields: [countryCode], references: [code])
+  roles            UserRole[]
+  status           UserStatus @default(active)
+  twoFactorEnabled Boolean    @default(false)
+  lastLoginAt      DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  accounts                Account[]
+  sessions                Session[]
+  twoFactors              TwoFactor[]
+  devices                 Device[]
+  consentRecords          ConsentRecord[]
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  updatedPlatformSettings PlatformSetting[]
+  uploads                 Upload[]
+  photographerProfile     PhotographerProfile?
+  requests                Request[]
+  quotes                  Quote[]
+
+  @@index([countryCode])
+  @@index([status])
+}
+
+// Better Auth "account" table: OAuth links and the credential (email+password)
+// row, where `password` holds the Argon2id hash written by the 1A.2 wrapper.
+model Account {
+  id                    String    @id @default(uuid(7))
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerId            String
+  accountId             String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+// Better Auth "session" table. `token` is renamed to `tokenHash`: the 1A.2
+// adapter wrapper hashes it (SHA-256) on write and lookup per SECURITY.md.
+model Session {
+  id        String   @id @default(uuid(7))
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Better Auth "verification" table (email verification / password reset
+// tokens). `value` is stored as issued by the library; see the "Field
+// mapping" note in the subplan about hashing it at rest in 1A.2.
+model Verification {
+  id         String   @id @default(uuid(7))
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+// Better Auth two-factor plugin's "twoFactor" table. `secret` is the TOTP
+// seed; encryption-at-rest for it lands in 1A.2.
+model TwoFactor {
+  id                      String    @id @default(uuid(7))
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secret                  String
+  backupCodes             String
+  verified                Boolean   @default(true)
+  failedVerificationCount Int       @default(0)
+  lockedUntil             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Device {
+  id            String         @id @default(uuid(7))
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expoPushToken String         @unique
+  platform      DevicePlatform
+  lastSeenAt    DateTime
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([userId])
+}
+
+// Append-only: no updatedAt, no update paths in seed code. A hand-written
+// CHECK constraint enforces exactly one of userId/anonymousId being set.
+model ConsentRecord {
+  id            String         @id @default(uuid(7))
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id])
+  anonymousId   String?
+  purpose       ConsentPurpose
+  granted       Boolean
+  policyVersion String
+  ip            String?
+  userAgent     String?
+  recordedAt    DateTime       @default(now())
+
+  @@index([userId])
+  @@index([anonymousId])
+}
+
+// Append-only: no updatedAt, no update paths in seed code. `actorId` is not
+// a foreign key so entries survive even if the actor's User row is gone.
+// Revoking UPDATE/DELETE at the database level is out of scope; see 1A.14.
+model AuditLog {
+  id         String         @id @default(uuid(7))
+  actorType  AuditActorType
+  actorId    String?
+  action     String
+  targetType String
+  targetId   String?
+  before     Json?
+  after      Json?
+  ip         String?
+  occurredAt DateTime       @default(now())
+
+  @@index([targetType, targetId])
+  @@index([actorId])
+  @@index([occurredAt])
+}
+
+// `emailSentAt`/`pushSentAt` are set by the worker's per-channel processor
+// once delivered, so a retry on the `notify` job never double-sends. The
+// `notify-sweep` job re-enqueues rows still pending a wanted channel past
+// its window; see the partial index note in DATA-MODEL.md.
+model Notification {
+  id          String                @id @default(uuid(7))
+  userId      String
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String
+  payload     Json
+  channels    NotificationChannel[]
+  emailSentAt DateTime?
+  pushSentAt  DateTime?
+  readAt      DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+}
+
+// A missing row for a `(userId, type, channel)` means the default: on.
+// `in_app` can't be disabled (enforced by the API, not here).
+model NotificationPreference {
+  id        String              @id @default(uuid(7))
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  channel   NotificationChannel
+  enabled   Boolean
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@unique([userId, type, channel])
+}
+
+// Generic upload record referenced by id from Attachment, VerificationDocument,
+// PortfolioImage and Delivery once 1A.3b lands. `objectKey` and `exif` are
+// private (SECURITY.md) and never serialised to clients; downloads are only
+// issued once `virusScanStatus = clean`. Uploads still `pending_upload` or
+// `uploaded` past `expiresAt` are removed by the worker's cleanup job.
+// `width`/`height` are set by the worker's image-process job once the
+// upload is processed.
+model Upload {
+  id                String          @id @default(uuid(7))
+  ownerId           String
+  owner             User            @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  purpose           UploadPurpose
+  status            UploadStatus    @default(pending_upload)
+  mimeType          String
+  declaredSizeBytes Int
+  actualSizeBytes   Int?
+  width             Int?
+  height            Int?
+  objectKey         String          @unique
+  variants          Json?
+  exif              Json?
+  virusScanStatus   VirusScanStatus @default(pending)
+  expiresAt         DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  avatarForProfile PhotographerProfile? @relation("PhotographerProfileAvatar")
+  coverForProfile  PhotographerProfile? @relation("PhotographerProfileCover")
+  portfolioImage   PortfolioImage?
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([status, expiresAt])
+}
+
+// `location` is `geography(Point, 4326)`, an `Unsupported` type Prisma
+// cannot index or write directly: the GiST index lives in hand-written
+// migration SQL and `location` is only ever set/read via raw queries.
+// `isPublished` requires `verificationStatus = verified` and
+// `stripePayoutsEnabled = true` (DATA-MODEL.md); enforced by callers, not
+// the database, since real profiles cannot flip either flag before 1A.8/1A.9.
+model PhotographerProfile {
+  id                       String                                 @id @default(uuid(7))
+  userId                   String                                 @unique
+  user                     User                                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug                     String                                 @unique
+  displayName              String
+  headline                 String?
+  bio                      Json
+  avatarUploadId           String?                                @unique
+  avatarUpload             Upload?                                @relation("PhotographerProfileAvatar", fields: [avatarUploadId], references: [id], onDelete: SetNull)
+  coverUploadId            String?                                @unique
+  coverUpload              Upload?                                @relation("PhotographerProfileCover", fields: [coverUploadId], references: [id], onDelete: SetNull)
+  links                    Json
+  categories               PhotographerCategory[]
+  languages                String[]
+  location                 Unsupported("geography(Point, 4326)")?
+  serviceRadiusKm          Int?
+  city                     String
+  countryCode              String                                 @db.Char(2)
+  country                  Country                                @relation(fields: [countryCode], references: [code])
+  verificationStatus       VerificationStatus                     @default(unverified)
+  stripeAccountId          String?
+  stripeOnboardingComplete Boolean                                @default(false)
+  stripePayoutsEnabled     Boolean                                @default(false)
+  ratingAvg                Decimal                                @default(0) @db.Decimal(3, 2)
+  ratingCount              Int                                    @default(0)
+  isPublished              Boolean                                @default(false)
+  deletedAt                DateTime?
+  createdAt                DateTime                               @default(now())
+  updatedAt                DateTime                               @updatedAt
+
+  portfolioImages PortfolioImage[]
+  products        Product[]
+  quotes          Quote[]
+
+  @@index([countryCode])
+  @@index([verificationStatus])
+  @@index([city])
+}
+
+// `width`/`height` are copied from `Upload` once the worker's image-process
+// job finishes, so the public profile response never has to join `Upload`.
+model PortfolioImage {
+  id        String               @id @default(uuid(7))
+  profileId String
+  profile   PhotographerProfile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  uploadId  String               @unique
+  upload    Upload               @relation(fields: [uploadId], references: [id], onDelete: Restrict)
+  width     Int?
+  height    Int?
+  order     Int
+  status    PortfolioImageStatus @default(processing)
+  deletedAt DateTime?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([profileId])
+  @@index([status])
+}
+
+model Product {
+  id              String               @id @default(uuid(7))
+  profileId       String
+  profile         PhotographerProfile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title           Json
+  description     Json?
+  category        PhotographerCategory
+  durationMinutes Int
+  deliverables    Json
+  basePriceCents  Int
+  currency        String               @db.Char(3)
+  isActive        Boolean              @default(true)
+  order           Int
+  deletedAt       DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tiers  ProductTier[]
+  quotes Quote[]
+
+  @@index([profileId])
+  @@index([isActive])
+}
+
+model ProductTier {
+  id                 String       @id @default(uuid(7))
+  productId          String
+  product            Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  usage              LicenceUsage
+  priceCents         Int
+  currency           String       @db.Char(3)
+  description        String?
+  licenceTextVersion String
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  quotes Quote[]
+
+  @@unique([productId, usage])
+  @@index([productId])
+}
+
+// `location` is `geography(Point, 4326)`, an `Unsupported` type Prisma
+// cannot index or write directly: the GiST index and the partial index on
+// `(status, expiresAt)` live in hand-written migration SQL. `address` holds
+// the full structured address and is visible only to the owning client and
+// the booked photographer (DATA-MODEL.md).
+model Request {
+  id             String                                 @id @default(uuid(7))
+  clientId       String
+  client         User                                   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  title          String
+  category       PhotographerCategory
+  description    String
+  eventDate      DateTime
+  dateFlexible   Boolean                                @default(false)
+  location       Unsupported("geography(Point, 4326)")?
+  address        Json
+  city           String
+  countryCode    String                                 @db.Char(2)
+  country        Country                                @relation(fields: [countryCode], references: [code])
+  budgetMinCents Int
+  budgetMaxCents Int
+  currency       String                                 @db.Char(3)
+  usage          LicenceUsage
+  status         RequestStatus                          @default(open)
+  expiresAt      DateTime
+  deletedAt      DateTime?
+  createdAt      DateTime                               @default(now())
+  updatedAt      DateTime                               @updatedAt
+
+  quotes Quote[]
+
+  @@index([clientId, createdAt])
+  @@index([countryCode])
+}
+
+// `photographerId` references `PhotographerProfile`, not `User` directly
+// (DATA-MODEL.md), so a quote survives a photographer's profile identity
+// (slug, display name) changing shape. `feePercent` is a snapshot of
+// `PlatformSetting('feePercent')` at creation time so later fee changes
+// never rewrite sent quotes; it is stored with the same precision as
+// `Country.vatRate`. `licenceUsage`/`licenceTextVersion` snapshot the licence
+// terms the client agreed to, because `productTierId` update
+// (products.service.ts) hard-deletes and recreates tiers, which would
+// otherwise silently null out and lose the original licence. The partial
+// unique index on `(requestId, photographerId) WHERE status = 'sent'` and
+// the CHECK constraints live in hand-written migration SQL.
+model Quote {
+  id                 String              @id @default(uuid(7))
+  requestId          String?
+  request            Request?            @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  photographerId     String
+  photographer       PhotographerProfile @relation(fields: [photographerId], references: [id], onDelete: Restrict)
+  clientId           String
+  client             User                @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  productId          String?
+  product            Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productTierId      String?
+  productTier        ProductTier?        @relation(fields: [productTierId], references: [id], onDelete: SetNull)
+  lineItems          Json
+  subtotalCents      Int
+  platformFeeCents   Int
+  totalCents         Int
+  feePercent         Decimal             @db.Decimal(5, 2)
+  licenceUsage       LicenceUsage
+  licenceTextVersion String?
+  currency           String              @db.Char(3)
+  validUntil         DateTime
+  message            String?
+  status             QuoteStatus         @default(sent)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([requestId])
+  @@index([clientId, createdAt])
+  @@index([photographerId, createdAt])
+  @@index([status, validUntil])
+  @@index([productId])
+  @@index([productTierId])
+}

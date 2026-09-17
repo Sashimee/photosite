@@ -1,0 +1,49 @@
+import { NextResponse, type NextRequest } from 'next/server';
+
+import { buildCspHeader, originOf } from './lib/csp';
+import { env } from './lib/env';
+import { buildLocaleRedirectPath } from './lib/locale-routing';
+
+const connectOrigins = [
+  originOf(env.NEXT_PUBLIC_API_URL),
+  originOf(env.NEXT_PUBLIC_SENTRY_DSN),
+].filter((origin): origin is string => origin !== null);
+
+export function proxy(request: NextRequest): NextResponse {
+  const { pathname, search } = request.nextUrl;
+  const isDev = process.env.NODE_ENV === 'development';
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  const cspHeader = buildCspHeader(nonce, isDev, connectOrigins);
+
+  const redirectPath = buildLocaleRedirectPath(
+    pathname,
+    search,
+    request.headers.get('accept-language'),
+  );
+
+  if (redirectPath) {
+    const response = NextResponse.redirect(new URL(redirectPath, request.url));
+    response.headers.set('Content-Security-Policy', cspHeader);
+    return response;
+  }
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', cspHeader);
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set('Content-Security-Policy', cspHeader);
+  return response;
+}
+
+export const config = {
+  matcher: [
+    {
+      source: '/((?!_next/static|_next/image|api|.*\\..*).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
+};

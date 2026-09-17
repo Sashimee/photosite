@@ -1,6 +1,14 @@
 RESUME.md
 .env
 .env.*
+!.env.example
 .DS_Store
 node_modules/
 dist/
+.turbo/
+packages/db/src/generated/
+coverage/
+.next/
+.expo/
+*.tsbuildinfo
+next-env.d.ts

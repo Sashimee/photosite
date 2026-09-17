@@ -1,0 +1,16 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  '@parcel/watcher': false
+  '@prisma/engines': true
+  '@sentry/cli': false
+  '@swc/core': false
+  msgpackr-extract: false
+  prisma: true
+minimumReleaseAgeExclude:
+  - '@types/node@24.13.5'
+  - prettier@3.9.7
+overrides:
+  deepmerge-ts: 8.0.2
+  mysql2: 3.24.4

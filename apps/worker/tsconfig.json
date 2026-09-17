@@ -1,0 +1,9 @@
+{
+  "extends": "@photoo/config/tsconfig/library.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "types": ["node"],
+    "experimentalDecorators": true
+  },
+  "include": ["src", "*.config.ts"]
+}

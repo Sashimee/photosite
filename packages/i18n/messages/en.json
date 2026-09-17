@@ -1,0 +1,224 @@
+{
+  "common": {
+    "appName": "Photoo",
+    "cancel": "Cancel",
+    "close": "Close",
+    "copy": "Copy",
+    "copied": "Copied",
+    "error": "An error occurred",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "save": "Save"
+  },
+  "locale": {
+    "de": "German",
+    "en": "English",
+    "es": "Spanish",
+    "fr": "French",
+    "pt": "Portuguese"
+  },
+  "mobile": {
+    "tabs": {
+      "discover": "Discover",
+      "requests": "Requests",
+      "messages": "Messages",
+      "account": "Account"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "description": "This screen does not exist.",
+      "backHome": "Go to home screen"
+    }
+  },
+  "web": {
+    "skipToContent": "Skip to content",
+    "nav": {
+      "findPhotographer": "Find a photographer",
+      "forPhotographers": "For photographers",
+      "jobs": "Jobs",
+      "signIn": "Sign in",
+      "account": "Account",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu",
+      "menuTitle": "Navigation"
+    },
+    "localeSwitcher": {
+      "label": "Change language"
+    },
+    "footer": {
+      "legalNav": "Legal",
+      "imprint": "Imprint",
+      "privacy": "Privacy policy",
+      "terms": "Terms of service",
+      "cookies": "Cookie policy",
+      "rights": "© {year} {appName}. All rights reserved."
+    },
+    "home": {
+      "heroTitle": "Book trusted photographers in Luxembourg",
+      "heroSubtitle": "Compare quotes from verified photographers and professionals for your next shoot.",
+      "searchLabel": "Search for a photography category or city",
+      "searchPlaceholder": "Wedding, portrait, corporate…",
+      "searchCta": "Search"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "description": "The page you are looking for does not exist or has been moved.",
+      "backHome": "Back to home"
+    },
+    "error": {
+      "title": "Something went wrong",
+      "description": "An unexpected error occurred while loading this page."
+    },
+    "globalError": {
+      "title": "Something went wrong",
+      "description": "The application ran into an unexpected error. Please try again."
+    },
+    "auth": {
+      "roles": {
+        "client": "Client looking to book a photographer",
+        "photographer": "Photographer",
+        "professional": "Professional or company"
+      },
+      "validation": {
+        "required": "This field is required.",
+        "tooShort": "This value is too short.",
+        "tooLong": "This value is too long.",
+        "invalidFormat": "Enter a valid value.",
+        "invalid": "This value isn't valid."
+      },
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "invalidCredentials": "Incorrect email or password.",
+        "emailTaken": "An account with this email already exists.",
+        "emailNotVerified": "Please verify your email before signing in.",
+        "invalidToken": "This link is invalid.",
+        "tokenExpired": "This link has expired. Request a new one.",
+        "passwordTooShort": "Password is too short.",
+        "passwordTooLong": "Password is too long.",
+        "passwordCompromised": "This password has appeared in a data breach. Choose a different one.",
+        "invalidCode": "That code isn't correct.",
+        "invalidBackupCode": "That backup code isn't correct.",
+        "totpAlreadyEnabled": "Two-factor authentication is already enabled.",
+        "twoFactorNotEnabled": "Two-factor authentication isn't enabled.",
+        "tooManyAttempts": "Too many attempts. Request a new code.",
+        "accountLocked": "Your account is temporarily locked. Try again later.",
+        "roleAlreadyAssigned": "You already have this role.",
+        "validationError": "Please check the highlighted fields.",
+        "tooManyRequests": "Too many attempts. Try again later.",
+        "tooManyRequestsWithRetry": "Too many attempts. Try again in {seconds, plural, one {# second} other {# seconds}}.",
+        "forbidden": "This request was blocked for your protection. Please reload the page and try again.",
+        "unauthorized": "Please sign in to continue.",
+        "notFound": "We couldn't find what you're looking for.",
+        "providerNotConfigured": "This sign-in method isn't available yet."
+      },
+      "signUp": {
+        "title": "Create your account",
+        "emailLabel": "Email",
+        "passwordLabel": "Password",
+        "passwordHint": "At least 10 characters.",
+        "roleLabel": "I am a…",
+        "submit": "Create account",
+        "success": "Check your email to verify your account before signing in.",
+        "alreadyHaveAccount": "Already have an account?",
+        "signInLink": "Sign in"
+      },
+      "signIn": {
+        "title": "Sign in",
+        "emailLabel": "Email",
+        "passwordLabel": "Password",
+        "submit": "Sign in",
+        "forgotPassword": "Forgot your password?",
+        "noAccount": "Don't have an account?",
+        "signUpLink": "Create one"
+      },
+      "twoFactor": {
+        "title": "Two-factor verification",
+        "description": "Enter the 6-digit code from your authenticator app.",
+        "codeLabel": "Authenticator code",
+        "backupCodeLabel": "Backup code",
+        "useBackupCode": "Use a backup code instead",
+        "useAuthenticatorCode": "Use an authenticator code instead",
+        "submit": "Verify"
+      },
+      "verifyEmail": {
+        "title": "Verifying your email",
+        "verifying": "Verifying your email…",
+        "success": "Your email is verified.",
+        "continue": "Continue to your account",
+        "invalidToken": "This verification link is invalid or has expired.",
+        "signInLink": "Sign in"
+      },
+      "forgotPassword": {
+        "title": "Reset your password",
+        "description": "Enter your email and we'll send you a reset link if an account exists.",
+        "emailLabel": "Email",
+        "submit": "Send reset link",
+        "success": "If an account exists for that email, a reset link has been sent."
+      },
+      "resetPassword": {
+        "title": "Choose a new password",
+        "passwordLabel": "New password",
+        "passwordHint": "At least 10 characters.",
+        "submit": "Reset password",
+        "success": "Password updated. You can now sign in.",
+        "signInLink": "Sign in",
+        "missingToken": "This reset link is invalid.",
+        "requestNewLink": "Request a new link"
+      }
+    },
+    "account": {
+      "title": "Account",
+      "signedInAs": "Signed in as {email}",
+      "menu": {
+        "account": "Account",
+        "signOut": "Sign out"
+      },
+      "roles": {
+        "title": "Roles",
+        "current": "Your roles",
+        "addRole": "Add a role",
+        "addRoleLabel": "Role to add",
+        "addRoleCta": "Add role",
+        "noneAvailable": "You already have every role.",
+        "added": "Role added."
+      },
+      "security": {
+        "title": "Security",
+        "twoFactorEnabled": "Two-factor authentication is on.",
+        "twoFactorDisabled": "Two-factor authentication is off.",
+        "enable2fa": "Enable two-factor authentication",
+        "disable2fa": "Disable two-factor authentication",
+        "confirmPasswordTitle": "Confirm your password to continue",
+        "passwordLabel": "Current password",
+        "startEnrollCta": "Continue",
+        "scanTitle": "Set up your authenticator app",
+        "scanDescription": "This key can't be shown again. Enter it manually in your authenticator app (Google Authenticator, 1Password, Authy, …), since scanning a QR code isn't supported yet.",
+        "secretLabel": "Setup key",
+        "copySecretLabel": "Copy setup key",
+        "backupCodesTitle": "Backup codes",
+        "backupCodesDescription": "Save these codes somewhere safe. Each can be used once if you lose access to your authenticator app. They won't be shown again.",
+        "backupCodesConfirm": "I've saved my backup codes",
+        "verifyCodeLabel": "6-digit code from your authenticator app",
+        "verifyCta": "Enable two-factor authentication",
+        "enabled": "Two-factor authentication is now enabled.",
+        "disableCodeLabel": "Current authenticator code",
+        "disablePasswordLabel": "Current password",
+        "disableCta": "Disable two-factor authentication",
+        "disabled": "Two-factor authentication is now disabled."
+      },
+      "sessions": {
+        "title": "Sessions",
+        "description": "Sign out of this browser, or every device you've ever signed in on.",
+        "signOut": "Sign out",
+        "signOutEverywhere": "Sign out everywhere"
+      },
+      "dangerZone": {
+        "title": "Data and account",
+        "exportData": "Download your data",
+        "exportComingSoon": "Data export is coming soon.",
+        "deleteAccount": "Delete account",
+        "deleteComingSoon": "Account deletion is coming soon."
+      }
+    }
+  }
+}
