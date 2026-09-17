@@ -13,7 +13,7 @@ export function createConfig(tsconfigRootDir) {
       languageOptions: {
         globals: globals.node,
         parserOptions: {
-          projectService: { allowDefaultProject: ['*.js', '*.config.ts'] },
+          projectService: { allowDefaultProject: ['*.js', '*.mjs', '*.config.ts'] },
           tsconfigRootDir,
         },
       },

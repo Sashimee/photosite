@@ -13,14 +13,6 @@
     "types": ["node", "expo/types"],
     "rootDir": "."
   },
-  "include": [
-    "app",
-    "src",
-    "jest",
-    "*.config.ts",
-    "*.config.js",
-    "app.config.ts",
-    "nativewind-env.d.ts"
-  ],
+  "include": ["app", "src", "jest", "*.config.ts", "app.config.ts", "nativewind-env.d.ts"],
   "exclude": ["node_modules"]
 }

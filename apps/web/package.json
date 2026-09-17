@@ -30,9 +30,8 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@photoo/config": "workspace:*",
     "@next/eslint-plugin-next": "16.3.5",
-    "@vitejs/plugin-react": "6.1.1",
+    "@photoo/config": "workspace:*",
     "@tailwindcss/postcss": "4.3.3",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
@@ -40,6 +39,8 @@
     "@types/node": "24.13.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "@vitest/coverage-v8": "5.0.1",
     "eslint": "9.39.5",
     "jsdom": "30.0.1",
     "postcss": "8.5.28",

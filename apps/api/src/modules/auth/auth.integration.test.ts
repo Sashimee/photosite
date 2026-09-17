@@ -72,6 +72,10 @@ describe('auth integration', () => {
 
   afterAll(async () => {
     await prisma.user.deleteMany({ where: { email: { in: createdEmails } } });
+    // Signing in as the seed user (below) creates real Session rows against
+    // a user this suite doesn't own; clean those up too so repeated local
+    // runs don't accumulate sessions on client@photoo.test forever.
+    await prisma.session.deleteMany({ where: { user: { email: 'client@photoo.test' } } });
     await prisma.$disconnect();
     redis.disconnect();
     await app.close();
