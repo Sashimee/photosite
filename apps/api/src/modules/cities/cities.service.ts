@@ -32,6 +32,7 @@ export class CitiesService {
           name: group.name,
           countryCode: group.countryCode,
           photographerCount: group.count,
+          location: { lat: group.lat, lng: group.lng },
         }),
       );
   }

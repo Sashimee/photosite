@@ -7,10 +7,23 @@ describe('CitySummarySchema', () => {
     name: 'Luxembourg',
     countryCode: 'LU',
     photographerCount: 3,
+    location: { lat: 49.61, lng: 6.13 },
   };
 
   it('accepts a well-formed city summary', () => {
     expect(CitySummarySchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('rejects a missing location', () => {
+    const withoutLocation: Partial<typeof valid> = { ...valid };
+    delete withoutLocation.location;
+    expect(CitySummarySchema.safeParse(withoutLocation).success).toBe(false);
+  });
+
+  it('rejects an out-of-range latitude', () => {
+    expect(
+      CitySummarySchema.safeParse({ ...valid, location: { lat: 91, lng: 6.13 } }).success,
+    ).toBe(false);
   });
 
   it('rejects a lowercase countryCode', () => {
