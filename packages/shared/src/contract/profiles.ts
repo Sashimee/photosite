@@ -179,6 +179,7 @@ export const PhotographerSearchQuerySchema = z
     lng: z.coerce.number().min(-180).max(180).optional(),
     radiusKm: z.coerce.number().int().min(1).max(200).optional(),
     city: z.string().min(1).max(120).optional(),
+    countryCode: CountryCodeSchema.optional(),
     category: PhotographerCategorySchema.optional(),
     language: LanguageCodeSchema.optional(),
     priceMinCents: z.coerce.number().int().nonnegative().optional(),

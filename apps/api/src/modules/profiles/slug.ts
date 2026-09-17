@@ -1,4 +1,4 @@
-import { SUPPORTED_LOCALES } from '@photoo/shared';
+import { SLUG_MAX_LENGTH, SUPPORTED_LOCALES, slugify } from '@photoo/shared';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 
 // Route segments of apps/web plus the reserved words from
@@ -16,28 +16,12 @@ const RESERVED_PROFILE_SLUGS: ReadonlySet<string> = new Set<string>([
   ...SUPPORTED_LOCALES,
 ]);
 
-const MAX_SLUG_LENGTH = 60;
-const FALLBACK_SLUG_BASE = 'photographer';
-
-function slugify(displayName: string): string {
-  const base = displayName
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, MAX_SLUG_LENGTH)
-    .replace(/-+$/g, '');
-
-  return base.length >= 3 ? base : FALLBACK_SLUG_BASE;
-}
-
 function withSuffix(base: string, suffix: number): string {
   if (suffix === 1) {
     return base;
   }
   const suffixText = `-${String(suffix)}`;
-  return `${base.slice(0, MAX_SLUG_LENGTH - suffixText.length)}${suffixText}`;
+  return `${base.slice(0, SLUG_MAX_LENGTH - suffixText.length)}${suffixText}`;
 }
 
 // Slugs are always server-generated (never accepted from clients), so

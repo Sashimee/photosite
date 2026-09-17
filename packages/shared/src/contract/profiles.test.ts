@@ -404,4 +404,12 @@ describe('PhotographerSearchQuerySchema', () => {
     expect(PhotographerSearchQuerySchema.safeParse({ radiusKm: '0' }).success).toBe(false);
     expect(PhotographerSearchQuerySchema.safeParse({ radiusKm: '201' }).success).toBe(false);
   });
+
+  it('accepts a countryCode filter', () => {
+    expect(PhotographerSearchQuerySchema.safeParse({ countryCode: 'LU' }).success).toBe(true);
+  });
+
+  it('rejects a lowercase countryCode', () => {
+    expect(PhotographerSearchQuerySchema.safeParse({ countryCode: 'lu' }).success).toBe(false);
+  });
 });

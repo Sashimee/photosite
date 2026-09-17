@@ -57,6 +57,8 @@ export {
 
 export { calculatePlatformFee, quoteTotals, type LineItem, type QuoteTotals } from './fee.js';
 
+export { SLUG_MAX_LENGTH, slugify, type SlugifyOptions } from './slug.js';
+
 export {
   ApiErrorSchema,
   CountryCodeSchema,
@@ -144,6 +146,8 @@ export {
   UserSchema,
   VerifyEmailRequestSchema,
 } from './contract/auth.js';
+
+export { CitiesQuerySchema, CitySummarySchema } from './contract/cities.js';
 
 export {
   AttachPortfolioImageRequestSchema,
