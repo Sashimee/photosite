@@ -7,6 +7,7 @@ import { RateLimitModule } from './common/rate-limit/rate-limit.module.js';
 import { EnvModule } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { ProductsModule } from './modules/products/products.module.js';
 import { ProfilesModule } from './modules/profiles/profiles.module.js';
 import { QuotesModule } from './modules/quotes/quotes.module.js';
@@ -32,6 +33,7 @@ import { StorageModule } from './storage/storage.module.js';
     ProductsModule,
     RequestsModule,
     QuotesModule,
+    NotificationsModule,
     OpenapiModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],

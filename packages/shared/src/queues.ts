@@ -84,6 +84,36 @@ export const NotificationsCleanupJobSchema = z.object({}).strict();
 
 export type NotificationsCleanupJob = z.infer<typeof NotificationsCleanupJobSchema>;
 
+export const NOTIFY_JOB_ATTEMPTS = 5;
+export const NOTIFY_JOB_BACKOFF_DELAY_MS = 5000;
+export const NOTIFY_JOB_FAILED_RETENTION_SECONDS = 24 * 60 * 60;
+
+export interface NotifyJobOptions {
+  jobId: string;
+  attempts: number;
+  backoff: { type: 'exponential'; delay: number };
+  removeOnComplete: boolean;
+  removeOnFail: { age: number };
+}
+
+// Centralises the `notify` queue's BullMQ options so the API (first
+// enqueue), the worker's quote-expiry job (first enqueue) and the
+// notify-sweep job (re-enqueue) never drift from each other. `jobId`
+// defaults to the notificationId for the first enqueue (idempotent insert);
+// the sweep passes a distinct id instead, because a job already terminal
+// (failed/completed) under the same id would silently block a re-add, and
+// the notify processor's emailSentAt/pushSentAt guards make re-processing
+// under a different id safe.
+export function notifyJobOptions(jobId: string): NotifyJobOptions {
+  return {
+    jobId,
+    attempts: NOTIFY_JOB_ATTEMPTS,
+    backoff: { type: 'exponential', delay: NOTIFY_JOB_BACKOFF_DELAY_MS },
+    removeOnComplete: true,
+    removeOnFail: { age: NOTIFY_JOB_FAILED_RETENTION_SECONDS },
+  };
+}
+
 export const QUEUE_JOB_SCHEMAS = {
   [EMAIL_QUEUE_NAME]: EmailJobSchema,
   [FILE_SCAN_QUEUE_NAME]: FileScanJobSchema,

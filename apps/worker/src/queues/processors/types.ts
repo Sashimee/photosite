@@ -53,5 +53,5 @@ export interface ObjectStorage {
 }
 
 export interface JobQueueLike {
-  add(name: string, data: unknown, opts?: Record<string, unknown>): Promise<unknown>;
+  add(name: string, data: unknown, opts?: object): Promise<unknown>;
 }

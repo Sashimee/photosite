@@ -4,9 +4,10 @@ import { AppModule } from '../app.module.js';
 import { configureApp } from '../bootstrap/configure-app.js';
 import { createFastifyAdapter } from '../bootstrap/fastify-adapter.js';
 import { APP_CONFIG, type Env } from '../config/env.js';
+import { TestEmailWorkerModule } from './test-email-worker.module.js';
 
 export async function createTestApp(env: Env): Promise<NestFastifyApplication> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule, TestEmailWorkerModule] })
     .overrideProvider(APP_CONFIG)
     .useValue(env)
     .compile();

@@ -47,12 +47,4 @@ export const NOT_YET_IMPLEMENTED: readonly NotYetImplementedRoute[] = [
   { method: 'POST', path: '/v1/me/data-requests' },
   { method: 'GET', path: '/v1/me/data-requests' },
   { method: 'POST', path: '/v1/consents' },
-  { method: 'GET', path: '/v1/notifications' },
-  { method: 'GET', path: '/v1/notifications/unread-count' },
-  { method: 'POST', path: '/v1/notifications/:id/read' },
-  { method: 'POST', path: '/v1/notifications/read-all' },
-  { method: 'GET', path: '/v1/me/notification-preferences' },
-  { method: 'PUT', path: '/v1/me/notification-preferences' },
-  { method: 'POST', path: '/v1/me/devices' },
-  { method: 'DELETE', path: '/v1/me/devices/:id' },
 ];
