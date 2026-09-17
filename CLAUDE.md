@@ -24,7 +24,7 @@ pnpm + Turborepo monorepo, TypeScript strict everywhere.
 - `apps/api` NestJS (Fastify) – REST + OpenAPI, Socket.IO chat, Better Auth (fallback Passport)
 - `apps/worker` NestJS standalone – BullMQ jobs: images (sharp), provenance (AI detection, reverse search, C2PA, EXIF), email (Brevo), push (Expo), payouts/release, GDPR exports
 - `packages/db` Prisma + PostgreSQL 16 + PostGIS; `packages/shared` zod schemas/enums/fee helper; `packages/api-client` generated from OpenAPI; `packages/i18n` ICU catalogs (en, fr, de, pt, es); `packages/config` eslint/tsconfig
-- Redis 7, S3-compatible EU object storage, Stripe Connect Express, Sentry
+- Redis 7, S3-compatible EU object storage, ClamAV (upload virus scanning), Stripe Connect Express, Sentry
 - Hosting: VPS dok.seil.products with Dokploy/Coolify; staging from `dev`, production from `main`
 
 ## Commands
@@ -48,7 +48,7 @@ pnpm --filter @photoo/web dev       # Next.js dev server on :3000, against NEXT_
 pnpm --filter @photoo/api dev       # NestJS (Fastify) API on PORT (default 4000), watches src/ and restarts
 pnpm --filter @photoo/mobile start  # Expo dev server against EXPO_PUBLIC_API_URL (mock or api); --ios/--android/--web variants
 pnpm --filter @photoo/<name> <script>
-pnpm stack:up       # docker compose: postgres+postgis, redis, minio, mailpit (127.0.0.1 only)
+pnpm stack:up       # docker compose: postgres+postgis, redis, minio, mailpit, clamav (127.0.0.1 only)
 pnpm stack:down     # stop the local dev stack
 pnpm stack:reset    # stop the local dev stack and remove its volumes
 pnpm db:seed        # forwards to packages/db seed script

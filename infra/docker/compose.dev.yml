@@ -73,7 +73,27 @@ services:
       - '127.0.0.1:${MAILPIT_SMTP_PORT:?copy infra/docker/.env.example to infra/docker/.env}:1025'
       - '127.0.0.1:${MAILPIT_UI_PORT:?copy infra/docker/.env.example to infra/docker/.env}:8025'
 
+  # clamav/clamav's entrypoint runs freshclam once, synchronously, before
+  # clamd starts, to fetch the initial signature database (~200 MB); on a
+  # cold clamav-data volume this can take several minutes, so this service
+  # is intentionally left out of `pnpm stack:up`'s `--wait` list (see root
+  # package.json) and started separately without waiting.
+  clamav:
+    image: clamav/clamav:1.5.4-debian13-slim
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${CLAMAV_PORT:?copy infra/docker/.env.example to infra/docker/.env}:3310'
+    volumes:
+      - clamav-data:/var/lib/clamav
+    healthcheck:
+      test: ['CMD', 'clamdcheck.sh']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10m
+
 volumes:
   postgres-data:
   redis-data:
   minio-data:
+  clamav-data:
