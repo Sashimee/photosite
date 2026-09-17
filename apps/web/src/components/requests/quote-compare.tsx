@@ -9,6 +9,7 @@ import { formatMoney, requireMoney } from '@/lib/money';
 import { FormattedDateTime } from './formatted-date-time';
 import { QuoteActions } from './quote-actions';
 import { QuoteLineItems } from './quote-line-items';
+import { QuotePhotographer } from './quote-photographer';
 
 type Quote = components['schemas']['Quote'];
 
@@ -29,9 +30,10 @@ export async function QuoteCompare({
     return null;
   }
 
-  const [tRequest, tQuote] = await Promise.all([
+  const [tRequest, tQuote, tProfile] = await Promise.all([
     getTranslations({ locale, namespace: 'web.requests.detail' }),
     getTranslations({ locale, namespace: 'web.quotes.detail' }),
+    getTranslations({ locale, namespace: 'web.profile' }),
   ]);
 
   return (
@@ -42,8 +44,20 @@ export async function QuoteCompare({
       <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {sentQuotes.map((quote) => {
           const total = requireMoney(quote.total, `quote "${quote.id}" total`);
+          const ratingLabel =
+            quote.photographer.ratingCount > 0
+              ? tProfile('rating', {
+                  ratingAvg: quote.photographer.ratingAvg,
+                  ratingCount: quote.photographer.ratingCount,
+                })
+              : null;
           return (
             <li key={quote.id} className="flex flex-col gap-3 rounded-lg border border-border p-4">
+              <QuotePhotographer
+                photographer={quote.photographer}
+                locale={locale}
+                ratingLabel={ratingLabel}
+              />
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium text-foreground">{formatMoney(total, locale)}</span>
                 <span className="text-sm text-muted-foreground">

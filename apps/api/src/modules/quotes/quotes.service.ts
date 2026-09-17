@@ -16,11 +16,13 @@ import {
   decodeCreatedAtCursor,
   encodeCreatedAtCursor,
 } from '../../common/pagination/created-at-cursor.js';
+import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { ChatService } from '../chat/chat.service.js';
-import { mapQuote } from './quote-mapper.js';
+import { mapQuote, mapQuotePhotographer } from './quote-mapper.js';
 import { QUOTE_EVENTS, type QuoteEvents } from './quote-events.js';
 import { QuotesRateLimitService } from './quotes-rate-limit.service.js';
+import { QuotesRepository } from './quotes.repository.js';
 
 interface SessionUser {
   id: string;
@@ -62,13 +64,19 @@ function resolveLocalizedTitle(title: unknown, locale: string): string {
 
 @Injectable()
 export class QuotesService {
+  private readonly baseUrl: string;
+
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(QuotesRepository) private readonly repository: QuotesRepository,
     @Inject(QuotesRateLimitService) private readonly rateLimit: QuotesRateLimitService,
     @Inject(QUOTE_EVENTS) private readonly events: QuoteEvents,
     @Inject(ChatService) private readonly chat: ChatService,
     @Inject(Logger) private readonly logger: Logger,
-  ) {}
+    @Inject(APP_CONFIG) config: Env,
+  ) {
+    this.baseUrl = config.S3_PUBLIC_BASE_URL;
+  }
 
   async createForRequest(
     user: SessionUser,
@@ -172,7 +180,7 @@ export class QuotesService {
 
     await this.events.onCreated(created);
 
-    return mapQuote(created);
+    return this.mapWithPhotographer(created);
   }
 
   async createDirect(
@@ -256,7 +264,7 @@ export class QuotesService {
 
     await this.events.onCreated(created);
 
-    return mapQuote(created);
+    return this.mapWithPhotographer(created);
   }
 
   async mine(
@@ -302,11 +310,11 @@ export class QuotesService {
       throw notFound();
     }
     if (quote.clientId === user.id) {
-      return mapQuote(quote);
+      return this.mapWithPhotographer(quote);
     }
     const profile = await this.findCallerProfile(user.id);
     if (profile?.id === quote.photographerId) {
-      return mapQuote(quote);
+      return this.mapWithPhotographer(quote);
     }
     throw notFound();
   }
@@ -446,7 +454,7 @@ export class QuotesService {
         );
       }
     }
-    return mapQuote(result.quote);
+    return this.mapWithPhotographer(result.quote);
   }
 
   async decline(user: SessionUser, id: string): Promise<QuoteDto> {
@@ -478,7 +486,7 @@ export class QuotesService {
     });
 
     await this.events.onDeclined(updated);
-    return mapQuote(updated);
+    return this.mapWithPhotographer(updated);
   }
 
   async withdraw(user: SessionUser, id: string): Promise<QuoteDto> {
@@ -514,15 +522,40 @@ export class QuotesService {
     });
 
     await this.events.onWithdrawn(updated);
-    return mapQuote(updated);
+    return this.mapWithPhotographer(updated);
   }
 
-  private paginate(rows: Quote[], limit: number): { items: QuoteDto[]; nextCursor: string | null } {
+  private async paginate(
+    rows: Quote[],
+    limit: number,
+  ): Promise<{ items: QuoteDto[]; nextCursor: string | null }> {
     const hasMore = rows.length > limit;
     const page = hasMore ? rows.slice(0, limit) : rows;
     const last = page[page.length - 1];
     const nextCursor = hasMore && last ? encodeCreatedAtCursor(last.createdAt, last.id) : null;
-    return { items: page.map(mapQuote), nextCursor };
+    return { items: await this.mapManyWithPhotographers(page), nextCursor };
+  }
+
+  private async mapWithPhotographer(quote: Quote): Promise<QuoteDto> {
+    const [dto] = await this.mapManyWithPhotographers([quote]);
+    if (!dto) {
+      throw new Error(`quotes: photographer profile ${quote.photographerId} not found`);
+    }
+    return dto;
+  }
+
+  private async mapManyWithPhotographers(rows: readonly Quote[]): Promise<QuoteDto[]> {
+    const photographerIds = rows.map((row) => row.photographerId);
+    const summaries = await this.repository.findPhotographerSummaries(photographerIds);
+    return rows.map((row) => {
+      const summary = summaries.get(row.photographerId);
+      if (!summary) {
+        throw new Error(
+          `quotes: photographer profile ${row.photographerId} not found for quote ${row.id}`,
+        );
+      }
+      return mapQuote(row, mapQuotePhotographer(summary, this.baseUrl));
+    });
   }
 
   private async computeTotals(lineItems: readonly LineItem[]): Promise<{

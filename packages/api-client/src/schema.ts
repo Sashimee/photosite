@@ -8213,6 +8213,7 @@ export interface components {
              * @example 2026-09-16T12:00:00.000Z
              */
             expiresAt: string | null;
+            quoteCount: number;
         };
         Address: {
             line1: string;
@@ -8297,6 +8298,7 @@ export interface components {
              * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
              */
             photographerId: string;
+            photographer: components["schemas"]["QuotePhotographer"];
             /**
              * Format: uuid
              * @description UUID identifier
@@ -8328,6 +8330,31 @@ export interface components {
             message: string | null;
             /** @enum {string} */
             status: "draft" | "sent" | "accepted" | "declined" | "expired" | "withdrawn";
+        };
+        QuotePhotographer: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /**
+             * @description URL-safe profile slug
+             * @example jane-doe-photography
+             */
+            slug: string;
+            /** @example Jane Doe Photography */
+            displayName: string;
+            /** Format: uri */
+            avatarUrl: string | null;
+            city: string;
+            /**
+             * @description ISO 3166-1 alpha-2 country code
+             * @example LU
+             */
+            countryCode: string;
+            ratingAvg: number;
+            ratingCount: number;
         };
         LineItem: {
             label: string;

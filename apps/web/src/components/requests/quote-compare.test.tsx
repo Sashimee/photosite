@@ -26,6 +26,16 @@ function makeQuote(overrides: Partial<Quote> = {}): Quote {
     id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
     requestId: '3fa85f64-5717-4562-b3fc-2c963f66aaaa',
     photographerId: '3fa85f64-5717-4562-b3fc-2c963f66bbbb',
+    photographer: {
+      id: '3fa85f64-5717-4562-b3fc-2c963f66bbbb',
+      slug: 'jane-doe',
+      displayName: 'Jane Doe',
+      avatarUrl: null,
+      city: 'Luxembourg',
+      countryCode: 'LU',
+      ratingAvg: 4.5,
+      ratingCount: 12,
+    },
     clientId: '3fa85f64-5717-4562-b3fc-2c963f66cccc',
     productId: null,
     productTierId: null,
@@ -74,6 +84,11 @@ describe('QuoteCompare', () => {
     expect(links).toHaveLength(1);
     expect(links[0]).toHaveAttribute('href', '/en/quotes/sent-1');
     expect(screen.getByText('€1,575.00')).toBeInTheDocument();
+    expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Jane Doe/ })).toHaveAttribute(
+      'href',
+      '/en/photographers/jane-doe',
+    );
   });
 
   it('renders nothing when there are no sent quotes', async () => {

@@ -68,6 +68,7 @@ export const RequestSchema = z
     usage: RequestUsageSchema,
     status: z.enum(REQUEST_STATUSES),
     expiresAt: IsoDateTimeSchema.nullable(),
+    quoteCount: z.int().nonnegative(),
   })
   .strict()
   .openapi('Request');

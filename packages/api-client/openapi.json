@@ -1217,6 +1217,10 @@
             "format": "date-time",
             "description": "ISO 8601 date-time",
             "example": "2026-09-16T12:00:00.000Z"
+          },
+          "quoteCount": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
@@ -1233,7 +1237,8 @@
           "budgetMax",
           "usage",
           "status",
-          "expiresAt"
+          "expiresAt",
+          "quoteCount"
         ],
         "additionalProperties": false
       },
@@ -1432,6 +1437,9 @@
             "description": "UUID identifier",
             "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
           },
+          "photographer": {
+            "$ref": "#/components/schemas/QuotePhotographer"
+          },
           "clientId": {
             "type": "string",
             "format": "uuid",
@@ -1502,6 +1510,7 @@
           "id",
           "requestId",
           "photographerId",
+          "photographer",
           "clientId",
           "productId",
           "productTierId",
@@ -1512,6 +1521,69 @@
           "validUntil",
           "message",
           "status"
+        ],
+        "additionalProperties": false
+      },
+      "QuotePhotographer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 60,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "URL-safe profile slug",
+            "example": "jane-doe-photography"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "example": "Jane Doe Photography"
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code",
+            "example": "LU"
+          },
+          "ratingAvg": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "ratingCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "displayName",
+          "avatarUrl",
+          "city",
+          "countryCode",
+          "ratingAvg",
+          "ratingCount"
         ],
         "additionalProperties": false
       },
