@@ -43,9 +43,10 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 
 ## Messaging
 
-- **Conversation** – type (`request`, `quote`, `booking`, `direct`), subjectId, participantIds[], lastMessageAt, archivedBy[].
-- **Message** – conversationId, senderId, body, attachments (JSON of `Attachment` ids), readBy (JSON), editedAt, deletedAt.
-- **Attachment** – uploaderId, storageKey, mime, size, virusScanStatus, kind (`image`, `pdf`, `other`).
+- **Conversation** – type (`request`, `quote`, `booking`, `direct`), subjectId (nullable; the id of the request/quote/booking the conversation is about, null for `direct`), lastMessageAt. Unique on `(type, subjectId)`, so creating the quote conversation twice for the same quote is a no-op at the database level. `request` and `direct` aren't creatable in the MVP (docs/steps/1A.6-chat.md); `booking` reuses the quote's conversation rather than creating a new row.
+- **ConversationParticipant** – conversationId, userId, lastReadAt (nullable), archivedAt (nullable), joinedAt. Unique on `(conversationId, userId)`. Replaces `Conversation.participantIds[]`, `Conversation.archivedBy[]` and `Message.readBy`: membership, unread counts (`messages.createdAt > lastReadAt` and sender ≠ me) and archive state become indexed row lookups instead of JSON/array scans.
+- **Message** – conversationId, senderId, body (nullable once soft-deleted; 1–4000 chars trimmed, plain text only), editedAt (always null in the MVP), deletedAt (soft delete by the sender within 15 minutes of sending; body is blanked, clients render "message deleted"). A message needs a body or at least one attachment.
+- **MessageAttachment** – messageId, uploadId (references `Upload`, purpose `chat_attachment`; unique, since an upload attaches to at most one message). Replaces the standalone `Attachment` entity: an upload must be `clean` or `processed` before it can be attached, and the uploader must be the message's sender.
 
 ## Professionals and job board
 
@@ -78,3 +79,5 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 - At most one `sent` Quote per `(requestId, photographerId)` (partial unique index), so concurrent quote sends can't both win.
 - `Quote.requestId IS NOT NULL OR Quote.productId IS NOT NULL` (CHECK constraint): every quote is either for a request or built from a product.
 - The `notify-sweep` job's query (`channels` wants a channel AND that channel's sent-at is still null AND `createdAt` older than the sweep window) is served by a partial index on rows where `emailSentAt IS NULL OR pushSentAt IS NULL`, since that predicate is implied by the per-channel condition for either channel; the query still filters `channels` and the specific sent-at column, but only against the already-narrow set of undelivered rows.
+- Deleting a `Conversation` cascades to its `ConversationParticipant` and `Message` rows; deleting a `Message` cascades to its `MessageAttachment` rows. `MessageAttachment.uploadId` is `Restrict`: an `Upload` still attached to a message can't be deleted.
+- `Message.body IS NOT NULL OR EXISTS (attachments)` at creation time (application-enforced, not a CHECK constraint, since the attachment count is a join): a message needs a body or at least one attachment, capped at 10 attachments.

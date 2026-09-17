@@ -6,6 +6,8 @@ export interface CityGroupRow {
   name: string;
   countryCode: string;
   count: number;
+  lat: number;
+  lng: number;
 }
 
 @Injectable()
@@ -30,7 +32,9 @@ export class CitiesRepository {
       SELECT
         MIN(p.city) AS "name",
         p."countryCode" AS "countryCode",
-        COUNT(*)::int AS "count"
+        COUNT(*)::int AS "count",
+        ROUND(AVG(ST_Y(p.location::geometry))::numeric, 2)::float8 AS "lat",
+        ROUND(AVG(ST_X(p.location::geometry))::numeric, 2)::float8 AS "lng"
       FROM "PhotographerProfile" p
       WHERE ${Prisma.join(conditions, ' AND ')}
       GROUP BY lower(p.city), p."countryCode"
