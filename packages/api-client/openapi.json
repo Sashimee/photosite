@@ -529,15 +529,24 @@
         "type": "object",
         "properties": {
           "instagram": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uri"
           },
           "website": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uri"
           },
           "behance": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uri"
           },
           "other": {
@@ -577,8 +586,7 @@
           },
           "url": {
             "type": "string",
-            "format": "uri",
-            "example": "https://cdn.photoo.lu/portfolio/abc123.jpg"
+            "format": "uri"
           },
           "width": {
             "type": "integer",
@@ -808,16 +816,25 @@
             "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
           },
           "url": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uri",
             "example": "https://cdn.photoo.lu/portfolio/abc123.jpg"
           },
           "width": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "exclusiveMinimum": 0
           },
           "height": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "exclusiveMinimum": 0
           },
           "order": {
@@ -890,9 +907,36 @@
             }
           },
           "description": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2000
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "en": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fr": {
+                "type": "string",
+                "minLength": 1
+              },
+              "de": {
+                "type": "string",
+                "minLength": 1
+              },
+              "pt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "es": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "description": "Text keyed by supported locale, only translated locales present",
+            "example": {
+              "en": "Wedding and portrait photographer in Luxembourg"
+            }
           },
           "category": {
             "type": "string",
@@ -911,11 +955,27 @@
             "exclusiveMinimum": 0
           },
           "deliverables": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 200
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "description": "Structured deliverables summary, e.g. photo counts and turnaround time",
+            "example": {
+              "photos": 200,
+              "editedPhotos": 80,
+              "turnaroundDays": 14,
+              "onlineGallery": true
             }
           },
           "basePrice": {
@@ -3957,8 +4017,9 @@
           },
           {
             "schema": {
-              "type": "number",
-              "exclusiveMinimum": 0
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
             },
             "required": false,
             "name": "radiusKm",
@@ -4175,6 +4236,16 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
@@ -4549,6 +4620,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not found",
             "content": {
@@ -4651,6 +4732,16 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
@@ -4859,6 +4950,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not found",
             "content": {
@@ -5034,6 +5135,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not found",
             "content": {
@@ -5095,9 +5206,36 @@
                     }
                   },
                   "description": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 2000
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "en": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "fr": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "de": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "pt": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "es": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "description": "Text keyed by supported locale, only translated locales present",
+                    "example": {
+                      "en": "Wedding and portrait photographer in Luxembourg"
+                    }
                   },
                   "category": {
                     "type": "string",
@@ -5116,11 +5254,27 @@
                     "exclusiveMinimum": 0
                   },
                   "deliverables": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 200
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "description": "Structured deliverables summary, e.g. photo counts and turnaround time",
+                    "example": {
+                      "photos": 200,
+                      "editedPhotos": 80,
+                      "turnaroundDays": 14,
+                      "onlineGallery": true
                     }
                   },
                   "basePrice": {
@@ -5176,7 +5330,6 @@
                 },
                 "required": [
                   "title",
-                  "description",
                   "category",
                   "durationMinutes",
                   "deliverables",
@@ -5211,6 +5364,16 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
@@ -5376,9 +5539,36 @@
                     }
                   },
                   "description": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 2000
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "en": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "fr": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "de": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "pt": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "es": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "description": "Text keyed by supported locale, only translated locales present",
+                    "example": {
+                      "en": "Wedding and portrait photographer in Luxembourg"
+                    }
                   },
                   "category": {
                     "type": "string",
@@ -5397,11 +5587,27 @@
                     "exclusiveMinimum": 0
                   },
                   "deliverables": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 200
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "description": "Structured deliverables summary, e.g. photo counts and turnaround time",
+                    "example": {
+                      "photos": 200,
+                      "editedPhotos": 80,
+                      "turnaroundDays": 14,
+                      "onlineGallery": true
                     }
                   },
                   "basePrice": {

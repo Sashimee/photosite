@@ -1435,6 +1435,15 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
                 /** @description Not found */
                 404: {
                     headers: {
@@ -1627,6 +1636,15 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
                 /** @description Not found */
                 404: {
                     headers: {
@@ -1692,6 +1710,15 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1846,6 +1873,15 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2022,6 +2058,15 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
                 /** @description Not found */
                 404: {
                     headers: {
@@ -2058,14 +2103,37 @@ export interface paths {
                             pt?: string;
                             es?: string;
                         };
-                        description: string;
+                        /**
+                         * @description Text keyed by supported locale, only translated locales present
+                         * @example {
+                         *       "en": "Wedding and portrait photographer in Luxembourg"
+                         *     }
+                         */
+                        description?: {
+                            en?: string;
+                            fr?: string;
+                            de?: string;
+                            pt?: string;
+                            es?: string;
+                        } | null;
                         /**
                          * @example wedding
                          * @enum {string}
                          */
                         category: "wedding" | "portrait" | "event" | "product" | "real-estate" | "corporate";
                         durationMinutes: number;
-                        deliverables: string[];
+                        /**
+                         * @description Structured deliverables summary, e.g. photo counts and turnaround time
+                         * @example {
+                         *       "photos": 200,
+                         *       "editedPhotos": 80,
+                         *       "turnaroundDays": 14,
+                         *       "onlineGallery": true
+                         *     }
+                         */
+                        deliverables: {
+                            [key: string]: string | number | boolean;
+                        };
                         basePrice: components["schemas"]["Money"];
                         isActive?: boolean;
                         order?: number;
@@ -2104,6 +2172,15 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2275,14 +2352,37 @@ export interface paths {
                             pt?: string;
                             es?: string;
                         };
-                        description?: string;
+                        /**
+                         * @description Text keyed by supported locale, only translated locales present
+                         * @example {
+                         *       "en": "Wedding and portrait photographer in Luxembourg"
+                         *     }
+                         */
+                        description?: {
+                            en?: string;
+                            fr?: string;
+                            de?: string;
+                            pt?: string;
+                            es?: string;
+                        } | null;
                         /**
                          * @example wedding
                          * @enum {string}
                          */
                         category?: "wedding" | "portrait" | "event" | "product" | "real-estate" | "corporate";
                         durationMinutes?: number;
-                        deliverables?: string[];
+                        /**
+                         * @description Structured deliverables summary, e.g. photo counts and turnaround time
+                         * @example {
+                         *       "photos": 200,
+                         *       "editedPhotos": 80,
+                         *       "turnaroundDays": 14,
+                         *       "onlineGallery": true
+                         *     }
+                         */
+                        deliverables?: {
+                            [key: string]: string | number | boolean;
+                        };
                         basePrice?: components["schemas"]["Money"];
                         isActive?: boolean;
                         order?: number;
@@ -6825,11 +6925,11 @@ export interface components {
         };
         ProfileLinks: {
             /** Format: uri */
-            instagram?: string;
+            instagram?: string | null;
             /** Format: uri */
-            website?: string;
+            website?: string | null;
             /** Format: uri */
-            behance?: string;
+            behance?: string | null;
             /** @default [] */
             other: {
                 label: string;
@@ -6844,10 +6944,7 @@ export interface components {
              * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
              */
             id: string;
-            /**
-             * Format: uri
-             * @example https://cdn.photoo.lu/portfolio/abc123.jpg
-             */
+            /** Format: uri */
             url: string;
             width: number;
             height: number;
@@ -6921,9 +7018,9 @@ export interface components {
              * Format: uri
              * @example https://cdn.photoo.lu/portfolio/abc123.jpg
              */
-            url: string;
-            width: number;
-            height: number;
+            url: string | null;
+            width: number | null;
+            height: number | null;
             order: number;
             /** @enum {string} */
             status: "processing" | "pending_review" | "approved" | "flagged" | "rejected";
@@ -6954,14 +7051,37 @@ export interface components {
                 pt?: string;
                 es?: string;
             };
-            description: string;
+            /**
+             * @description Text keyed by supported locale, only translated locales present
+             * @example {
+             *       "en": "Wedding and portrait photographer in Luxembourg"
+             *     }
+             */
+            description: {
+                en?: string;
+                fr?: string;
+                de?: string;
+                pt?: string;
+                es?: string;
+            } | null;
             /**
              * @example wedding
              * @enum {string}
              */
             category: "wedding" | "portrait" | "event" | "product" | "real-estate" | "corporate";
             durationMinutes: number;
-            deliverables: string[];
+            /**
+             * @description Structured deliverables summary, e.g. photo counts and turnaround time
+             * @example {
+             *       "photos": 200,
+             *       "editedPhotos": 80,
+             *       "turnaroundDays": 14,
+             *       "onlineGallery": true
+             *     }
+             */
+            deliverables: {
+                [key: string]: string | number | boolean;
+            };
             basePrice: components["schemas"]["Money"];
             isActive: boolean;
             order: number;

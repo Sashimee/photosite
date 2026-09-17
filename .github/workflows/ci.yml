@@ -36,6 +36,7 @@ jobs:
       S3_FORCE_PATH_STYLE: 'true'
       S3_PRIVATE_BUCKET: photoo-private
       S3_PUBLIC_BUCKET: photoo-public
+      S3_PUBLIC_BASE_URL: http://127.0.0.1:9000/photoo-public
     services:
       postgres:
         image: postgis/postgis:16-3.5
@@ -80,7 +81,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Start MinIO and create the photoo-private/photoo-public buckets
+      - name: Start MinIO, create buckets and allow anonymous reads of photoo-public
         run: |
           docker run -d --name minio \
             -p 9000:9000 \
@@ -88,10 +89,25 @@ jobs:
             -e MINIO_ROOT_PASSWORD=photoo_dev_password \
             quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
           timeout 60 bash -c 'until curl -sf http://127.0.0.1:9000/minio/health/ready; do sleep 1; done'
+          cat > /tmp/photoo-public-anonymous-policy.json <<'EOF'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {"AWS": ["*"]},
+                "Action": ["s3:GetObject"],
+                "Resource": ["arn:aws:s3:::photoo-public/*"]
+              }
+            ]
+          }
+          EOF
           docker run --rm --network host \
+            --entrypoint sh \
             -e MC_HOST_local=http://photoo_dev:photoo_dev_password@127.0.0.1:9000 \
+            -v /tmp/photoo-public-anonymous-policy.json:/tmp/photoo-public-anonymous-policy.json \
             quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
-            mb --ignore-existing local/photoo-private local/photoo-public
+            -c "mc mb --ignore-existing local/photoo-private local/photoo-public && mc anonymous set none local/photoo-private && mc anonymous set-json /tmp/photoo-public-anonymous-policy.json local/photoo-public"
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm i18n:check

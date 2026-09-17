@@ -4,21 +4,6 @@ export interface NotYetImplementedRoute {
 }
 
 export const NOT_YET_IMPLEMENTED: readonly NotYetImplementedRoute[] = [
-  { method: 'GET', path: '/v1/photographers' },
-  { method: 'GET', path: '/v1/photographers/:slug' },
-  { method: 'GET', path: '/v1/me/photographer-profile' },
-  { method: 'POST', path: '/v1/me/photographer-profile' },
-  { method: 'PATCH', path: '/v1/me/photographer-profile' },
-  { method: 'GET', path: '/v1/me/photographer-profile/portfolio' },
-  { method: 'POST', path: '/v1/me/photographer-profile/portfolio' },
-  { method: 'PATCH', path: '/v1/me/photographer-profile/portfolio/order' },
-  { method: 'DELETE', path: '/v1/me/photographer-profile/portfolio/:imageId' },
-  { method: 'GET', path: '/v1/photographers/:slug/products' },
-  { method: 'GET', path: '/v1/me/products' },
-  { method: 'POST', path: '/v1/me/products' },
-  { method: 'GET', path: '/v1/me/products/:productId' },
-  { method: 'PATCH', path: '/v1/me/products/:productId' },
-  { method: 'DELETE', path: '/v1/me/products/:productId' },
   { method: 'POST', path: '/v1/requests' },
   { method: 'GET', path: '/v1/requests/mine' },
   { method: 'GET', path: '/v1/requests/:id' },

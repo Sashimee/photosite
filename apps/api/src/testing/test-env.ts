@@ -22,6 +22,7 @@ export const TEST_ENV: Env = {
   S3_FORCE_PATH_STYLE: true,
   S3_PRIVATE_BUCKET: 'photoo-private',
   S3_PUBLIC_BUCKET: 'photoo-public',
+  S3_PUBLIC_BASE_URL: 'http://127.0.0.1:9000/photoo-public',
 };
 
 export const UNREACHABLE_TEST_ENV: Env = {

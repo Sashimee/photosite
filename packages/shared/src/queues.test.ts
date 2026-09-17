@@ -6,6 +6,8 @@ import {
   FileScanJobSchema,
   IMAGE_PROCESS_QUEUE_NAME,
   ImageProcessJobSchema,
+  PORTFOLIO_IMAGE_CLEANUP_QUEUE_NAME,
+  PortfolioImageCleanupJobSchema,
   QUEUE_JOB_SCHEMAS,
   QUEUE_NAMES,
   UPLOADS_CLEANUP_QUEUE_NAME,
@@ -16,7 +18,13 @@ const VALID_UPLOAD_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
 
 describe('QUEUE_NAMES', () => {
   it('lists every queue exactly once', () => {
-    expect(QUEUE_NAMES).toEqual(['email', 'file-scan', 'image-process', 'uploads-cleanup']);
+    expect(QUEUE_NAMES).toEqual([
+      'email',
+      'file-scan',
+      'image-process',
+      'uploads-cleanup',
+      'portfolio-image-cleanup',
+    ]);
     expect(new Set(QUEUE_NAMES).size).toBe(QUEUE_NAMES.length);
   });
 
@@ -26,6 +34,7 @@ describe('QUEUE_NAMES', () => {
       FILE_SCAN_QUEUE_NAME,
       IMAGE_PROCESS_QUEUE_NAME,
       UPLOADS_CLEANUP_QUEUE_NAME,
+      PORTFOLIO_IMAGE_CLEANUP_QUEUE_NAME,
     ]).toEqual(QUEUE_NAMES);
   });
 });
@@ -122,6 +131,38 @@ describe('uploads-cleanup job schema', () => {
 
   it('rejects unknown extra keys', () => {
     expect(UploadsCleanupJobSchema.safeParse({ uploadId: VALID_UPLOAD_ID }).success).toBe(false);
+  });
+});
+
+describe('portfolio-image-cleanup job schema', () => {
+  it('accepts an uploadId with variant keys', () => {
+    expect(
+      PortfolioImageCleanupJobSchema.safeParse({
+        uploadId: VALID_UPLOAD_ID,
+        variantKeys: ['v/abc/thumb.jpg'],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts an empty variantKeys array', () => {
+    expect(
+      PortfolioImageCleanupJobSchema.safeParse({ uploadId: VALID_UPLOAD_ID, variantKeys: [] })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects a missing uploadId', () => {
+    expect(PortfolioImageCleanupJobSchema.safeParse({ variantKeys: [] }).success).toBe(false);
+  });
+
+  it('rejects unknown extra keys', () => {
+    expect(
+      PortfolioImageCleanupJobSchema.safeParse({
+        uploadId: VALID_UPLOAD_ID,
+        variantKeys: [],
+        extra: 'nope',
+      }).success,
+    ).toBe(false);
   });
 });
 

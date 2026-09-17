@@ -115,6 +115,7 @@ const EnvSchema = z
     S3_FORCE_PATH_STYLE: BooleanFlagSchema,
     S3_PRIVATE_BUCKET: z.string().min(1),
     S3_PUBLIC_BUCKET: z.string().min(1),
+    S3_PUBLIC_BASE_URL: z.url(),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== 'production') {

@@ -6,10 +6,67 @@ import {
   PhotographerSearchQuerySchema,
   PhotographerSummarySchema,
   PortfolioImageSchema,
+  ProfileLinksSchema,
   PublicPhotographerProfileSchema,
   PublicPortfolioImageSchema,
   UpdatePhotographerProfileRequestSchema,
 } from './profiles.js';
+
+describe('ProfileLinksSchema', () => {
+  it('accepts null instagram, website and behance (as stored by the seed)', () => {
+    expect(
+      ProfileLinksSchema.safeParse({
+        instagram: null,
+        website: null,
+        behance: null,
+        other: [],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts omitted instagram, website and behance', () => {
+    expect(ProfileLinksSchema.safeParse({ other: [] }).success).toBe(true);
+  });
+
+  it('rejects a non-URL instagram value', () => {
+    expect(ProfileLinksSchema.safeParse({ instagram: 'not-a-url', other: [] }).success).toBe(false);
+  });
+
+  it('rejects a javascript: instagram URL', () => {
+    expect(
+      ProfileLinksSchema.safeParse({ instagram: 'javascript:alert(1)', other: [] }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a data: website URL', () => {
+    expect(
+      ProfileLinksSchema.safeParse({ website: 'data:text/html,<script>1</script>', other: [] })
+        .success,
+    ).toBe(false);
+  });
+
+  it('rejects a mixed-case JAVASCRIPT: behance URL', () => {
+    expect(
+      ProfileLinksSchema.safeParse({ behance: 'JAVASCRIPT:alert(1)', other: [] }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a javascript: URL in other[].url', () => {
+    expect(
+      ProfileLinksSchema.safeParse({
+        other: [{ label: 'Malicious', url: 'javascript:alert(1)' }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts an https other[].url', () => {
+    expect(
+      ProfileLinksSchema.safeParse({
+        other: [{ label: 'Portfolio', url: 'https://example.com' }],
+      }).success,
+    ).toBe(true);
+  });
+});
 
 const validPortfolioImage = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
@@ -157,6 +214,18 @@ describe('PortfolioImageSchema and PublicPortfolioImageSchema', () => {
     expect(PortfolioImageSchema.safeParse(validPortfolioImage).success).toBe(true);
   });
 
+  it('owner schema accepts null url, width and height for a still-processing image', () => {
+    expect(
+      PortfolioImageSchema.safeParse({
+        ...validPortfolioImage,
+        status: 'processing',
+        url: null,
+        width: null,
+        height: null,
+      }).success,
+    ).toBe(true);
+  });
+
   it('public schema rejects a status field', () => {
     expect(PublicPortfolioImageSchema.safeParse(validPortfolioImage).success).toBe(false);
   });
@@ -166,6 +235,13 @@ describe('PortfolioImageSchema and PublicPortfolioImageSchema', () => {
     expect(PublicPortfolioImageSchema.safeParse({ id, url, width, height, order }).success).toBe(
       true,
     );
+  });
+
+  it('public schema rejects a null url', () => {
+    const { id, width, height, order } = validPortfolioImage;
+    expect(
+      PublicPortfolioImageSchema.safeParse({ id, url: null, width, height, order }).success,
+    ).toBe(false);
   });
 });
 
@@ -318,5 +394,14 @@ describe('PhotographerSearchQuerySchema', () => {
 
   it('rejects unknown keys', () => {
     expect(PhotographerSearchQuerySchema.safeParse({ sort: 'price' }).success).toBe(false);
+  });
+
+  it('rejects a non-integer radiusKm', () => {
+    expect(PhotographerSearchQuerySchema.safeParse({ radiusKm: '25.5' }).success).toBe(false);
+  });
+
+  it('rejects a radiusKm outside 1..200', () => {
+    expect(PhotographerSearchQuerySchema.safeParse({ radiusKm: '0' }).success).toBe(false);
+    expect(PhotographerSearchQuerySchema.safeParse({ radiusKm: '201' }).success).toBe(false);
   });
 });

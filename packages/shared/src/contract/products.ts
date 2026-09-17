@@ -24,10 +24,15 @@ export const ProductSchema = z
     id: IdSchema,
     profileId: IdSchema,
     title: LocalizedTextSchema,
-    description: z.string().min(1).max(2000),
+    description: LocalizedTextSchema.nullable(),
     category: PhotographerCategorySchema,
     durationMinutes: z.int().positive(),
-    deliverables: z.array(z.string().min(1).max(200)),
+    deliverables: z
+      .record(z.string().min(1).max(60), z.union([z.string().max(200), z.number(), z.boolean()]))
+      .openapi({
+        description: 'Structured deliverables summary, e.g. photo counts and turnaround time',
+        example: { photos: 200, editedPhotos: 80, turnaroundDays: 14, onlineGallery: true },
+      }),
     basePrice: MoneySchema,
     isActive: z.boolean(),
     order: z.int().nonnegative(),
@@ -45,7 +50,7 @@ export const CreateProductRequestSchema = ProductSchema.omit({
     tiers: z.array(CreateProductTierRequestSchema).min(1),
   })
   .strict()
-  .partial({ isActive: true, order: true });
+  .partial({ isActive: true, order: true, description: true });
 
 export const UpdateProductRequestSchema = CreateProductRequestSchema.partial();
 
@@ -77,7 +82,7 @@ registry.registerPath({
       description: 'All of the current user products',
       content: { 'application/json': { schema: z.array(ProductSchema) } },
     },
-    ...errorResponses([401, 404]),
+    ...errorResponses([401, 403, 404]),
   },
 });
 
@@ -95,7 +100,7 @@ registry.registerPath({
       description: 'Product created',
       content: { 'application/json': { schema: ProductSchema } },
     },
-    ...errorResponses([400, 401, 404, 422]),
+    ...errorResponses([400, 401, 403, 404, 422]),
   },
 });
 
