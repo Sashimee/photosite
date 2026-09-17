@@ -63,6 +63,10 @@
       "quoteExpired": {
         "subject": "A quote has expired",
         "body": "Your quote for {requestTitle} with {counterpartName} has expired. View it here: {url}"
+      },
+      "messageReceived": {
+        "subject": "New message from {counterpartName}",
+        "body": "{counterpartName} sent you a message. View it here: {url}"
       }
     }
   },
@@ -104,6 +108,10 @@
       "quoteExpired": {
         "title": "Quote expired",
         "body": "Your quote with {counterpartName} has expired"
+      },
+      "messageReceived": {
+        "title": "New message",
+        "body": "{counterpartName} sent you a message"
       }
     }
   },

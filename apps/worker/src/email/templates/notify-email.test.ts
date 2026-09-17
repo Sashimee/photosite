@@ -84,7 +84,7 @@ describe('renderNotifyEmail', () => {
     expect(message.html).toContain('<a href="https://photoo.lu/en/account/notifications">');
   });
 
-  it('renders every notification type without throwing', () => {
+  it('renders every quote notification type without throwing', () => {
     const types = [
       'quote_received',
       'quote_accepted',
@@ -97,6 +97,35 @@ describe('renderNotifyEmail', () => {
         renderNotifyEmail(type, PAYLOAD, 'en', 'jane@example.com', 'https://photoo.lu'),
       ).not.toThrow();
     }
+  });
+
+  it('renders message_received with a conversation deep link', () => {
+    const message = renderNotifyEmail(
+      'message_received',
+      { conversationId: 'conversation-1', counterpartName: 'Jane Doe' },
+      'en',
+      'jane@example.com',
+      'https://photoo.lu',
+    );
+    expect(message.subject).toContain('Jane Doe');
+    expect(message.text).toContain('https://photoo.lu/en/messages/conversation-1');
+  });
+
+  it('falls back to "A client" for message_received when counterpartName is absent (S6)', () => {
+    const message = renderNotifyEmail(
+      'message_received',
+      { conversationId: 'conversation-1' },
+      'en',
+      'jane@example.com',
+      'https://photoo.lu',
+    );
+    expect(message.text).toContain('A client');
+  });
+
+  it('throws when a message_received payload has no conversationId', () => {
+    expect(() =>
+      renderNotifyEmail('message_received', {}, 'en', 'jane@example.com', 'https://photoo.lu'),
+    ).toThrow(/conversationId/);
   });
 
   it('renders in the recipient locale, falling back to en for an unsupported locale key lookup', () => {
