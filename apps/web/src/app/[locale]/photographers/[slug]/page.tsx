@@ -8,11 +8,13 @@ import { DEFAULT_LOCALE, isLocale, SUPPORTED_LOCALES, type Locale } from '@photo
 
 import { api } from '@/lib/api';
 import { env } from '@/lib/env';
+import { isCountrySegment } from '@/lib/discovery';
 import { resolveLocalizedText } from '@/lib/localized-text';
 import { buildProfileJsonLd, serializeJsonLd } from '@/lib/profile-jsonld';
 import { buildRobotsMetadata } from '@/lib/robots';
 import { truncateAtWordBoundary } from '@/lib/truncate';
 
+import { CountryLandingPage, generateCountryLandingMetadata } from './country-landing';
 import { PortfolioGrid } from './portfolio-grid';
 import { ProductList } from './product-list';
 import { ProfileBio } from './profile-bio';
@@ -76,6 +78,10 @@ export async function generateMetadata({
   }
   const locale: Locale = requestedLocale;
 
+  if (isCountrySegment(slug)) {
+    return generateCountryLandingMetadata({ locale, countryCode: slug.toUpperCase() });
+  }
+
   const result = await loadProfile(slug);
   if (!result) {
     return {};
@@ -120,6 +126,10 @@ export default async function PhotographerProfilePage({
     notFound();
   }
   const locale: Locale = requestedLocale;
+
+  if (isCountrySegment(slug)) {
+    return <CountryLandingPage locale={locale} countryCode={slug.toUpperCase()} />;
+  }
 
   const [result, headersList] = await Promise.all([loadProfile(slug), headers()]);
   if (!result) {
