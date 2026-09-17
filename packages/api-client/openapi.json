@@ -898,6 +898,47 @@
         ],
         "additionalProperties": false
       },
+      "CountrySummary": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code",
+            "example": "LU"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "ISO 4217 currency code",
+            "example": "EUR"
+          },
+          "defaultLocale": {
+            "type": "string",
+            "enum": [
+              "en",
+              "fr",
+              "de",
+              "pt",
+              "es"
+            ],
+            "description": "BCP 47 locale",
+            "example": "en"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "currency",
+          "defaultLocale"
+        ],
+        "additionalProperties": false
+      },
       "Product": {
         "type": "object",
         "properties": {
@@ -5503,6 +5544,29 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/countries": {
+      "get": {
+        "summary": "List enabled countries",
+        "tags": [
+          "countries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Enabled countries, ordered by name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CountrySummary"
+                  }
                 }
               }
             }

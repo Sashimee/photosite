@@ -153,6 +153,7 @@ export {
 } from './contract/auth.js';
 
 export { CitiesQuerySchema, CitySummarySchema } from './contract/cities.js';
+export { CountrySummarySchema } from './contract/countries.js';
 
 export {
   AttachPortfolioImageRequestSchema,

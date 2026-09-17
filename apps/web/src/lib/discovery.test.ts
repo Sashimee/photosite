@@ -20,13 +20,19 @@ describe('isCountrySegment', () => {
 });
 
 describe('isEnabledCountryCode', () => {
-  it('accepts Luxembourg', () => {
-    expect(isEnabledCountryCode('LU')).toBe(true);
+  const enabledCountryCodes = ['LU'];
+
+  it('accepts a country in the enabled list', () => {
+    expect(isEnabledCountryCode('LU', enabledCountryCodes)).toBe(true);
   });
 
-  it('rejects any other country', () => {
-    expect(isEnabledCountryCode('FR')).toBe(false);
-    expect(isEnabledCountryCode('lu')).toBe(false);
+  it('rejects a country not in the enabled list', () => {
+    expect(isEnabledCountryCode('FR', enabledCountryCodes)).toBe(false);
+    expect(isEnabledCountryCode('lu', enabledCountryCodes)).toBe(false);
+  });
+
+  it('rejects everything when no country is enabled', () => {
+    expect(isEnabledCountryCode('LU', [])).toBe(false);
   });
 });
 

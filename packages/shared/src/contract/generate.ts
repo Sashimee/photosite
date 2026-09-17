@@ -4,6 +4,7 @@ import './health.js';
 import './auth.js';
 import './profiles.js';
 import './cities.js';
+import './countries.js';
 import './products.js';
 import './requests.js';
 import './quotes.js';

@@ -2036,6 +2036,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/countries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List enabled countries */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Enabled countries, ordered by name */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CountrySummary"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/photographers/{slug}/products": {
         parameters: {
             query?: never;
@@ -7787,6 +7823,25 @@ export interface components {
             countryCode: string;
             photographerCount: number;
             location: components["schemas"]["LatLng"];
+        };
+        CountrySummary: {
+            /**
+             * @description ISO 3166-1 alpha-2 country code
+             * @example LU
+             */
+            code: string;
+            name: string;
+            /**
+             * @description ISO 4217 currency code
+             * @example EUR
+             */
+            currency: string;
+            /**
+             * @description BCP 47 locale
+             * @example en
+             * @enum {string}
+             */
+            defaultLocale: "en" | "fr" | "de" | "pt" | "es";
         };
         Product: {
             /**
