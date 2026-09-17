@@ -275,6 +275,7 @@ export {
   ExpoPushTokenSchema,
   MarkAllNotificationsReadResponseSchema,
   NotificationChannelSchema,
+  type NotificationPayload,
   NotificationPayloadSchema,
   NotificationPreferenceEntrySchema,
   NotificationPreferencesResponseSchema,
@@ -285,3 +286,8 @@ export {
   UnreadCountResponseSchema,
   UpdateNotificationPreferencesRequestSchema,
 } from './contract/notifications.js';
+
+export {
+  resolveNotificationChannels,
+  type NotificationPreferenceOverride,
+} from './notification-channels.js';

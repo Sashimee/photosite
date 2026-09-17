@@ -29,6 +29,8 @@ export const NotificationPayloadSchema = z
   .strict()
   .openapi('NotificationPayload');
 
+export type NotificationPayload = z.infer<typeof NotificationPayloadSchema>;
+
 export const NotificationSchema = z
   .object({
     id: IdSchema,
