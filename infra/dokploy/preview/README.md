@@ -127,33 +127,50 @@ photographer profiles, a request/quote pair) local dev gets from
 `pnpm db:seed`. Run it once after the first successful deploy (and again
 any time the schema/seed data changes in a way you want reflected):
 
-The `seed` profile below is the shape of the job, but `docker compose
---profile seed run` cannot be used on the Dokploy host: Dokploy keeps the
-project env in its own database and writes no `.env` beside the checkout
-in `/etc/dokploy/compose/<appName>/code`, and compose refuses to parse
-this file while any `${VAR:?}` is unset. So run the one-shot container
-directly, taking the already-resolved connection strings out of the
-running `api` container. Only `SEED_USER_PASSWORD` has to be typed (copy
-it from the compose service's Environment tab), because the seed is its
-only consumer and no running container carries it:
+With Dokploy's "Create environment file" option on, Dokploy writes the
+project env as a `.env` **beside the compose file** it deploys
+(`/etc/dokploy/compose/<appName>/code/infra/dokploy/preview/.env`), not
+at the repository root, and Compose loads it from there on its own. So
+the normal invocation works from the checkout:
+
+```bash
+cd /etc/dokploy/compose/compose-index-back-end-application-k6x26o/code
+docker compose -p compose-index-back-end-application-k6x26o \
+  -f infra/dokploy/preview/compose.yml --profile seed run --rm seed
+```
+
+Do not pass `--env-file .env` — that resolves against the working
+directory, where Dokploy never writes one, and Compose then refuses to
+parse this file with any `${VAR:?}` unset.
+
+If that file is missing (the option was turned on after the last deploy,
+so no deploy has written it yet), either redeploy once or run the
+one-shot container directly, taking the already-resolved connection
+strings out of the running **worker** container. It has to be the worker
+and not the api: the api's MinIO user is scoped to `photoo-private`
+("Object storage users" below), while the seed writes placeholder images
+to `photoo-public`, so the api's key fails with `AccessDenied`. Only
+`SEED_USER_PASSWORD` has to be typed (copy it from the compose service's
+Environment tab), because the seed is its only consumer and no running
+container carries it:
 
 ```bash
 proj=compose-index-back-end-application-k6x26o
-api=$(docker ps -q -f "label=com.docker.compose.project=$proj" \
-                  -f "label=com.docker.compose.service=api" | head -1)
+wkr=$(docker ps -q -f "label=com.docker.compose.project=$proj" \
+                  -f "label=com.docker.compose.service=worker" | head -1)
 getenv() { docker inspect "$1" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n "s/^$2=//p"; }
-net=$(docker inspect "$api" --format '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' | grep internal)
+net=$(docker inspect "$wkr" --format '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' | grep internal)
 
 read -rsp 'SEED_USER_PASSWORD: ' seedpw; echo
 
 docker run --rm --network "$net" -w /app/packages/db --entrypoint node \
   -e NODE_ENV=development \
-  -e DATABASE_URL="$(getenv "$api" DATABASE_URL)" \
+  -e DATABASE_URL="$(getenv "$wkr" DATABASE_URL)" \
   -e SEED_USER_PASSWORD="$seedpw" \
   -e S3_ENDPOINT=http://minio:9000 \
   -e S3_REGION=eu-west-1 \
-  -e S3_ACCESS_KEY_ID="$(getenv "$api" S3_ACCESS_KEY_ID)" \
-  -e S3_SECRET_ACCESS_KEY="$(getenv "$api" S3_SECRET_ACCESS_KEY)" \
+  -e S3_ACCESS_KEY_ID="$(getenv "$wkr" S3_ACCESS_KEY_ID)" \
+  -e S3_SECRET_ACCESS_KEY="$(getenv "$wkr" S3_SECRET_ACCESS_KEY)" \
   -e S3_FORCE_PATH_STYLE=true \
   -e S3_PRIVATE_BUCKET=photoo-private \
   -e S3_PUBLIC_BUCKET=photoo-public \
