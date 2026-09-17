@@ -25,6 +25,14 @@ Last updated: 2026-09-17.
 | 0.8 | Logo, colours, type, app icons, store screenshot template | O5 |
 | 1E.1 | Configure the production `photoo-public` bucket's read policy (anonymous/CDN `s3:GetObject` only, no `ListBucket`) with the EU object storage provider at deploy time; dev MinIO uses a custom bucket policy for this (`infra/docker/compose.dev.yml`) but production is provider-specific | 1E.1 staging/prod public image serving |
 
+## Accounts and access (2026-09-17)
+
+| Issue | Needed from Alex | Blocks | Workaround meanwhile |
+|-------|------------------|--------|----------------------|
+| GitHub Actions jobs are not starting: "recent account payments have failed or your spending limit needs to be increased" | Fix billing in GitHub Settings → Billing & plans, then re-run CI on `main` (or `gh workflow run ci.yml --ref main`) | CI on every PR (no merges on green), the Deploy preview workflow (images for the migrate fix from #71 aren't built, so api and worker stay down on footoo.bas.lu) | Local root checks before opening PRs; PRs stay open until CI runs |
+| The Dokploy API token was printed once in a tool output | Rotate it in Dokploy and replace `~/.config/dokploy/seil.token` | – | – |
+| `~/.config/ghcr/read.token` is root-owned and world-readable (644), and belongs to the personal account | `chmod 600` plus chown to your user; ideally replace it with a read:packages token from a machine user and update the `ghcr-sashimee-read` registry in Dokploy | – | Works as is |
+
 ## Local environment
 
 | Issue | Needed from Alex | Why deferred |
