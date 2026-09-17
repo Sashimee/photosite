@@ -79,9 +79,7 @@ describe('uploads integration', () => {
     return app.getHttpAdapter().getInstance();
   }
 
-  async function signUpAndSignIn(
-    roles: readonly string[],
-  ): Promise<{ token: string; id: string }> {
+  async function signUpAndSignIn(roles: readonly string[]): Promise<{ token: string; id: string }> {
     const email = uniqueEmail(roles.join('-'));
     const signUpResponse = await fastify().inject({
       method: 'POST',
