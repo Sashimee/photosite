@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { hash } from '@node-rs/argon2';
-import type { UserRole } from '@photoo/shared';
+import { quoteTotals, type UserRole } from '@photoo/shared';
 import { createS3Client, putPublicObject } from '@photoo/shared/storage';
 import { createPrismaClient, type LicenceUsage, type PhotographerCategory } from './index.js';
 
@@ -572,6 +572,108 @@ async function seedPlatformSetting(
   });
 }
 
+export const SEED_REQUEST_CLIENT_EMAIL = 'client@photoo.test';
+export const SEED_REQUEST_PHOTOGRAPHER_SLUG = 'sofia-martins';
+export const SEED_REQUEST_TITLE = 'Wedding day coverage in Luxembourg City';
+
+const SEED_REQUEST_LOCATION = { lat: 49.6116, lng: 6.1319 };
+
+// One open request from the seeded client, quoted by one seeded demo
+// photographer, so 1A.5b's integration tests have a real request/quote pair
+// to read without creating their own fixtures. Idempotent: keyed on
+// (clientId, title), which nothing else in the seed produces twice.
+// `feePercent` and the line item price come from PlatformSetting and the
+// photographer's own seeded product, never hardcoded totals, so this stays
+// correct if either changes.
+export async function seedRequestAndQuote(
+  prisma: ReturnType<typeof createPrismaClient>,
+): Promise<void> {
+  const client = await prisma.user.findUniqueOrThrow({
+    where: { email: SEED_REQUEST_CLIENT_EMAIL },
+  });
+  const photographer = await prisma.photographerProfile.findUniqueOrThrow({
+    where: { slug: SEED_REQUEST_PHOTOGRAPHER_SLUG },
+    include: { products: { include: { tiers: true } } },
+  });
+
+  const existingRequest = await prisma.request.findFirst({
+    where: { clientId: client.id, title: SEED_REQUEST_TITLE },
+  });
+  if (existingRequest) {
+    return;
+  }
+
+  const eventDate = new Date();
+  eventDate.setUTCDate(eventDate.getUTCDate() + 90);
+  const expiresAt = new Date();
+  expiresAt.setUTCDate(expiresAt.getUTCDate() + 60);
+
+  const request = await prisma.request.create({
+    data: {
+      clientId: client.id,
+      title: SEED_REQUEST_TITLE,
+      category: 'wedding',
+      description: 'Looking for full-day wedding coverage in Luxembourg City.',
+      eventDate,
+      dateFlexible: false,
+      address: { street: '1 Place Guillaume II', city: 'Luxembourg City', postalCode: 'L-1648' },
+      city: 'Luxembourg City',
+      countryCode: 'LU',
+      budgetMinCents: 200000,
+      budgetMaxCents: 400000,
+      currency: 'EUR',
+      usage: 'personal',
+      status: 'open',
+      expiresAt,
+    },
+  });
+
+  await prisma.$executeRaw`
+    UPDATE "Request"
+    SET location = ST_SetSRID(ST_MakePoint(${SEED_REQUEST_LOCATION.lng}, ${SEED_REQUEST_LOCATION.lat}), 4326)::geography
+    WHERE id = ${request.id}
+  `;
+
+  const weddingProduct = photographer.products.find((product) =>
+    product.tiers.some((tier) => tier.usage === 'personal'),
+  );
+  const weddingTier = weddingProduct?.tiers.find((tier) => tier.usage === 'personal');
+  if (!weddingProduct || !weddingTier) {
+    throw new Error(
+      `db seed: no personal-usage product tier found for photographer "${SEED_REQUEST_PHOTOGRAPHER_SLUG}"`,
+    );
+  }
+
+  const feePercentSetting = await prisma.platformSetting.findUniqueOrThrow({
+    where: { key: 'feePercent' },
+  });
+  const feePercent = feePercentSetting.value as number;
+
+  const productTitle = (weddingProduct.title as { en: string }).en;
+  const lineItems = [{ label: productTitle, qty: 1, unitCents: weddingTier.priceCents }];
+  const totals = quoteTotals(lineItems, feePercent);
+
+  const validUntil = new Date();
+  validUntil.setUTCDate(validUntil.getUTCDate() + 7);
+
+  await prisma.quote.create({
+    data: {
+      requestId: request.id,
+      photographerId: photographer.id,
+      clientId: client.id,
+      lineItems,
+      subtotalCents: totals.subtotalCents,
+      platformFeeCents: totals.platformFeeCents,
+      totalCents: totals.totalCents,
+      feePercent,
+      licenceUsage: request.usage,
+      currency: 'EUR',
+      validUntil,
+      status: 'sent',
+    },
+  });
+}
+
 export async function seedDatabase(prisma: ReturnType<typeof createPrismaClient>): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('db seed: refusing to run with NODE_ENV=production');
@@ -581,6 +683,7 @@ export async function seedDatabase(prisma: ReturnType<typeof createPrismaClient>
   await seedPhotographerProfiles(prisma);
   await seedPlatformSetting(prisma, 'feePercent', 5);
   await seedPlatformSetting(prisma, 'autoReleaseDays', 7);
+  await seedRequestAndQuote(prisma);
 }
 
 async function main(): Promise<void> {

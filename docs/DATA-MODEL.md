@@ -33,8 +33,8 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 
 ## Marketplace
 
-- **Request** – clientId, title, category, description, eventDate, dateFlexible, location (geography Point), address (structured), budgetMinCents, budgetMaxCents, currency, usage (licence intent), status (`open`, `quoted`, `booked`, `closed`, `cancelled`), expiresAt, deletedAt.
-- **Quote** – requestId (nullable for direct product bookings), photographerId, clientId, productId (nullable), productTierId (nullable), lineItems (JSON: label, qty, unitCents), subtotalCents, platformFeeCents, totalCents, currency, validUntil, message, status (`draft`, `sent`, `accepted`, `declined`, `expired`, `withdrawn`).
+- **Request** – clientId, title, category, description, eventDate, dateFlexible, location (geography Point), address (structured, visible only to the owning client and later the booked photographer), city and countryCode (copied out of `address` so the photographer feed can filter without reading it), budgetMinCents, budgetMaxCents, currency, usage (licence intent), status (`open`, `quoted`, `booked`, `closed`, `cancelled`), expiresAt (earlier of `eventDate` and `createdAt + 60 days`), deletedAt.
+- **Quote** – requestId (nullable for direct product bookings; a quote always has a requestId or a productId), photographerId (references `PhotographerProfile`, not `User`, so a quote survives the photographer's profile identity changing shape), clientId, productId (nullable), productTierId (nullable; hard-deleted and recreated when a photographer edits their tiers, so this can go null on an existing quote), lineItems (JSON: label, qty, unitCents), subtotalCents, platformFeeCents, totalCents, feePercent (snapshot of `PlatformSetting('feePercent')` at creation time, so later fee changes never rewrite sent quotes), licenceUsage (snapshot of the licence usage the client agreed to — the request's `usage` for a request quote, the tier's `usage` for a direct quote — since `productTierId` can be nulled out later), licenceTextVersion (the tier's licence text version for a direct quote, null for a request quote), currency, validUntil, message, status (`draft`, `sent`, `accepted`, `declined`, `expired`, `withdrawn`).
 - **Booking** – quoteId (1:1), clientId, photographerId, scheduledAt, location, status (state machine: `pending_payment`, `paid_held`, `in_progress`, `delivered`, `released`, `refunded`, `disputed`, `cancelled`), paymentIntentId, chargeId, transferId, releaseDueAt, deliveredAt, releasedAt, cancelledAt, cancellationReason.
 - **Delivery** – bookingId, message, fileKeys (JSON) or external link, deliveredAt, acceptedAt.
 - **Review** (Phase 3) – bookingId, authorId, targetId, rating, text, status.
@@ -72,3 +72,7 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 - `Upload.objectKey` and `Upload.exif` are never serialised to clients; only processed `variants` keys and status fields are.
 - An `Upload` is only downloadable once `virusScanStatus = clean`.
 - Uploads still `pending_upload` or `uploaded` past `expiresAt` are abandoned and removed by the worker's cleanup job.
+- `Request.budgetMinCents <= budgetMaxCents` (CHECK constraint).
+- `Quote.totalCents = subtotalCents` and both are non-negative, along with `platformFeeCents` (CHECK constraints); the platform fee is deducted from the photographer's payout at release, never added on top of what the client pays.
+- At most one `sent` Quote per `(requestId, photographerId)` (partial unique index), so concurrent quote sends can't both win.
+- `Quote.requestId IS NOT NULL OR Quote.productId IS NOT NULL` (CHECK constraint): every quote is either for a request or built from a product.
