@@ -116,12 +116,26 @@ jobs:
       - name: Trigger Dokploy deploy webhook
         env:
           WEBHOOK_URL: ${{ secrets.DOKPLOY_PREVIEW_WEBHOOK_URL }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           if [ -z "$WEBHOOK_URL" ]; then
             echo "::error::DOKPLOY_PREVIEW_WEBHOOK_URL repository secret is not set (docs/steps/human-followups.md)" >&2
             exit 1
           fi
-          status=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$WEBHOOK_URL")
+          # Dokploy's compose webhook parses the body like a GitHub push
+          # event and rejects anything else (`{"message":"Branch Not
+          # Match"}`, HTTP 301, on a bare POST). The commit message is a
+          # fixed string, never the real one, so nothing from git history
+          # ends up unescaped in the request.
+          payload=$(jq -n --arg sha "$HEAD_SHA" '{
+            ref: "refs/heads/main",
+            after: $sha,
+            head_commit: { message: ("deploy-preview " + $sha) }
+          }')
+          status=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -H 'x-github-event: push' \
+            -d "$payload")
           if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
             echo "::error::Dokploy deploy webhook returned HTTP $status" >&2
             exit 1

@@ -27,10 +27,15 @@ RUN pnpm exec turbo run build --filter=@photoo/api...
 
 # Built off `build`, before devDependencies (incl. `prisma`) are pruned
 # below, so `prisma migrate deploy` has the CLI. See compose.yml's `migrate`.
+# Runs the pnpm-linked binary directly (not `pnpm exec`): this container
+# sits on the internal-only network, and `pnpm exec` shells out through
+# corepack, which tries to fetch pnpm from the registry as the `app` user
+# (whose corepack cache is empty - only `base`'s root user populated one).
 FROM build AS migrate
 RUN addgroup -S app -g 1001 && adduser -S app -G app -u 1001 -h /app && chown -R app:app /app
 USER app
-CMD ["pnpm", "--filter", "@photoo/db", "exec", "prisma", "migrate", "deploy"]
+WORKDIR /app/packages/db
+CMD ["node_modules/.bin/prisma", "migrate", "deploy"]
 
 FROM build AS prod-deps
 RUN pnpm prune --prod --ignore-scripts
