@@ -18,10 +18,6 @@ export const EmailJobSchema = z.discriminatedUnion('type', [
 
 export type EmailJob = z.infer<typeof EmailJobSchema>;
 
-// file-scan/image-process/uploads-cleanup all look the same at 1A.3a
-// (an upload to look up), but are kept as separate schemas rather than one
-// shared alias so each queue can grow its own payload independently once
-// 1A.3b adds the worker logic.
 export const FileScanJobSchema = z.object({ uploadId: IdSchema }).strict();
 
 export type FileScanJob = z.infer<typeof FileScanJobSchema>;
@@ -30,7 +26,9 @@ export const ImageProcessJobSchema = z.object({ uploadId: IdSchema }).strict();
 
 export type ImageProcessJob = z.infer<typeof ImageProcessJobSchema>;
 
-export const UploadsCleanupJobSchema = z.object({ uploadId: IdSchema }).strict();
+// A repeatable sweep of every expired upload, not a lookup of one row, so
+// (unlike file-scan/image-process) it carries no uploadId.
+export const UploadsCleanupJobSchema = z.object({}).strict();
 
 export type UploadsCleanupJob = z.infer<typeof UploadsCleanupJobSchema>;
 

@@ -1,6 +1,8 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { RedisService } from '../../redis/redis.service.js';
-import { RedisRateLimiter, type RateLimitRule } from './rate-limit.js';
+import {
+  RedisRateLimiter,
+  type RateLimitRule,
+} from '../../common/rate-limit/redis-rate-limiter.js';
 
 export type AuthRouteScope =
   | 'sign-in'
@@ -49,24 +51,20 @@ export const AUTH_ROUTE_RULES: Record<AuthRouteScope, ScopeRules> = {
 
 @Injectable()
 export class AuthRateLimitService {
-  private readonly limiter: RedisRateLimiter;
-
-  constructor(@Inject(RedisService) redisService: RedisService) {
-    this.limiter = new RedisRateLimiter(redisService.client);
-  }
+  constructor(@Inject(RedisRateLimiter) private readonly limiter: RedisRateLimiter) {}
 
   async enforce(scope: AuthRouteScope, ip: string | undefined, accountKey?: string): Promise<void> {
     const rules = AUTH_ROUTE_RULES[scope];
 
     if (rules.ip) {
-      const result = await this.limiter.consume(`${scope}:ip`, ip ?? 'unknown', rules.ip);
+      const result = await this.limiter.consume(`auth:${scope}:ip`, ip ?? 'unknown', rules.ip);
       if (!result.allowed) {
         this.throwTooManyRequests(result.retryAfterSeconds);
       }
     }
 
     if (rules.account && accountKey) {
-      const result = await this.limiter.consume(`${scope}:account`, accountKey, rules.account);
+      const result = await this.limiter.consume(`auth:${scope}:account`, accountKey, rules.account);
       if (!result.allowed) {
         this.throwTooManyRequests(result.retryAfterSeconds);
       }
@@ -76,7 +74,7 @@ export class AuthRateLimitService {
   // Only the account counter is cleared on success: clearing the IP counter
   // would let one valid account reset the limit for guesses against others.
   async resetAccount(scope: AuthRouteScope, accountKey: string): Promise<void> {
-    await this.limiter.reset(`${scope}:account`, accountKey);
+    await this.limiter.reset(`auth:${scope}:account`, accountKey);
   }
 
   private throwTooManyRequests(retryAfterSeconds: number): never {

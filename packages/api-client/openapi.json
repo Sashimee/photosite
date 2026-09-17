@@ -1475,9 +1475,22 @@
           },
           "headers": {
             "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
+            "properties": {
+              "Content-Type": {
+                "type": "string",
+                "example": "image/jpeg"
+              },
+              "Content-Length": {
+                "type": "string",
+                "example": "1024"
+              }
+            },
+            "required": [
+              "Content-Type",
+              "Content-Length"
+            ],
+            "additionalProperties": false,
+            "description": "Headers the client must send exactly as given on the presigned PUT"
           },
           "expiresAt": {
             "type": "string",
@@ -1515,6 +1528,19 @@
             ],
             "example": "portfolio"
           },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_upload",
+              "uploaded",
+              "scanning",
+              "clean",
+              "infected",
+              "failed",
+              "processed"
+            ],
+            "example": "processed"
+          },
           "mimeType": {
             "type": "string",
             "minLength": 3,
@@ -1522,8 +1548,15 @@
             "pattern": "^[a-z0-9.+-]+\\/[a-z0-9.+-]+$",
             "example": "image/jpeg"
           },
-          "sizeBytes": {
+          "declaredSizeBytes": {
             "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "actualSizeBytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
             "exclusiveMinimum": 0
           },
           "virusScanStatus": {
@@ -1535,15 +1568,6 @@
               "failed"
             ]
           },
-          "processedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time",
-            "description": "ISO 8601 date-time",
-            "example": "2026-09-16T12:00:00.000Z"
-          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -1554,10 +1578,11 @@
         "required": [
           "id",
           "purpose",
+          "status",
           "mimeType",
-          "sizeBytes",
+          "declaredSizeBytes",
+          "actualSizeBytes",
           "virusScanStatus",
-          "processedAt",
           "createdAt"
         ],
         "additionalProperties": false

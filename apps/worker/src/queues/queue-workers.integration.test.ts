@@ -9,11 +9,11 @@ import { APP_CONFIG } from '../config/env.js';
 import { requireIntegrationEnv } from '../testing/require-integration-env.js';
 import { TEST_ENV } from '../testing/test-env.js';
 
-const testEnv = requireIntegrationEnv(['REDIS_URL']);
+const testEnv = requireIntegrationEnv(['REDIS_URL', 'TEST_DATABASE_URL']);
 
 describe('QueueWorkersService against a real Redis', () => {
   if (!testEnv) {
-    it.skip('fails a malformed job with a logged reason (skipped: REDIS_URL is not set)', () =>
+    it.skip('fails a malformed job with a logged reason (skipped: REDIS_URL or TEST_DATABASE_URL is not set)', () =>
       undefined);
     return;
   }
@@ -26,7 +26,12 @@ describe('QueueWorkersService against a real Redis', () => {
   beforeAll(async () => {
     moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(APP_CONFIG)
-      .useValue({ ...TEST_ENV, REDIS_URL: testEnv.REDIS_URL, HEALTH_PORT: 4102 })
+      .useValue({
+        ...TEST_ENV,
+        REDIS_URL: testEnv.REDIS_URL,
+        DATABASE_URL: testEnv.TEST_DATABASE_URL,
+        HEALTH_PORT: 4102,
+      })
       .overrideProvider(Logger)
       .useValue(fakeLogger)
       .compile();
@@ -58,8 +63,9 @@ describe('QueueWorkersService against a real Redis', () => {
     );
   });
 
-  it('completes a job with a payload that matches the shared schema', async () => {
-    const job = await queue.add('scan', { uploadId: '3fa85f64-5717-4562-b3fc-2c963f66afa6' });
+  it('completes, rather than fails, a well-formed job for an upload row that no longer exists', async () => {
+    const uploadId = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+    const job = await queue.add('scan', { uploadId });
 
     await vi.waitFor(
       async () => {
@@ -68,9 +74,9 @@ describe('QueueWorkersService against a real Redis', () => {
       { timeout: 5000, interval: 100 },
     );
 
-    expect(fakeLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ queue: 'file-scan', jobId: job.id }) as unknown,
-      expect.any(String) as unknown,
+    expect(fakeLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ uploadId }) as unknown,
+      'file-scan: upload not found, skipping',
     );
   });
 });

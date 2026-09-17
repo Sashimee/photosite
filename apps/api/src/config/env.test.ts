@@ -11,6 +11,13 @@ const validEnv = {
   WEB_APP_URL: 'http://localhost:3000',
   AUTH_SECRET: 'a'.repeat(32),
   AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+  S3_ENDPOINT: 'http://127.0.0.1:9000',
+  S3_REGION: 'eu-west-1',
+  S3_ACCESS_KEY_ID: 'photoo_dev',
+  S3_SECRET_ACCESS_KEY: 'photoo_dev_password',
+  S3_FORCE_PATH_STYLE: 'true',
+  S3_PRIVATE_BUCKET: 'photoo-private',
+  S3_PUBLIC_BUCKET: 'photoo-public',
 };
 
 describe('loadEnv', () => {
@@ -155,5 +162,34 @@ describe('loadEnv', () => {
     });
     expect(env.GOOGLE_CLIENT_ID).toBe('client-id');
     expect(env.GOOGLE_CLIENT_SECRET).toBe('client-secret');
+  });
+
+  it('parses the S3 configuration, coercing S3_FORCE_PATH_STYLE to a boolean', () => {
+    const env = loadEnv(validEnv);
+    expect(env.S3_ENDPOINT).toBe('http://127.0.0.1:9000');
+    expect(env.S3_REGION).toBe('eu-west-1');
+    expect(env.S3_ACCESS_KEY_ID).toBe('photoo_dev');
+    expect(env.S3_SECRET_ACCESS_KEY).toBe('photoo_dev_password');
+    expect(env.S3_FORCE_PATH_STYLE).toBe(true);
+    expect(env.S3_PRIVATE_BUCKET).toBe('photoo-private');
+    expect(env.S3_PUBLIC_BUCKET).toBe('photoo-public');
+  });
+
+  it('defaults S3_FORCE_PATH_STYLE to false when unset', () => {
+    const withoutFlag: Record<string, string> = { ...validEnv };
+    delete withoutFlag.S3_FORCE_PATH_STYLE;
+    expect(loadEnv(withoutFlag).S3_FORCE_PATH_STYLE).toBe(false);
+  });
+
+  it('rejects a missing S3_ENDPOINT', () => {
+    const withoutEndpoint: Record<string, string> = { ...validEnv };
+    delete withoutEndpoint.S3_ENDPOINT;
+    expect(() => loadEnv(withoutEndpoint)).toThrow(/S3_ENDPOINT/);
+  });
+
+  it('rejects a missing S3_PRIVATE_BUCKET', () => {
+    const withoutBucket: Record<string, string> = { ...validEnv };
+    delete withoutBucket.S3_PRIVATE_BUCKET;
+    expect(() => loadEnv(withoutBucket)).toThrow(/S3_PRIVATE_BUCKET/);
   });
 });

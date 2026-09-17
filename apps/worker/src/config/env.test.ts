@@ -5,6 +5,13 @@ const validEnv = {
   NODE_ENV: 'development',
   DATABASE_URL: 'postgresql://user:pass@127.0.0.1:5432/photoo',
   REDIS_URL: 'redis://127.0.0.1:6379',
+  S3_ENDPOINT: 'http://127.0.0.1:9000',
+  S3_REGION: 'eu-west-1',
+  S3_ACCESS_KEY_ID: 'photoo_dev',
+  S3_SECRET_ACCESS_KEY: 'photoo_dev_password',
+  S3_FORCE_PATH_STYLE: 'true',
+  S3_PRIVATE_BUCKET: 'photoo-private',
+  S3_PUBLIC_BUCKET: 'photoo-public',
 };
 
 describe('loadEnv', () => {
@@ -19,6 +26,26 @@ describe('loadEnv', () => {
     expect(env.WORKER_CONCURRENCY_FILE_SCAN).toBe(2);
     expect(env.WORKER_CONCURRENCY_IMAGE_PROCESS).toBe(2);
     expect(env.WORKER_CONCURRENCY_UPLOADS_CLEANUP).toBe(1);
+    expect(env.CLAMAV_SCAN_TIMEOUT_MS).toBe(30_000);
+    expect(env.CLAMAV_MAX_SCAN_BYTES).toBe(25 * 1024 * 1024);
+    expect(env.UPLOADS_CLEANUP_INTERVAL_MS).toBe(10 * 60 * 1000);
+    expect(env.IMAGE_PROCESS_MAX_PIXELS).toBe(100_000_000);
+    expect(env.S3_ENDPOINT).toBe('http://127.0.0.1:9000');
+    expect(env.S3_FORCE_PATH_STYLE).toBe(true);
+    expect(env.S3_PRIVATE_BUCKET).toBe('photoo-private');
+    expect(env.S3_PUBLIC_BUCKET).toBe('photoo-public');
+  });
+
+  it('defaults S3_FORCE_PATH_STYLE to false when unset', () => {
+    const withoutFlag: Record<string, string> = { ...validEnv };
+    delete withoutFlag.S3_FORCE_PATH_STYLE;
+    expect(loadEnv(withoutFlag).S3_FORCE_PATH_STYLE).toBe(false);
+  });
+
+  it('rejects a missing S3_ENDPOINT', () => {
+    const withoutEndpoint: Record<string, string> = { ...validEnv };
+    delete withoutEndpoint.S3_ENDPOINT;
+    expect(() => loadEnv(withoutEndpoint)).toThrow(/S3_ENDPOINT/);
   });
 
   it('rejects a missing NODE_ENV', () => {

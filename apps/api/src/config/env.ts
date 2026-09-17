@@ -107,6 +107,14 @@ const EnvSchema = z
     SMTP_HOST: z.string().min(1).default('localhost'),
     SMTP_PORT: z.coerce.number().int().positive().default(1025),
     SMTP_FROM: z.email().default('dev@photoo.lu'),
+
+    S3_ENDPOINT: z.url(),
+    S3_REGION: z.string().min(1),
+    S3_ACCESS_KEY_ID: z.string().min(1),
+    S3_SECRET_ACCESS_KEY: z.string().min(1),
+    S3_FORCE_PATH_STYLE: BooleanFlagSchema,
+    S3_PRIVATE_BUCKET: z.string().min(1),
+    S3_PUBLIC_BUCKET: z.string().min(1),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== 'production') {
