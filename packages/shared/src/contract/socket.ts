@@ -1,4 +1,10 @@
-import { ConversationSchema, MessageSchema, atLeastOneOfBodyOrAttachments } from './chat.js';
+import {
+  ConversationSchema,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  MessageBodySchema,
+  MessageSchema,
+  atLeastOneOfBodyOrAttachments,
+} from './chat.js';
 import { IdSchema } from './common.js';
 import { z } from './zod.js';
 
@@ -8,11 +14,17 @@ export const SocketHandshakeAuthSchema = z
   })
   .strict();
 
+export const ClientConversationJoinEventSchema = z
+  .object({
+    conversationId: IdSchema,
+  })
+  .strict();
+
 export const ClientMessageSendEventSchema = z
   .object({
     conversationId: IdSchema,
-    body: z.string().min(1).max(4000).optional(),
-    attachmentIds: z.array(IdSchema).min(1).optional(),
+    body: MessageBodySchema.optional(),
+    attachmentIds: z.array(IdSchema).min(1).max(MAX_ATTACHMENTS_PER_MESSAGE).optional(),
   })
   .strict()
   .refine(atLeastOneOfBodyOrAttachments, {
@@ -35,6 +47,12 @@ export const ClientReadEventSchema = z
   .strict();
 
 export const ServerMessageNewEventSchema = z
+  .object({
+    message: MessageSchema,
+  })
+  .strict();
+
+export const ServerMessageDeletedEventSchema = z
   .object({
     message: MessageSchema,
   })
@@ -63,6 +81,7 @@ export const ServerConversationUpdatedEventSchema = z
   .strict();
 
 export const CLIENT_SOCKET_EVENTS = {
+  CONVERSATION_JOIN: 'conversation:join',
   MESSAGE_SEND: 'message:send',
   TYPING: 'typing',
   READ: 'read',
@@ -70,7 +89,18 @@ export const CLIENT_SOCKET_EVENTS = {
 
 export const SERVER_SOCKET_EVENTS = {
   MESSAGE_NEW: 'message:new',
+  MESSAGE_DELETED: 'message:deleted',
   TYPING: 'typing',
   READ: 'read',
   CONVERSATION_UPDATED: 'conversation:updated',
 } as const;
+
+export interface SocketAckError {
+  code: string;
+  message: string;
+}
+
+// Every ack callback resolves with this envelope instead of throwing, so an
+// invalid payload or a rejected action reaches the client as data, not a
+// dropped connection.
+export type SocketAck<T> = { ok: true; data: T } | { ok: false; error: SocketAckError };

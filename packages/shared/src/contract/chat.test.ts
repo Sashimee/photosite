@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ArchiveConversationRequestSchema,
   ConversationSchema,
+  ConversationsQuerySchema,
   MarkConversationReadRequestSchema,
   MessageSchema,
+  ReportConversationRequestSchema,
   SendMessageRequestSchema,
 } from './chat.js';
 
@@ -11,8 +12,9 @@ const validConversation = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   type: 'booking',
   subjectId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-  participantIds: ['3fa85f64-5717-4562-b3fc-2c963f66afa6'],
+  participants: [{ userId: '3fa85f64-5717-4562-b3fc-2c963f66afa6', lastReadAt: null }],
   lastMessageAt: '2026-09-16T12:00:00.000Z',
+  lastMessagePreview: 'Hello there',
   unreadCount: 2,
   archivedByMe: false,
 };
@@ -23,8 +25,8 @@ const validMessage = {
   senderId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   body: 'Hello there',
   attachments: [],
-  readBy: [],
   editedAt: null,
+  deletedAt: null,
   createdAt: '2026-09-16T12:00:00.000Z',
 };
 
@@ -39,13 +41,19 @@ describe('ConversationSchema', () => {
     );
   });
 
-  it('rejects an archivedBy field carrying other users ids', () => {
+  it('rejects a legacy participantIds field', () => {
     expect(
       ConversationSchema.safeParse({
         ...validConversation,
-        archivedBy: ['3fa85f64-5717-4562-b3fc-2c963f66afa6'],
+        participantIds: ['3fa85f64-5717-4562-b3fc-2c963f66afa6'],
       }).success,
     ).toBe(false);
+  });
+
+  it('requires at least one participant', () => {
+    expect(ConversationSchema.safeParse({ ...validConversation, participants: [] }).success).toBe(
+      false,
+    );
   });
 });
 
@@ -60,6 +68,16 @@ describe('MessageSchema', () => {
         ...validMessage,
         body: null,
         attachments: [{ id: validMessage.id, kind: 'image' }],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts a deleted message with a blanked body', () => {
+    expect(
+      MessageSchema.safeParse({
+        ...validMessage,
+        body: null,
+        deletedAt: '2026-09-16T12:05:00.000Z',
       }).success,
     ).toBe(true);
   });
@@ -100,6 +118,41 @@ describe('SendMessageRequestSchema', () => {
   it('rejects an empty body string with no attachments', () => {
     expect(SendMessageRequestSchema.safeParse({ body: '' }).success).toBe(false);
   });
+
+  it('rejects more than 10 attachment ids', () => {
+    const attachmentIds = Array.from({ length: 11 }, () => '3fa85f64-5717-4562-b3fc-2c963f66afa6');
+    expect(SendMessageRequestSchema.safeParse({ attachmentIds }).success).toBe(false);
+  });
+
+  it('trims surrounding whitespace from the body', () => {
+    const result = SendMessageRequestSchema.safeParse({ body: '  Hello  ' });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.body).toBe('Hello');
+  });
+
+  it('rejects a body that is only whitespace', () => {
+    expect(SendMessageRequestSchema.safeParse({ body: '   ' }).success).toBe(false);
+  });
+
+  it('accepts newlines and tabs in the body', () => {
+    expect(SendMessageRequestSchema.safeParse({ body: 'line one\nline two\tend' }).success).toBe(
+      true,
+    );
+  });
+
+  it('rejects a NUL byte in the body', () => {
+    expect(SendMessageRequestSchema.safeParse({ body: 'hello\u0000world' }).success).toBe(false);
+  });
+
+  it('rejects an ANSI escape sequence in the body', () => {
+    expect(SendMessageRequestSchema.safeParse({ body: 'hello\u001b[31mworld' }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects a carriage return in the body', () => {
+    expect(SendMessageRequestSchema.safeParse({ body: 'hello\rworld' }).success).toBe(false);
+  });
 });
 
 describe('MarkConversationReadRequestSchema', () => {
@@ -113,13 +166,32 @@ describe('MarkConversationReadRequestSchema', () => {
   });
 });
 
-describe('ArchiveConversationRequestSchema', () => {
-  it('defaults archived to true', () => {
-    const result = ArchiveConversationRequestSchema.parse({});
-    expect(result.archived).toBe(true);
+describe('ConversationsQuerySchema', () => {
+  it('leaves archived unset by default', () => {
+    const result = ConversationsQuerySchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.archived).toBeUndefined();
   });
 
-  it('accepts an explicit false to unarchive', () => {
-    expect(ArchiveConversationRequestSchema.safeParse({ archived: false }).success).toBe(true);
+  it('coerces an archived=true query string', () => {
+    const result = ConversationsQuerySchema.safeParse({ archived: 'true' });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.archived).toBe(true);
+  });
+});
+
+describe('ReportConversationRequestSchema', () => {
+  it('requires a non-empty reason', () => {
+    expect(ReportConversationRequestSchema.safeParse({ reason: '' }).success).toBe(false);
+    expect(ReportConversationRequestSchema.safeParse({ reason: 'Spam' }).success).toBe(true);
+  });
+
+  it('accepts an optional messageId', () => {
+    expect(
+      ReportConversationRequestSchema.safeParse({
+        reason: 'Spam',
+        messageId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+      }).success,
+    ).toBe(true);
   });
 });

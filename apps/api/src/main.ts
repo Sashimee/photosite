@@ -7,6 +7,7 @@ import { AppModule } from './app.module.js';
 import { configureApp } from './bootstrap/configure-app.js';
 import { createFastifyAdapter } from './bootstrap/fastify-adapter.js';
 import { APP_CONFIG, loadEnv, type Env } from './config/env.js';
+import { RedisIoAdapter } from './modules/chat/socket-io-redis-adapter.js';
 
 async function bootstrap(): Promise<void> {
   const bootstrapConfig = loadEnv();
@@ -21,6 +22,10 @@ async function bootstrap(): Promise<void> {
   const config = app.get<Env>(APP_CONFIG);
 
   await configureApp(app, config);
+
+  const redisIoAdapter = new RedisIoAdapter(app, config.REDIS_URL);
+  redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   app.enableShutdownHooks();
 

@@ -11,8 +11,15 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock, refresh: refreshMock }),
 }));
 
+const MENU_LABELS: Record<string, string> = {
+  account: 'Account',
+  myRequests: 'My requests',
+  quotes: 'Quotes',
+  signOut: 'Sign out',
+};
+
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => (key === 'account' ? 'Account' : 'Sign out'),
+  useTranslations: () => (key: string) => MENU_LABELS[key] ?? key,
 }));
 
 const sampleUser: SessionUser = {
@@ -55,6 +62,11 @@ describe('AccountMenu', () => {
       'href',
       '/en/account',
     );
+    expect(screen.getByRole('menuitem', { name: 'My requests' })).toHaveAttribute(
+      'href',
+      '/en/requests',
+    );
+    expect(screen.getByRole('menuitem', { name: 'Quotes' })).toHaveAttribute('href', '/en/quotes');
   });
 
   it('signs out, refreshes the session and navigates home', async () => {

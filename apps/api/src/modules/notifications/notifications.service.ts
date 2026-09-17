@@ -4,6 +4,7 @@ import {
   NOTIFICATION_CHANNELS,
   NOTIFICATION_TYPES,
   NotificationPayloadSchema,
+  isChannelAvailable,
   resolveNotificationChannels,
   type DeviceSchema,
   type NotificationChannel,
@@ -161,7 +162,7 @@ export class NotificationsService {
           userId: user.id,
           type: entry.type,
           channel: entry.channel,
-          enabled: entry.channel === 'in_app' ? true : entry.enabled,
+          enabled: preferenceEnabled(entry.type, entry.channel, entry.enabled),
         })),
       }),
     ]);
@@ -231,13 +232,23 @@ interface PreferenceRow {
   enabled: boolean;
 }
 
+function preferenceEnabled(
+  type: NotificationType,
+  channel: NotificationChannel,
+  requested: boolean,
+): boolean {
+  if (channel === 'in_app') return true;
+  if (!isChannelAvailable(type, channel)) return false;
+  return requested;
+}
+
 function fillPreferenceMatrix(rows: readonly PreferenceRow[]): PreferencesResponse['preferences'] {
   const overrides = new Map(rows.map((row) => [`${row.type}:${row.channel}`, row.enabled]));
   const entries: PreferencesResponse['preferences'] = [];
   for (const type of NOTIFICATION_TYPES) {
     for (const channel of NOTIFICATION_CHANNELS) {
-      const enabled = channel === 'in_app' ? true : (overrides.get(`${type}:${channel}`) ?? true);
-      entries.push({ type, channel, enabled });
+      const stored = overrides.get(`${type}:${channel}`) ?? true;
+      entries.push({ type, channel, enabled: preferenceEnabled(type, channel, stored) });
     }
   }
   return entries;

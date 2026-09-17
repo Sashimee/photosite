@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import { AuditLogModule } from '../../common/audit/audit-log.module.js';
 import { RateLimitModule } from '../../common/rate-limit/rate-limit.module.js';
 import { APP_CONFIG, type Env } from '../../config/env.js';
+import { ChatSocketBridgeModule } from '../chat/chat-socket-bridge.module.js';
 import { AUTH_INSTANCE, authInstanceProvider } from './auth-instance.provider.js';
 import type { Auth } from './auth-instance.js';
 import { AuthController } from './auth.controller.js';
@@ -14,7 +15,7 @@ import { mountOAuthCallback } from './oauth-callback.js';
 import { OriginGuard } from './origin-guard.js';
 
 @Module({
-  imports: [AuditLogModule, RateLimitModule, EmailQueueModule],
+  imports: [AuditLogModule, RateLimitModule, EmailQueueModule, ChatSocketBridgeModule],
   controllers: [AuthController],
   providers: [authInstanceProvider, AuthRateLimitService, OriginGuard],
   exports: [authInstanceProvider],

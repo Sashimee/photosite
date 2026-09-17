@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ClientConversationJoinEventSchema,
   ClientMessageSendEventSchema,
   ClientReadEventSchema,
   ClientTypingEventSchema,
   ServerConversationUpdatedEventSchema,
+  ServerMessageDeletedEventSchema,
   ServerMessageNewEventSchema,
   ServerReadEventSchema,
   ServerTypingEventSchema,
@@ -11,6 +13,13 @@ import {
 } from './socket.js';
 
 const id = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+
+describe('ClientConversationJoinEventSchema', () => {
+  it('requires a conversationId', () => {
+    expect(ClientConversationJoinEventSchema.safeParse({ conversationId: id }).success).toBe(true);
+    expect(ClientConversationJoinEventSchema.safeParse({}).success).toBe(false);
+  });
+});
 
 describe('SocketHandshakeAuthSchema', () => {
   it('accepts an empty payload for cookie-based sessions', () => {
@@ -91,11 +100,25 @@ describe('server events', () => {
       senderId: id,
       body: 'Hello',
       attachments: [],
-      readBy: [],
       editedAt: null,
+      deletedAt: null,
       createdAt: '2026-09-16T12:00:00.000Z',
     };
     expect(ServerMessageNewEventSchema.safeParse({ message }).success).toBe(true);
+  });
+
+  it('ServerMessageDeletedEventSchema wraps a blanked message', () => {
+    const message = {
+      id,
+      conversationId: id,
+      senderId: id,
+      body: null,
+      attachments: [],
+      editedAt: null,
+      deletedAt: '2026-09-16T12:05:00.000Z',
+      createdAt: '2026-09-16T12:00:00.000Z',
+    };
+    expect(ServerMessageDeletedEventSchema.safeParse({ message }).success).toBe(true);
   });
 
   it('ServerConversationUpdatedEventSchema wraps a conversation', () => {
@@ -103,8 +126,9 @@ describe('server events', () => {
       id,
       type: 'direct',
       subjectId: null,
-      participantIds: [id],
+      participants: [{ userId: id, lastReadAt: null }],
       lastMessageAt: null,
+      lastMessagePreview: null,
       unreadCount: 0,
       archivedByMe: false,
     };

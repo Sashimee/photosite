@@ -23,7 +23,7 @@ type TwoFactorFormValues = z.infer<typeof SignInTotpRequestSchema>;
 export function TwoFactorForm({ locale, next }: { locale: Locale; next?: string | undefined }) {
   const t = useTranslations('web.auth.twoFactor');
   const tErrors = useTranslations('web.auth');
-  const tValidation = useTranslations('web.auth');
+  const tValidation = useTranslations('common.validation');
   const router = useRouter();
   const [mode, setMode] = useState<'code' | 'backupCode'>('code');
   const [submitError, setSubmitError] = useState<string | null>(null);

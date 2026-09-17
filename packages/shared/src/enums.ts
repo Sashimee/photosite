@@ -142,6 +142,7 @@ export const NOTIFICATION_TYPES = [
   'quote_declined',
   'quote_withdrawn',
   'quote_expired',
+  'message_received',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

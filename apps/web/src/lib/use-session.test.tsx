@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -67,7 +67,7 @@ describe('useSession', () => {
 
     render(<Probe initialUser={null} />);
 
-    expect(await screen.findByTestId('status')).toHaveTextContent('authenticated');
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('authenticated'));
     expect(screen.getByTestId('email')).toHaveTextContent('client@example.com');
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -81,7 +81,7 @@ describe('useSession', () => {
 
     render(<Probe initialUser={null} />);
 
-    expect(await screen.findByTestId('status')).toHaveTextContent('unauthenticated');
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'));
     expect(screen.getByTestId('email')).toHaveTextContent('none');
   });
 

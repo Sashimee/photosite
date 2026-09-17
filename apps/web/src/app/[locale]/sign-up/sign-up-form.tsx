@@ -29,7 +29,7 @@ export function SignUpForm({ locale }: { locale: Locale }) {
   const t = useTranslations('web.auth.signUp');
   const tRoles = useTranslations('web.auth.roles');
   const tErrors = useTranslations('web.auth');
-  const tValidation = useTranslations('web.auth');
+  const tValidation = useTranslations('common.validation');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 

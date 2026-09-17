@@ -234,6 +234,12 @@ describe('requests integration', () => {
 
   afterAll(async () => {
     if (createdUserIds.length > 0 || createdProfileIds.length > 0) {
+      // Quote creation also creates a quote Conversation (docs/steps/1A.6-chat.md);
+      // its ConversationParticipant rows must go before the users, since
+      // that FK is Restrict.
+      await prisma.conversation.deleteMany({
+        where: { type: 'quote', participants: { some: { userId: { in: createdUserIds } } } },
+      });
       await prisma.quote.deleteMany({
         where: {
           OR: [{ clientId: { in: createdUserIds } }, { photographerId: { in: createdProfileIds } }],

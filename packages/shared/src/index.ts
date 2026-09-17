@@ -153,6 +153,7 @@ export {
 } from './contract/auth.js';
 
 export { CitiesQuerySchema, CitySummarySchema } from './contract/cities.js';
+export { CountrySummarySchema } from './contract/countries.js';
 
 export {
   AttachPortfolioImageRequestSchema,
@@ -220,25 +221,34 @@ export {
 } from './contract/uploads.js';
 
 export {
-  ArchiveConversationRequestSchema,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  MAX_MESSAGE_BODY_LENGTH,
+  ConversationParticipantSchema,
   ConversationSchema,
+  ConversationsQuerySchema,
   MarkConversationReadRequestSchema,
   MessageAttachmentSchema,
+  MessageBodySchema,
   MessageSchema,
+  ReportConversationRequestSchema,
   SendMessageRequestSchema,
 } from './contract/chat.js';
 
 export {
   CLIENT_SOCKET_EVENTS,
+  ClientConversationJoinEventSchema,
   ClientMessageSendEventSchema,
   ClientReadEventSchema,
   ClientTypingEventSchema,
   SERVER_SOCKET_EVENTS,
   ServerConversationUpdatedEventSchema,
+  ServerMessageDeletedEventSchema,
   ServerMessageNewEventSchema,
   ServerReadEventSchema,
   ServerTypingEventSchema,
   SocketHandshakeAuthSchema,
+  type SocketAck,
+  type SocketAckError,
 } from './contract/socket.js';
 
 export {
@@ -298,6 +308,7 @@ export {
 } from './contract/notifications.js';
 
 export {
+  isChannelAvailable,
   resolveNotificationChannels,
   type NotificationPreferenceOverride,
 } from './notification-channels.js';
