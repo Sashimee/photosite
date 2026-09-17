@@ -1,10 +1,14 @@
 import { z } from 'zod';
 
+// Docker build args and compose `${VAR:-}` pass unset optionals as empty strings.
+const optional = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((value) => (value === '' ? undefined : value), schema.optional());
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   NEXT_PUBLIC_API_URL: z.url(),
-  NEXT_PUBLIC_SENTRY_DSN: z.url().optional(),
-  SENTRY_REQUIRED: z.enum(['true', 'false']).optional(),
+  NEXT_PUBLIC_SENTRY_DSN: optional(z.url()),
+  SENTRY_REQUIRED: optional(z.enum(['true', 'false'])),
   NEXT_PUBLIC_ALLOW_INDEXING: z
     .string()
     .optional()
