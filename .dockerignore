@@ -1,0 +1,16 @@
+**/node_modules
+**/dist
+**/.next
+**/.expo
+**/coverage
+**/.turbo
+**/*.tsbuildinfo
+next-env.d.ts
+.git
+.github
+.husky
+.vscode
+RESUME.md
+**/.env
+**/.env.*
+!**/.env.example

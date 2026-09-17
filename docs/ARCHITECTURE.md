@@ -60,20 +60,26 @@ Tooling: pnpm workspaces, Turborepo, TypeScript strict, ESLint + Prettier, Vites
 
 ## Runtime topology on the VPS
 
+**Preview (Phase 0.5, noindex, from `main`):**
+
 ```
 Internet
-  └─ Traefik (managed by Dokploy/Coolify, Let's Encrypt)
-       ├─ photoo.lu          -> web (Next.js, node)
-       ├─ admin.photoo.lu    -> admin (Next.js, node)   [+ IP allow-list, 2FA]
-       └─ api.photoo.lu      -> api (NestJS, HTTP + WebSocket)
-  worker (NestJS standalone)  -> consumes BullMQ queues
-  postgres 16 + postgis        (volume, nightly pg_dump to object storage)
-  redis 7                      (AOF persistence)
-Object storage (Hetzner, EU)   <- presigned uploads from web/mobile, variants written by worker
-Stripe, Brevo, Expo Push, provenance APIs  <- outbound only; webhooks inbound to api
+  └─ Traefik (managed by Dokploy)
+       ├─ footoo.bas.lu/v1/*     -> api (NestJS, HTTP + WebSocket)
+       ├─ footoo.bas.lu/photoo-public/* (GET/HEAD only) -> minio:9000 (public bucket)
+       └─ footoo.bas.lu/*        -> web (Next.js, node)
+  worker (NestJS standalone)    -> consumes BullMQ queues
+  postgres 16 + postgis         (volume)
+  redis 7                       (AOF persistence)
+  minio (local S3 for demo)
+  mailpit (internal, no public route)
+Object storage (Hetzner, EU)    <- presigned uploads from web/mobile, variants written by worker
+Stripe, Expo Push, provenance APIs <- outbound only; webhooks inbound to api
 ```
 
-Staging is a second Dokploy project (`staging.photoo.lu`, `api-staging`, `admin-staging`) deployed from `dev`; production deploys from `main`.
+**Staging and production (planned for Phase 1E.1 and 2.4):**
+
+Staging is a second Dokploy project (`staging.photoo.lu`, `api-staging`, `admin-staging`) deployed from `dev`; production deploys from `main` with separate DNS and credentials.
 
 ## Domain model (summary)
 
