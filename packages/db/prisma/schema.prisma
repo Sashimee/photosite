@@ -128,6 +128,13 @@ enum QuoteStatus {
   withdrawn
 }
 
+enum ConversationType {
+  request
+  quote
+  booking
+  direct
+}
+
 model Country {
   code              String   @id @db.Char(2)
   name              String
@@ -174,18 +181,20 @@ model User {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  accounts                Account[]
-  sessions                Session[]
-  twoFactors              TwoFactor[]
-  devices                 Device[]
-  consentRecords          ConsentRecord[]
-  notifications           Notification[]
-  notificationPreferences NotificationPreference[]
-  updatedPlatformSettings PlatformSetting[]
-  uploads                 Upload[]
-  photographerProfile     PhotographerProfile?
-  requests                Request[]
-  quotes                  Quote[]
+  accounts                 Account[]
+  sessions                 Session[]
+  twoFactors               TwoFactor[]
+  devices                  Device[]
+  consentRecords           ConsentRecord[]
+  notifications            Notification[]
+  notificationPreferences  NotificationPreference[]
+  updatedPlatformSettings  PlatformSetting[]
+  uploads                  Upload[]
+  photographerProfile      PhotographerProfile?
+  requests                 Request[]
+  quotes                   Quote[]
+  conversationParticipants ConversationParticipant[]
+  sentMessages             Message[]
 
   @@index([countryCode])
   @@index([status])
@@ -374,9 +383,10 @@ model Upload {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
-  avatarForProfile PhotographerProfile? @relation("PhotographerProfileAvatar")
-  coverForProfile  PhotographerProfile? @relation("PhotographerProfileCover")
-  portfolioImage   PortfolioImage?
+  avatarForProfile  PhotographerProfile? @relation("PhotographerProfileAvatar")
+  coverForProfile   PhotographerProfile? @relation("PhotographerProfileCover")
+  portfolioImage    PortfolioImage?
+  messageAttachment MessageAttachment?
 
   @@index([ownerId])
   @@index([status])
@@ -569,4 +579,85 @@ model Quote {
   @@index([status, validUntil])
   @@index([productId])
   @@index([productTierId])
+}
+
+// `subjectId` is the id of the request/quote/booking the conversation is
+// about (polymorphic on `type`, so no foreign key), null for `direct`. The
+// unique `(type, subjectId)` index makes creating the quote conversation
+// idempotent (docs/steps/1A.6-chat.md): the same transaction that creates a
+// quote can call `create` and rely on the database to reject a duplicate.
+// `request` and `direct` aren't creatable in the MVP; `booking` reuses the
+// quote's conversation rather than creating a new row.
+model Conversation {
+  id            String           @id @default(uuid(7))
+  type          ConversationType
+  subjectId     String?
+  lastMessageAt DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@unique([type, subjectId])
+}
+
+// Replaces `Conversation.participantIds[]`, `Conversation.archivedBy[]` and
+// `Message.readBy` (DATA-MODEL.md): membership checks, unread counts
+// (`messages.createdAt > lastReadAt` and sender != me) and archive state are
+// indexed row lookups instead of array/JSON scans. Unique on the pair, so a
+// user can't be added to the same conversation twice.
+model ConversationParticipant {
+  id             String       @id @default(uuid(7))
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  lastReadAt     DateTime?
+  archivedAt     DateTime?
+  joinedAt       DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([conversationId, userId])
+  @@index([userId, archivedAt])
+}
+
+// Body is 1-4000 chars trimmed, plain text only; a message needs a body or
+// at least one attachment (application-enforced, DATA-MODEL.md). Edits
+// aren't supported in the MVP so `editedAt` stays null. Delete is a soft
+// delete by the sender within 15 minutes: `body` is blanked and `deletedAt`
+// is set, and clients render "message deleted".
+model Message {
+  id             String       @id @default(uuid(7))
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  body           String?
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  attachments MessageAttachment[]
+
+  @@index([conversationId, createdAt(sort: Desc), id])
+}
+
+// Replaces the standalone `Attachment` entity: reuses `Upload` (purpose
+// `chat_attachment`) instead of duplicating storage metadata. `uploadId` is
+// unique because an upload attaches to at most one message. `uploadId` is
+// `Restrict` so an attached upload can't be deleted out from under a
+// message; the uploader-must-be-sender and clean/processed checks are
+// application-enforced at attach time (DATA-MODEL.md).
+model MessageAttachment {
+  id        String   @id @default(uuid(7))
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  uploadId  String   @unique
+  upload    Upload   @relation(fields: [uploadId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([messageId])
 }
