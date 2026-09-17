@@ -30,6 +30,13 @@ export interface PortfolioImageRepository {
   }): Promise<{ count: number }>;
 }
 
+export interface UpdateManyRepository<
+  TWhere = Record<string, unknown>,
+  TData = Record<string, unknown>,
+> {
+  updateMany(args: { where: TWhere; data: TData }): Promise<{ count: number }>;
+}
+
 export interface PutObjectArgs {
   bucket: string;
   key: string;
