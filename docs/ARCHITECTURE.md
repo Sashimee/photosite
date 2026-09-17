@@ -126,7 +126,7 @@ Thresholds are set to the coverage measured with the local stack running (`pnpm 
 |---|---|---|---|---|
 | `packages/shared` | 98 | 95 | 99 | 99 |
 | `packages/i18n` | 93 | 89 | 99 | 93 |
-| `packages/db` | 75 | 70 | 82 | 75 |
+| `packages/db` | 75 | 66 (CI runs the seed on a fresh database, so fewer seed branches execute than locally) | 82 | 75 |
 | `packages/api-client` | 99 | 99 | 99 | 99 |
 | `apps/api` | 85 | 67 | 90 | 86 |
 | `apps/web` | 48 | 60 | 55 | 48 |
