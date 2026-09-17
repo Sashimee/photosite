@@ -12,7 +12,7 @@ Last updated: 2026-09-17.
 | O2 | Legal entity operating photoo.lu | 0.6 Stripe platform, store accounts, 0.7, DAC7 | None needed before Phase 1 payments |
 | O3 | Confirm auto-release delay | 1A.8 | Seeded as `autoReleaseDays = 7` in `PlatformSetting`, editable later |
 | O4 | AI detection and reverse-search vendors | 1A.10 | Vendor adapters behind an interface with a fake adapter in tests |
-| O5 | Brand kit | 1B.1 design tokens, 1C.9 store assets | Neutral tokens in `apps/web/src/styles/tokens.css` and a text wordmark; swap that one file when 0.8 lands |
+| O5 | Brand kit | 1B.1 design tokens, 1C.9 store assets | Neutral tokens in `apps/web/src/styles/tokens.css` and a text wordmark; swap that one file when 0.8 lands. `apps/mobile/tailwind.config.js` mirrors the same neutral scale as sRGB hex (NativeWind cannot resolve `oklch()`); update it alongside. `apps/mobile/assets/icon.png` and `splash.png` are plain solid-colour placeholders generated locally; replace with real app icon/splash art in 1C.9 |
 
 ## Human-only plan steps
 
@@ -33,6 +33,6 @@ Last updated: 2026-09-17.
 
 | Service | Placeholder until Alex provides it |
 |---------|------------------------------------|
-| Sentry | `@sentry/nextjs` is a no-op without `SENTRY_DSN`; staging/prod set `SENTRY_REQUIRED=true` so a missing DSN fails the build |
-| Expo account + EAS project | `eas.json` and `app.config.ts` are committed; `extra.eas.projectId` comes from `EAS_PROJECT_ID`. Alex creates the Expo project, sets the variable, then the first development builds run (1C.1 follow-up) |
+| Sentry | `@sentry/nextjs` is a no-op without `SENTRY_DSN`; staging/prod set `SENTRY_REQUIRED=true` so a missing DSN fails the build. On mobile, `@sentry/react-native` is only initialised in `apps/mobile/src/lib/sentry.ts` when `EXPO_PUBLIC_SENTRY_DSN` is set; `expo-doctor` prints an organization/project warning for source-map upload until Alex adds those to the EAS/Sentry config |
+| Expo account + EAS project | `eas.json` and `app.config.ts` are committed (1C.1 done). `extra.eas.projectId` comes from `EAS_PROJECT_ID`, omitted when unset. Alex creates the Expo project at expo.dev, sets `EAS_PROJECT_ID` (and `EXPO_TOKEN` for CI), runs `eas init` once, then the first `eas build --profile development` for iOS/Android |
 | OAuth apps (Google, Apple, Facebook, Microsoft) | 1A.2 enables a provider only when its client id/secret env vars are set; email + password works without them |

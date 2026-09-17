@@ -14,6 +14,19 @@
     "fr": "French",
     "pt": "Portuguese"
   },
+  "mobile": {
+    "tabs": {
+      "discover": "Discover",
+      "requests": "Requests",
+      "messages": "Messages",
+      "account": "Account"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "description": "This screen does not exist.",
+      "backHome": "Go to home screen"
+    }
+  },
   "web": {
     "skipToContent": "Skip to content",
     "nav": {

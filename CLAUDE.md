@@ -36,8 +36,8 @@ pnpm install
 pnpm lint           # eslint in every workspace (turbo)
 pnpm i18n:check     # check catalog consistency (strict mode added in 2.3)
 pnpm typecheck      # tsc --noEmit in every workspace
-pnpm test           # vitest run in every workspace
-pnpm build          # tsc builds to dist/ (apps/web builds to .next/ via next build)
+pnpm test           # vitest run in every workspace (apps/mobile uses jest-expo instead)
+pnpm build          # tsc builds to dist/ (apps/web builds to .next/ via next build); apps/mobile has no build script, native builds go through EAS
 pnpm format         # prettier --write (markdown is excluded)
 pnpm mock:api       # serve packages/api-client/openapi.json with Prism (Docker image) on 127.0.0.1:4010
 pnpm --filter @photoo/shared openapi:generate       # zod contract -> packages/api-client/openapi.json
@@ -45,6 +45,7 @@ pnpm --filter @photoo/api-client generate           # openapi.json -> typed clie
 pnpm --filter @photoo/api-client generate:check     # fail if the typed client is stale
 pnpm --filter @photoo/web dev       # Next.js dev server on :3000, against NEXT_PUBLIC_API_URL (mock or api)
 pnpm --filter @photoo/api dev       # NestJS (Fastify) API on PORT (default 4000), watches src/ and restarts
+pnpm --filter @photoo/mobile start  # Expo dev server against EXPO_PUBLIC_API_URL (mock or api); --ios/--android/--web variants
 pnpm --filter @photoo/<name> <script>
 pnpm stack:up       # docker compose: postgres+postgis, redis, minio, mailpit (127.0.0.1 only)
 pnpm stack:down     # stop the local dev stack
@@ -52,7 +53,7 @@ pnpm stack:reset    # stop the local dev stack and remove its volumes
 pnpm db:seed        # forwards to packages/db seed script
 ```
 
-Planned, not yet present: `pnpm dev` running every app against the stack at once. Workspaces are named `@photoo/<dir>`. TypeScript stays on 6.0 until typescript-eslint supports 7. A husky pre-commit hook runs lint-staged.
+Planned, not yet present: `pnpm dev` running every app against the stack at once. Workspaces are named `@photoo/<dir>`. TypeScript stays on 6.0 until typescript-eslint supports 7. A husky pre-commit hook runs lint-staged. `apps/mobile` native builds/submits run through EAS (`eas.json`); `eas init`, `eas build`, `eas submit` need an Expo account login and `EAS_PROJECT_ID` (see `docs/steps/human-followups.md`).
 
 Update this section when scripts change (docs-sync agent).
 

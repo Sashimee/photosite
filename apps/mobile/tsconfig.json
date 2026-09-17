@@ -1,8 +1,26 @@
 {
-  "extends": "@photoo/config/tsconfig/library.json",
+  "extends": "@photoo/config/tsconfig/base.json",
   "compilerOptions": {
-    "rootDir": ".",
-    "types": ["node"]
+    "target": "ES2024",
+    "lib": ["DOM", "ES2024"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "noEmit": true,
+    "customConditions": ["react-native"],
+    "types": ["node", "expo/types"],
+    "rootDir": "."
   },
-  "include": ["src", "*.config.ts"]
+  "include": [
+    "app",
+    "src",
+    "jest",
+    "*.config.ts",
+    "*.config.js",
+    "app.config.ts",
+    "nativewind-env.d.ts"
+  ],
+  "exclude": ["node_modules"]
 }
