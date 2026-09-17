@@ -17,46 +17,36 @@ vi.mock('next-intl/server', () => ({
       translate(namespace, key, values),
 }));
 
-const REQUEST_ITEM = {
-  id: 'req-1',
-  clientId: 'client-1',
-  title: 'Wedding photographer needed',
-  category: 'wedding',
-  description: 'Full day coverage',
-  eventDate: '2026-10-01T12:00:00.000Z',
-  dateFlexible: false,
-  location: { lat: 49.61, lng: 6.13 },
-  address: {
-    line1: '10 rue de la Gare',
-    city: 'Luxembourg',
-    postalCode: 'L-1611',
-    countryCode: 'LU',
-  },
-  budgetMin: { amountCents: 100000, currency: 'EUR' },
-  budgetMax: { amountCents: 200000, currency: 'EUR' },
-  usage: 'personal',
-  status: 'open',
-  expiresAt: null,
-};
+function requestItem(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'req-1',
+    clientId: 'client-1',
+    title: 'Wedding photographer needed',
+    category: 'wedding',
+    description: 'Full day coverage',
+    eventDate: '2026-10-01T12:00:00.000Z',
+    dateFlexible: false,
+    location: { lat: 49.61, lng: 6.13 },
+    address: {
+      line1: '10 rue de la Gare',
+      city: 'Luxembourg',
+      postalCode: 'L-1611',
+      countryCode: 'LU',
+    },
+    budgetMin: { amountCents: 100000, currency: 'EUR' },
+    budgetMax: { amountCents: 200000, currency: 'EUR' },
+    usage: 'personal',
+    status: 'open',
+    expiresAt: null,
+    quoteCount: 0,
+    ...overrides,
+  };
+}
 
-function mockApi({
-  items,
-  nextCursor = null,
-  quoteItemsCount = 0,
-}: {
-  items: unknown[];
-  nextCursor?: string | null;
-  quoteItemsCount?: number;
-}) {
+function mockApi({ items, nextCursor = null }: { items: unknown[]; nextCursor?: string | null }) {
   apiGetMock.mockImplementation((url: string) => {
     if (url === '/v1/requests/mine') {
       return Promise.resolve({ data: { items, nextCursor }, response: { status: 200 } });
-    }
-    if (url === '/v1/requests/{requestId}/quotes') {
-      return Promise.resolve({
-        data: { items: Array.from({ length: quoteItemsCount }), nextCursor: null },
-        response: { status: 200 },
-      });
     }
     throw new Error(`unexpected GET ${url}`);
   });
@@ -136,9 +126,9 @@ describe('RequestsListPage', () => {
     expect(screen.getByText("You haven't sent any requests yet.")).toBeInTheDocument();
   });
 
-  it('lists requests with a status badge and quote count, and a next-page link', async () => {
+  it('lists requests with a status badge and quote count from the API, and a next-page link', async () => {
     getSessionMock.mockResolvedValue({ id: 'user-1' });
-    mockApi({ items: [REQUEST_ITEM], nextCursor: 'cursor-2', quoteItemsCount: 3 });
+    mockApi({ items: [requestItem({ quoteCount: 3 })], nextCursor: 'cursor-2' });
     const RequestsListPage = await loadPage();
 
     const element = await RequestsListPage({
@@ -154,6 +144,7 @@ describe('RequestsListPage', () => {
     expect(
       screen.getByText(translate('web.requests.list', 'quoteCount', { count: 3 })),
     ).toBeInTheDocument();
+    expect(apiGetMock).toHaveBeenCalledTimes(1);
 
     const nextPage = screen.getByRole('link', { name: 'Next page' });
     expect(nextPage).toHaveAttribute('href', '/en/requests?cursor=cursor-2');
@@ -161,7 +152,7 @@ describe('RequestsListPage', () => {
 
   it('resolves the singular and zero plural forms of the quote count literally', async () => {
     getSessionMock.mockResolvedValue({ id: 'user-1' });
-    mockApi({ items: [REQUEST_ITEM], quoteItemsCount: 1 });
+    mockApi({ items: [requestItem({ quoteCount: 1 })] });
     const RequestsListPage = await loadPage();
 
     const element = await RequestsListPage({
@@ -175,7 +166,7 @@ describe('RequestsListPage', () => {
 
   it('shows "No quotes yet" for a request with zero quotes', async () => {
     getSessionMock.mockResolvedValue({ id: 'user-1' });
-    mockApi({ items: [REQUEST_ITEM], quoteItemsCount: 0 });
+    mockApi({ items: [requestItem({ quoteCount: 0 })] });
     const RequestsListPage = await loadPage();
 
     const element = await RequestsListPage({
@@ -189,7 +180,7 @@ describe('RequestsListPage', () => {
 
   it('does not show a next-page link without a next cursor', async () => {
     getSessionMock.mockResolvedValue({ id: 'user-1' });
-    mockApi({ items: [REQUEST_ITEM] });
+    mockApi({ items: [requestItem()] });
     const RequestsListPage = await loadPage();
 
     const element = await RequestsListPage({

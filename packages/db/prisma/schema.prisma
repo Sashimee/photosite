@@ -96,6 +96,15 @@ enum VerificationStatus {
   rejected
 }
 
+enum VerificationCaseStatus {
+  draft
+  submitted
+  in_review
+  approved
+  rejected
+  expired
+}
+
 enum PortfolioImageStatus {
   processing
   pending_review
@@ -150,6 +159,7 @@ model Country {
   users                User[]
   photographerProfiles PhotographerProfile[]
   requests             Request[]
+  verificationCases    VerificationCase[]
 }
 
 model PlatformSetting {
@@ -181,20 +191,23 @@ model User {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  accounts                 Account[]
-  sessions                 Session[]
-  twoFactors               TwoFactor[]
-  devices                  Device[]
-  consentRecords           ConsentRecord[]
-  notifications            Notification[]
-  notificationPreferences  NotificationPreference[]
-  updatedPlatformSettings  PlatformSetting[]
-  uploads                  Upload[]
-  photographerProfile      PhotographerProfile?
-  requests                 Request[]
-  quotes                   Quote[]
-  conversationParticipants ConversationParticipant[]
-  sentMessages             Message[]
+  accounts                  Account[]
+  sessions                  Session[]
+  twoFactors                TwoFactor[]
+  devices                   Device[]
+  consentRecords            ConsentRecord[]
+  notifications             Notification[]
+  notificationPreferences   NotificationPreference[]
+  updatedPlatformSettings   PlatformSetting[]
+  uploads                   Upload[]
+  photographerProfile       PhotographerProfile?
+  requests                  Request[]
+  quotes                    Quote[]
+  conversationParticipants  ConversationParticipant[]
+  sentMessages              Message[]
+  verificationCases         VerificationCase[]        @relation("VerificationCaseUser")
+  assignedVerificationCases VerificationCase[]        @relation("VerificationCaseAssignedAdmin")
+  decidedVerificationCases  VerificationCase[]        @relation("VerificationCaseDecidedByAdmin")
 
   @@index([countryCode])
   @@index([status])
@@ -383,10 +396,11 @@ model Upload {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
-  avatarForProfile  PhotographerProfile? @relation("PhotographerProfileAvatar")
-  coverForProfile   PhotographerProfile? @relation("PhotographerProfileCover")
-  portfolioImage    PortfolioImage?
-  messageAttachment MessageAttachment?
+  avatarForProfile     PhotographerProfile?  @relation("PhotographerProfileAvatar")
+  coverForProfile      PhotographerProfile?  @relation("PhotographerProfileCover")
+  portfolioImage       PortfolioImage?
+  messageAttachment    MessageAttachment?
+  verificationDocument VerificationDocument?
 
   @@index([ownerId])
   @@index([status])
@@ -499,6 +513,62 @@ model ProductTier {
 
   @@unique([productId, usage])
   @@index([productId])
+}
+
+// `businessName`, `vatNumber` and `businessRegistrationNumber` are AES-256-GCM
+// ciphertext written by the API's crypto helper (`VERIFICATION_ENCRYPTION_KEY`,
+// separate from `AUTH_ENCRYPTION_KEY` so the two rotate independently); never
+// plaintext, never queried. The partial unique index enforcing at most one
+// active case (`draft`, `submitted` or `in_review`) per `userId` lives in
+// hand-written migration SQL, like the Quote `sent`-status partial index.
+model VerificationCase {
+  id                         String                 @id @default(uuid(7))
+  userId                     String
+  user                       User                   @relation("VerificationCaseUser", fields: [userId], references: [id], onDelete: Cascade)
+  countryCode                String                 @db.Char(2)
+  country                    Country                @relation(fields: [countryCode], references: [code])
+  status                     VerificationCaseStatus @default(draft)
+  businessName               String?
+  vatNumber                  String?
+  businessRegistrationNumber String?
+  submittedAt                DateTime?
+  decidedAt                  DateTime?
+  assignedAdminId            String?
+  assignedAdmin              User?                  @relation("VerificationCaseAssignedAdmin", fields: [assignedAdminId], references: [id])
+  decidedByAdminId           String?
+  decidedByAdmin             User?                  @relation("VerificationCaseDecidedByAdmin", fields: [decidedByAdminId], references: [id])
+  rejectionReason            String?
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+
+  documents VerificationDocument[]
+
+  @@index([userId])
+  @@index([countryCode])
+  @@index([status])
+  @@index([assignedAdminId])
+  @@index([decidedByAdminId])
+}
+
+// Mirrors `MessageAttachment`: `uploadId` is unique (an upload attaches to at
+// most one verification document) and `Restrict` so a document can't be
+// deleted out from under a submitted case. `mimeType`, `actualSizeBytes` and
+// `virusScanStatus` are read from `Upload`, not duplicated (DATA-MODEL.md).
+// Re-attaching the same `documentKey` while the case is `draft` replaces the
+// row (delete then create) instead of updating it, so the unique constraint
+// below never blocks that flow.
+model VerificationDocument {
+  id          String           @id @default(uuid(7))
+  caseId      String
+  case        VerificationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  documentKey String
+  uploadId    String           @unique
+  upload      Upload           @relation(fields: [uploadId], references: [id], onDelete: Restrict)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([caseId, documentKey])
+  @@index([caseId])
 }
 
 // `location` is `geography(Point, 4326)`, an `Unsupported` type Prisma

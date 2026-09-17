@@ -1,4 +1,8 @@
-import { ImageProcessJobSchema, type ImageProcessJob } from '@photoo/shared';
+import {
+  ImageProcessJobSchema,
+  PUBLIC_UPLOAD_PURPOSES,
+  type ImageProcessJob,
+} from '@photoo/shared';
 import type { Job, Processor } from 'bullmq';
 import type { Logger } from 'nestjs-pino';
 import { processImage } from '../../processing/image-processor.js';
@@ -29,6 +33,14 @@ export function createImageProcessProcessor(deps: ImageProcessDeps): Processor<I
     const upload = await deps.prisma.client.upload.findUnique({ where: { id: payload.uploadId } });
     if (!upload) {
       deps.logger.warn({ uploadId: payload.uploadId }, 'image-process: upload not found, skipping');
+      return;
+    }
+
+    if (!(PUBLIC_UPLOAD_PURPOSES as readonly string[]).includes(upload.purpose)) {
+      deps.logger.warn(
+        { uploadId: upload.id, purpose: upload.purpose },
+        'image-process: refusing to write public variants for a non-public purpose',
+      );
       return;
     }
 

@@ -1,4 +1,4 @@
-import { FileScanJobSchema, type FileScanJob } from '@photoo/shared';
+import { FileScanJobSchema, PUBLIC_UPLOAD_PURPOSES, type FileScanJob } from '@photoo/shared';
 import type { Job, Processor } from 'bullmq';
 import type { Logger } from 'nestjs-pino';
 import type { RecordAuditLogInput } from '../../common/audit-log.service.js';
@@ -73,7 +73,8 @@ export function createFileScanProcessor(deps: FileScanDeps): Processor<FileScanJ
       data: { status: 'clean', virusScanStatus: 'clean' },
     });
 
-    if (upload.mimeType.startsWith('image/')) {
+    const isPublicPurpose = (PUBLIC_UPLOAD_PURPOSES as readonly string[]).includes(upload.purpose);
+    if (upload.mimeType.startsWith('image/') && isPublicPurpose) {
       await deps.imageProcessQueue.add(
         'process',
         { uploadId: upload.id },

@@ -194,6 +194,7 @@ export {
   CreateQuoteRequestSchema,
   DirectQuoteRequestSchema,
   LineItemSchema,
+  QuotePhotographerSchema,
   QuoteSchema,
   QuotesMineQuerySchema,
 } from './contract/quotes.js';
@@ -211,6 +212,7 @@ export {
 export {
   UPLOAD_PURPOSES,
   UPLOAD_PURPOSE_LIMITS,
+  PUBLIC_UPLOAD_PURPOSES,
   CreateUploadRequestSchema,
   CreateUploadResponseSchema,
   MimeTypeSchema,

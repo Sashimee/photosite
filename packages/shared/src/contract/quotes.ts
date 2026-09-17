@@ -8,6 +8,7 @@ import {
   errorResponses,
   paginatedResponseSchema,
 } from './common.js';
+import { PhotographerSummarySchema } from './profiles.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
 
@@ -29,11 +30,25 @@ const FutureIsoDateTimeSchema = IsoDateTimeSchema.refine(
   'must be in the future',
 );
 
+export const QuotePhotographerSchema = PhotographerSummarySchema.pick({
+  id: true,
+  slug: true,
+  displayName: true,
+  avatarUrl: true,
+  city: true,
+  countryCode: true,
+  ratingAvg: true,
+  ratingCount: true,
+})
+  .strict()
+  .openapi('QuotePhotographer');
+
 export const QuoteSchema = z
   .object({
     id: IdSchema,
     requestId: IdSchema.nullable(),
     photographerId: IdSchema,
+    photographer: QuotePhotographerSchema,
     clientId: IdSchema,
     productId: IdSchema.nullable(),
     productTierId: IdSchema.nullable(),

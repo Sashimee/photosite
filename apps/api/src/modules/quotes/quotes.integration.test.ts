@@ -23,10 +23,22 @@ function uniqueEmail(label: string): string {
   return `quotes-${label}-${randomUUID()}@photoo.test`;
 }
 
+interface QuotePhotographerBody {
+  id: string;
+  slug: string;
+  displayName: string;
+  avatarUrl: string | null;
+  city: string;
+  countryCode: string;
+  ratingAvg: number;
+  ratingCount: number;
+}
+
 interface QuoteBody {
   id: string;
   requestId: string | null;
   photographerId: string;
+  photographer: QuotePhotographerBody;
   clientId: string;
   productId: string | null;
   productTierId: string | null;
@@ -359,6 +371,26 @@ describe('quotes integration', () => {
       expect(response.statusCode).toBe(403);
     });
 
+    it('includes the photographer summary derived from their published profile', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const request = await createRequestAs(client.token);
+      const photographer = await createPublishedPhotographer('summary');
+
+      const response = await sendQuote(photographer.token, request.id);
+      expect(response.statusCode).toBe(201);
+      const body = response.json<QuoteBody>();
+      expect(body.photographer).toEqual({
+        id: photographer.profileId,
+        slug: photographer.slug,
+        displayName: 'Fx Quote Photog summary',
+        avatarUrl: null,
+        city: 'Fx Quote City summary',
+        countryCode: 'LU',
+        ratingAvg: 0,
+        ratingCount: 0,
+      });
+    });
+
     it('computes subtotal, platform fee and total from lineItems via the shared fee helper', async () => {
       const client = await signUpAndSignIn(['client']);
       const request = await createRequestAs(client.token);
@@ -596,6 +628,8 @@ describe('quotes integration', () => {
       expect(body.total).toEqual({ amountCents: 80000, currency: 'EUR' });
       expect(body.requestId).toBeNull();
       expect(body.productTierId).toBe(tier.id);
+      expect(body.photographer.id).toBe(photographer.profileId);
+      expect(body.photographer.slug).toBe(photographer.slug);
 
       const conversation = await prisma.conversation.findUnique({
         where: { type_subjectId: { type: 'quote', subjectId: body.id } },
@@ -1090,6 +1124,26 @@ describe('quotes integration', () => {
         headers: authHeaders(photographer.token),
       });
       expect(asPhotographer.json<PaginatedBody<QuoteBody>>().items.length).toBeGreaterThan(0);
+    });
+
+    it('resolves each item to its own photographer summary in a list of quotes from different photographers', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const requestA = await createRequestAs(client.token, { title: 'List A' });
+      const requestB = await createRequestAs(client.token, { title: 'List B' });
+      const photographerA = await createPublishedPhotographer('list-a');
+      const photographerB = await createPublishedPhotographer('list-b');
+      await sendQuote(photographerA.token, requestA.id);
+      await sendQuote(photographerB.token, requestB.id);
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/quotes/mine?role=client',
+        headers: authHeaders(client.token),
+      });
+      const items = response.json<PaginatedBody<QuoteBody>>().items;
+      const bySlug = new Map(items.map((item) => [item.photographer.slug, item.photographer]));
+      expect(bySlug.get(photographerA.slug)?.id).toBe(photographerA.profileId);
+      expect(bySlug.get(photographerB.slug)?.id).toBe(photographerB.profileId);
     });
   });
 });

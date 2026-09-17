@@ -113,6 +113,7 @@ describe('RequestSchema', () => {
         usage: validCreateRequest.usage,
         status: 'closed',
         expiresAt: null,
+        quoteCount: 0,
       }).success,
     ).toBe(true);
   });

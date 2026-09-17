@@ -3,6 +3,7 @@ import {
   CreateQuoteRequestSchema,
   DirectQuoteRequestSchema,
   LineItemSchema,
+  QuotePhotographerSchema,
   QuoteSchema,
 } from './quotes.js';
 
@@ -10,10 +11,22 @@ const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
 const validLineItem = { label: 'Session', qty: 1, unitCents: 15000 };
 
+const validPhotographer = {
+  id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+  slug: 'jane-doe',
+  displayName: 'Jane Doe',
+  avatarUrl: null,
+  city: 'Luxembourg',
+  countryCode: 'LU',
+  ratingAvg: 4.5,
+  ratingCount: 12,
+};
+
 const validQuote = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   requestId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   photographerId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+  photographer: validPhotographer,
   clientId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   productId: null,
   productTierId: null,
@@ -60,6 +73,18 @@ describe('LineItemSchema', () => {
   });
 });
 
+describe('QuotePhotographerSchema', () => {
+  it('accepts a well-formed photographer summary', () => {
+    expect(QuotePhotographerSchema.safeParse(validPhotographer).success).toBe(true);
+  });
+
+  it('rejects fields not part of the picked subset', () => {
+    expect(
+      QuotePhotographerSchema.safeParse({ ...validPhotographer, headline: 'Hi' }).success,
+    ).toBe(false);
+  });
+});
+
 describe('QuoteSchema', () => {
   it('accepts a well-formed quote', () => {
     expect(QuoteSchema.safeParse(validQuote).success).toBe(true);
@@ -72,6 +97,12 @@ describe('QuoteSchema', () => {
   it('rejects more than 50 line items', () => {
     const lineItems = Array.from({ length: 51 }, () => validLineItem);
     expect(QuoteSchema.safeParse({ ...validQuote, lineItems }).success).toBe(false);
+  });
+
+  it('rejects a quote missing the photographer summary', () => {
+    const withoutPhotographer: Partial<typeof validQuote> = { ...validQuote };
+    delete withoutPhotographer.photographer;
+    expect(QuoteSchema.safeParse(withoutPhotographer).success).toBe(false);
   });
 });
 
