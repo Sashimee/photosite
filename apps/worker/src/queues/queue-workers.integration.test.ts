@@ -62,16 +62,19 @@ describe('QueueWorkersService against a real Redis', () => {
   it('marks a job with a payload that fails the shared schema as failed and logs the reason', async () => {
     const job = await queue.add('scan', { uploadId: 'not-a-uuid' });
 
+    // The job's Redis state and the worker's local 'failed' event (which
+    // drives fakeLogger.error) aren't written atomically, so job.getState()
+    // can already read "failed" before the event fires; both must be polled
+    // together, not asserted right after the state check alone resolves.
     await vi.waitFor(
       async () => {
         expect(await job.getState()).toBe('failed');
+        expect(fakeLogger.error).toHaveBeenCalledWith(
+          expect.objectContaining({ queue: 'file-scan', jobId: job.id }) as unknown,
+          'worker: job failed',
+        );
       },
       { timeout: 5000, interval: 100 },
-    );
-
-    expect(fakeLogger.error).toHaveBeenCalledWith(
-      expect.objectContaining({ queue: 'file-scan', jobId: job.id }) as unknown,
-      'worker: job failed',
     );
   });
 
@@ -82,13 +85,12 @@ describe('QueueWorkersService against a real Redis', () => {
     await vi.waitFor(
       async () => {
         expect(await job.getState()).toBe('completed');
+        expect(fakeLogger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({ uploadId }) as unknown,
+          'file-scan: upload not found, skipping',
+        );
       },
       { timeout: 5000, interval: 100 },
-    );
-
-    expect(fakeLogger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ uploadId }) as unknown,
-      'file-scan: upload not found, skipping',
     );
   });
 });

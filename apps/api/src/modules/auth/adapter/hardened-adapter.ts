@@ -1,5 +1,5 @@
 import type { DBAdapter, DBAdapterInstance, DBTransactionAdapter, Where } from 'better-auth';
-import { decryptAesGcm, encryptAesGcm } from '../../../common/crypto/aes-gcm.js';
+import { decryptAesGcm, encryptAesGcm } from '@photoo/shared/crypto';
 import { sha256Hex } from '../../../common/crypto/hash.js';
 
 type Row = Record<string, unknown>;

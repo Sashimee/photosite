@@ -11,6 +11,10 @@ export const TEST_ENV: Env = {
   TRUSTED_PROXIES: [],
   AUTH_SECRET: 'test-auth-secret-at-least-32-characters-long',
   AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 9),
+  VERIFICATION_ENCRYPTION_KEY: Buffer.from(
+    '9DsORuh9HI1DUnXKM0DKVcgw36Y9NfbLBSlfPmQxwYs=',
+    'base64',
+  ),
   S3_ENDPOINT: 'http://127.0.0.1:9000',
   S3_REGION: 'eu-west-1',
   S3_ACCESS_KEY_ID: 'photoo_dev',

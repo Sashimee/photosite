@@ -34,41 +34,78 @@ export const VerificationDocumentSchema = z
   .strict()
   .openapi('VerificationDocument');
 
-const VerificationCaseBaseSchema = z.object({
+// `downloadUrl` is optional: a document whose upload hasn't cleared the
+// virus scan yet (status clean/processed) is listed without a link rather
+// than blocking the whole case view on one pending scan.
+export const AdminVerificationDocumentSchema = VerificationDocumentSchema.extend({
+  downloadUrl: z.url().optional(),
+})
+  .strict()
+  .openapi('AdminVerificationDocument');
+
+const VerificationCaseCommonSchema = z.object({
   id: IdSchema,
   countryCode: CountryCodeSchema,
   status: z.enum(VERIFICATION_CASE_STATUSES),
-  businessName: z.string().min(1).max(200).nullable(),
-  vatNumber: z.string().min(1).max(40).nullable(),
-  businessRegistrationNumber: z.string().min(1).max(60).nullable(),
   documents: z.array(VerificationDocumentSchema),
   submittedAt: IsoDateTimeSchema.nullable(),
   decidedAt: IsoDateTimeSchema.nullable(),
-  rejectionReason: z.string().max(2000).nullable(),
+  rejectionReason: z.string().min(1).max(1000).nullable(),
+});
+
+const VerificationCaseBaseSchema = VerificationCaseCommonSchema.extend({
+  businessName: z.string().min(1).max(200).nullable(),
+  vatNumber: z.string().min(1).max(40).nullable(),
+  businessRegistrationNumber: z.string().min(1).max(60).nullable(),
 });
 
 export const VerificationCaseSchema =
   VerificationCaseBaseSchema.strict().openapi('VerificationCase');
 
+export const AdminVerificationPhotographerSchema = z
+  .object({
+    displayName: z.string().min(1).max(200),
+    email: z.email(),
+  })
+  .strict()
+  .openapi('AdminVerificationPhotographer');
+
+// Used by the list endpoint: no business PII (businessName/vatNumber/
+// businessRegistrationNumber stay decrypted only on the single-case
+// endpoint below, which is audited) and no per-document presigned URLs, so
+// paging through the queue never mass-decrypts PII or mass-issues
+// short-lived S3 links (docs/steps/1A.9-verification.md "Admin review").
+// `photographer` carries just enough identity for the queue UI (1D.3).
+export const AdminVerificationCaseSummarySchema = VerificationCaseCommonSchema.extend({
+  userId: IdSchema,
+  assignedAdminId: IdSchema.nullable(),
+  decidedByAdminId: IdSchema.nullable(),
+  photographer: AdminVerificationPhotographerSchema,
+})
+  .strict()
+  .openapi('AdminVerificationCaseSummary');
+
 export const AdminVerificationCaseSchema = VerificationCaseBaseSchema.extend({
   userId: IdSchema,
+  assignedAdminId: IdSchema.nullable(),
   decidedByAdminId: IdSchema.nullable(),
+  documents: z.array(AdminVerificationDocumentSchema),
 })
   .strict()
   .openapi('AdminVerificationCase');
 
+// countryCode is never accepted from the client: the case's country is
+// always the caller's photographer profile countryCode, set by the server
+// (docs/steps/1A.9-verification.md).
 export const CreateVerificationCaseRequestSchema = z
   .object({
-    countryCode: CountryCodeSchema,
     businessName: z.string().min(1).max(200).optional(),
     vatNumber: z.string().min(1).max(40).optional(),
     businessRegistrationNumber: z.string().min(1).max(60).optional(),
   })
   .strict();
 
-export const UpdateVerificationCaseRequestSchema = CreateVerificationCaseRequestSchema.omit({
-  countryCode: true,
-}).partial();
+export const UpdateVerificationCaseRequestSchema = CreateVerificationCaseRequestSchema.partial();
 
 export const AttachVerificationDocumentRequestSchema = z
   .object({
@@ -105,7 +142,7 @@ registry.registerPath({
       description: "The current user's verification case",
       content: { 'application/json': { schema: VerificationCaseSchema } },
     },
-    ...errorResponses([401, 404]),
+    ...errorResponses([401, 403, 404]),
   },
 });
 
@@ -123,7 +160,7 @@ registry.registerPath({
       description: 'Verification case created',
       content: { 'application/json': { schema: VerificationCaseSchema } },
     },
-    ...errorResponses([400, 401, 409, 422]),
+    ...errorResponses([400, 401, 403, 409, 422, 429]),
   },
 });
 
@@ -141,7 +178,7 @@ registry.registerPath({
       description: 'Verification case updated',
       content: { 'application/json': { schema: VerificationCaseSchema } },
     },
-    ...errorResponses([400, 401, 404, 409, 422]),
+    ...errorResponses([400, 401, 403, 404, 409, 422, 429]),
   },
 });
 
@@ -159,7 +196,7 @@ registry.registerPath({
       description: 'Document attached',
       content: { 'application/json': { schema: VerificationDocumentSchema } },
     },
-    ...errorResponses([400, 401, 404, 409, 422]),
+    ...errorResponses([400, 401, 403, 404, 409, 422, 429]),
   },
 });
 
@@ -174,6 +211,6 @@ registry.registerPath({
       description: 'Verification case submitted',
       content: { 'application/json': { schema: VerificationCaseSchema } },
     },
-    ...errorResponses([401, 404, 409, 422]),
+    ...errorResponses([401, 403, 404, 409, 422, 429]),
   },
 });

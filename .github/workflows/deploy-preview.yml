@@ -55,11 +55,20 @@ jobs:
           file: infra/docker/api.Dockerfile
           target: runtime
           push: true
+          load: true
           tags: |
             ghcr.io/sashimee/photosite-api:main
             ghcr.io/sashimee/photosite-api:${{ steps.sha.outputs.short }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
+
+      # Boots the image with no network and no env, which fails fast on
+      # env validation - but only after Node has resolved every static
+      # import, so a workspace package missing from the runtime stage
+      # (ERR_MODULE_NOT_FOUND) still surfaces here before the image ever
+      # reaches Dokploy.
+      - name: Smoke test api image
+        run: .github/workflows/smoke-test-image.sh "ghcr.io/sashimee/photosite-api:${{ steps.sha.outputs.short }}"
 
       # -migrate keeps devDependencies (the `prisma` CLI) the runtime target
       # strips; see infra/docker/api.Dockerfile.
@@ -83,11 +92,17 @@ jobs:
           file: infra/docker/worker.Dockerfile
           target: runtime
           push: true
+          load: true
           tags: |
             ghcr.io/sashimee/photosite-worker:main
             ghcr.io/sashimee/photosite-worker:${{ steps.sha.outputs.short }}
           cache-from: type=gha,scope=worker
           cache-to: type=gha,mode=max,scope=worker
+
+      # See "Smoke test api image" above for why this catches a missing
+      # workspace package before Dokploy ever pulls the image.
+      - name: Smoke test worker image
+        run: .github/workflows/smoke-test-image.sh "ghcr.io/sashimee/photosite-worker:${{ steps.sha.outputs.short }}"
 
       # Repository variables, not secrets: NEXT_PUBLIC_* is inlined into the
       # client bundle either way. Defaulted so the build never hard-fails on

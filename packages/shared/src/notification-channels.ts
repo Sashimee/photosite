@@ -11,6 +11,8 @@ export interface NotificationPreferenceOverride {
 // override, so this is a single source of truth every layer must consult.
 const UNAVAILABLE_CHANNELS: Partial<Record<NotificationType, ReadonlySet<NotificationChannel>>> = {
   message_received: new Set(['email']),
+  verification_approved: new Set(['push']),
+  verification_rejected: new Set(['push']),
 };
 
 export function isChannelAvailable(type: NotificationType, channel: NotificationChannel): boolean {

@@ -1,10 +1,16 @@
 import { verify } from '@node-rs/argon2';
+import { decryptAesGcm } from '@photoo/shared/crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createPrismaClient } from './index.js';
 import {
   CREDENTIAL_PROVIDER_ID,
+  DEV_VERIFICATION_ENCRYPTION_KEY,
   LUXEMBOURG_REQUIRED_DOCUMENTS,
+  SEED_UNVERIFIED_PHOTOGRAPHER_EMAIL,
   SEED_USERS,
+  SEED_VERIFICATION_BUSINESS_NAME,
+  SEED_VERIFICATION_BUSINESS_REGISTRATION_NUMBER,
+  SEED_VERIFICATION_VAT_NUMBER,
   getSeedUserPassword,
   seedDatabase,
 } from './seed.js';
@@ -159,5 +165,38 @@ describe('seedDatabase', () => {
       where: { email: { in: SEED_USERS.map((seedUser) => seedUser.email) } },
     });
     expect(seedUserCount).toBe(SEED_USERS.length);
+  });
+
+  it('seeds a submitted verification case with encrypted business fields, not plaintext', async () => {
+    await seedDatabase(prisma);
+
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email: SEED_UNVERIFIED_PHOTOGRAPHER_EMAIL },
+    });
+    const verificationCase = await prisma.verificationCase.findFirstOrThrow({
+      where: { userId: user.id },
+    });
+
+    expect(verificationCase.status).toBe('submitted');
+    expect(verificationCase.businessName).not.toBe(SEED_VERIFICATION_BUSINESS_NAME);
+    expect(verificationCase.vatNumber).not.toBe(SEED_VERIFICATION_VAT_NUMBER);
+    expect(verificationCase.businessRegistrationNumber).not.toBe(
+      SEED_VERIFICATION_BUSINESS_REGISTRATION_NUMBER,
+    );
+    expect(verificationCase.businessName).not.toContain(SEED_VERIFICATION_BUSINESS_NAME);
+
+    const key = Buffer.from(DEV_VERIFICATION_ENCRYPTION_KEY, 'base64');
+    expect(decryptAesGcm(verificationCase.businessName ?? '', key)).toBe(
+      SEED_VERIFICATION_BUSINESS_NAME,
+    );
+    expect(decryptAesGcm(verificationCase.vatNumber ?? '', key)).toBe(SEED_VERIFICATION_VAT_NUMBER);
+    expect(decryptAesGcm(verificationCase.businessRegistrationNumber ?? '', key)).toBe(
+      SEED_VERIFICATION_BUSINESS_REGISTRATION_NUMBER,
+    );
+
+    const documents = await prisma.verificationDocument.findMany({
+      where: { caseId: verificationCase.id },
+    });
+    expect(documents).toHaveLength(LUXEMBOURG_REQUIRED_DOCUMENTS.length);
   });
 });

@@ -34,6 +34,10 @@ one is the "why".
    - `AUTH_SECRET`: `openssl rand -base64 48`.
    - `AUTH_ENCRYPTION_KEY`: `openssl rand -base64 32` - must decode to
      exactly 32 bytes, so use exactly this command, not a different length.
+   - `VERIFICATION_ENCRYPTION_KEY`: `openssl rand -base64 32`, same
+     constraint as `AUTH_ENCRYPTION_KEY` - used by both the `api` service and
+     the `seed` profile, which must get the same value or the api can't
+     decrypt what the seed encrypts.
    - `SEED_USER_PASSWORD`: `openssl rand -base64 24` (only used by the
      `seed` profile below).
    - `IMAGE_TAG`: `main` (the workflow always also pushes `sha-<short>`
@@ -127,14 +131,65 @@ photographer profiles, a request/quote pair) local dev gets from
 `pnpm db:seed`. Run it once after the first successful deploy (and again
 any time the schema/seed data changes in a way you want reflected):
 
-```
-docker compose -f infra/dokploy/preview/compose.yml --profile seed run --rm seed
+With Dokploy's "Create environment file" option on, Dokploy writes the
+project env as a `.env` **beside the compose file** it deploys
+(`/etc/dokploy/compose/<appName>/code/infra/dokploy/preview/.env`), not
+at the repository root, and Compose loads it from there on its own. So
+the normal invocation works from the checkout:
+
+```bash
+cd /etc/dokploy/compose/compose-index-back-end-application-k6x26o/code
+docker compose -p compose-index-back-end-application-k6x26o \
+  -f infra/dokploy/preview/compose.yml --profile seed run --rm seed
 ```
 
-(From the Dokploy host or terminal - this is not part of the automatic
-deploy graph, so it never re-runs on its own. It is idempotent: re-running
-it against an already-seeded database is a no-op for every row it already
-created.)
+Do not pass `--env-file .env` — that resolves against the working
+directory, where Dokploy never writes one, and Compose then refuses to
+parse this file with any `${VAR:?}` unset.
+
+If that file is missing (the option was turned on after the last deploy,
+so no deploy has written it yet), either redeploy once or run the
+one-shot container directly, taking the already-resolved connection
+strings out of the running **worker** container. It has to be the worker
+and not the api: the api's MinIO user is scoped to `photoo-private`
+("Object storage users" below), while the seed writes placeholder images
+to `photoo-public`, so the api's key fails with `AccessDenied`. Only
+`SEED_USER_PASSWORD` has to be typed (copy it from the compose service's
+Environment tab), because the seed is its only consumer and no running
+container carries it:
+
+```bash
+proj=compose-index-back-end-application-k6x26o
+wkr=$(docker ps -q -f "label=com.docker.compose.project=$proj" \
+                  -f "label=com.docker.compose.service=worker" | head -1)
+getenv() { docker inspect "$1" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n "s/^$2=//p"; }
+net=$(docker inspect "$wkr" --format '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' | grep internal)
+
+read -rsp 'SEED_USER_PASSWORD: ' seedpw; echo
+
+docker run --rm --network "$net" -w /app/packages/db --entrypoint node \
+  -e NODE_ENV=development \
+  -e DATABASE_URL="$(getenv "$wkr" DATABASE_URL)" \
+  -e SEED_USER_PASSWORD="$seedpw" \
+  -e S3_ENDPOINT=http://minio:9000 \
+  -e S3_REGION=eu-west-1 \
+  -e S3_ACCESS_KEY_ID="$(getenv "$wkr" S3_ACCESS_KEY_ID)" \
+  -e S3_SECRET_ACCESS_KEY="$(getenv "$wkr" S3_SECRET_ACCESS_KEY)" \
+  -e S3_FORCE_PATH_STYLE=true \
+  -e S3_PRIVATE_BUCKET=photoo-private \
+  -e S3_PUBLIC_BUCKET=photoo-public \
+  ghcr.io/sashimee/photosite-api:main-migrate dist/seed.js
+
+unset seedpw
+```
+
+`read -rsp` does not echo, and `$net` is the project's `internal`
+network, where `postgres` and `minio` resolve by name. Verify with
+`curl -s https://footoo.bas.lu/v1/photographers | head -c 200`.
+
+This is not part of the automatic deploy graph, so it never re-runs on
+its own. It is idempotent: re-running it against an already-seeded
+database is a no-op for every row it already created.
 
 ### Known limitation
 
@@ -200,6 +255,21 @@ instance could spoof it. Two follow-ups, both from setup step 5:
 `minio:9000` (`GET`/`HEAD` only, path-style, so `/photoo-public/<key>`
 maps onto the bucket 1:1). This makes seeded/uploaded public image variants
 browser-reachable.
+
+**If images 404 with a Next.js page instead of MinIO's XML**, the router
+is disabled, not missing. Traefik drops a router whose rule fails to
+parse and the request falls through to the catch-all web router, which
+answers with its own 404 - so the symptom looks like a missing object.
+Check the rule, not the bucket:
+
+```bash
+sudo docker exec dokploy-traefik wget -qO- \
+  http://localhost:8080/api/http/routers/photoo-preview-public@docker
+```
+
+`status` must be `enabled`; an `error` field holds the parse failure.
+Traefik v3 matchers take exactly one parameter each, so `Method` needs
+`(Method(`GET`) || Method(`HEAD`))` rather than a two-verb list.
 
 **Browser uploads still don't work.** Presigned PUT URLs are signed against
 `S3_ENDPOINT=http://minio:9000` (the internal address, used for both

@@ -91,6 +91,8 @@ describe('renderNotifyEmail', () => {
       'quote_declined',
       'quote_withdrawn',
       'quote_expired',
+      'verification_approved',
+      'verification_rejected',
     ] as const;
     for (const type of types) {
       expect(() =>
@@ -149,5 +151,30 @@ describe('renderNotifyEmail', () => {
         'https://photoo.lu',
       ),
     ).toThrow(/quoteId/);
+  });
+
+  it('renders verification_approved with an account deep link and no quoteId required', () => {
+    const message = renderNotifyEmail(
+      'verification_approved',
+      {},
+      'en',
+      'jane@example.com',
+      'https://photoo.lu',
+    );
+    expect(message.subject).toContain('approved');
+    expect(message.text).toContain('https://photoo.lu/en/account/verification');
+  });
+
+  it('renders verification_rejected without leaking the reason into the email body', () => {
+    const message = renderNotifyEmail(
+      'verification_rejected',
+      { reason: 'Business registration document is illegible' },
+      'en',
+      'jane@example.com',
+      'https://photoo.lu',
+    );
+    expect(message.subject).toContain('rejected');
+    expect(message.text).not.toContain('illegible');
+    expect(message.text).toContain('https://photoo.lu/en/account/verification');
   });
 });

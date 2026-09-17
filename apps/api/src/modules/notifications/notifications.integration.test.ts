@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createPrismaClient, type PrismaClient } from '@photoo/db';
+import {
+  isChannelAvailable,
+  type NotificationChannel,
+  type NotificationType,
+} from '@photoo/shared';
 import { Redis } from 'ioredis';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp } from '../../testing/create-test-app.js';
@@ -10,7 +15,10 @@ import { TEST_ENV } from '../../testing/test-env.js';
 
 const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL', 'REDIS_URL']);
 const PASSWORD = `photoo-test-${randomUUID()}`;
-const AUTH_FAKE_IP = '10.50.7.1';
+// Dedicated to this suite so its sign-up/sign-in/device-registration calls
+// never share a per-IP auth or devices:register rate limit bucket with
+// chat.integration.test.ts's own AUTH_FAKE_IP (issue #97).
+const AUTH_FAKE_IP = '10.50.8.1';
 
 function extractFragmentToken(link: string): string | null {
   const hashIndex = link.indexOf('#token=');
@@ -278,16 +286,16 @@ describe('notifications integration', () => {
       });
       expect(response.statusCode).toBe(200);
       const body = response.json<PreferencesBody>();
-      // message_received has no email delivery path at all (isChannelAvailable),
-      // so it defaults off rather than on like every other type/channel pair.
-      const notMessageReceivedEmail = body.preferences.filter(
-        (entry) => !(entry.type === 'message_received' && entry.channel === 'email'),
-      );
-      expect(notMessageReceivedEmail.every((entry) => entry.enabled)).toBe(true);
-      const messageReceivedEmail = body.preferences.find(
-        (entry) => entry.type === 'message_received' && entry.channel === 'email',
-      );
-      expect(messageReceivedEmail?.enabled).toBe(false);
+      // A type/channel pair with no delivery path at all (isChannelAvailable,
+      // e.g. message_received:email or verification_approved:push) defaults
+      // off; every available pair defaults on.
+      for (const entry of body.preferences) {
+        const available = isChannelAvailable(
+          entry.type as NotificationType,
+          entry.channel as NotificationChannel,
+        );
+        expect(entry.enabled).toBe(available);
+      }
       expect(body.preferences.length).toBeGreaterThan(0);
     });
 

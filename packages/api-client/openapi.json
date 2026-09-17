@@ -2256,30 +2256,6 @@
               "expired"
             ]
           },
-          "businessName": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "vatNumber": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "minLength": 1,
-            "maxLength": 40
-          },
-          "businessRegistrationNumber": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "minLength": 1,
-            "maxLength": 60
-          },
           "documents": {
             "type": "array",
             "items": {
@@ -2309,20 +2285,45 @@
               "string",
               "null"
             ],
-            "maxLength": 2000
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "businessName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "vatNumber": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "businessRegistrationNumber": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 60
           }
         },
         "required": [
           "id",
           "countryCode",
           "status",
-          "businessName",
-          "vatNumber",
-          "businessRegistrationNumber",
           "documents",
           "submittedAt",
           "decidedAt",
-          "rejectionReason"
+          "rejectionReason",
+          "businessName",
+          "vatNumber",
+          "businessRegistrationNumber"
         ],
         "additionalProperties": false
       },
@@ -2373,7 +2374,7 @@
         ],
         "additionalProperties": false
       },
-      "AdminVerificationCase": {
+      "AdminVerificationCaseSummary": {
         "type": "object",
         "properties": {
           "id": {
@@ -2398,30 +2399,6 @@
               "rejected",
               "expired"
             ]
-          },
-          "businessName": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "vatNumber": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "minLength": 1,
-            "maxLength": 40
-          },
-          "businessRegistrationNumber": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "minLength": 1,
-            "maxLength": 60
           },
           "documents": {
             "type": "array",
@@ -2452,10 +2429,164 @@
               "string",
               "null"
             ],
-            "maxLength": 2000
+            "minLength": 1,
+            "maxLength": 1000
           },
           "userId": {
             "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "assignedAdminId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "decidedByAdminId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "photographer": {
+            "$ref": "#/components/schemas/AdminVerificationPhotographer"
+          }
+        },
+        "required": [
+          "id",
+          "countryCode",
+          "status",
+          "documents",
+          "submittedAt",
+          "decidedAt",
+          "rejectionReason",
+          "userId",
+          "assignedAdminId",
+          "decidedByAdminId",
+          "photographer"
+        ],
+        "additionalProperties": false
+      },
+      "AdminVerificationPhotographer": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "required": [
+          "displayName",
+          "email"
+        ],
+        "additionalProperties": false
+      },
+      "AdminVerificationCase": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code",
+            "example": "LU"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "submitted",
+              "in_review",
+              "approved",
+              "rejected",
+              "expired"
+            ]
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminVerificationDocument"
+            }
+          },
+          "submittedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "decidedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "rejectionReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "businessName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "vatNumber": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "businessRegistrationNumber": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "assignedAdminId": {
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid",
             "description": "UUID identifier",
             "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
@@ -2474,15 +2605,67 @@
           "id",
           "countryCode",
           "status",
-          "businessName",
-          "vatNumber",
-          "businessRegistrationNumber",
           "documents",
           "submittedAt",
           "decidedAt",
           "rejectionReason",
+          "businessName",
+          "vatNumber",
+          "businessRegistrationNumber",
           "userId",
+          "assignedAdminId",
           "decidedByAdminId"
+        ],
+        "additionalProperties": false
+      },
+      "AdminVerificationDocument": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "documentKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "example": "id_card"
+          },
+          "mimeType": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 127,
+            "pattern": "^[a-z0-9.+-]+\\/[a-z0-9.+-]+$",
+            "example": "image/jpeg"
+          },
+          "virusScanStatus": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "clean",
+              "infected",
+              "failed"
+            ]
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "downloadUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "id",
+          "documentKey",
+          "mimeType",
+          "virusScanStatus",
+          "uploadedAt"
         ],
         "additionalProperties": false
       },
@@ -3006,7 +3189,9 @@
               "quote_declined",
               "quote_withdrawn",
               "quote_expired",
-              "message_received"
+              "message_received",
+              "verification_approved",
+              "verification_rejected"
             ],
             "example": "quote_received"
           },
@@ -3085,6 +3270,11 @@
             "format": "uuid",
             "description": "UUID identifier",
             "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
           }
         },
         "additionalProperties": false
@@ -3141,7 +3331,9 @@
               "quote_declined",
               "quote_withdrawn",
               "quote_expired",
-              "message_received"
+              "message_received",
+              "verification_approved",
+              "verification_rejected"
             ],
             "example": "quote_received"
           },
@@ -9640,6 +9832,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not found",
             "content": {
@@ -9671,12 +9873,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "countryCode": {
-                    "type": "string",
-                    "pattern": "^[A-Z]{2}$",
-                    "description": "ISO 3166-1 alpha-2 country code",
-                    "example": "LU"
-                  },
                   "businessName": {
                     "type": "string",
                     "minLength": 1,
@@ -9693,9 +9889,6 @@
                     "maxLength": 60
                   }
                 },
-                "required": [
-                  "countryCode"
-                ],
                 "additionalProperties": false
               }
             }
@@ -9732,6 +9925,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Conflict",
             "content": {
@@ -9744,6 +9947,16 @@
           },
           "422": {
             "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
             "content": {
               "application/json": {
                 "schema": {
@@ -9825,6 +10038,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not found",
             "content": {
@@ -9847,6 +10070,16 @@
           },
           "422": {
             "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
             "content": {
               "application/json": {
                 "schema": {
@@ -9931,6 +10164,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not found",
             "content": {
@@ -9953,6 +10196,16 @@
           },
           "422": {
             "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
             "content": {
               "application/json": {
                 "schema": {
@@ -9999,6 +10252,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not found",
             "content": {
@@ -10021,6 +10284,16 @@
           },
           "422": {
             "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
             "content": {
               "application/json": {
                 "schema": {
@@ -10577,6 +10850,7 @@
           }
         ],
         "x-required-permission": "verification",
+        "x-requires-2fa": true,
         "parameters": [
           {
             "schema": {
@@ -10597,6 +10871,34 @@
             "required": false,
             "name": "limit",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "submitted",
+                "in_review",
+                "approved",
+                "rejected",
+                "expired"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$",
+              "description": "ISO 3166-1 alpha-2 country code",
+              "example": "LU"
+            },
+            "required": false,
+            "description": "ISO 3166-1 alpha-2 country code",
+            "name": "countryCode",
+            "in": "query"
           }
         ],
         "responses": {
@@ -10610,7 +10912,7 @@
                     "items": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/AdminVerificationCase"
+                        "$ref": "#/components/schemas/AdminVerificationCaseSummary"
                       }
                     },
                     "nextCursor": {
@@ -10626,6 +10928,16 @@
                     "nextCursor"
                   ],
                   "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
@@ -10649,6 +10961,16 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -10665,6 +10987,7 @@
           }
         ],
         "x-required-permission": "verification",
+        "x-requires-2fa": true,
         "parameters": [
           {
             "schema": {
@@ -10723,6 +11046,87 @@
         }
       }
     },
+    "/v1/admin/verification-cases/{id}/start-review": {
+      "post": {
+        "summary": "Start reviewing a verification case",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "verification",
+        "x-requires-2fa": true,
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verification case moved to in_review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminVerificationCaseSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/verification-cases/{id}/approve": {
       "post": {
         "summary": "Approve a verification case",
@@ -10735,6 +11139,7 @@
           }
         ],
         "x-required-permission": "verification",
+        "x-requires-2fa": true,
         "parameters": [
           {
             "schema": {
@@ -10755,7 +11160,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminVerificationCase"
+                  "$ref": "#/components/schemas/AdminVerificationCaseSummary"
                 }
               }
             }
@@ -10815,6 +11220,7 @@
           }
         ],
         "x-required-permission": "verification",
+        "x-requires-2fa": true,
         "parameters": [
           {
             "schema": {
@@ -10838,7 +11244,7 @@
                   "reason": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 2000
+                    "maxLength": 1000
                   }
                 },
                 "required": [
@@ -10855,7 +11261,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminVerificationCase"
+                  "$ref": "#/components/schemas/AdminVerificationCaseSummary"
                 }
               }
             }

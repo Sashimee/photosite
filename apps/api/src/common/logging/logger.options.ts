@@ -23,6 +23,20 @@ export const REDACT_PATHS = [
   '*.backupCodes',
   '*.newPassword',
   '*.currentPassword',
+  // VerificationCase PII and its admin decision (#113): businessName,
+  // vatNumber and businessRegistrationNumber are decrypted only to build a
+  // response body, rejectionReason is free-text an admin wrote, and
+  // downloadUrl is a presigned document link - none of these belong in logs.
+  '*.businessName',
+  '*.vatNumber',
+  '*.businessRegistrationNumber',
+  '*.rejectionReason',
+  '*.downloadUrl',
+  'businessName',
+  'vatNumber',
+  'businessRegistrationNumber',
+  'rejectionReason',
+  'downloadUrl',
   // Not a bare `*.url`/`*.otpauthUrl`: pino's `*` wildcard matches one level
   // under any object, which would also swallow `req.url` (the serializer
   // below already strips its query string and masks reset tokens, and it

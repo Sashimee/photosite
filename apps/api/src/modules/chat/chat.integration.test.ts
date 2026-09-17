@@ -116,10 +116,20 @@ describe('chat integration', () => {
       `lockout:auth:*:${AUTH_FAKE_IP}`,
       `rate-limit:uploads:*:${UPLOADS_FAKE_IP}`,
       `lockout:uploads:*:${UPLOADS_FAKE_IP}`,
-      // No other suite opens real socket connections, so this glob is safe
-      // to clear unscoped (issue #50's concern doesn't apply here).
+      // No other suite opens real socket connections or sends chat messages,
+      // so these globs are safe to clear unscoped (issue #50's concern
+      // doesn't apply here). Without this, the per-IP message counter (every
+      // REST message send in this file shares the default 127.0.0.1) keeps
+      // accumulating across tests instead of resetting each `afterEach`, and
+      // "limits to 30 messages a minute per user" alone spends 31 of its 100
+      // per-minute budget: under contention, later tests' own message sends
+      // can silently 429 (never asserted on) once the shared counter tips
+      // over, leaving a conversation's lastMessageAt unset and making the
+      // pagination order look like a tiebreak flip (issue #97).
       'rate-limit:chat:socket:connect:ip:*',
       'lockout:chat:socket:connect:ip:*',
+      'rate-limit:chat:message:*',
+      'lockout:chat:message:*',
     ];
     const globbed = (await Promise.all(patterns.map((pattern) => redis.keys(pattern)))).flat();
     if (globbed.length > 0) {
@@ -1313,6 +1323,7 @@ describe('typing throttle with an injected clock', () => {
   let app: NestFastifyApplication;
   let baseUrl: string;
   let prisma: PrismaClient;
+  let redis: Redis;
   let clockValueMs = 0;
   const createdUserIds: string[] = [];
   const createdConversationIds: string[] = [];
@@ -1321,6 +1332,21 @@ describe('typing throttle with an injected clock', () => {
 
   function fastify() {
     return app.getHttpAdapter().getInstance();
+  }
+
+  // Sign-up is capped at 5 per hour per IP; without clearing it here, two
+  // sign-ups per run of this describe accumulate across every previous
+  // invocation and eventually lock CLOCK_AUTH_FAKE_IP out, making
+  // signUpAndSignIn() throw on an undefined session/user body.
+  async function clearRateLimitKeys(): Promise<void> {
+    const patterns = [
+      `rate-limit:auth:*:${CLOCK_AUTH_FAKE_IP}`,
+      `lockout:auth:*:${CLOCK_AUTH_FAKE_IP}`,
+    ];
+    const globbed = (await Promise.all(patterns.map((pattern) => redis.keys(pattern)))).flat();
+    if (globbed.length > 0) {
+      await redis.del(...globbed);
+    }
   }
 
   async function signUpAndSignIn(): Promise<{ token: string; id: string }> {
@@ -1399,9 +1425,13 @@ describe('typing throttle with an injected clock', () => {
     const port = typeof address === 'object' && address ? address.port : 0;
     baseUrl = `http://127.0.0.1:${String(port)}`;
     prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
+    redis = new Redis(testEnv.REDIS_URL);
+    await clearRateLimitKeys();
   });
 
   afterAll(async () => {
+    await clearRateLimitKeys();
+    redis.disconnect();
     for (const socket of sockets.splice(0)) {
       socket.disconnect();
     }

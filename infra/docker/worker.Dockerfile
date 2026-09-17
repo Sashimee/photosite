@@ -7,7 +7,7 @@ RUN corepack enable && corepack prepare pnpm@12.4.2 --activate
 WORKDIR /app
 
 # turbo prune trims the workspace to @photoo/worker and the packages it
-# depends on (db, shared, config) before anything is installed.
+# depends on (db, i18n, shared, config) before anything is installed.
 FROM base AS pruner
 RUN npm install --global turbo@2.10.13
 COPY . .
@@ -59,6 +59,10 @@ COPY --from=trimmed --chown=app:app /app/packages/db/dist ./packages/db/dist
 COPY --from=trimmed --chown=app:app /app/packages/shared/package.json ./packages/shared/package.json
 COPY --from=trimmed --chown=app:app /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=trimmed --chown=app:app /app/packages/shared/dist ./packages/shared/dist
+COPY --from=trimmed --chown=app:app /app/packages/i18n/package.json ./packages/i18n/package.json
+COPY --from=trimmed --chown=app:app /app/packages/i18n/node_modules ./packages/i18n/node_modules
+COPY --from=trimmed --chown=app:app /app/packages/i18n/dist ./packages/i18n/dist
+COPY --from=trimmed --chown=app:app /app/packages/i18n/messages ./packages/i18n/messages
 USER app
 EXPOSE 4100
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

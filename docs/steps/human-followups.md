@@ -11,7 +11,7 @@ Last updated: 2026-09-17.
 | O1 | List which external accounts already exist | 0.6, 1E.1, 2.4 | Code uses env vars with local fakes (MinIO, Mailpit, Stripe test mode once keys exist) |
 | O2 | Legal entity operating photoo.lu | 0.6 Stripe platform, store accounts, 0.7, DAC7 | None needed before Phase 1 payments |
 | O3 | Confirm auto-release delay | 1A.8 | Seeded as `autoReleaseDays = 7` in `PlatformSetting`, editable later |
-| O4 | AI detection and reverse-search vendors | 1A.10 | Vendor adapters behind an interface with a fake adapter in tests |
+| O4 | AI detection vendor (Hive vs Sightengine) and reverse-search vendor (TinEye vs Google Vision Web Detection): pick one of each, create the accounts, provide the API keys | 1A.10 real checks (the pipeline itself is not blocked) | `docs/steps/1A.10-provenance.md`: both vendors sit behind an interface whose null implementation is selected when the key is absent. The pipeline, scoring, admin queue and status effects all work without a vendor — every image simply lands in the admin queue as `review` instead of being auto-approved |
 | O5 | Brand kit | 1B.1 design tokens, 1C.9 store assets | Neutral tokens in `apps/web/src/styles/tokens.css` and a text wordmark; swap that one file when 0.8 lands. `apps/mobile/tailwind.config.js` mirrors the same neutral scale as sRGB hex (NativeWind cannot resolve `oklch()`); update it alongside. `apps/mobile/assets/icon.png` and `splash.png` are plain solid-colour placeholders generated locally; replace with real app icon/splash art in 1C.9 |
 
 ## Human-only plan steps
@@ -30,9 +30,41 @@ Last updated: 2026-09-17.
 | Issue | Needed from Alex | Blocks | Workaround meanwhile |
 |-------|------------------|--------|----------------------|
 | GitHub Actions jobs are not starting: "recent account payments have failed or your spending limit needs to be increased" | Fix billing in GitHub Settings → Billing & plans, then re-run CI on `main` (or `gh workflow run ci.yml --ref main`) | CI on every PR (no merges on green), the Deploy preview workflow (images for the migrate fix from #71 aren't built, so api and worker stay down on footoo.bas.lu) | Local root checks before opening PRs; PRs stay open until CI runs |
-| The preview database is empty (`GET /v1/photographers` returns no items), so profile, search and request pages have nothing to show | Run the seed once from the Dokploy terminal or a host shell: `docker compose -p compose-index-back-end-application-k6x26o -f infra/dokploy/preview/compose.yml --profile seed run --rm seed` (runbook: `infra/dokploy/preview/README.md` "Seed"; needs `SEED_USER_PASSWORD` in the Dokploy env). The Dokploy API has no run-one-off-container call and SSH to the host times out | Demo content on footoo.bas.lu | Local stack has seed data |
+| The preview database is empty (`GET /v1/photographers` returns no items), so profile, search and request pages have nothing to show | Run the seed once from a host shell, per `infra/dokploy/preview/README.md` "Seed": `cd /etc/dokploy/compose/compose-index-back-end-application-k6x26o/code && docker compose -p compose-index-back-end-application-k6x26o -f infra/dokploy/preview/compose.yml --profile seed run --rm seed`. Never add `--env-file .env`: Dokploy's "Create environment file" writes the `.env` beside the compose file (`code/infra/dokploy/preview/.env`), not at the repo root. The runbook also has a direct `docker run` fallback for when that file has not been written yet — it must take its S3 keys from the **worker** container, since the api's MinIO user is scoped to `photoo-private` and the seed writes to `photoo-public`. The Dokploy API has no run-one-off-container call and SSH from the dev machine times out | Demo content on footoo.bas.lu | Local stack has seed data |
 | The Dokploy API token was printed once in a tool output | Rotate it in Dokploy and replace `~/.config/dokploy/seil.token` | – | – |
 | `~/.config/ghcr/read.token` is root-owned and world-readable (644), and belongs to the personal account | `chmod 600` plus chown to your user; ideally replace it with a read:packages token from a machine user and update the `ghcr-sashimee-read` registry in Dokploy | – | Works as is |
+
+## Provenance vendors (1A.10)
+
+| Issue | Needed from Alex | Blocks | Workaround meanwhile |
+|-------|------------------|--------|----------------------|
+| Turning `PROVENANCE_ENABLED=true` sends a public portfolio image to a third-party vendor, which makes that vendor a sub-processor | A signed DPA per vendor, the vendor named in the privacy policy and in `docs/COMPLIANCE.md` sub-processors, and an EU or adequacy-decision transfer basis | Automatic AI-detection and reverse-search verdicts in any real environment | The flag stays off; only EXIF and (optionally) C2PA signals are used, and nothing leaves the worker |
+| Each uploaded portfolio image costs one vendor call | Confirm the per-image price and set a monthly cap with the vendor | – | Queue concurrency is 2 and a checked image is never re-checked without an explicit admin re-check |
+
+## Legal review (1A.12 GDPR)
+
+| Issue | Needed from Alex | Blocks | Workaround meanwhile |
+|-------|------------------|--------|----------------------|
+| The 30-day deletion grace period and the retention table in `docs/COMPLIANCE.md` (10-year ledger, 5-year verification records, 90-day chat purge) are our reading of the law, not a lawyer's | Confirm the figures with the lawyer, and confirm that the self-service export may exclude verification document *bytes* (metadata included) as long as a documented manual route exists | Nothing in code — the numbers are constants in one place and a change is a one-line edit | The plan implements the current table and keeps every figure as a named constant |
+| The deletion confirmation and grace-period notice must state what survives deletion and for how long | Approve the wording | Real user-facing copy | Placeholder English copy in `packages/i18n`, translations after approval |
+| A subject who insists on copies of their verification documents needs a manual process (identity check before release) | Define the support process | – | Nothing is built for this in Phase 1; the export README points at support |
+
+## Job board (1A.13)
+
+| Issue | Needed from Alex | Blocks | Workaround meanwhile |
+|-------|------------------|--------|----------------------|
+| Do professionals need document-based verification like photographers (1A.9), or is a manual `verified` flag enough for launch? | A decision, with the lawyer if it touches liability for who may post work offers | Nothing — the flag ships either way | 1A.13 ships the manual admin flag and no self-service flow |
+| Must a job offer carry a compensation range to be published? Pay-transparency rules are moving, and Luxembourg's position should be checked before the board is public | Confirm with the lawyer | Making the field required (a one-line contract change) | `compensation` is optional in Phase 1 |
+| Job board terms: what a professional warrants when posting, and the takedown process | Folded into the Phase 2 ToS work already listed | Public launch of the board | Offers are reportable by id; moderation queue is 1A.11 |
+
+## Payments (1A.8) — the biggest schedule risk
+
+| Issue | Needed from Alex | Blocks | Workaround meanwhile |
+|-------|------------------|--------|----------------------|
+| O2: the operating legal entity, and then the Stripe platform account | Decide the entity, create the Stripe account, provide **test-mode** keys (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) | Every live payment path: Connect Express onboarding, real webhook signatures, 3-D Secure and Radar behaviour | `docs/steps/1A.8-payments.md`: all Stripe access goes through a `StripeGateway` interface with a deterministic fake used in tests, CI and local dev. The state machine, ledger, idempotency, refunds, release job and PDFs are all built and tested against it. The API refuses to boot in production without a real key — the fake is never a fallback |
+| Once test-mode keys exist, a short live checklist has to be run | Connect Express onboarding with a test account; `stripe listen` webhook replay against a real signature; a 3-D Secure test card through the Payment Element; a partial refund; a transfer reversal | Confidence that the fake matched reality | The checklist is written down in the step plan so it is a scheduled verification, not an unknown |
+| Accountant: VAT on the platform fee for Luxembourg photographers (17 %), whether the platform issues the fee invoice itself, and DAC7 applicability plus the exact seller fields to collect | Answers from the accountant | Correct invoicing and the yearly DAC7 export (Phase 3) | The shared fee helper takes a VAT-on-fee flag driven by `Country.vatRate`, defaulting to off |
+| Stripe Radar rules, and whether 3-D Secure is forced on every payment | A decision once the account exists | Fraud posture at launch | Automatic payment methods decide, which is Stripe's default |
 
 ## Local environment
 

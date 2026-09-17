@@ -255,6 +255,9 @@ export {
 
 export {
   AdminVerificationCaseSchema,
+  AdminVerificationCaseSummarySchema,
+  AdminVerificationDocumentSchema,
+  AdminVerificationPhotographerSchema,
   AttachVerificationDocumentRequestSchema,
   CreateVerificationCaseRequestSchema,
   RequiredDocumentSchema,
@@ -272,9 +275,11 @@ export {
   AdminReportSchema,
   AdminUserSchema,
   AdminUserSearchQuerySchema,
+  AdminVerificationCasesQuerySchema,
   PlatformSettingsSchema,
   RefundBookingRequestSchema,
   RejectProvenanceCheckRequestSchema,
+  RejectVerificationCaseRequestSchema,
   ResolveReportRequestSchema,
   ReverseBookingTransferRequestSchema,
   SetUserRolesRequestSchema,

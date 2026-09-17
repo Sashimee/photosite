@@ -36,10 +36,23 @@ describe('renderNotifyPush', () => {
       'quote_declined',
       'quote_withdrawn',
       'quote_expired',
+      'verification_approved',
+      'verification_rejected',
     ] as const;
     for (const type of types) {
       expect(() => renderNotifyPush(type, PAYLOAD, 'en')).not.toThrow();
     }
+  });
+
+  it('renders verification_rejected without leaking the reason into the push body', () => {
+    const push = renderNotifyPush(
+      'verification_rejected',
+      { reason: 'Business registration document is illegible' },
+      'en',
+    );
+    expect(push.title).toBe('Verification rejected');
+    expect(push.body).not.toContain('illegible');
+    expect(push.url).toBe('/en/account/verification');
   });
 
   it('throws when the payload has no quoteId', () => {
