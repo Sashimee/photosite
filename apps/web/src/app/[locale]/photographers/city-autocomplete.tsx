@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useState } from 'react';
 
+import type { components } from '@photoo/api-client';
+
 import { api } from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,21 +11,22 @@ import { Label } from '@/components/ui/label';
 const DEBOUNCE_MS = 250;
 const SUGGESTION_LIMIT = 5;
 
-interface CitySuggestion {
-  slug: string;
-  name: string;
-}
+type CitySuggestion = components['schemas']['CitySummary'];
 
 export function CityAutocomplete({
   label,
   name,
   defaultValue,
   countryCode,
+  onCitySelect,
 }: {
   label: string;
   name: string;
   defaultValue?: string | undefined;
   countryCode?: string | undefined;
+  // Needed by callers (the request form's location picker) that want the
+  // centroid behind a typed city name, not just the text itself.
+  onCitySelect?: (city: CitySuggestion | null) => void;
 }) {
   const id = useId();
   const listId = `${id}-cities`;
@@ -34,6 +37,7 @@ export function CityAutocomplete({
     const query = value.trim();
     if (query.length === 0) {
       setSuggestions([]);
+      onCitySelect?.(null);
       return;
     }
 
@@ -46,13 +50,19 @@ export function CityAutocomplete({
           },
         })
         .then(({ data }) => {
-          if (!cancelled) {
-            setSuggestions(data ?? []);
+          if (cancelled) {
+            return;
           }
+          const results = data ?? [];
+          setSuggestions(results);
+          onCitySelect?.(
+            results.find((city) => city.name.toLowerCase() === query.toLowerCase()) ?? null,
+          );
         })
         .catch(() => {
           if (!cancelled) {
             setSuggestions([]);
+            onCitySelect?.(null);
           }
         });
     }, DEBOUNCE_MS);

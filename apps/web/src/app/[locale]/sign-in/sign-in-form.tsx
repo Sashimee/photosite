@@ -26,7 +26,7 @@ interface SignInFormValues {
 export function SignInForm({ locale, next }: { locale: Locale; next?: string | undefined }) {
   const t = useTranslations('web.auth.signIn');
   const tErrors = useTranslations('web.auth');
-  const tValidation = useTranslations('web.auth');
+  const tValidation = useTranslations('common.validation');
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
 

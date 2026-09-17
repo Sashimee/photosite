@@ -9,6 +9,13 @@
     "loading": "Loading...",
     "retry": "Retry",
     "save": "Save",
+    "validation": {
+      "required": "This field is required.",
+      "tooShort": "This value is too short.",
+      "tooLong": "This value is too long.",
+      "invalidFormat": "Enter a valid value.",
+      "invalid": "This value isn't valid."
+    },
     "categories": {
       "wedding": "Wedding",
       "portrait": "Portrait",
@@ -156,13 +163,6 @@
         "photographer": "Photographer",
         "professional": "Professional or company"
       },
-      "validation": {
-        "required": "This field is required.",
-        "tooShort": "This value is too short.",
-        "tooLong": "This value is too long.",
-        "invalidFormat": "Enter a valid value.",
-        "invalid": "This value isn't valid."
-      },
       "errors": {
         "generic": "Something went wrong. Please try again.",
         "invalidCredentials": "Incorrect email or password.",
@@ -248,6 +248,8 @@
       "signedInAs": "Signed in as {email}",
       "menu": {
         "account": "Account",
+        "myRequests": "My requests",
+        "quotes": "Quotes",
         "signOut": "Sign out"
       },
       "roles": {
@@ -359,10 +361,152 @@
       }
     },
     "requests": {
-      "placeholder": {
-        "title": "Requests are coming soon",
-        "description": "Sending booking requests isn't available yet. Check back soon.",
-        "backCta": "Go back"
+      "new": {
+        "metaTitle": "Request a quote",
+        "title": "Tell photographers what you need",
+        "intro": "Describe your shoot and matching photographers can send you a quote. You'll be able to compare quotes and accept the one you like.",
+        "photographerIntro": "This request goes out to every matching photographer nearby, not just {displayName}.",
+        "backToProfile": "Back to profile",
+        "form": {
+          "titleLabel": "Title",
+          "categoryLabel": "Category",
+          "categoryPlaceholder": "Choose a category",
+          "descriptionLabel": "Description",
+          "eventDateLabel": "Event date and time",
+          "dateFlexibleLabel": "My date is flexible",
+          "locationHeading": "Location",
+          "locationExplanation": "Pick your city or share your location so photographers know where you need them.",
+          "cityLabel": "City",
+          "useMyLocationCta": "Use my location",
+          "useMyLocationError": "We couldn't get your location. Try picking a city instead.",
+          "locationSet": "Location set.",
+          "locationRequired": "Choose a city or use your location before sending the request.",
+          "addressHeading": "Address",
+          "addressHint": "Only shared with a photographer once you accept their quote.",
+          "addressLine1Label": "Address line 1",
+          "addressLine2Label": "Address line 2 (optional)",
+          "addressCityLabel": "City",
+          "addressPostalCodeLabel": "Postal code",
+          "addressCountryLabel": "Country",
+          "addressCountryPlaceholder": "Choose a country",
+          "budgetHeading": "Budget",
+          "budgetMinLabel": "Minimum",
+          "budgetMaxLabel": "Maximum",
+          "budgetCurrencyHint": "Choose a country to set your currency.",
+          "budgetMinGreaterThanMax": "Minimum must not be greater than maximum.",
+          "usageLabel": "How will you use the photos?",
+          "usagePlaceholder": "Choose a usage",
+          "submit": "Send request",
+          "submitting": "Sending…"
+        },
+        "directQuote": {
+          "productsHeading": "Or request a package directly",
+          "cta": "Request this package",
+          "sending": "Sending…"
+        }
+      },
+      "list": {
+        "metaTitle": "My requests",
+        "title": "My requests",
+        "intro": "Requests you've sent to photographers.",
+        "empty": "You haven't sent any requests yet.",
+        "newCta": "New request",
+        "loadMore": "Next page",
+        "quoteCount": "{count, plural, =0 {No quotes yet} one {# quote} other {# quotes}}"
+      },
+      "detail": {
+        "metaTitle": "Request",
+        "backToList": "Back to my requests",
+        "eventDateLabel": "Event date",
+        "budgetLabel": "Budget",
+        "usageLabel": "Usage",
+        "addressLabel": "Address",
+        "quotesHeading": "Quotes",
+        "noQuotes": "No quotes yet. Matching photographers can send one any time.",
+        "compareHeading": "Compare quotes",
+        "cancelCta": "Cancel request",
+        "cancelConfirmTitle": "Cancel this request?",
+        "cancelConfirmDescription": "Photographers won't be able to send new quotes once it's cancelled.",
+        "cancelConfirmCta": "Yes, cancel request",
+        "cancelPending": "Cancelling…",
+        "cancelDismissCta": "Keep request",
+        "cancelledNotice": "This request has been cancelled.",
+        "notFound": {
+          "title": "Request not found",
+          "description": "This request doesn't exist, or it isn't yours.",
+          "backCta": "Back to my requests"
+        }
+      },
+      "status": {
+        "open": "Open",
+        "quoted": "Quoted",
+        "booked": "Booked",
+        "closed": "Closed",
+        "cancelled": "Cancelled"
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "conflict": "This request can't be changed right now.",
+        "invalid": "Check the highlighted fields and try again.",
+        "forbidden": "You don't have access to this request.",
+        "notFound": "This request could not be found.",
+        "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      }
+    },
+    "quotes": {
+      "list": {
+        "metaTitle": "Quotes",
+        "title": "Quotes",
+        "intro": "Quotes photographers have sent you.",
+        "empty": "You haven't received any quotes yet.",
+        "loadMore": "Next page"
+      },
+      "detail": {
+        "metaTitle": "Quote",
+        "backToList": "Back to quotes",
+        "backToRequest": "Back to request",
+        "viewCta": "View full quote",
+        "validUntilLabel": "Valid until",
+        "lineItemsHeading": "What's included",
+        "totalLabel": "Total",
+        "messageHeading": "Message from the photographer",
+        "acceptCta": "Accept quote",
+        "declineCta": "Decline quote",
+        "acceptConfirmTitle": "Accept this quote?",
+        "acceptConfirmDescription": "Booking and payment are coming soon; accepting reserves this quote and we'll follow up with next steps.",
+        "acceptConfirmCta": "Yes, accept quote",
+        "acceptPending": "Accepting…",
+        "acceptDismissCta": "Not yet",
+        "declineConfirmTitle": "Decline this quote?",
+        "declineConfirmDescription": "The photographer will be notified that you declined.",
+        "declineConfirmCta": "Yes, decline quote",
+        "declinePending": "Declining…",
+        "declineDismissCta": "Keep quote",
+        "acceptedNotice": "Quote accepted. Booking and payment are coming soon — we'll be in touch with next steps.",
+        "declinedNotice": "Quote declined.",
+        "notFound": {
+          "title": "Quote not found",
+          "description": "This quote doesn't exist, or it isn't yours.",
+          "backCta": "Back to quotes"
+        }
+      },
+      "status": {
+        "draft": "Draft",
+        "sent": "Sent",
+        "accepted": "Accepted",
+        "declined": "Declined",
+        "expired": "Expired",
+        "withdrawn": "Withdrawn"
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "conflict": "This quote is no longer available.",
+        "invalid": "Check the highlighted fields and try again.",
+        "forbidden": "You don't have access to this quote.",
+        "notFound": "This quote could not be found.",
+        "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
       }
     }
   }
