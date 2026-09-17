@@ -1198,6 +1198,118 @@
         ],
         "additionalProperties": false
       },
+      "RequestSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 150
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "wedding",
+              "portrait",
+              "event",
+              "product",
+              "real-estate",
+              "corporate"
+            ],
+            "example": "wedding"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "eventDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "dateFlexible": {
+            "type": "boolean"
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code",
+            "example": "LU"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LatLng"
+          },
+          "budgetMin": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "budgetMax": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "usage": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "commercial",
+              "editorial",
+              "extended"
+            ],
+            "example": "personal"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "quoted",
+              "booked",
+              "closed",
+              "cancelled"
+            ]
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "hasQuoted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "category",
+          "description",
+          "eventDate",
+          "dateFlexible",
+          "city",
+          "countryCode",
+          "location",
+          "budgetMin",
+          "budgetMax",
+          "usage",
+          "status",
+          "expiresAt",
+          "hasQuoted"
+        ],
+        "additionalProperties": false
+      },
       "Quote": {
         "type": "object",
         "properties": {
@@ -1251,7 +1363,8 @@
             "items": {
               "$ref": "#/components/schemas/LineItem"
             },
-            "minItems": 1
+            "minItems": 1,
+            "maxItems": 50
           },
           "subtotal": {
             "$ref": "#/components/schemas/Money"
@@ -1314,11 +1427,13 @@
           },
           "qty": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "maximum": 1000
           },
           "unitCents": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 99999999
           }
         },
         "required": [
@@ -5924,6 +6039,125 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List open requests matching the current photographer profile",
+        "tags": [
+          "requests"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "required": false,
+            "name": "radiusKm",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of matching requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RequestSummary"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -6164,7 +6398,7 @@
     },
     "/v1/quotes": {
       "post": {
-        "summary": "Create a quote for a request or a direct product tier",
+        "summary": "Create a quote for a request",
         "tags": [
           "quotes"
         ],
@@ -6188,24 +6422,13 @@
                     "description": "UUID identifier",
                     "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
                   },
-                  "productId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "description": "UUID identifier",
-                    "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-                  },
-                  "productTierId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "description": "UUID identifier",
-                    "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-                  },
                   "lineItems": {
                     "type": "array",
                     "items": {
                       "$ref": "#/components/schemas/LineItem"
                     },
-                    "minItems": 1
+                    "minItems": 1,
+                    "maxItems": 50
                   },
                   "validUntil": {
                     "type": "string",
@@ -6219,6 +6442,7 @@
                   }
                 },
                 "required": [
+                  "requestId",
                   "lineItems",
                   "validUntil"
                 ],
@@ -6278,8 +6502,179 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/photographers/{slug}/products/{productId}/quotes": {
+      "post": {
+        "summary": "Request a direct quote from a product tier",
+        "tags": [
+          "quotes"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 60,
+              "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+              "description": "URL-safe profile slug",
+              "example": "jane-doe-photography"
+            },
+            "required": true,
+            "description": "URL-safe profile slug",
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "productId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "productTierId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "UUID identifier",
+                    "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "productTierId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Quote created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
             "content": {
               "application/json": {
                 "schema": {
@@ -6293,7 +6688,7 @@
     },
     "/v1/quotes/mine": {
       "get": {
-        "summary": "List the current photographer's quotes",
+        "summary": "List the current user's quotes",
         "tags": [
           "quotes"
         ],
@@ -6324,6 +6719,18 @@
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "photographer",
+                "client"
+              ]
+            },
+            "required": false,
+            "name": "role",
             "in": "query"
           }
         ],
@@ -6358,8 +6765,80 @@
               }
             }
           },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/quotes/{id}": {
+      "get": {
+        "summary": "Get a quote",
+        "tags": [
+          "quotes"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The quote",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {

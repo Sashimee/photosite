@@ -157,11 +157,19 @@ export {
   AddressSchema,
   CreateRequestRequestSchema,
   RequestCategorySchema,
+  RequestFeedQuerySchema,
   RequestSchema,
+  RequestSummarySchema,
   RequestUsageSchema,
 } from './contract/requests.js';
 
-export { CreateQuoteRequestSchema, LineItemSchema, QuoteSchema } from './contract/quotes.js';
+export {
+  CreateQuoteRequestSchema,
+  DirectQuoteRequestSchema,
+  LineItemSchema,
+  QuoteSchema,
+  QuotesMineQuerySchema,
+} from './contract/quotes.js';
 
 export {
   BookingBaseSchema,

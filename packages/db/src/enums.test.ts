@@ -6,6 +6,8 @@ import {
   NOTIFICATION_CHANNELS,
   PHOTOGRAPHER_CATEGORIES,
   PORTFOLIO_IMAGE_STATUSES,
+  QUOTE_STATUSES,
+  REQUEST_STATUSES,
   SUPPORTED_LOCALES,
   UPLOAD_PURPOSES,
   UPLOAD_STATUSES,
@@ -24,6 +26,8 @@ import {
   NotificationChannel,
   PhotographerCategory,
   PortfolioImageStatus,
+  QuoteStatus,
+  RequestStatus,
   UploadPurpose,
   UploadStatus,
   UserRole,
@@ -93,5 +97,13 @@ describe('Prisma enums mirror packages/shared enums', () => {
 
   it('LicenceUsage matches LICENCE_USAGES', () => {
     expect(Object.values(LicenceUsage).sort()).toEqual([...LICENCE_USAGES].sort());
+  });
+
+  it('RequestStatus matches REQUEST_STATUSES', () => {
+    expect(Object.values(RequestStatus).sort()).toEqual([...REQUEST_STATUSES].sort());
+  });
+
+  it('QuoteStatus matches QUOTE_STATUSES', () => {
+    expect(Object.values(QuoteStatus).sort()).toEqual([...QUOTE_STATUSES].sort());
   });
 });

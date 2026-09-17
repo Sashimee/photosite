@@ -5,11 +5,14 @@ export interface NotYetImplementedRoute {
 
 export const NOT_YET_IMPLEMENTED: readonly NotYetImplementedRoute[] = [
   { method: 'POST', path: '/v1/requests' },
+  { method: 'GET', path: '/v1/requests' },
   { method: 'GET', path: '/v1/requests/mine' },
   { method: 'GET', path: '/v1/requests/:id' },
   { method: 'POST', path: '/v1/requests/:id/cancel' },
   { method: 'POST', path: '/v1/quotes' },
+  { method: 'POST', path: '/v1/photographers/:slug/products/:productId/quotes' },
   { method: 'GET', path: '/v1/quotes/mine' },
+  { method: 'GET', path: '/v1/quotes/:id' },
   { method: 'GET', path: '/v1/requests/:requestId/quotes' },
   { method: 'POST', path: '/v1/quotes/:id/accept' },
   { method: 'POST', path: '/v1/quotes/:id/decline' },

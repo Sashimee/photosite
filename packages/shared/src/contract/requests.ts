@@ -64,6 +64,31 @@ export const RequestSchema = z
   .strict()
   .openapi('Request');
 
+export const RequestSummarySchema = z
+  .object({
+    id: IdSchema,
+    title: z.string().min(1).max(150),
+    category: RequestCategorySchema,
+    description: z.string().min(1).max(4000),
+    eventDate: IsoDateTimeSchema,
+    dateFlexible: z.boolean(),
+    city: z.string().min(1).max(120),
+    countryCode: CountryCodeSchema,
+    location: LatLngSchema,
+    budgetMin: MoneySchema,
+    budgetMax: MoneySchema,
+    usage: RequestUsageSchema,
+    status: z.enum(REQUEST_STATUSES),
+    expiresAt: IsoDateTimeSchema.nullable(),
+    hasQuoted: z.boolean(),
+  })
+  .strict()
+  .openapi('RequestSummary');
+
+export const RequestFeedQuerySchema = CursorPaginationQuerySchema.extend({
+  radiusKm: z.coerce.number().int().min(1).max(200).default(50),
+}).strict();
+
 export const CreateRequestRequestSchema = z
   .object({
     title: z.string().min(1).max(150),
@@ -97,7 +122,25 @@ registry.registerPath({
       description: 'Request created',
       content: { 'application/json': { schema: RequestSchema } },
     },
-    ...errorResponses([400, 401, 422]),
+    ...errorResponses([400, 401, 422, 429]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/requests'),
+  summary: 'List open requests matching the current photographer profile',
+  tags: ['requests'],
+  security: AUTH_SECURITY,
+  request: {
+    query: RequestFeedQuerySchema,
+  },
+  responses: {
+    '200': {
+      description: 'A page of matching requests',
+      content: { 'application/json': { schema: paginatedResponseSchema(RequestSummarySchema) } },
+    },
+    ...errorResponses([400, 401, 403]),
   },
 });
 

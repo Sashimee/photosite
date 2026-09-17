@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { AddressSchema, CreateRequestRequestSchema, RequestSchema } from './requests.js';
+import {
+  AddressSchema,
+  CreateRequestRequestSchema,
+  RequestFeedQuerySchema,
+  RequestSchema,
+  RequestSummarySchema,
+} from './requests.js';
 
 const validAddress = {
   line1: '10 rue de la Gare',
@@ -99,5 +105,67 @@ describe('RequestSchema', () => {
         expiresAt: null,
       }).success,
     ).toBe(true);
+  });
+});
+
+describe('RequestSummarySchema', () => {
+  const validSummary = {
+    id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+    title: validCreateRequest.title,
+    category: validCreateRequest.category,
+    description: validCreateRequest.description,
+    eventDate: futureDate,
+    dateFlexible: false,
+    city: validAddress.city,
+    countryCode: validAddress.countryCode,
+    location: validCreateRequest.location,
+    budgetMin: validCreateRequest.budgetMin,
+    budgetMax: validCreateRequest.budgetMax,
+    usage: validCreateRequest.usage,
+    status: 'open',
+    expiresAt: null,
+    hasQuoted: false,
+  };
+
+  it('accepts a well-formed summary', () => {
+    expect(RequestSummarySchema.safeParse(validSummary).success).toBe(true);
+  });
+
+  it('rejects a summary carrying the address', () => {
+    expect(RequestSummarySchema.safeParse({ ...validSummary, address: validAddress }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects a summary carrying the clientId', () => {
+    expect(
+      RequestSummarySchema.safeParse({
+        ...validSummary,
+        clientId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('RequestFeedQuerySchema', () => {
+  it('defaults radiusKm to 50', () => {
+    expect(RequestFeedQuerySchema.parse({}).radiusKm).toBe(50);
+  });
+
+  it('accepts the radiusKm bounds', () => {
+    expect(RequestFeedQuerySchema.safeParse({ radiusKm: 1 }).success).toBe(true);
+    expect(RequestFeedQuerySchema.safeParse({ radiusKm: 200 }).success).toBe(true);
+  });
+
+  it('rejects radiusKm below 1', () => {
+    expect(RequestFeedQuerySchema.safeParse({ radiusKm: 0 }).success).toBe(false);
+  });
+
+  it('rejects radiusKm above 200', () => {
+    expect(RequestFeedQuerySchema.safeParse({ radiusKm: 201 }).success).toBe(false);
+  });
+
+  it('coerces a string radiusKm from the query string', () => {
+    expect(RequestFeedQuerySchema.parse({ radiusKm: '75' }).radiusKm).toBe(75);
   });
 });

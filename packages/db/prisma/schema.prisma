@@ -111,6 +111,23 @@ enum LicenceUsage {
   extended
 }
 
+enum RequestStatus {
+  open
+  quoted
+  booked
+  closed
+  cancelled
+}
+
+enum QuoteStatus {
+  draft
+  sent
+  accepted
+  declined
+  expired
+  withdrawn
+}
+
 model Country {
   code              String   @id @db.Char(2)
   name              String
@@ -125,6 +142,7 @@ model Country {
 
   users                User[]
   photographerProfiles PhotographerProfile[]
+  requests             Request[]
 }
 
 model PlatformSetting {
@@ -165,6 +183,8 @@ model User {
   updatedPlatformSettings PlatformSetting[]
   uploads                 Upload[]
   photographerProfile     PhotographerProfile?
+  requests                Request[]
+  quotes                  Quote[]
 
   @@index([countryCode])
   @@index([status])
@@ -379,6 +399,7 @@ model PhotographerProfile {
 
   portfolioImages PortfolioImage[]
   products        Product[]
+  quotes          Quote[]
 
   @@index([countryCode])
   @@index([verificationStatus])
@@ -422,7 +443,8 @@ model Product {
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
-  tiers ProductTier[]
+  tiers  ProductTier[]
+  quotes Quote[]
 
   @@index([profileId])
   @@index([isActive])
@@ -440,6 +462,88 @@ model ProductTier {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
+  quotes Quote[]
+
   @@unique([productId, usage])
   @@index([productId])
+}
+
+// `location` is `geography(Point, 4326)`, an `Unsupported` type Prisma
+// cannot index or write directly: the GiST index and the partial index on
+// `(status, expiresAt)` live in hand-written migration SQL. `address` holds
+// the full structured address and is visible only to the owning client and
+// the booked photographer (DATA-MODEL.md).
+model Request {
+  id             String                                 @id @default(uuid(7))
+  clientId       String
+  client         User                                   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  title          String
+  category       PhotographerCategory
+  description    String
+  eventDate      DateTime
+  dateFlexible   Boolean                                @default(false)
+  location       Unsupported("geography(Point, 4326)")?
+  address        Json
+  city           String
+  countryCode    String                                 @db.Char(2)
+  country        Country                                @relation(fields: [countryCode], references: [code])
+  budgetMinCents Int
+  budgetMaxCents Int
+  currency       String                                 @db.Char(3)
+  usage          LicenceUsage
+  status         RequestStatus                          @default(open)
+  expiresAt      DateTime
+  deletedAt      DateTime?
+  createdAt      DateTime                               @default(now())
+  updatedAt      DateTime                               @updatedAt
+
+  quotes Quote[]
+
+  @@index([clientId, createdAt])
+  @@index([countryCode])
+}
+
+// `photographerId` references `PhotographerProfile`, not `User` directly
+// (DATA-MODEL.md), so a quote survives a photographer's profile identity
+// (slug, display name) changing shape. `feePercent` is a snapshot of
+// `PlatformSetting('feePercent')` at creation time so later fee changes
+// never rewrite sent quotes; it is stored with the same precision as
+// `Country.vatRate`. `licenceUsage`/`licenceTextVersion` snapshot the licence
+// terms the client agreed to, because `productTierId` update
+// (products.service.ts) hard-deletes and recreates tiers, which would
+// otherwise silently null out and lose the original licence. The partial
+// unique index on `(requestId, photographerId) WHERE status = 'sent'` and
+// the CHECK constraints live in hand-written migration SQL.
+model Quote {
+  id                 String              @id @default(uuid(7))
+  requestId          String?
+  request            Request?            @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  photographerId     String
+  photographer       PhotographerProfile @relation(fields: [photographerId], references: [id], onDelete: Restrict)
+  clientId           String
+  client             User                @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  productId          String?
+  product            Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productTierId      String?
+  productTier        ProductTier?        @relation(fields: [productTierId], references: [id], onDelete: SetNull)
+  lineItems          Json
+  subtotalCents      Int
+  platformFeeCents   Int
+  totalCents         Int
+  feePercent         Decimal             @db.Decimal(5, 2)
+  licenceUsage       LicenceUsage
+  licenceTextVersion String?
+  currency           String              @db.Char(3)
+  validUntil         DateTime
+  message            String?
+  status             QuoteStatus         @default(sent)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([requestId])
+  @@index([clientId, createdAt])
+  @@index([photographerId, createdAt])
+  @@index([status, validUntil])
+  @@index([productId])
+  @@index([productTierId])
 }
