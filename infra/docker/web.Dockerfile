@@ -28,6 +28,8 @@ COPY --from=pruner /app/out/full/ ./
 # NEXT_PUBLIC_SENTRY_DSN, an optional URL in apps/web/src/lib/env.ts) into
 # an empty string instead of leaving it unset.
 ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_SITE_URL
+ARG NEXT_PUBLIC_MEDIA_BASE_URL
 ARG NEXT_PUBLIC_ALLOW_INDEXING
 ARG NEXT_PUBLIC_SENTRY_DSN
 ARG SENTRY_REQUIRED

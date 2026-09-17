@@ -9,10 +9,30 @@ import { env } from './src/lib/env';
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const isProduction = process.env.NODE_ENV === 'production';
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+const mediaBaseUrl = env.NEXT_PUBLIC_MEDIA_BASE_URL
+  ? new URL(env.NEXT_PUBLIC_MEDIA_BASE_URL)
+  : null;
 
 const nextConfig: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: fileURLToPath(new URL('../..', import.meta.url)),
+  images: {
+    remotePatterns: mediaBaseUrl
+      ? [
+          {
+            protocol: mediaBaseUrl.protocol.replace(':', '') as 'http' | 'https',
+            hostname: mediaBaseUrl.hostname,
+            port: mediaBaseUrl.port,
+            pathname: `${mediaBaseUrl.pathname.replace(/\/$/, '')}/**`,
+          },
+        ]
+      : [],
+    // The local stack's media origin (http://localhost:9000) is a local IP,
+    // which Next's image optimizer otherwise refuses to fetch from.
+    ...(isDevelopment ? { dangerouslyAllowLocalIP: true } : {}),
+  },
   headers() {
     return [
       {

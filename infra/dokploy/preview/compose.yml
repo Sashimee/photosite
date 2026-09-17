@@ -17,6 +17,8 @@ services:
       # Must match the image's build args (deploy-preview.yml): read again
       # at request time by apps/web's middleware, not just inlined at build.
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?copy infra/dokploy/preview/.env.example to .env}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://footoo.bas.lu}
+      NEXT_PUBLIC_MEDIA_BASE_URL: ${NEXT_PUBLIC_MEDIA_BASE_URL:-https://footoo.bas.lu/photoo-public}
       NEXT_PUBLIC_ALLOW_INDEXING: ${NEXT_PUBLIC_ALLOW_INDEXING:-false}
       NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
       SENTRY_REQUIRED: ${SENTRY_REQUIRED:-false}

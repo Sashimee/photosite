@@ -32,6 +32,7 @@ export async function generateMetadata({
   const t = await getTranslations({ locale, namespace: 'web.home' });
 
   return {
+    metadataBase: new URL(env.NEXT_PUBLIC_SITE_URL),
     title: t('heroTitle'),
     description: t('heroSubtitle'),
     robots: buildRobotsMetadata(env.NEXT_PUBLIC_ALLOW_INDEXING),
