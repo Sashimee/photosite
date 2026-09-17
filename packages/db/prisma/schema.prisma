@@ -54,6 +54,32 @@ enum NotificationChannel {
   in_app
 }
 
+enum UploadPurpose {
+  portfolio
+  avatar
+  cover
+  chat_attachment
+  verification_document
+  delivery_file
+}
+
+enum UploadStatus {
+  pending_upload
+  uploaded
+  scanning
+  clean
+  infected
+  failed
+  processed
+}
+
+enum VirusScanStatus {
+  pending
+  clean
+  infected
+  failed
+}
+
 model Country {
   code              String   @id @db.Char(2)
   name              String
@@ -105,6 +131,7 @@ model User {
   consentRecords          ConsentRecord[]
   notifications           Notification[]
   updatedPlatformSettings PlatformSetting[]
+  uploads                 Upload[]
 
   @@index([countryCode])
   @@index([status])
@@ -243,4 +270,31 @@ model Notification {
   updatedAt DateTime              @updatedAt
 
   @@index([userId, readAt])
+}
+
+// Generic upload record referenced by id from Attachment, VerificationDocument,
+// PortfolioImage and Delivery once 1A.3b lands. `objectKey` and `exif` are
+// private (SECURITY.md) and never serialised to clients; downloads are only
+// issued once `virusScanStatus = clean`. Uploads still `pending_upload` or
+// `uploaded` past `expiresAt` are removed by the worker's cleanup job.
+model Upload {
+  id                String          @id @default(uuid(7))
+  ownerId           String
+  owner             User            @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  purpose           UploadPurpose
+  status            UploadStatus    @default(pending_upload)
+  mimeType          String
+  declaredSizeBytes Int
+  actualSizeBytes   Int?
+  objectKey         String          @unique
+  variants          Json?
+  exif              Json?
+  virusScanStatus   VirusScanStatus @default(pending)
+  expiresAt         DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([status, expiresAt])
 }

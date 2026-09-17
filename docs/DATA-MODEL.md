@@ -12,6 +12,10 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 - **Device** – userId, expoPushToken, platform, lastSeenAt.
 - **ConsentRecord** – userId or anonymousId, purpose (`analytics`, `ads`, `marketing`), granted, version of the policy, ip, userAgent, recordedAt. Append-only.
 
+## Uploads
+
+- **Upload** – ownerId (User), purpose (`UPLOAD_PURPOSES`: `portfolio`, `avatar`, `cover`, `chat_attachment`, `verification_document`, `delivery_file`), status (`pending_upload`, `uploaded`, `scanning`, `clean`, `infected`, `failed`, `processed`), mimeType, declaredSizeBytes, actualSizeBytes (nullable until the object is confirmed), objectKey (private bucket, unique), variants (JSON of public keys, populated once processed), exif (JSON, private), virusScanStatus mirroring shared `VIRUS_SCAN_STATUSES`, expiresAt. Generic upload record; `Attachment`, `VerificationDocument`, `PortfolioImage` and `Delivery` files reference an `Upload` by id once 1A.3b lands.
+
 ## Photographer
 
 - **PhotographerProfile** – userId (1:1), slug (unique), displayName, headline, bio (per locale JSON), avatarKey, coverKey, links (JSON: instagram, website, behance, other[]), categories[] (enum: wedding, portrait, event, product, real-estate, corporate, …), languages[], location (geography Point), serviceRadiusKm, city, countryCode, verificationStatus (`unverified`, `pending`, `verified`, `rejected`), stripeAccountId, stripeOnboardingComplete, stripePayoutsEnabled, ratingAvg, ratingCount, isPublished, deletedAt.
@@ -65,3 +69,6 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 - `PortfolioImage.status = approved` is required before an image appears on a public profile.
 - `PhotographerProfile.isPublished` requires `verificationStatus = verified` and `stripePayoutsEnabled = true`.
 - All money fields are integer cents plus an ISO currency code.
+- `Upload.objectKey` and `Upload.exif` are never serialised to clients; only processed `variants` keys and status fields are.
+- An `Upload` is only downloadable once `virusScanStatus = clean`.
+- Uploads still `pending_upload` or `uploaded` past `expiresAt` are abandoned and removed by the worker's cleanup job.

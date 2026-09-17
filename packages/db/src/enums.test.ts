@@ -4,8 +4,11 @@ import {
   DEVICE_PLATFORMS,
   NOTIFICATION_CHANNELS,
   SUPPORTED_LOCALES,
+  UPLOAD_PURPOSES,
+  UPLOAD_STATUSES,
   USER_ROLES,
   USER_STATUSES,
+  VIRUS_SCAN_STATUSES,
 } from '@photoo/shared';
 import { describe, expect, it } from 'vitest';
 import {
@@ -14,8 +17,11 @@ import {
   DevicePlatform,
   Locale,
   NotificationChannel,
+  UploadPurpose,
+  UploadStatus,
   UserRole,
   UserStatus,
+  VirusScanStatus,
 } from './index.js';
 
 describe('Prisma enums mirror packages/shared enums', () => {
@@ -45,5 +51,17 @@ describe('Prisma enums mirror packages/shared enums', () => {
 
   it('NotificationChannel matches NOTIFICATION_CHANNELS', () => {
     expect(Object.values(NotificationChannel).sort()).toEqual([...NOTIFICATION_CHANNELS].sort());
+  });
+
+  it('UploadPurpose matches UPLOAD_PURPOSES', () => {
+    expect(Object.values(UploadPurpose).sort()).toEqual([...UPLOAD_PURPOSES].sort());
+  });
+
+  it('UploadStatus matches UPLOAD_STATUSES', () => {
+    expect(Object.values(UploadStatus).sort()).toEqual([...UPLOAD_STATUSES].sort());
+  });
+
+  it('VirusScanStatus matches VIRUS_SCAN_STATUSES', () => {
+    expect(Object.values(VirusScanStatus).sort()).toEqual([...VIRUS_SCAN_STATUSES].sort());
   });
 });

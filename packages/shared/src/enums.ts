@@ -75,6 +75,18 @@ export const VIRUS_SCAN_STATUSES = ['pending', 'clean', 'infected', 'failed'] as
 
 export type VirusScanStatus = (typeof VIRUS_SCAN_STATUSES)[number];
 
+export const UPLOAD_STATUSES = [
+  'pending_upload',
+  'uploaded',
+  'scanning',
+  'clean',
+  'infected',
+  'failed',
+  'processed',
+] as const;
+
+export type UploadStatus = (typeof UPLOAD_STATUSES)[number];
+
 export const VERIFICATION_CASE_STATUSES = [
   'draft',
   'submitted',
