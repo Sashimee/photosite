@@ -1,14 +1,18 @@
+import { fileURLToPath } from 'node:url';
+
 import { withSentryConfig } from '@sentry/nextjs/config';
 import type { NextConfig } from 'next';
 import createNextIntlPlugin from 'next-intl/plugin';
 
-import './src/lib/env';
+import { env } from './src/lib/env';
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
+  outputFileTracingRoot: fileURLToPath(new URL('../..', import.meta.url)),
   headers() {
     return [
       {
@@ -30,6 +34,9 @@ const nextConfig: NextConfig = {
                 },
               ]
             : []),
+          ...(env.NEXT_PUBLIC_ALLOW_INDEXING
+            ? []
+            : [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }]),
         ],
       },
     ];

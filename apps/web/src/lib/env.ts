@@ -5,6 +5,11 @@ const EnvSchema = z.object({
   NEXT_PUBLIC_API_URL: z.url(),
   NEXT_PUBLIC_SENTRY_DSN: z.url().optional(),
   SENTRY_REQUIRED: z.enum(['true', 'false']).optional(),
+  NEXT_PUBLIC_ALLOW_INDEXING: z
+    .string()
+    .optional()
+    .default('false')
+    .transform((value) => value === 'true'),
 });
 
 function loadEnv() {

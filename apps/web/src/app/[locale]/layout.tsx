@@ -9,6 +9,8 @@ import { isLocale, SUPPORTED_LOCALES, type Locale } from '@photoo/shared';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { SkipLink } from '@/components/skip-link';
+import { env } from '@/lib/env';
+import { buildRobotsMetadata } from '@/lib/robots';
 import '@/styles/globals.css';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +34,7 @@ export async function generateMetadata({
   return {
     title: t('heroTitle'),
     description: t('heroSubtitle'),
+    robots: buildRobotsMetadata(env.NEXT_PUBLIC_ALLOW_INDEXING),
     alternates: {
       languages: Object.fromEntries(
         SUPPORTED_LOCALES.map((supported) => [supported, `/${supported}`]),
