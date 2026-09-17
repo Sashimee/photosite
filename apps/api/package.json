@@ -39,6 +39,7 @@
     "@photoo/config": "workspace:*",
     "@types/node": "24.13.5",
     "@types/nodemailer": "8.0.2",
+    "@vitest/coverage-v8": "5.0.1",
     "concurrently": "10.0.5",
     "eslint": "9.39.5",
     "typescript": "6.0.3",
