@@ -12,6 +12,7 @@ import './chat.js';
 import './verification.js';
 import './admin.js';
 import './gdpr.js';
+import './notifications.js';
 
 export const OPENAPI_INFO_VERSION = '0.1.0';
 

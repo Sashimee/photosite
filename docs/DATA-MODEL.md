@@ -56,7 +56,8 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 
 ## Platform
 
-- **Notification** – userId, type, payload (JSON), channels sent (email/push/in-app), readAt.
+- **Notification** – userId, type, payload (JSON), channels (email/push/in-app, chosen at creation after preferences), emailSentAt, pushSentAt (nullable, set by the worker's per-channel processor once delivered, so a retry never double-sends), readAt.
+- **NotificationPreference** – userId, type, channel, enabled. Unique on `(userId, type, channel)`; a missing row means the type/channel defaults to on. `in_app` can't be disabled (enforced by the API, not the schema).
 - **Report** – reporterId, targetType, targetId, reason, status, adminId, resolution.
 - **AuditLog** – actorId (user or admin or system), action, targetType, targetId, before (JSON), after (JSON), ip, occurredAt. Append-only.
 - **PlatformSetting** – key, value (JSON), updatedByAdminId. Holds fee percentage (default 5), auto-release days, feature flags.
@@ -76,3 +77,4 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 - `Quote.totalCents = subtotalCents` and both are non-negative, along with `platformFeeCents` (CHECK constraints); the platform fee is deducted from the photographer's payout at release, never added on top of what the client pays.
 - At most one `sent` Quote per `(requestId, photographerId)` (partial unique index), so concurrent quote sends can't both win.
 - `Quote.requestId IS NOT NULL OR Quote.productId IS NOT NULL` (CHECK constraint): every quote is either for a request or built from a product.
+- The `notify-sweep` job's query (`channels` wants a channel AND that channel's sent-at is still null AND `createdAt` older than the sweep window) is served by a partial index on rows where `emailSentAt IS NULL OR pushSentAt IS NULL`, since that predicate is implied by the per-channel condition for either channel; the query still filters `channels` and the specific sent-at column, but only against the already-narrow set of undelivered rows.
