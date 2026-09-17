@@ -1,10 +1,25 @@
 import { Global, Module } from '@nestjs/common';
 import { z } from 'zod';
 
-const EnvSchema = z.object({
+function optionalNonEmpty() {
+  return z
+    .string()
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined));
+}
+
+function optionalBoolean() {
+  return z
+    .string()
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === 'true'));
+}
+
+const BaseEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']),
   DATABASE_URL: z.url(),
   REDIS_URL: z.url(),
+  WEB_APP_URL: z.url(),
 
   HEALTH_PORT: z.coerce.number().int().positive().default(4100),
 
@@ -43,7 +58,62 @@ const EnvSchema = z.object({
     .transform((value) => value === 'true'),
   S3_PRIVATE_BUCKET: z.string().min(1),
   S3_PUBLIC_BUCKET: z.string().min(1),
+
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_SECURE: optionalBoolean(),
+  SMTP_USER: optionalNonEmpty(),
+  SMTP_PASSWORD: optionalNonEmpty(),
+  SMTP_FROM: z.email().optional(),
+
+  EXPO_ACCESS_TOKEN: optionalNonEmpty(),
+
+  WORKER_CONCURRENCY_EMAIL: z.coerce.number().int().positive().default(3),
+  WORKER_CONCURRENCY_NOTIFY: z.coerce.number().int().positive().default(3),
+  WORKER_CONCURRENCY_NOTIFY_SWEEP: z.coerce.number().int().positive().default(1),
+  WORKER_CONCURRENCY_PUSH_RECEIPTS: z.coerce.number().int().positive().default(1),
+  WORKER_CONCURRENCY_NOTIFICATIONS_CLEANUP: z.coerce.number().int().positive().default(1),
+  NOTIFY_SWEEP_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(5 * 60 * 1000),
+  PUSH_RECEIPTS_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(15 * 60 * 1000),
+  NOTIFICATIONS_CLEANUP_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(24 * 60 * 60 * 1000),
 });
+
+const EnvSchema = BaseEnvSchema.superRefine((value, ctx) => {
+  if (value.NODE_ENV !== 'production') {
+    return;
+  }
+  const required: (keyof typeof value)[] = [
+    'SMTP_HOST',
+    'SMTP_PORT',
+    'SMTP_SECURE',
+    'SMTP_USER',
+    'SMTP_PASSWORD',
+    'SMTP_FROM',
+  ];
+  for (const key of required) {
+    if (value[key] === undefined) {
+      ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required in production` });
+    }
+  }
+}).transform((value) => ({
+  ...value,
+  SMTP_HOST: value.SMTP_HOST ?? 'localhost',
+  SMTP_PORT: value.SMTP_PORT ?? 1025,
+  SMTP_SECURE: value.SMTP_SECURE ?? false,
+  SMTP_FROM: value.SMTP_FROM ?? 'dev@photoo.lu',
+}));
 
 export type Env = z.infer<typeof EnvSchema>;
 

@@ -5,6 +5,7 @@ const validEnv = {
   NODE_ENV: 'development',
   DATABASE_URL: 'postgresql://user:pass@127.0.0.1:5432/photoo',
   REDIS_URL: 'redis://127.0.0.1:6379',
+  WEB_APP_URL: 'http://localhost:3000',
   S3_ENDPOINT: 'http://127.0.0.1:9000',
   S3_REGION: 'eu-west-1',
   S3_ACCESS_KEY_ID: 'photoo_dev',
@@ -96,5 +97,34 @@ describe('loadEnv', () => {
 
   it('rejects an unsupported NODE_ENV value', () => {
     expect(() => loadEnv({ ...validEnv, NODE_ENV: 'staging' })).toThrow(/NODE_ENV/);
+  });
+
+  it('defaults SMTP settings to Mailpit outside production', () => {
+    const env = loadEnv(validEnv);
+    expect(env.SMTP_HOST).toBe('localhost');
+    expect(env.SMTP_PORT).toBe(1025);
+    expect(env.SMTP_SECURE).toBe(false);
+    expect(env.SMTP_FROM).toBe('dev@photoo.lu');
+    expect(env.SMTP_USER).toBeUndefined();
+    expect(env.SMTP_PASSWORD).toBeUndefined();
+  });
+
+  it('rejects production without explicit SMTP settings', () => {
+    expect(() => loadEnv({ ...validEnv, NODE_ENV: 'production' })).toThrow(/SMTP_HOST/);
+  });
+
+  it('accepts production with every SMTP variable set', () => {
+    const env = loadEnv({
+      ...validEnv,
+      NODE_ENV: 'production',
+      SMTP_HOST: 'smtp-relay.brevo.com',
+      SMTP_PORT: '587',
+      SMTP_SECURE: 'false',
+      SMTP_USER: 'apikey',
+      SMTP_PASSWORD: 'secret',
+      SMTP_FROM: 'no-reply@photoo.lu',
+    });
+    expect(env.SMTP_HOST).toBe('smtp-relay.brevo.com');
+    expect(env.SMTP_SECURE).toBe(false);
   });
 });

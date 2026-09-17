@@ -31,11 +31,7 @@ describe('loadEnv', () => {
     expect(env.WEB_ORIGINS).toEqual(['http://localhost:3000']);
     expect(env.NODE_ENV).toBe('development');
     expect(env.AUTH_ENCRYPTION_KEY).toBeInstanceOf(Buffer);
-    expect(env.SMTP_HOST).toBe('localhost');
-    expect(env.SMTP_PORT).toBe(1025);
-    expect(env.SMTP_FROM).toBe('dev@photoo.lu');
     expect(env.GOOGLE_CLIENT_ID).toBeUndefined();
-    expect(env.DEV_MAIL_WORKER).toBe(false);
     expect(env.TRUSTED_PROXIES).toEqual([]);
   });
 
@@ -45,13 +41,11 @@ describe('loadEnv', () => {
     expect(() => loadEnv(withoutNodeEnv)).toThrow(/NODE_ENV/);
   });
 
-  it('parses DEV_MAIL_WORKER=true and a comma-separated TRUSTED_PROXIES', () => {
+  it('parses a comma-separated TRUSTED_PROXIES', () => {
     const env = loadEnv({
       ...validEnv,
-      DEV_MAIL_WORKER: 'true',
       TRUSTED_PROXIES: '10.0.0.0/24, 192.168.1.1',
     });
-    expect(env.DEV_MAIL_WORKER).toBe(true);
     expect(env.TRUSTED_PROXIES).toEqual(['10.0.0.0/24', '192.168.1.1']);
   });
 

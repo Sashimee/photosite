@@ -920,6 +920,84 @@ describe('quotes integration', () => {
     });
   });
 
+  describe('notifications', () => {
+    it('notifies the client with quote_received when a quote is sent', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const request = await createRequestAs(client.token);
+      const photographer = await createPublishedPhotographer('notify-received');
+
+      const quote = (await sendQuote(photographer.token, request.id)).json<QuoteBody>();
+
+      const notification = await prisma.notification.findFirst({
+        where: { userId: client.id, type: 'quote_received' },
+      });
+      expect(notification).not.toBeNull();
+      expect((notification?.payload as { quoteId?: string } | null)?.quoteId).toBe(quote.id);
+    });
+
+    it('notifies the winning photographer with quote_accepted and the losing one with quote_declined', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const request = await createRequestAs(client.token);
+      const winner = await createPublishedPhotographer('notify-accepted');
+      const loser = await createPublishedPhotographer('notify-declined-sibling');
+
+      const winnerQuote = (await sendQuote(winner.token, request.id)).json<QuoteBody>();
+      const loserQuote = (await sendQuote(loser.token, request.id)).json<QuoteBody>();
+
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/quotes/${winnerQuote.id}/accept`,
+        headers: authHeaders(client.token),
+      });
+
+      const accepted = await prisma.notification.findFirst({
+        where: { userId: winner.userId, type: 'quote_accepted' },
+      });
+      expect((accepted?.payload as { quoteId?: string } | null)?.quoteId).toBe(winnerQuote.id);
+
+      const declined = await prisma.notification.findFirst({
+        where: { userId: loser.userId, type: 'quote_declined' },
+      });
+      expect((declined?.payload as { quoteId?: string } | null)?.quoteId).toBe(loserQuote.id);
+    });
+
+    it('notifies the photographer with quote_declined on an explicit decline', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const request = await createRequestAs(client.token);
+      const photographer = await createPublishedPhotographer('notify-decline');
+      const quote = (await sendQuote(photographer.token, request.id)).json<QuoteBody>();
+
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/quotes/${quote.id}/decline`,
+        headers: authHeaders(client.token),
+      });
+
+      const notification = await prisma.notification.findFirst({
+        where: { userId: photographer.userId, type: 'quote_declined' },
+      });
+      expect((notification?.payload as { quoteId?: string } | null)?.quoteId).toBe(quote.id);
+    });
+
+    it('notifies the client with quote_withdrawn when the photographer withdraws', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const request = await createRequestAs(client.token);
+      const photographer = await createPublishedPhotographer('notify-withdraw');
+      const quote = (await sendQuote(photographer.token, request.id)).json<QuoteBody>();
+
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/quotes/${quote.id}/withdraw`,
+        headers: authHeaders(photographer.token),
+      });
+
+      const notification = await prisma.notification.findFirst({
+        where: { userId: client.id, type: 'quote_withdrawn' },
+      });
+      expect((notification?.payload as { quoteId?: string } | null)?.quoteId).toBe(quote.id);
+    });
+  });
+
   describe('reads', () => {
     it('returns 404 for a third party reading a quote', async () => {
       const client = await signUpAndSignIn(['client']);

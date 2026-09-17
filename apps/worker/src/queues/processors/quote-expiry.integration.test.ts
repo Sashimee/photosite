@@ -10,6 +10,10 @@ function fakeLogger() {
   return { log: () => undefined, warn: () => undefined, error: () => undefined };
 }
 
+function notifyDeps(prisma: PrismaClient) {
+  return { prisma: { client: prisma }, notifyQueue: { add: () => Promise.resolve(undefined) } };
+}
+
 describe('createQuoteExpiryProcessor against a real database', () => {
   if (!testEnv) {
     it.skip('skipped: TEST_DATABASE_URL is not set', () => undefined);
@@ -224,6 +228,9 @@ describe('createQuoteExpiryProcessor against a real database', () => {
       where: { id: { in: [requestId, bookedRequestId, cancelledRequestId, deletedRequestId] } },
     });
     await prisma.photographerProfile.deleteMany({ where: { id: profileId } });
+    await prisma.notification.deleteMany({
+      where: { userId: { in: [clientId, photographerUserId] } },
+    });
     await prisma.user.deleteMany({ where: { id: { in: [clientId, photographerUserId] } } });
     await prisma.$disconnect();
   });
@@ -231,6 +238,7 @@ describe('createQuoteExpiryProcessor against a real database', () => {
   it('expires the quote, closes the request, and is idempotent on a second run', async () => {
     const processor = createQuoteExpiryProcessor({
       prisma: { client: prisma },
+      notify: notifyDeps(prisma),
       logger: fakeLogger() as never,
     });
 
@@ -243,6 +251,15 @@ describe('createQuoteExpiryProcessor against a real database', () => {
     expect(quoteAfterFirstRun.status).toBe('expired');
     expect(requestAfterFirstRun.status).toBe('closed');
 
+    const notifications = await prisma.notification.findMany({
+      where: { userId: { in: [clientId, photographerUserId] }, type: 'quote_expired' },
+    });
+    const forThisQuote = notifications.filter(
+      (n) => (n.payload as { quoteId?: string }).quoteId === quoteId,
+    );
+    expect(forThisQuote).toHaveLength(2);
+    expect(forThisQuote.map((n) => n.userId).sort()).toEqual([clientId, photographerUserId].sort());
+
     await processor(undefined as never);
 
     const quoteAfterSecondRun = await prisma.quote.findUniqueOrThrow({ where: { id: quoteId } });
@@ -251,11 +268,21 @@ describe('createQuoteExpiryProcessor against a real database', () => {
     });
     expect(quoteAfterSecondRun.status).toBe('expired');
     expect(requestAfterSecondRun.status).toBe('closed');
+
+    const notificationsAfterSecondRun = await prisma.notification.findMany({
+      where: { userId: { in: [clientId, photographerUserId] }, type: 'quote_expired' },
+    });
+    expect(
+      notificationsAfterSecondRun.filter(
+        (n) => (n.payload as { quoteId?: string }).quoteId === quoteId,
+      ),
+    ).toHaveLength(2);
   });
 
   it('expires a sent quote whose request is already cancelled, without touching the request', async () => {
     const processor = createQuoteExpiryProcessor({
       prisma: { client: prisma },
+      notify: notifyDeps(prisma),
       logger: fakeLogger() as never,
     });
 
@@ -272,6 +299,7 @@ describe('createQuoteExpiryProcessor against a real database', () => {
   it('leaves a booked request and its accepted quote alone', async () => {
     const processor = createQuoteExpiryProcessor({
       prisma: { client: prisma },
+      notify: notifyDeps(prisma),
       logger: fakeLogger() as never,
     });
 
@@ -286,6 +314,7 @@ describe('createQuoteExpiryProcessor against a real database', () => {
   it('leaves a soft-deleted, expired request open instead of closing it', async () => {
     const processor = createQuoteExpiryProcessor({
       prisma: { client: prisma },
+      notify: notifyDeps(prisma),
       logger: fakeLogger() as never,
     });
 

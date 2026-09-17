@@ -93,8 +93,6 @@ const EnvSchema = z
     AUTH_SECRET: z.string().min(32, 'must be at least 32 characters'),
     AUTH_ENCRYPTION_KEY: AuthEncryptionKeySchema,
 
-    DEV_MAIL_WORKER: BooleanFlagSchema,
-
     GOOGLE_CLIENT_ID: optionalNonEmpty(),
     GOOGLE_CLIENT_SECRET: optionalNonEmpty(),
     APPLE_CLIENT_ID: optionalNonEmpty(),
@@ -103,10 +101,6 @@ const EnvSchema = z
     FACEBOOK_CLIENT_SECRET: optionalNonEmpty(),
     MICROSOFT_CLIENT_ID: optionalNonEmpty(),
     MICROSOFT_CLIENT_SECRET: optionalNonEmpty(),
-
-    SMTP_HOST: z.string().min(1).default('localhost'),
-    SMTP_PORT: z.coerce.number().int().positive().default(1025),
-    SMTP_FROM: z.email().default('dev@photoo.lu'),
 
     S3_ENDPOINT: z.url(),
     S3_REGION: z.string().min(1),
