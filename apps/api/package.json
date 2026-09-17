@@ -20,9 +20,12 @@
     "@nestjs/common": "12.0.3",
     "@nestjs/core": "12.0.3",
     "@nestjs/platform-fastify": "12.0.3",
+    "@nestjs/platform-socket.io": "12.0.3",
+    "@nestjs/websockets": "12.0.3",
     "@node-rs/argon2": "2.2.1",
     "@photoo/db": "workspace:*",
     "@photoo/shared": "workspace:*",
+    "@socket.io/redis-adapter": "8.3.0",
     "better-auth": "1.7.5",
     "bullmq": "6.3.6",
     "dotenv": "17.4.2",
@@ -33,6 +36,7 @@
     "pino-http": "11.0.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
+    "socket.io": "4.8.3",
     "zod": "4.6.5"
   },
   "devDependencies": {
@@ -43,6 +47,7 @@
     "@vitest/coverage-v8": "5.0.1",
     "concurrently": "10.0.5",
     "eslint": "9.39.5",
+    "socket.io-client": "4.8.3",
     "typescript": "6.0.3",
     "vitest": "5.0.1"
   }
