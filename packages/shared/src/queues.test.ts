@@ -10,6 +10,8 @@ import {
   PortfolioImageCleanupJobSchema,
   QUEUE_JOB_SCHEMAS,
   QUEUE_NAMES,
+  QUOTE_EXPIRY_QUEUE_NAME,
+  QuoteExpiryJobSchema,
   UPLOADS_CLEANUP_QUEUE_NAME,
   UploadsCleanupJobSchema,
 } from './queues.js';
@@ -24,6 +26,7 @@ describe('QUEUE_NAMES', () => {
       'image-process',
       'uploads-cleanup',
       'portfolio-image-cleanup',
+      'quote-expiry',
     ]);
     expect(new Set(QUEUE_NAMES).size).toBe(QUEUE_NAMES.length);
   });
@@ -35,6 +38,7 @@ describe('QUEUE_NAMES', () => {
       IMAGE_PROCESS_QUEUE_NAME,
       UPLOADS_CLEANUP_QUEUE_NAME,
       PORTFOLIO_IMAGE_CLEANUP_QUEUE_NAME,
+      QUOTE_EXPIRY_QUEUE_NAME,
     ]).toEqual(QUEUE_NAMES);
   });
 });
@@ -163,6 +167,16 @@ describe('portfolio-image-cleanup job schema', () => {
         extra: 'nope',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('quote-expiry job schema', () => {
+  it('accepts an empty payload', () => {
+    expect(QuoteExpiryJobSchema.safeParse({}).success).toBe(true);
+  });
+
+  it('rejects unknown extra keys', () => {
+    expect(QuoteExpiryJobSchema.safeParse({ uploadId: VALID_UPLOAD_ID }).success).toBe(false);
   });
 });
 

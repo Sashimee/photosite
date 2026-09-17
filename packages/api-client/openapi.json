@@ -1107,10 +1107,10 @@
             "$ref": "#/components/schemas/Address"
           },
           "budgetMin": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/RequestBudgetMoney"
           },
           "budgetMax": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/RequestBudgetMoney"
           },
           "usage": {
             "type": "string",
@@ -1198,6 +1198,27 @@
         ],
         "additionalProperties": false
       },
+      "RequestBudgetMoney": {
+        "type": "object",
+        "properties": {
+          "amountCents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 99999999
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "ISO 4217 currency code",
+            "example": "EUR"
+          }
+        },
+        "required": [
+          "amountCents",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
       "RequestSummary": {
         "type": "object",
         "properties": {
@@ -1253,10 +1274,10 @@
             "$ref": "#/components/schemas/LatLng"
           },
           "budgetMin": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/RequestBudgetMoney"
           },
           "budgetMax": {
-            "$ref": "#/components/schemas/Money"
+            "$ref": "#/components/schemas/RequestBudgetMoney"
           },
           "usage": {
             "type": "string",
@@ -5966,10 +5987,10 @@
                     "$ref": "#/components/schemas/Address"
                   },
                   "budgetMin": {
-                    "$ref": "#/components/schemas/Money"
+                    "$ref": "#/components/schemas/RequestBudgetMoney"
                   },
                   "budgetMax": {
-                    "$ref": "#/components/schemas/Money"
+                    "$ref": "#/components/schemas/RequestBudgetMoney"
                   },
                   "usage": {
                     "type": "string",
@@ -6931,16 +6952,6 @@
           },
           "401": {
             "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {

@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   FILE_SCAN_QUEUE_NAME,
   IMAGE_PROCESS_QUEUE_NAME,
+  QUOTE_EXPIRY_QUEUE_NAME,
   UPLOADS_CLEANUP_QUEUE_NAME,
 } from '@photoo/shared';
 import { Queue, Worker } from 'bullmq';
@@ -15,10 +16,12 @@ import { StorageService } from '../storage/storage.service.js';
 import { shutdownWorkers } from './graceful-shutdown.js';
 import { createFileScanProcessor } from './processors/file-scan.processor.js';
 import { createImageProcessProcessor } from './processors/image-process.processor.js';
+import { createQuoteExpiryProcessor } from './processors/quote-expiry.processor.js';
 import { createUploadsCleanupProcessor } from './processors/uploads-cleanup.processor.js';
 
 const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 30_000;
 const UPLOADS_CLEANUP_SCHEDULER_ID = 'uploads-cleanup';
+const QUOTE_EXPIRY_SCHEDULER_ID = 'quote-expiry';
 
 @Injectable()
 export class QueueWorkersService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -50,7 +53,10 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
     const uploadsCleanupQueue = new Queue(UPLOADS_CLEANUP_QUEUE_NAME, {
       connection: this.newConnection(),
     });
-    this.queues.push(imageProcessQueue, uploadsCleanupQueue);
+    const quoteExpiryQueue = new Queue(QUOTE_EXPIRY_QUEUE_NAME, {
+      connection: this.newConnection(),
+    });
+    this.queues.push(imageProcessQueue, uploadsCleanupQueue, quoteExpiryQueue);
 
     // Redis being unreachable at boot must not crash the whole process (the
     // health server still needs to come up and report /ready as down): the
@@ -63,6 +69,16 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       );
     } catch (error) {
       this.logger.warn({ err: error }, 'queue-workers: failed to schedule uploads-cleanup');
+    }
+
+    try {
+      await quoteExpiryQueue.upsertJobScheduler(
+        QUOTE_EXPIRY_SCHEDULER_ID,
+        { every: this.config.QUOTE_EXPIRY_INTERVAL_MS },
+        { name: 'sweep', data: {} },
+      );
+    } catch (error) {
+      this.logger.warn({ err: error }, 'queue-workers: failed to schedule quote-expiry');
     }
 
     const fileScanWorker = new Worker(
@@ -110,10 +126,23 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       },
     );
 
+    const quoteExpiryWorker = new Worker(
+      QUOTE_EXPIRY_QUEUE_NAME,
+      createQuoteExpiryProcessor({
+        prisma: this.prisma,
+        logger: this.logger,
+      }),
+      {
+        connection: this.newConnection(),
+        concurrency: this.config.WORKER_CONCURRENCY_QUOTE_EXPIRY,
+      },
+    );
+
     for (const [name, worker] of [
       [FILE_SCAN_QUEUE_NAME, fileScanWorker],
       [IMAGE_PROCESS_QUEUE_NAME, imageProcessWorker],
       [UPLOADS_CLEANUP_QUEUE_NAME, uploadsCleanupWorker],
+      [QUOTE_EXPIRY_QUEUE_NAME, quoteExpiryWorker],
     ] as const) {
       worker.on('failed', (job, err) => {
         this.logger.error({ err, jobId: job?.id, queue: name }, 'worker: job failed');
