@@ -31,7 +31,7 @@ interface EnrollmentData {
 export function TwoFactorPanel({ twoFactorEnabled }: { twoFactorEnabled: boolean }) {
   const t = useTranslations('web.account.security');
   const tErrors = useTranslations('web.auth');
-  const tValidation = useTranslations('web.auth');
+  const tValidation = useTranslations('common.validation');
   const router = useRouter();
 
   const [stage, setStage] = useState<Stage>(twoFactorEnabled ? 'enabled' : 'idle');

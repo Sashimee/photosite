@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { hash } from '@node-rs/argon2';
 import { quoteTotals, type UserRole } from '@photoo/shared';
 import { createS3Client, putPublicObject } from '@photoo/shared/storage';
@@ -18,38 +19,49 @@ function getDatabaseUrl(): string {
 
 const ACCEPTED_DOCUMENT_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
 
+// `label` is `LocalizedTextSchema`, but `description` on `RequiredDocumentSchema`
+// (packages/shared/src/contract/verification.ts) is a plain nullable string,
+// not localized text.
 export const LUXEMBOURG_REQUIRED_DOCUMENTS = [
   {
     key: 'autorisation_etablissement',
     label: { en: "Business establishment authorization (autorisation d'établissement)" },
-    description: {
-      en: "Luxembourg permit required to operate a commercial activity ('autorisation d'établissement').",
-    },
+    description:
+      "Luxembourg permit required to operate a commercial activity ('autorisation d'établissement').",
     acceptedMimeTypes: ACCEPTED_DOCUMENT_MIME_TYPES,
   },
   {
     key: 'vat_number',
     label: { en: 'VAT (TVA) registration certificate' },
-    description: { en: 'Proof of Luxembourg VAT (TVA) registration number.' },
+    description: 'Proof of Luxembourg VAT (TVA) registration number.',
     acceptedMimeTypes: ACCEPTED_DOCUMENT_MIME_TYPES,
   },
   {
     key: 'id_document',
     label: { en: 'Government-issued ID document' },
-    description: { en: 'Passport or national ID card of the account holder.' },
+    description: 'Passport or national ID card of the account holder.',
     acceptedMimeTypes: ACCEPTED_DOCUMENT_MIME_TYPES,
   },
   {
     key: 'proof_of_address',
     label: { en: 'Proof of address' },
-    description: { en: 'A utility bill or bank statement issued within the last 3 months.' },
+    description: 'A utility bill or bank statement issued within the last 3 months.',
     acceptedMimeTypes: ACCEPTED_DOCUMENT_MIME_TYPES,
   },
 ];
 
+// Backfills `requiredDocuments` on an existing row so a DB seeded before its
+// `description` field matched `RequiredDocumentSchema` (a plain string, not
+// localized text) gets corrected on the next seed run.
 async function seedCountry(prisma: ReturnType<typeof createPrismaClient>): Promise<void> {
   const existing = await prisma.country.findUnique({ where: { code: 'LU' } });
   if (existing) {
+    if (!isDeepStrictEqual(existing.requiredDocuments, LUXEMBOURG_REQUIRED_DOCUMENTS)) {
+      await prisma.country.update({
+        where: { code: 'LU' },
+        data: { requiredDocuments: LUXEMBOURG_REQUIRED_DOCUMENTS },
+      });
+    }
     return;
   }
   await prisma.country.create({
@@ -578,10 +590,19 @@ export const SEED_REQUEST_TITLE = 'Wedding day coverage in Luxembourg City';
 
 const SEED_REQUEST_LOCATION = { lat: 49.6116, lng: 6.1319 };
 
+const SEED_REQUEST_ADDRESS = {
+  line1: '1 Place Guillaume II',
+  city: 'Luxembourg City',
+  postalCode: 'L-1648',
+  countryCode: 'LU',
+};
+
 // One open request from the seeded client, quoted by one seeded demo
 // photographer, so 1A.5b's integration tests have a real request/quote pair
 // to read without creating their own fixtures. Idempotent: keyed on
-// (clientId, title), which nothing else in the seed produces twice.
+// (clientId, title), which nothing else in the seed produces twice. Backfills
+// `address` on an existing row so a DB seeded before the shape matched
+// `AddressSchema` (issue #92) gets corrected on the next seed run.
 // `feePercent` and the line item price come from PlatformSetting and the
 // photographer's own seeded product, never hardcoded totals, so this stays
 // correct if either changes.
@@ -600,6 +621,12 @@ export async function seedRequestAndQuote(
     where: { clientId: client.id, title: SEED_REQUEST_TITLE },
   });
   if (existingRequest) {
+    if (!isDeepStrictEqual(existingRequest.address, SEED_REQUEST_ADDRESS)) {
+      await prisma.request.update({
+        where: { id: existingRequest.id },
+        data: { address: SEED_REQUEST_ADDRESS },
+      });
+    }
     return;
   }
 
@@ -616,7 +643,7 @@ export async function seedRequestAndQuote(
       description: 'Looking for full-day wedding coverage in Luxembourg City.',
       eventDate,
       dateFlexible: false,
-      address: { street: '1 Place Guillaume II', city: 'Luxembourg City', postalCode: 'L-1648' },
+      address: SEED_REQUEST_ADDRESS,
       city: 'Luxembourg City',
       countryCode: 'LU',
       budgetMinCents: 200000,

@@ -1,3 +1,4 @@
+import { AddressSchema } from '@photoo/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPrismaClient } from './index.js';
 import {
@@ -137,7 +138,7 @@ describe('requests and quotes schema', () => {
       description: 'Fixture request for requests-quotes.test.ts.',
       eventDate,
       dateFlexible: false,
-      address: { street: 'Fixture street', city: 'Reykjavik', postalCode: '101' },
+      address: { line1: 'Fixture street', city: 'Reykjavik', postalCode: '101', countryCode: 'LU' },
       city: 'Reykjavik',
       countryCode: 'LU',
       budgetMinCents: 100_00,
@@ -358,6 +359,49 @@ describe('requests and quotes schema', () => {
         }),
       };
       expect(countAfterSecondRun).toEqual(countAfterFirstRun);
+    });
+
+    // Regression test for #92: the seed used to write `Request.address` as
+    // `{street, city, postalCode}`, which fails `AddressSchema` and made
+    // `GET /v1/requests/mine` throw a ZodError in `mapFullRequest`.
+    it('seeds a request address that parses with AddressSchema', async () => {
+      await seedRequestAndQuote(prisma);
+
+      const seedClient = await prisma.user.findUniqueOrThrow({
+        where: { email: SEED_REQUEST_CLIENT_EMAIL },
+      });
+      const request = await prisma.request.findFirstOrThrow({
+        where: { clientId: seedClient.id, title: SEED_REQUEST_TITLE },
+      });
+
+      expect(() => AddressSchema.parse(request.address)).not.toThrow();
+    });
+
+    it('backfills an existing seeded request row whose address predates AddressSchema', async () => {
+      await seedRequestAndQuote(prisma);
+
+      const seedClient = await prisma.user.findUniqueOrThrow({
+        where: { email: SEED_REQUEST_CLIENT_EMAIL },
+      });
+      const seeded = await prisma.request.findFirstOrThrow({
+        where: { clientId: seedClient.id, title: SEED_REQUEST_TITLE },
+      });
+
+      await prisma.request.update({
+        where: { id: seeded.id },
+        data: {
+          address: {
+            street: '1 Place Guillaume II',
+            city: 'Luxembourg City',
+            postalCode: 'L-1648',
+          },
+        },
+      });
+
+      await seedRequestAndQuote(prisma);
+
+      const backfilled = await prisma.request.findUniqueOrThrow({ where: { id: seeded.id } });
+      expect(() => AddressSchema.parse(backfilled.address)).not.toThrow();
     });
   });
 

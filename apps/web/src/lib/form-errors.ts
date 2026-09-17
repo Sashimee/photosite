@@ -15,7 +15,8 @@ export interface FieldErrorLike {
 
 // Never renders a zod issue's own `.message` (hard-coded English in
 // packages/shared); translates by issue type instead so every string shown
-// to the user comes from packages/i18n.
+// to the user comes from packages/i18n. `t` is expected to be scoped to
+// `common.validation`.
 export function fieldErrorMessage(
   t: TranslateFn,
   error: FieldErrorLike | undefined,
@@ -24,5 +25,5 @@ export function fieldErrorMessage(
     return undefined;
   }
   const key = (error.type ? ISSUE_TYPE_KEYS[error.type] : undefined) ?? 'invalid';
-  return t(`validation.${key}`);
+  return t(key);
 }

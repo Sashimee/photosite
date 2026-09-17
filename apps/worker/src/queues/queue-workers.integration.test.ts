@@ -11,6 +11,17 @@ import { TEST_ENV } from '../testing/test-env.js';
 
 const testEnv = requireIntegrationEnv(['REDIS_URL', 'TEST_DATABASE_URL']);
 
+// db 0 is shared with apps/api's integration suites, which enqueue real
+// "file-scan" jobs there and run concurrently with this one; this real
+// QueueWorkersService consumer would otherwise swallow those jobs.
+const ISOLATED_REDIS_DB = '13';
+
+function isolateRedisDb(url: string): string {
+  const isolated = new URL(url);
+  isolated.pathname = `/${ISOLATED_REDIS_DB}`;
+  return isolated.toString();
+}
+
 describe('QueueWorkersService against a real Redis', () => {
   if (!testEnv) {
     it.skip('fails a malformed job with a logged reason (skipped: REDIS_URL or TEST_DATABASE_URL is not set)', () =>
@@ -24,11 +35,12 @@ describe('QueueWorkersService against a real Redis', () => {
   let queue: Queue;
 
   beforeAll(async () => {
+    const isolatedRedisUrl = isolateRedisDb(testEnv.REDIS_URL);
     moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(APP_CONFIG)
       .useValue({
         ...TEST_ENV,
-        REDIS_URL: testEnv.REDIS_URL,
+        REDIS_URL: isolatedRedisUrl,
         DATABASE_URL: testEnv.TEST_DATABASE_URL,
         HEALTH_PORT: 4102,
       })
@@ -37,7 +49,7 @@ describe('QueueWorkersService against a real Redis', () => {
       .compile();
     await moduleRef.init();
 
-    producerConnection = new Redis(testEnv.REDIS_URL, { maxRetriesPerRequest: null });
+    producerConnection = new Redis(isolatedRedisUrl, { maxRetriesPerRequest: null });
     queue = new Queue('file-scan', { connection: producerConnection });
   });
 
