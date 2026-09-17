@@ -180,6 +180,7 @@ model User {
   devices                 Device[]
   consentRecords          ConsentRecord[]
   notifications           Notification[]
+  notificationPreferences NotificationPreference[]
   updatedPlatformSettings PlatformSetting[]
   uploads                 Upload[]
   photographerProfile     PhotographerProfile?
@@ -311,18 +312,40 @@ model AuditLog {
   @@index([occurredAt])
 }
 
+// `emailSentAt`/`pushSentAt` are set by the worker's per-channel processor
+// once delivered, so a retry on the `notify` job never double-sends. The
+// `notify-sweep` job re-enqueues rows still pending a wanted channel past
+// its window; see the partial index note in DATA-MODEL.md.
 model Notification {
-  id        String                @id @default(uuid(7))
-  userId    String
-  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String
-  payload   Json
-  channels  NotificationChannel[]
-  readAt    DateTime?
-  createdAt DateTime              @default(now())
-  updatedAt DateTime              @updatedAt
+  id          String                @id @default(uuid(7))
+  userId      String
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String
+  payload     Json
+  channels    NotificationChannel[]
+  emailSentAt DateTime?
+  pushSentAt  DateTime?
+  readAt      DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
 
   @@index([userId, readAt])
+  @@index([userId, createdAt])
+}
+
+// A missing row for a `(userId, type, channel)` means the default: on.
+// `in_app` can't be disabled (enforced by the API, not here).
+model NotificationPreference {
+  id        String              @id @default(uuid(7))
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  channel   NotificationChannel
+  enabled   Boolean
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@unique([userId, type, channel])
 }
 
 // Generic upload record referenced by id from Attachment, VerificationDocument,
