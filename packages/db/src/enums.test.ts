@@ -1,6 +1,7 @@
 import {
   AUDIT_ACTOR_TYPES,
   CONSENT_PURPOSES,
+  CONVERSATION_TYPES,
   DEVICE_PLATFORMS,
   LICENCE_USAGES,
   NOTIFICATION_CHANNELS,
@@ -20,6 +21,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AuditActorType,
   ConsentPurpose,
+  ConversationType,
   DevicePlatform,
   LicenceUsage,
   Locale,
@@ -105,5 +107,9 @@ describe('Prisma enums mirror packages/shared enums', () => {
 
   it('QuoteStatus matches QUOTE_STATUSES', () => {
     expect(Object.values(QuoteStatus).sort()).toEqual([...QUOTE_STATUSES].sort());
+  });
+
+  it('ConversationType matches CONVERSATION_TYPES', () => {
+    expect(Object.values(ConversationType).sort()).toEqual([...CONVERSATION_TYPES].sort());
   });
 });

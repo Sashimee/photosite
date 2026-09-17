@@ -44,7 +44,9 @@ const nextConfig: NextConfig = {
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+            // geolocation=(self): the "near me" search filter reads it on
+            // click only, never automatically (docs/steps/1B.4-discovery.md).
+            value: 'camera=(), microphone=(), geolocation=(self), interest-cohort=()',
           },
           ...(isProduction
             ? [

@@ -316,6 +316,48 @@
         "backHome": "Back to home"
       }
     },
+    "search": {
+      "metaTitle": "Find a photographer",
+      "metaDescription": "Search photographers in Luxembourg by city, category, language and price.",
+      "title": "Find a photographer",
+      "intro": "Browse verified photographer profiles, compare portfolios and prices, and request a quote directly.",
+      "empty": "No photographers match your filters.",
+      "clearFilters": "Clear filters",
+      "loadMore": "Load more",
+      "filters": {
+        "formLabel": "Search filters",
+        "cityLabel": "City",
+        "categoryLabel": "Category",
+        "allCategories": "All categories",
+        "languageLabel": "Language",
+        "allLanguages": "Any language",
+        "priceMinLabel": "Min price",
+        "priceMaxLabel": "Max price",
+        "submit": "Search",
+        "nearMe": "Near me",
+        "nearMeError": "We couldn't get your location. Try searching by city instead."
+      }
+    },
+    "landing": {
+      "intro": "Browse verified photographer profiles, compare portfolios and prices, and request a quote directly.",
+      "empty": "No photographers found here yet.",
+      "topCitiesHeading": "Browse by city",
+      "categoriesHeading": "Browse by category",
+      "countryMetaTitle": "Photographers in {place}",
+      "countryMetaDescription": "Find and book verified photographers in {place}. Compare portfolios, prices and reviews.",
+      "countryHeading": "{count, plural, one {# photographer} other {# photographers}} in {place}",
+      "cityMetaTitle": "Photographers in {place}",
+      "cityMetaDescription": "Find and book verified photographers in {place}. Compare portfolios, prices and reviews.",
+      "cityHeading": "{count, plural, one {# photographer} other {# photographers}} in {place}",
+      "categoryMetaTitle": "{category} photographers in {place}",
+      "categoryMetaDescription": "Find and book verified {category} photographers in {place}. Compare portfolios, prices and reviews.",
+      "categoryHeading": "{count, plural, one {# {category} photographer} other {# {category} photographers}} in {place}",
+      "notFound": {
+        "title": "Nothing here yet",
+        "description": "This page doesn't exist, or there's no content for it yet.",
+        "backToSearch": "Back to search"
+      }
+    },
     "requests": {
       "placeholder": {
         "title": "Requests are coming soon",

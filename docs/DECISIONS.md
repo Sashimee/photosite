@@ -36,3 +36,4 @@ Decisions taken with Alex on 2026-09-16 before any code was written. Change a de
 | O3 | Auto-release delay | Days after delivery before escrow auto-releases (proposal: 7) | Phase 1, payments |
 | O4 | AI detection vendor | Hive vs Sightengine for AI-generated detection; TinEye vs Google Vision Web Detection for reverse search | Phase 1, provenance |
 | O5 | Brand / design | Logo, colours, typography for web, app and store listings | Phase 1, web design system |
+| O6 | Maps and geocoding | Tile provider for discovery maps and a geocoding API for request addresses (EU-hosted options: MapTiler, Stadia, self-hosted Nominatim/Photon). Meanwhile no map, and request coordinates come from a known city centroid or browser geolocation (see docs/steps/1B.5-request-flow.md) | Phase 1, discovery and requests |

@@ -674,6 +674,63 @@ export async function seedRequestAndQuote(
   });
 }
 
+// One `quote` conversation for the seeded request/quote, between the
+// seeded client and the photographer's user, with two messages, so 1A.6b's
+// integration tests have a real conversation to read without creating their
+// own fixtures. Idempotent on `(type, subjectId)`, the same unique index
+// that makes `QuotesService` idempotent when it creates this conversation
+// in the quote's transaction (docs/steps/1A.6-chat.md).
+export async function seedQuoteConversation(
+  prisma: ReturnType<typeof createPrismaClient>,
+): Promise<void> {
+  const client = await prisma.user.findUniqueOrThrow({
+    where: { email: SEED_REQUEST_CLIENT_EMAIL },
+  });
+  const photographer = await prisma.photographerProfile.findUniqueOrThrow({
+    where: { slug: SEED_REQUEST_PHOTOGRAPHER_SLUG },
+  });
+  const quote = await prisma.quote.findFirstOrThrow({
+    where: { clientId: client.id, photographerId: photographer.id },
+  });
+
+  const existingConversation = await prisma.conversation.findUnique({
+    where: { type_subjectId: { type: 'quote', subjectId: quote.id } },
+  });
+  if (existingConversation) {
+    return;
+  }
+
+  const conversation = await prisma.conversation.create({
+    data: {
+      type: 'quote',
+      subjectId: quote.id,
+      participants: {
+        create: [{ userId: client.id }, { userId: photographer.userId }],
+      },
+    },
+  });
+
+  await prisma.message.create({
+    data: {
+      conversationId: conversation.id,
+      senderId: client.id,
+      body: 'Hi! Thanks for the quote, does the price include travel to the ceremony venue?',
+    },
+  });
+  const secondMessage = await prisma.message.create({
+    data: {
+      conversationId: conversation.id,
+      senderId: photographer.userId,
+      body: 'Yes, travel within Luxembourg City is included. Let me know if you have any other questions.',
+    },
+  });
+
+  await prisma.conversation.update({
+    where: { id: conversation.id },
+    data: { lastMessageAt: secondMessage.createdAt },
+  });
+}
+
 export async function seedDatabase(prisma: ReturnType<typeof createPrismaClient>): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('db seed: refusing to run with NODE_ENV=production');
@@ -684,6 +741,7 @@ export async function seedDatabase(prisma: ReturnType<typeof createPrismaClient>
   await seedPlatformSetting(prisma, 'feePercent', 5);
   await seedPlatformSetting(prisma, 'autoReleaseDays', 7);
   await seedRequestAndQuote(prisma);
+  await seedQuoteConversation(prisma);
 }
 
 async function main(): Promise<void> {

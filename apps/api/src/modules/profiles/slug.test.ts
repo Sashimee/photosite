@@ -51,4 +51,22 @@ describe('generateUniqueSlug', () => {
     const prisma = fakePrisma([]);
     expect(await generateUniqueSlug(prisma, '日本語')).toBe('photographer');
   });
+
+  // A 2-letter slug would be indistinguishable from a country landing route
+  // segment (docs/steps/1B.4-discovery.md); no display name, however short
+  // or collision-prone, may ever produce one.
+  it.each(['a', 'ab', 'lu', 'FR', '1', '12', '-', '  ab  ', 'a1', '日本'])(
+    'never produces a 2-character slug for %j',
+    async (displayName) => {
+      const prisma = fakePrisma([]);
+      const slug = await generateUniqueSlug(prisma, displayName);
+      expect(slug.length).not.toBe(2);
+    },
+  );
+
+  it('never produces a 2-character slug across suffix collisions', async () => {
+    const prisma = fakePrisma(['lu', 'lu-2', 'lu-3']);
+    const slug = await generateUniqueSlug(prisma, 'lu');
+    expect(slug.length).not.toBe(2);
+  });
 });

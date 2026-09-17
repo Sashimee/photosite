@@ -71,6 +71,7 @@ export class ProfilesService {
       lng: query.lng,
       radiusKm: query.radiusKm,
       city: query.city,
+      countryCode: query.countryCode,
       category: query.category,
       language: query.language,
       priceMinCents: query.priceMinCents,
