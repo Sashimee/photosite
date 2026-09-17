@@ -12,10 +12,10 @@ function getDatabaseUrl(): string {
 }
 
 function getShadowDatabaseUrl(): string {
-  const url = process.env.TEST_DATABASE_URL;
+  const url = process.env.SHADOW_DATABASE_URL;
   if (!url) {
     throw new Error(
-      'TEST_DATABASE_URL is not set. Copy packages/db/.env.example to packages/db/.env and set it. It is reused as the migration shadow database.',
+      'SHADOW_DATABASE_URL is not set. Copy packages/db/.env.example to packages/db/.env and set it. Prisma wipes this database when generating migrations, so it must never be the dev or test database.',
     );
   }
   return url;
