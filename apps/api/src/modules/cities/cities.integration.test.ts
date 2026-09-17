@@ -20,6 +20,7 @@ interface CityBody {
   name: string;
   countryCode: string;
   photographerCount: number;
+  location: { lat: number; lng: number };
 }
 
 function uniqueEmail(label: string): string {
@@ -45,6 +46,8 @@ describe('cities integration', () => {
     city: string;
     countryCode: string;
     isPublished: boolean;
+    location?: { lat: number; lng: number };
+    deleted?: boolean;
   }): Promise<void> {
     const user = await prisma.user.create({
       data: {
@@ -59,7 +62,7 @@ describe('cities integration', () => {
     });
     createdUserIds.push(user.id);
 
-    await prisma.photographerProfile.create({
+    const profile = await prisma.photographerProfile.create({
       data: {
         userId: user.id,
         slug: `fx-cities-${spec.label}-${RUN_ID}`,
@@ -71,8 +74,16 @@ describe('cities integration', () => {
         city: spec.city,
         countryCode: spec.countryCode,
         isPublished: spec.isPublished,
+        deletedAt: spec.deleted === true ? new Date() : null,
       },
     });
+
+    const location = spec.location ?? { lat: 49.61, lng: 6.13 };
+    await prisma.$executeRaw`
+      UPDATE "PhotographerProfile"
+      SET location = ST_SetSRID(ST_MakePoint(${location.lng}, ${location.lat}), 4326)::geography
+      WHERE id = ${profile.id}
+    `;
   }
 
   async function cleanup(): Promise<void> {
@@ -93,6 +104,8 @@ describe('cities integration', () => {
   const limitA = `Fxcitylimit-a-${RUN_ID}`;
   const limitB = `Fxcitylimit-b-${RUN_ID}`;
   const limitC = `Fxcitylimit-c-${RUN_ID}`;
+  const centroidCity = `Fxcitycentroid-${RUN_ID}`;
+  const excludedCity = `Fxcityexcluded-${RUN_ID}`;
 
   beforeAll(async () => {
     app = await createTestApp({
@@ -167,6 +180,49 @@ describe('cities integration', () => {
       city: limitC,
       countryCode: 'LU',
       isPublished: true,
+    });
+    await createFixtureProfile({
+      label: 'centroid-a',
+      city: centroidCity,
+      countryCode: 'LU',
+      isPublished: true,
+      location: { lat: 49.61, lng: 6.1 },
+    });
+    await createFixtureProfile({
+      label: 'centroid-b',
+      city: centroidCity,
+      countryCode: 'LU',
+      isPublished: true,
+      location: { lat: 49.62, lng: 6.11 },
+    });
+    await createFixtureProfile({
+      label: 'centroid-c',
+      city: centroidCity,
+      countryCode: 'LU',
+      isPublished: true,
+      location: { lat: 49.63, lng: 6.13 },
+    });
+    await createFixtureProfile({
+      label: 'excluded-published',
+      city: excludedCity,
+      countryCode: 'LU',
+      isPublished: true,
+      location: { lat: 49.5, lng: 6.0 },
+    });
+    await createFixtureProfile({
+      label: 'excluded-unpublished',
+      city: excludedCity,
+      countryCode: 'LU',
+      isPublished: false,
+      location: { lat: 10, lng: 10 },
+    });
+    await createFixtureProfile({
+      label: 'excluded-deleted',
+      city: excludedCity,
+      countryCode: 'LU',
+      isPublished: true,
+      deleted: true,
+      location: { lat: 20, lng: 20 },
     });
   });
 
@@ -306,6 +362,29 @@ describe('cities integration', () => {
     it('rejects an unknown query key with 400', async () => {
       const response = await fastify().inject({ method: 'GET', url: '/v1/cities?sort=name' });
       expect(response.statusCode).toBe(400);
+    });
+
+    it('returns the centroid of the published profiles snapped to 2 decimals', async () => {
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/cities?q=${encodeURIComponent(centroidCity)}`,
+      });
+      const body = response.json<CityBody[]>();
+      expect(body).toHaveLength(1);
+      expect(body[0]?.location).toEqual({ lat: 49.62, lng: 6.11 });
+    });
+
+    it('excludes unpublished and deleted profiles from the centroid', async () => {
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/cities?q=${encodeURIComponent(excludedCity)}`,
+      });
+      const body = response.json<CityBody[]>();
+      expect(body).toHaveLength(1);
+      expect(body[0]).toMatchObject({
+        photographerCount: 1,
+        location: { lat: 49.5, lng: 6 },
+      });
     });
   });
 });

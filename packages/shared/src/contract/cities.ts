@@ -1,4 +1,4 @@
-import { CountryCodeSchema, errorResponses } from './common.js';
+import { CountryCodeSchema, errorResponses, LatLngSchema } from './common.js';
 import { apiPath, registry } from './registry.js';
 import { z } from './zod.js';
 
@@ -8,6 +8,7 @@ export const CitySummarySchema = z
     name: z.string().min(1).max(120),
     countryCode: CountryCodeSchema,
     photographerCount: z.int().positive(),
+    location: LatLngSchema,
   })
   .strict()
   .openapi('CitySummary');

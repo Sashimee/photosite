@@ -7786,6 +7786,7 @@ export interface components {
              */
             countryCode: string;
             photographerCount: number;
+            location: components["schemas"]["LatLng"];
         };
         Product: {
             /**

@@ -884,13 +884,17 @@
           "photographerCount": {
             "type": "integer",
             "exclusiveMinimum": 0
+          },
+          "location": {
+            "$ref": "#/components/schemas/LatLng"
           }
         },
         "required": [
           "slug",
           "name",
           "countryCode",
-          "photographerCount"
+          "photographerCount",
+          "location"
         ],
         "additionalProperties": false
       },
