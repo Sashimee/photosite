@@ -37,9 +37,16 @@ async function fakeJpegBuffer(): Promise<Buffer> {
 function fakeDeps(buffer: Buffer, upload: UploadRow | null = BASE_UPLOAD) {
   const update = vi.fn(() => Promise.resolve(upload ?? BASE_UPLOAD));
   const putObject = vi.fn<(input: PutObjectArgs) => Promise<void>>(() => Promise.resolve());
+  const portfolioImageUpdateMany = vi.fn(() => Promise.resolve({ count: 0 }));
 
   const deps: ImageProcessDeps = {
-    prisma: { client: { upload: { findUnique: vi.fn(() => Promise.resolve(upload)), update } } },
+    prisma: {
+      client: {
+        upload: { findUnique: vi.fn(() => Promise.resolve(upload)), update },
+        $transaction: (fn) =>
+          fn({ upload: { update }, portfolioImage: { updateMany: portfolioImageUpdateMany } }),
+      },
+    },
     storage: {
       config: { privateBucket: 'photoo-private', publicBucket: 'photoo-public' },
       getObjectBuffer: vi.fn(() => Promise.resolve(buffer)),
@@ -49,7 +56,7 @@ function fakeDeps(buffer: Buffer, upload: UploadRow | null = BASE_UPLOAD) {
     logger: fakeLogger(),
   };
 
-  return { deps, update, putObject };
+  return { deps, update, putObject, portfolioImageUpdateMany };
 }
 
 describe('createImageProcessProcessor', () => {
@@ -66,9 +73,25 @@ describe('createImageProcessProcessor', () => {
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: UPLOAD_ID },
-        data: expect.objectContaining({ status: 'processed' }) as unknown,
+        data: expect.objectContaining({
+          status: 'processed',
+          width: 400,
+          height: 300,
+        }) as unknown,
       }),
     );
+  });
+
+  it('moves a portfolio image linked to the upload from processing to pending_review', async () => {
+    const buffer = await fakeJpegBuffer();
+    const { deps, portfolioImageUpdateMany } = fakeDeps(buffer);
+
+    await createImageProcessProcessor(deps)(fakeJob(), undefined, undefined);
+
+    expect(portfolioImageUpdateMany).toHaveBeenCalledWith({
+      where: { uploadId: UPLOAD_ID, status: 'processing' },
+      data: { status: 'pending_review', width: 400, height: 300 },
+    });
   });
 
   it('marks the upload failed on a magic-byte mismatch instead of throwing', async () => {

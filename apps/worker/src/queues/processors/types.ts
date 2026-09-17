@@ -23,6 +23,13 @@ export interface UploadRepository {
   update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<UploadRow>;
 }
 
+export interface PortfolioImageRepository {
+  updateMany(args: {
+    where: Record<string, unknown>;
+    data: Record<string, unknown>;
+  }): Promise<{ count: number }>;
+}
+
 export interface PutObjectArgs {
   bucket: string;
   key: string;

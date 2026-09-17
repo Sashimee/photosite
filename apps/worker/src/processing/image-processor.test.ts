@@ -51,6 +51,35 @@ describe('processImage', () => {
     }
   });
 
+  it('reports the width and height of the original image', async () => {
+    const buffer = await jpegWithGps(800, 600);
+    const result = await processImage({
+      buffer,
+      declaredMimeType: 'image/jpeg',
+      maxPixels: 100_000_000,
+    });
+
+    expect(result.width).toBe(800);
+    expect(result.height).toBe(600);
+  });
+
+  it('swaps width and height for an EXIF orientation that rotates the image 90 degrees', async () => {
+    const buffer = await sharp({
+      create: { width: 800, height: 600, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .withMetadata({ orientation: 6 })
+      .jpeg()
+      .toBuffer();
+    const result = await processImage({
+      buffer,
+      declaredMimeType: 'image/jpeg',
+      maxPixels: 100_000_000,
+    });
+
+    expect(result.width).toBe(600);
+    expect(result.height).toBe(800);
+  });
+
   it('does not upscale an image smaller than a variant width', async () => {
     const buffer = await jpegWithGps(100, 80);
     const result = await processImage({

@@ -2,10 +2,20 @@ import { ImageProcessJobSchema, type ImageProcessJob } from '@photoo/shared';
 import type { Job, Processor } from 'bullmq';
 import type { Logger } from 'nestjs-pino';
 import { processImage } from '../../processing/image-processor.js';
-import type { ObjectStorage, UploadRepository } from './types.js';
+import type { ObjectStorage, PortfolioImageRepository, UploadRepository } from './types.js';
+
+interface ImageProcessTransactionClient {
+  upload: Pick<UploadRepository, 'update'>;
+  portfolioImage: Pick<PortfolioImageRepository, 'updateMany'>;
+}
 
 export interface ImageProcessDeps {
-  prisma: { client: { upload: Pick<UploadRepository, 'findUnique' | 'update'> } };
+  prisma: {
+    client: {
+      upload: Pick<UploadRepository, 'findUnique' | 'update'>;
+      $transaction<T>(fn: (tx: ImageProcessTransactionClient) => Promise<T>): Promise<T>;
+    };
+  };
   storage: Pick<ObjectStorage, 'config' | 'getObjectBuffer' | 'putObject'>;
   maxPixels: number;
   logger: Logger;
@@ -56,9 +66,21 @@ export function createImageProcessProcessor(deps: ImageProcessDeps): Processor<I
       result.variants.map((variant) => [`${variant.name}_${variant.format}`, variant.key]),
     );
 
-    await deps.prisma.client.upload.update({
-      where: { id: upload.id },
-      data: { status: 'processed', variants, exif: result.exif },
+    await deps.prisma.client.$transaction(async (tx) => {
+      await tx.upload.update({
+        where: { id: upload.id },
+        data: {
+          status: 'processed',
+          variants,
+          exif: result.exif,
+          width: result.width,
+          height: result.height,
+        },
+      });
+      await tx.portfolioImage.updateMany({
+        where: { uploadId: upload.id, status: 'processing' },
+        data: { status: 'pending_review', width: result.width, height: result.height },
+      });
     });
   };
 }
