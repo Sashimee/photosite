@@ -14,10 +14,10 @@
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "migrate:status": "prisma migrate status",
-    "build": "pnpm run generate && tsc -p tsconfig.build.json",
-    "lint": "pnpm run generate && eslint .",
-    "typecheck": "pnpm run generate && tsc --noEmit",
-    "test": "pnpm run generate && vitest run --passWithNoTests",
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
     "seed": "pnpm run generate && tsc -p tsconfig.build.json && node dist/seed.js"
   },
   "devDependencies": {
