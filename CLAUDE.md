@@ -44,6 +44,7 @@ pnpm --filter @photoo/shared openapi:generate       # zod contract -> packages/a
 pnpm --filter @photoo/api-client generate           # openapi.json -> typed client (src/schema.ts)
 pnpm --filter @photoo/api-client generate:check     # fail if the typed client is stale
 pnpm --filter @photoo/web dev       # Next.js dev server on :3000, against NEXT_PUBLIC_API_URL (mock or api)
+pnpm --filter @photoo/api dev       # NestJS (Fastify) API on PORT (default 4000), watches src/ and restarts
 pnpm --filter @photoo/<name> <script>
 pnpm stack:up       # docker compose: postgres+postgis, redis, minio, mailpit (127.0.0.1 only)
 pnpm stack:down     # stop the local dev stack
