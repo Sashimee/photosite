@@ -95,6 +95,34 @@ describe('cities integration', () => {
     createdUserIds.length = 0;
   }
 
+  // Slugs always start with this literal prefix (RUN_ID is only ever a
+  // suffix), and `bounds the result to limit`/`returns the fuller limit`
+  // below assert an exact ["Fxcitylimit-a-...", "Fxcitylimit-b-...", ...]
+  // list for the `Fxcitylimit-` prefix query: a killed run's own
+  // never-cleaned-up rows would sort into that list too and break the exact
+  // match, so remove them by prefix before creating this run's fixtures
+  // (issue #97).
+  // Safe against a concurrent worktree run (not just a dead one): the prefix
+  // alone would match its still-live fixtures on the same TEST_DATABASE_URL,
+  // but no run of this file takes anywhere near 30 minutes.
+  const ORPHAN_MAX_AGE_MS = 30 * 60 * 1000;
+
+  async function cleanupOrphanedFixtures(): Promise<void> {
+    const orphans = await prisma.photographerProfile.findMany({
+      where: {
+        slug: { startsWith: 'fx-cities-' },
+        createdAt: { lt: new Date(Date.now() - ORPHAN_MAX_AGE_MS) },
+      },
+      select: { userId: true },
+    });
+    if (orphans.length === 0) {
+      return;
+    }
+    const userIds = orphans.map((orphan) => orphan.userId);
+    await prisma.photographerProfile.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+  }
+
   const publishedCity = `Fxcitypublished-${RUN_ID}`;
   const mixedCity = `Fxcitymixed-${RUN_ID}`;
   const accentedCity = `Fxcityépinal-${RUN_ID}`;
@@ -114,6 +142,7 @@ describe('cities integration', () => {
       REDIS_URL: testEnv.REDIS_URL,
     });
     prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
+    await cleanupOrphanedFixtures();
 
     await createFixtureProfile({
       label: 'published',

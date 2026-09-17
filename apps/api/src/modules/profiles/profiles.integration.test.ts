@@ -60,14 +60,24 @@ function decodeOpaqueCursor(cursor: string): { mode: string; value: number; id: 
   };
 }
 
-// Fixtures cluster around this remote point, far from any seed or other
-// suite's coordinates, so radius/order assertions only ever see this suite's
-// own data. RUN_ID keeps slugs/cities unique across repeated runs.
+// Derived from RUN_ID and kept in a remote North Atlantic box, far from
+// Luxembourg, from products.integration.test.ts's fixed Sydney fixture, and
+// from quotes/requests's own random Pacific box (issue #50), so radius/order
+// assertions only ever see this suite's own data even when a previous run's
+// fixtures were never cleaned up (issue #97). RUN_ID keeps slugs/cities
+// unique across repeated runs.
 const RUN_ID = randomUUID().replaceAll('-', '').slice(0, 8);
-const RUN_POINT = { lat: 64.9631, lng: -19.0208 };
-// More than 20km from RUN_POINT, so the grid-cell fixtures never appear in
-// the RUN_POINT radius assertions below.
-const GRID_POINT = { lat: 64.5, lng: -19.5 };
+const RUN_SEED = Number.parseInt(RUN_ID, 16);
+const RUN_POINT = {
+  lat: 55 + (RUN_SEED % 150) / 10,
+  lng: -30 + ((RUN_SEED >> 8) % 200) / 10,
+};
+// Always >500km from RUN_POINT (and from each other), so the grid-cell and
+// "other" fixtures never appear in the RUN_POINT radius assertions below,
+// regardless of where RUN_POINT itself landed this run.
+const GRID_POINT = { lat: RUN_POINT.lat - 10, lng: RUN_POINT.lng - 10 };
+const OTHER_LAT = RUN_POINT.lat - 20;
+const OTHER_LNG = RUN_POINT.lng - 20;
 const KM_PER_DEGREE_LAT = 111.32;
 
 function offsetLat(km: number): number {
@@ -80,6 +90,12 @@ function offsetLat(km: number): number {
 // instance; without a distinct IP, clearing or hitting the per-IP auth rate
 // limits here would race with theirs.
 const AUTH_FAKE_IP = '10.50.1.1';
+// Distinct from the default injected remote address (127.0.0.1), which
+// uploads.integration.test.ts deliberately exhausts to test the uploads
+// per-IP rate limit: sharing it would let this file's avatar/portfolio
+// upload creations tip that limit over, failing uploadAndComplete() with
+// "Failed to parse URL from undefined" when POST /v1/uploads 429s (issue #97).
+const UPLOADS_FAKE_IP = '10.50.1.2';
 
 async function clearRateLimitKeys(redis: Redis): Promise<void> {
   const patterns = [
@@ -87,6 +103,8 @@ async function clearRateLimitKeys(redis: Redis): Promise<void> {
     'lockout:profiles:*',
     `rate-limit:auth:*:${AUTH_FAKE_IP}`,
     `lockout:auth:*:${AUTH_FAKE_IP}`,
+    `rate-limit:uploads:*:${UPLOADS_FAKE_IP}`,
+    `lockout:uploads:*:${UPLOADS_FAKE_IP}`,
   ];
   const all = (await Promise.all(patterns.map((pattern) => redis.keys(pattern)))).flat();
   if (all.length > 0) {
@@ -309,8 +327,44 @@ describe('profiles integration', () => {
   const pageA = { slug: `fx-page-a-${RUN_ID}`, city: `Fxpaging ${RUN_ID}` };
   const pageB = { slug: `fx-page-b-${RUN_ID}`, city: `Fxpaging ${RUN_ID}` };
 
-  const OTHER_LAT = 63.5;
-  const OTHER_LNG = -22.0;
+  // Fixture slugs always start with one of these literal prefixes (RUN_ID is
+  // only ever appended as a suffix), so a run that got killed before its own
+  // afterAll ran leaves rows a later run can find and remove by prefix alone,
+  // before they can poison this run's radius/exact-list assertions (issue #97).
+  const FIXTURE_SLUG_PREFIXES = [
+    'fx-core-',
+    'fx-near-',
+    'fx-far-',
+    'fx-grid-a-',
+    'fx-grid-b-',
+    'fx-realestate-',
+    'fx-langpt-',
+    'fx-price-',
+    'fx-page-a-',
+    'fx-page-b-',
+  ];
+
+  // Safe against a concurrent worktree run (not just a dead one): the prefix
+  // alone would match its still-live fixtures on the same TEST_DATABASE_URL,
+  // but no run of this file takes anywhere near 30 minutes.
+  const ORPHAN_MAX_AGE_MS = 30 * 60 * 1000;
+
+  async function cleanupOrphanedFixtures(): Promise<void> {
+    const orphans = await prisma.photographerProfile.findMany({
+      where: {
+        OR: FIXTURE_SLUG_PREFIXES.map((prefix) => ({ slug: { startsWith: prefix } })),
+        createdAt: { lt: new Date(Date.now() - ORPHAN_MAX_AGE_MS) },
+      },
+      select: { userId: true },
+    });
+    if (orphans.length === 0) {
+      return;
+    }
+    const userIds = orphans.map((orphan) => orphan.userId);
+    await prisma.photographerProfile.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.upload.deleteMany({ where: { ownerId: { in: userIds } } });
+    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+  }
 
   beforeAll(async () => {
     app = await createTestApp({
@@ -321,6 +375,7 @@ describe('profiles integration', () => {
     prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
     redis = new Redis(testEnv.REDIS_URL);
     await clearRateLimitKeys(redis);
+    await cleanupOrphanedFixtures();
 
     await createFixtureProfile({
       ...core,
@@ -768,6 +823,7 @@ describe('profiles integration', () => {
       const response = await fastify().inject({
         method: 'POST',
         url: '/v1/uploads',
+        remoteAddress: UPLOADS_FAKE_IP,
         headers: authHeaders(token),
         payload: { purpose, mimeType: 'image/jpeg', sizeBytes: 1024 },
       });
@@ -806,6 +862,7 @@ describe('profiles integration', () => {
       const otherUpload = await fastify().inject({
         method: 'POST',
         url: '/v1/uploads',
+        remoteAddress: UPLOADS_FAKE_IP,
         headers: authHeaders(otherUser.token),
         payload: { purpose: 'avatar', mimeType: 'image/jpeg', sizeBytes: 1024 },
       });
@@ -827,6 +884,7 @@ describe('profiles integration', () => {
       const coverUpload = await fastify().inject({
         method: 'POST',
         url: '/v1/uploads',
+        remoteAddress: UPLOADS_FAKE_IP,
         headers: authHeaders(owner.token),
         payload: { purpose: 'cover', mimeType: 'image/jpeg', sizeBytes: 1024 },
       });
@@ -920,6 +978,7 @@ describe('profiles integration', () => {
       const response = await fastify().inject({
         method: 'POST',
         url: '/v1/uploads',
+        remoteAddress: UPLOADS_FAKE_IP,
         headers: authHeaders(token),
         payload: { purpose, mimeType: 'image/jpeg', sizeBytes: 1024 },
       });

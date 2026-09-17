@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createPrismaClient, type PrismaClient } from '@photoo/db';
@@ -5,17 +6,40 @@ import { createS3Client } from '@photoo/shared/storage';
 import { Redis } from 'ioredis';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp } from '../../testing/create-test-app.js';
+import { waitForLinkInEmail } from '../../testing/mailpit.js';
 import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
 import { TEST_ENV } from '../../testing/test-env.js';
 import { s3ConfigFromEnv } from '../../storage/s3-config.js';
 
 const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL', 'REDIS_URL']);
-const SEED_USER_PASSWORD = process.env.SEED_USER_PASSWORD ?? 'correct-horse-battery-staple';
+const PASSWORD = `photoo-test-${randomUUID()}`;
+
+// auth.integration.test.ts signs in as the shared seed users too (to test
+// its own account-scoped rate limit), and account-scoped keys aren't tied to
+// an IP; a fresh unique account per run avoids racing that suite's counter
+// for the same seed account instead of just moving the contention (issue #97).
+const AUTH_FAKE_IP = '10.50.3.1';
+
+function extractFragmentToken(link: string): string | null {
+  const hashIndex = link.indexOf('#token=');
+  if (hashIndex === -1) {
+    return null;
+  }
+  return decodeURIComponent(link.slice(hashIndex + '#token='.length));
+}
+
+function uniqueEmail(label: string): string {
+  return `uploads-${label}-${randomUUID()}@photoo.test`;
+}
 
 async function clearRateLimitKeys(redis: Redis): Promise<void> {
-  const keys = await redis.keys('rate-limit:uploads:*');
-  const lockoutKeys = await redis.keys('lockout:uploads:*');
-  const all = [...keys, ...lockoutKeys];
+  const patterns = [
+    'rate-limit:uploads:*',
+    'lockout:uploads:*',
+    `rate-limit:auth:*:${AUTH_FAKE_IP}`,
+    `lockout:auth:*:${AUTH_FAKE_IP}`,
+  ];
+  const all = (await Promise.all(patterns.map((pattern) => redis.keys(pattern)))).flat();
   if (all.length > 0) {
     await redis.del(...all);
   }
@@ -49,18 +73,44 @@ describe('uploads integration', () => {
   let clientId: string;
   let photographerToken: string;
   const createdUploadIds: string[] = [];
+  const createdUserIds: string[] = [];
 
   function fastify() {
     return app.getHttpAdapter().getInstance();
   }
 
-  async function signIn(email: string): Promise<{ token: string; id: string }> {
-    const response = await fastify().inject({
+  async function signUpAndSignIn(
+    roles: readonly string[],
+  ): Promise<{ token: string; id: string }> {
+    const email = uniqueEmail(roles.join('-'));
+    const signUpResponse = await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/sign-up',
+      remoteAddress: AUTH_FAKE_IP,
+      payload: { email, password: PASSWORD, roles, locale: 'en' },
+    });
+    const userId = signUpResponse.json<{ user: { id: string } }>().user.id;
+    createdUserIds.push(userId);
+
+    const link = await waitForLinkInEmail(email, /https?:\/\/\S*verify-email#token=\S+/);
+    const token = extractFragmentToken(link);
+    if (!token) {
+      throw new Error(`no token found in verification link: ${link}`);
+    }
+    await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/verify-email',
+      remoteAddress: AUTH_FAKE_IP,
+      payload: { token },
+    });
+
+    const signInResponse = await fastify().inject({
       method: 'POST',
       url: '/v1/auth/sign-in',
-      payload: { email, password: SEED_USER_PASSWORD },
+      remoteAddress: AUTH_FAKE_IP,
+      payload: { email, password: PASSWORD },
     });
-    const body = response.json<{ user: { id: string }; session: { token: string } }>();
+    const body = signInResponse.json<{ user: { id: string }; session: { token: string } }>();
     return { token: body.session.token, id: body.user.id };
   }
 
@@ -91,10 +141,10 @@ describe('uploads integration', () => {
     redis = new Redis(testEnv.REDIS_URL);
     await clearRateLimitKeys(redis);
 
-    const client = await signIn('client@photoo.test');
+    const client = await signUpAndSignIn(['client']);
     clientToken = client.token;
     clientId = client.id;
-    photographerToken = (await signIn('photographer@photoo.test')).token;
+    photographerToken = (await signUpAndSignIn(['photographer'])).token;
   });
 
   afterEach(async () => {
@@ -103,9 +153,7 @@ describe('uploads integration', () => {
 
   afterAll(async () => {
     await prisma.upload.deleteMany({ where: { id: { in: createdUploadIds } } });
-    await prisma.session.deleteMany({
-      where: { user: { email: { in: ['client@photoo.test', 'photographer@photoo.test'] } } },
-    });
+    await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     await prisma.$disconnect();
     redis.disconnect();
     await app.close();

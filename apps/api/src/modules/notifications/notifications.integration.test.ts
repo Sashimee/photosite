@@ -10,7 +10,10 @@ import { TEST_ENV } from '../../testing/test-env.js';
 
 const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL', 'REDIS_URL']);
 const PASSWORD = `photoo-test-${randomUUID()}`;
-const AUTH_FAKE_IP = '10.50.7.1';
+// Dedicated to this suite so its sign-up/sign-in/device-registration calls
+// never share a per-IP auth or devices:register rate limit bucket with
+// chat.integration.test.ts's own AUTH_FAKE_IP (issue #97).
+const AUTH_FAKE_IP = '10.50.8.1';
 
 function extractFragmentToken(link: string): string | null {
   const hashIndex = link.indexOf('#token=');
