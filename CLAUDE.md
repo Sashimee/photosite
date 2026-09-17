@@ -25,7 +25,7 @@ pnpm + Turborepo monorepo, TypeScript strict everywhere.
 - `apps/worker` NestJS standalone – BullMQ jobs: images (sharp), provenance (AI detection, reverse search, C2PA, EXIF), email (Brevo), push (Expo), payouts/release, GDPR exports
 - `packages/db` Prisma + PostgreSQL 16 + PostGIS; `packages/shared` zod schemas/enums/fee helper; `packages/api-client` generated from OpenAPI; `packages/i18n` ICU catalogs (en, fr, de, pt, es); `packages/config` eslint/tsconfig
 - Redis 7, S3-compatible EU object storage, ClamAV (upload virus scanning), Stripe Connect Express, Sentry
-- Hosting: VPS dok.seil.products with Dokploy/Coolify; staging from `dev`, production from `main`
+- Hosting: VPS dok.seil.pro with Dokploy; preview (noindex) at footoo.bas.lu from `main`, staging from `dev`, production from `main` (later phases)
 
 ## Commands
 
@@ -52,7 +52,12 @@ pnpm stack:up       # docker compose: postgres+postgis, redis, minio, mailpit, c
 pnpm stack:down     # stop the local dev stack
 pnpm stack:reset    # stop the local dev stack and remove its volumes
 pnpm db:seed        # forwards to packages/db seed script
+docker build -f infra/docker/api.Dockerfile -t photosite-api:dev .
+docker build -f infra/docker/worker.Dockerfile -t photosite-worker:dev .
+docker build -f infra/docker/web.Dockerfile -t photosite-web:dev .
 ```
+
+Preview (Phase 0.5): Dockerfiles in `infra/docker/`, compose and runbook in `infra/dokploy/preview/`. Deploy via GitHub Actions workflow `.github/workflows/deploy-preview.yml` to GHCR, then Dokploy webhook.
 
 Planned, not yet present: `pnpm dev` running every app against the stack at once. Workspaces are named `@photoo/<dir>`. TypeScript stays on 6.0 until typescript-eslint supports 7. A husky pre-commit hook runs lint-staged. `apps/mobile` native builds/submits run through EAS (`eas.json`); `eas init`, `eas build`, `eas submit` need an Expo account login and `EAS_PROJECT_ID` (see `docs/steps/human-followups.md`).
 
