@@ -11,6 +11,7 @@ const validEnv = {
   WEB_APP_URL: 'http://localhost:3000',
   AUTH_SECRET: 'a'.repeat(32),
   AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+  VERIFICATION_ENCRYPTION_KEY: Buffer.alloc(32, 8).toString('base64'),
   S3_ENDPOINT: 'http://127.0.0.1:9000',
   S3_REGION: 'eu-west-1',
   S3_ACCESS_KEY_ID: 'photoo_dev',
@@ -154,6 +155,24 @@ describe('loadEnv', () => {
     expect(() =>
       loadEnv({ ...validEnv, AUTH_ENCRYPTION_KEY: Buffer.alloc(16).toString('base64') }),
     ).toThrow(/AUTH_ENCRYPTION_KEY/);
+  });
+
+  it('rejects a VERIFICATION_ENCRYPTION_KEY that is not 32 bytes', () => {
+    expect(() =>
+      loadEnv({ ...validEnv, VERIFICATION_ENCRYPTION_KEY: Buffer.alloc(16).toString('base64') }),
+    ).toThrow(/VERIFICATION_ENCRYPTION_KEY/);
+  });
+
+  it('refuses the .env.example VERIFICATION_ENCRYPTION_KEY placeholder in production', () => {
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: 'production',
+        AUTH_SECRET: 'b'.repeat(32),
+        AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+        VERIFICATION_ENCRYPTION_KEY: '9DsORuh9HI1DUnXKM0DKVcgw36Y9NfbLBSlfPmQxwYs=',
+      }),
+    ).toThrow(/VERIFICATION_ENCRYPTION_KEY/);
   });
 
   it('leaves OAuth provider credentials unset when not provided', () => {

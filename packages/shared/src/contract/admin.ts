@@ -1,7 +1,14 @@
-import { PROVENANCE_VERDICTS, USER_ROLES, USER_STATUSES, type AdminPermission } from '../enums.js';
+import {
+  PROVENANCE_VERDICTS,
+  USER_ROLES,
+  USER_STATUSES,
+  VERIFICATION_CASE_STATUSES,
+  type AdminPermission,
+} from '../enums.js';
 import { UserSchema } from './auth.js';
 import { BookingBaseSchema } from './bookings.js';
 import {
+  CountryCodeSchema,
   CursorPaginationQuerySchema,
   IdSchema,
   IsoDateTimeSchema,
@@ -9,7 +16,7 @@ import {
   paginatedResponseSchema,
 } from './common.js';
 import { ADMIN_SECURITY, apiPath, registry } from './registry.js';
-import { AdminVerificationCaseSchema } from './verification.js';
+import { AdminVerificationCaseSchema, AdminVerificationCaseSummarySchema } from './verification.js';
 import { z } from './zod.js';
 
 function adminOperation(permission: AdminPermission, options?: { requires2fa?: boolean }) {
@@ -249,24 +256,29 @@ registry.registerPath({
   },
 });
 
+export const AdminVerificationCasesQuerySchema = CursorPaginationQuerySchema.extend({
+  status: z.enum(VERIFICATION_CASE_STATUSES).optional(),
+  countryCode: CountryCodeSchema.optional(),
+}).strict();
+
 registry.registerPath({
   method: 'get',
   path: apiPath('/admin/verification-cases'),
   summary: 'List the verification queue',
   tags: ['admin'],
   security: ADMIN_SECURITY,
-  ...adminOperation('verification'),
+  ...adminOperation('verification', { requires2fa: true }),
   request: {
-    query: CursorPaginationQuerySchema,
+    query: AdminVerificationCasesQuerySchema,
   },
   responses: {
     '200': {
       description: 'A page of verification cases',
       content: {
-        'application/json': { schema: paginatedResponseSchema(AdminVerificationCaseSchema) },
+        'application/json': { schema: paginatedResponseSchema(AdminVerificationCaseSummarySchema) },
       },
     },
-    ...errorResponses([401, 403]),
+    ...errorResponses([400, 401, 403, 422]),
   },
 });
 
@@ -276,7 +288,7 @@ registry.registerPath({
   summary: 'Get a verification case',
   tags: ['admin'],
   security: ADMIN_SECURITY,
-  ...adminOperation('verification'),
+  ...adminOperation('verification', { requires2fa: true }),
   request: {
     params: z.object({ id: IdSchema }).strict(),
   },
@@ -291,26 +303,45 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'post',
+  path: apiPath('/admin/verification-cases/{id}/start-review'),
+  summary: 'Start reviewing a verification case',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('verification', { requires2fa: true }),
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+  },
+  responses: {
+    '200': {
+      description: 'Verification case moved to in_review',
+      content: { 'application/json': { schema: AdminVerificationCaseSummarySchema } },
+    },
+    ...errorResponses([401, 403, 404, 409]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
   path: apiPath('/admin/verification-cases/{id}/approve'),
   summary: 'Approve a verification case',
   tags: ['admin'],
   security: ADMIN_SECURITY,
-  ...adminOperation('verification'),
+  ...adminOperation('verification', { requires2fa: true }),
   request: {
     params: z.object({ id: IdSchema }).strict(),
   },
   responses: {
     '200': {
       description: 'Verification case approved',
-      content: { 'application/json': { schema: AdminVerificationCaseSchema } },
+      content: { 'application/json': { schema: AdminVerificationCaseSummarySchema } },
     },
     ...errorResponses([401, 403, 404, 409]),
   },
 });
 
-const RejectVerificationCaseRequestSchema = z
+export const RejectVerificationCaseRequestSchema = z
   .object({
-    reason: z.string().min(1).max(2000),
+    reason: z.string().min(1).max(1000),
   })
   .strict();
 
@@ -320,7 +351,7 @@ registry.registerPath({
   summary: 'Reject a verification case',
   tags: ['admin'],
   security: ADMIN_SECURITY,
-  ...adminOperation('verification'),
+  ...adminOperation('verification', { requires2fa: true }),
   request: {
     params: z.object({ id: IdSchema }).strict(),
     body: { content: { 'application/json': { schema: RejectVerificationCaseRequestSchema } } },
@@ -328,7 +359,7 @@ registry.registerPath({
   responses: {
     '200': {
       description: 'Verification case rejected',
-      content: { 'application/json': { schema: AdminVerificationCaseSchema } },
+      content: { 'application/json': { schema: AdminVerificationCaseSummarySchema } },
     },
     ...errorResponses([400, 401, 403, 404, 409, 422]),
   },

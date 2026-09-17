@@ -19,4 +19,8 @@ export class CountriesRepository {
       orderBy: { name: 'asc' },
     });
   }
+
+  async findEnabledByCode(code: string) {
+    return this.prisma.client.country.findFirst({ where: { code, enabled: true } });
+  }
 }

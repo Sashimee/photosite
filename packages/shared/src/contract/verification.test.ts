@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AdminVerificationCaseSchema,
+  AdminVerificationCaseSummarySchema,
+  AdminVerificationDocumentSchema,
   AttachVerificationDocumentRequestSchema,
   CreateVerificationCaseRequestSchema,
   RequiredDocumentSchema,
@@ -80,6 +83,99 @@ describe('VerificationCaseSchema', () => {
       false,
     );
   });
+
+  it('rejects a rejectionReason longer than 1000 characters', () => {
+    expect(
+      VerificationCaseSchema.safeParse({ ...validCase, rejectionReason: 'a'.repeat(1001) }).success,
+    ).toBe(false);
+  });
+});
+
+const validAdminCase = {
+  ...validCase,
+  userId: id,
+  assignedAdminId: null,
+  decidedByAdminId: null,
+};
+
+const validAdminCaseSummary = {
+  id,
+  countryCode: 'LU',
+  status: 'submitted',
+  documents: [validDocument],
+  submittedAt: '2026-09-16T12:00:00.000Z',
+  decidedAt: null,
+  rejectionReason: null,
+  userId: id,
+  assignedAdminId: null,
+  decidedByAdminId: null,
+  photographer: { displayName: 'Jane Doe', email: 'jane@example.com' },
+};
+
+describe('AdminVerificationCaseSummarySchema', () => {
+  it('accepts a well-formed admin case with the photographer identity, no business fields', () => {
+    expect(AdminVerificationCaseSummarySchema.safeParse(validAdminCaseSummary).success).toBe(true);
+  });
+
+  it('rejects a businessName field', () => {
+    expect(
+      AdminVerificationCaseSummarySchema.safeParse({
+        ...validAdminCaseSummary,
+        businessName: 'Jane Doe Photography SARL',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a document carrying a downloadUrl', () => {
+    expect(
+      AdminVerificationCaseSummarySchema.safeParse({
+        ...validAdminCaseSummary,
+        documents: [{ ...validDocument, downloadUrl: 'https://example.com/doc.pdf' }],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('AdminVerificationCaseSchema', () => {
+  it('accepts a document with no downloadUrl (not yet scanned clean)', () => {
+    expect(
+      AdminVerificationCaseSchema.safeParse({
+        ...validAdminCase,
+        documents: [validDocument],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts a document with a presigned downloadUrl', () => {
+    expect(
+      AdminVerificationCaseSchema.safeParse({
+        ...validAdminCase,
+        documents: [{ ...validDocument, downloadUrl: 'https://example.com/doc.pdf' }],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a photographer field: only the summary carries it', () => {
+    expect(
+      AdminVerificationCaseSchema.safeParse({
+        ...validAdminCase,
+        photographer: { displayName: 'Jane Doe', email: 'jane@example.com' },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('AdminVerificationDocumentSchema', () => {
+  it('accepts a document with no downloadUrl', () => {
+    expect(AdminVerificationDocumentSchema.safeParse(validDocument).success).toBe(true);
+  });
+
+  it('rejects an invalid downloadUrl when present', () => {
+    expect(
+      AdminVerificationDocumentSchema.safeParse({ ...validDocument, downloadUrl: 'not-a-url' })
+        .success,
+    ).toBe(false);
+  });
 });
 
 describe('VerificationDocumentSchema', () => {
@@ -95,14 +191,22 @@ describe('VerificationDocumentSchema', () => {
 });
 
 describe('CreateVerificationCaseRequestSchema', () => {
-  it('accepts a country code only', () => {
-    expect(CreateVerificationCaseRequestSchema.safeParse({ countryCode: 'LU' }).success).toBe(true);
+  it('accepts an empty body: the country comes from the caller profile, never the client', () => {
+    expect(CreateVerificationCaseRequestSchema.safeParse({}).success).toBe(true);
+  });
+
+  it('rejects a countryCode field', () => {
+    expect(CreateVerificationCaseRequestSchema.safeParse({ countryCode: 'LU' }).success).toBe(
+      false,
+    );
   });
 
   it('rejects a request carrying a status field', () => {
     expect(
-      CreateVerificationCaseRequestSchema.safeParse({ countryCode: 'LU', status: 'approved' })
-        .success,
+      CreateVerificationCaseRequestSchema.safeParse({
+        businessName: 'Jane Doe',
+        status: 'approved',
+      }).success,
     ).toBe(false);
   });
 });

@@ -237,16 +237,24 @@ model Account {
 
 // Better Auth "session" table. `token` is renamed to `tokenHash`: the 1A.2
 // adapter wrapper hashes it (SHA-256) on write and lookup per SECURITY.md.
+// `twoFactorVerifiedAt` has no better-auth counterpart (not a rename of a
+// library field, so no `session.fields` mapping needed): it is set by the
+// two-factor verify step for this session's id and read by
+// `requireAdminSession` to require a *recently* verified second factor
+// rather than merely `User.twoFactorEnabled`, superseding the note in
+// `require-admin.ts`. Null means the second factor was never verified in
+// this session.
 model Session {
-  id        String   @id @default(uuid(7))
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String   @unique
-  userAgent String?
-  ip        String?
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String    @id @default(uuid(7))
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash           String    @unique
+  userAgent           String?
+  ip                  String?
+  expiresAt           DateTime
+  twoFactorVerifiedAt DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([userId])
   @@index([expiresAt])

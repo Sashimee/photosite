@@ -4,6 +4,7 @@ import { formatText } from '../format-message.js';
 import {
   buildConversationPath,
   buildNotificationPath,
+  buildVerificationCasePath,
   requireConversationId,
   requireQuoteId,
 } from './notify-email.js';
@@ -37,6 +38,8 @@ export function renderNotifyPush(
     quote_withdrawn: t.quoteWithdrawn,
     quote_expired: t.quoteExpired,
     message_received: t.messageReceived,
+    verification_approved: t.verificationApproved,
+    verification_rejected: t.verificationRejected,
   };
   const template = templates[type];
   const fallback = PHOTOGRAPHER_FACING_TYPES.has(type)
@@ -47,7 +50,9 @@ export function renderNotifyPush(
   const url =
     type === 'message_received'
       ? buildConversationPath(locale, requireConversationId(type, payload))
-      : buildNotificationPath(locale, requireQuoteId(type, payload));
+      : type === 'verification_approved' || type === 'verification_rejected'
+        ? buildVerificationCasePath(locale)
+        : buildNotificationPath(locale, requireQuoteId(type, payload));
 
   return {
     title: template.title,

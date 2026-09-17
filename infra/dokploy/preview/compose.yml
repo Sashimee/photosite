@@ -72,6 +72,7 @@ services:
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
       AUTH_SECRET: ${AUTH_SECRET:?generate with `openssl rand -base64 48`}
       AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:?generate with `openssl rand -base64 32`}
+      VERIFICATION_ENCRYPTION_KEY: ${VERIFICATION_ENCRYPTION_KEY:?generate with `openssl rand -base64 32`}
       S3_ENDPOINT: http://minio:9000
       S3_REGION: eu-west-1
       # Scoped MinIO user (photoo-private only), created by `minio-init`;
@@ -194,6 +195,9 @@ services:
       NODE_ENV: development
       DATABASE_URL: postgresql://${POSTGRES_USER:?set in .env}:${POSTGRES_PASSWORD:?set in .env}@postgres:5432/${POSTGRES_DB:?set in .env}
       SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:?generate with `openssl rand -base64 24`}
+      # Must match the api service's key above, or the api can't decrypt the
+      # VerificationCase fields the seed encrypts.
+      VERIFICATION_ENCRYPTION_KEY: ${VERIFICATION_ENCRYPTION_KEY:?generate with `openssl rand -base64 32`}
       S3_ENDPOINT: http://minio:9000
       S3_REGION: eu-west-1
       # The seed only ever writes placeholder images to photoo-public, so it

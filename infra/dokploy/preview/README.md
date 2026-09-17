@@ -34,6 +34,10 @@ one is the "why".
    - `AUTH_SECRET`: `openssl rand -base64 48`.
    - `AUTH_ENCRYPTION_KEY`: `openssl rand -base64 32` - must decode to
      exactly 32 bytes, so use exactly this command, not a different length.
+   - `VERIFICATION_ENCRYPTION_KEY`: `openssl rand -base64 32`, same
+     constraint as `AUTH_ENCRYPTION_KEY` - used by both the `api` service and
+     the `seed` profile, which must get the same value or the api can't
+     decrypt what the seed encrypts.
    - `SEED_USER_PASSWORD`: `openssl rand -base64 24` (only used by the
      `seed` profile below).
    - `IMAGE_TAG`: `main` (the workflow always also pushes `sha-<short>`

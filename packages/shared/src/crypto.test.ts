@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { decryptAesGcm, encryptAesGcm } from './aes-gcm.js';
+import { decryptAesGcm, encryptAesGcm } from './crypto.js';
 
 describe('encryptAesGcm / decryptAesGcm', () => {
   const key = randomBytes(32);
