@@ -9,11 +9,15 @@ const connectOrigins = [
   originOf(env.NEXT_PUBLIC_SENTRY_DSN),
 ].filter((origin): origin is string => origin !== null);
 
+const imgOrigins = [originOf(env.NEXT_PUBLIC_MEDIA_BASE_URL)].filter(
+  (origin): origin is string => origin !== null,
+);
+
 export function proxy(request: NextRequest): NextResponse {
   const { pathname, search } = request.nextUrl;
   const isDev = process.env.NODE_ENV === 'development';
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
-  const cspHeader = buildCspHeader(nonce, isDev, connectOrigins);
+  const cspHeader = buildCspHeader(nonce, isDev, connectOrigins, imgOrigins);
 
   const redirectPath = buildLocaleRedirectPath(
     pathname,

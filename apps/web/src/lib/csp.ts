@@ -6,12 +6,13 @@ export function buildCspHeader(
   nonce: string,
   isDev: boolean,
   connectOrigins: readonly string[] = [],
+  imgOrigins: readonly string[] = [],
 ): string {
   const cspDirectives = [
     `default-src 'self'`,
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? ` 'unsafe-eval'` : ''}`,
     `style-src 'self' ${isDev ? `'unsafe-inline'` : `'nonce-${nonce}'`}`,
-    `img-src 'self' blob: data:`,
+    ['img-src', "'self'", 'blob:', 'data:', ...imgOrigins].join(' '),
     `font-src 'self'`,
     ['connect-src', "'self'", ...connectOrigins].join(' '),
     `object-src 'none'`,
