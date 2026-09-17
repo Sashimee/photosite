@@ -17,11 +17,11 @@
     "i18n:check": "pnpm --filter @photoo/i18n i18n:check",
     "mock:api": "docker run --rm -p 127.0.0.1:4010:4010 -v \"$PWD/packages/api-client/openapi.json:/contract/openapi.json:ro\" stoplight/prism:5.15.10 mock /contract/openapi.json --dynamic --host 0.0.0.0 --port 4010 --multiprocess false",
     "prepare": "husky",
-    "stack:up": "docker compose -f infra/docker/compose.dev.yml up -d --wait postgres redis minio mailpit && docker compose -f infra/docker/compose.dev.yml run --rm minio-init",
+    "stack:up": "docker compose -f infra/docker/compose.dev.yml up -d --wait postgres redis minio mailpit && docker compose -f infra/docker/compose.dev.yml run --rm minio-init && docker compose -f infra/docker/compose.dev.yml up -d clamav",
     "stack:down": "docker compose -f infra/docker/compose.dev.yml down",
     "stack:reset": "docker compose -f infra/docker/compose.dev.yml down -v",
     "db:seed": "pnpm --filter @photoo/db run seed",
-    "test:integration": "set -a && . packages/db/.env && . apps/api/.env && set +a && pnpm --filter @photoo/db test && pnpm --filter @photoo/api test"
+    "test:integration": "set -a && . packages/db/.env && . apps/api/.env && set +a && pnpm --filter @photoo/db test && pnpm --filter @photoo/api test && pnpm --filter @photoo/worker test"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [

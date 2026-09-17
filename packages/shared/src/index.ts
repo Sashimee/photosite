@@ -19,6 +19,7 @@ export {
   CONVERSATION_TYPES,
   ATTACHMENT_KINDS,
   VIRUS_SCAN_STATUSES,
+  UPLOAD_STATUSES,
   VERIFICATION_CASE_STATUSES,
   PROVENANCE_VERDICTS,
   DATA_REQUEST_TYPES,
@@ -40,6 +41,7 @@ export {
   type ConversationType,
   type AttachmentKind,
   type VirusScanStatus,
+  type UploadStatus,
   type VerificationCaseStatus,
   type ProvenanceVerdict,
   type DataRequestType,
@@ -76,6 +78,25 @@ export { ADMIN_SECURITY, API_PREFIX, apiPath, registry } from './contract/regist
 export { buildOpenApiDocument, OPENAPI_INFO_VERSION } from './contract/generate.js';
 
 export { HealthResponseSchema, ReadyResponseSchema } from './contract/health.js';
+
+export {
+  EMAIL_QUEUE_NAME,
+  EmailJobSchema,
+  FILE_SCAN_QUEUE_NAME,
+  FileScanJobSchema,
+  IMAGE_PROCESS_QUEUE_NAME,
+  ImageProcessJobSchema,
+  QUEUE_JOB_SCHEMAS,
+  QUEUE_NAMES,
+  UPLOADS_CLEANUP_QUEUE_NAME,
+  UploadsCleanupJobSchema,
+  type EmailJob,
+  type FileScanJob,
+  type ImageProcessJob,
+  type QueueJobPayload,
+  type QueueName,
+  type UploadsCleanupJob,
+} from './queues.js';
 
 export {
   AddRoleRequestSchema,

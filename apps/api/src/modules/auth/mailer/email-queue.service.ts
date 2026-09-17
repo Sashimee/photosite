@@ -1,15 +1,11 @@
 import type { OnApplicationShutdown } from '@nestjs/common';
 import { Inject, Injectable } from '@nestjs/common';
+import { EMAIL_QUEUE_NAME, EmailJobSchema, type EmailJob } from '@photoo/shared';
 import { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
 import { APP_CONFIG, type Env } from '../../../config/env.js';
 
-export const EMAIL_QUEUE_NAME = 'email';
-
-export type EmailJob =
-  | { type: 'verify-email'; to: string; url: string }
-  | { type: 'reset-password'; to: string; url: string }
-  | { type: 'account-exists'; to: string };
+export { EMAIL_QUEUE_NAME, type EmailJob };
 
 const FAILED_JOB_RETENTION_SECONDS = 24 * 60 * 60;
 
@@ -27,10 +23,11 @@ export class EmailQueueService implements OnApplicationShutdown {
   }
 
   async enqueue(job: EmailJob): Promise<void> {
+    const validated = EmailJobSchema.parse(job);
     // The job payload (including any verification/reset link) is dropped
     // once the mail is sent, and kept only briefly on failure for
     // debugging, so Redis never retains a long-lived copy of the token.
-    await this.queue.add(job.type, job, {
+    await this.queue.add(validated.type, validated, {
       removeOnComplete: true,
       removeOnFail: { age: FAILED_JOB_RETENTION_SECONDS },
     });

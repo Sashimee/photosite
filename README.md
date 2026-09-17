@@ -18,12 +18,12 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm build
 Copy `infra/docker/.env.example` to `infra/docker/.env` and each app's `.env.example` to `.env`, then:
 
 ```
-pnpm stack:up     # postgres+postgis, redis, minio, mailpit on 127.0.0.1
+pnpm stack:up     # postgres+postgis, redis, minio, mailpit, clamav on 127.0.0.1
 pnpm stack:down   # stop the stack
 pnpm stack:reset  # stop the stack and remove its volumes
 ```
 
-Mailpit UI: http://localhost:8025. MinIO console: http://localhost:9001.
+Mailpit UI: http://localhost:8025. MinIO console: http://localhost:9001. ClamAV (`clamav`) is started without waiting for it to become healthy, since its first `freshclam` signature download can take several minutes on a cold volume; check `docker compose -f infra/docker/compose.dev.yml ps clamav` for its status.
 
 ## API contract
 
