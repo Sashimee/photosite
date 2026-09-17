@@ -1,6 +1,6 @@
 import { hash } from '@node-rs/argon2';
 import { afterAll, describe, expect, it } from 'vitest';
-import { createPrismaClient } from './index.js';
+import { Prisma, createPrismaClient } from './index.js';
 import {
   SEED_PHOTOGRAPHER_PROFILES,
   getSeedUserPassword,
@@ -13,6 +13,11 @@ import { requireIntegrationEnv } from './testing/require-integration-env.js';
 const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL']);
 
 const LUXEMBOURG_CITY = { lat: 49.6116, lng: 6.1319 };
+
+// The api integration suite creates its own Luxembourg-located profiles in the
+// same test database while this file runs, so radius assertions are scoped to
+// the seeded demo rows.
+const SEEDED_SLUGS = Prisma.join(SEED_PHOTOGRAPHER_PROFILES.map((profile) => profile.slug));
 
 // Own slug/email/coordinates, disjoint from SEED_PHOTOGRAPHER_PROFILES and
 // far from every seed city, so this fixture never collides with the seeded
@@ -208,6 +213,7 @@ describe('photographer profile schema', () => {
       const nearby = await prisma.$queryRaw<{ slug: string }[]>`
         SELECT slug FROM "PhotographerProfile"
         WHERE "deletedAt" IS NULL
+          AND slug IN (${SEEDED_SLUGS})
           AND ST_DWithin(
             location,
             ST_SetSRID(ST_MakePoint(${LUXEMBOURG_CITY.lng}, ${LUXEMBOURG_CITY.lat}), 4326)::geography,
@@ -225,6 +231,7 @@ describe('photographer profile schema', () => {
       const nearby = await prisma.$queryRaw<{ slug: string }[]>`
         SELECT slug FROM "PhotographerProfile"
         WHERE "deletedAt" IS NULL
+          AND slug IN (${SEEDED_SLUGS})
           AND ST_DWithin(
             location,
             ST_SetSRID(ST_MakePoint(${LUXEMBOURG_CITY.lng}, ${LUXEMBOURG_CITY.lat}), 4326)::geography,
@@ -242,6 +249,7 @@ describe('photographer profile schema', () => {
       const nearby = await prisma.$queryRaw<{ slug: string }[]>`
         SELECT slug FROM "PhotographerProfile"
         WHERE "deletedAt" IS NULL
+          AND slug IN (${SEEDED_SLUGS})
           AND ST_DWithin(
             location,
             ST_SetSRID(ST_MakePoint(6.0, 50.0), 4326)::geography,
