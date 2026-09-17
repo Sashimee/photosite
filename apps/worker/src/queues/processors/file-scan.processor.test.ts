@@ -121,6 +121,36 @@ describe('createFileScanProcessor', () => {
     );
   });
 
+  it('marks a clean chat attachment image clean without enqueueing image-process', async () => {
+    server = await startFakeClamdServer(() => 'stream: OK\0');
+    const deps = fakeDeps({
+      clamdPort: server.port,
+      upload: { ...BASE_UPLOAD, purpose: 'chat_attachment' },
+    });
+    const processor = createFileScanProcessor(deps);
+
+    await processor(fakeJob(), undefined, undefined);
+
+    expect(deps.update).toHaveBeenCalledWith({
+      where: { id: UPLOAD_ID },
+      data: { status: 'clean', virusScanStatus: 'clean' },
+    });
+    expect(deps.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('marks a clean verification document image clean without enqueueing image-process', async () => {
+    server = await startFakeClamdServer(() => 'stream: OK\0');
+    const deps = fakeDeps({
+      clamdPort: server.port,
+      upload: { ...BASE_UPLOAD, purpose: 'verification_document' },
+    });
+    const processor = createFileScanProcessor(deps);
+
+    await processor(fakeJob(), undefined, undefined);
+
+    expect(deps.enqueue).not.toHaveBeenCalled();
+  });
+
   it('deletes the object, marks infected and writes an AuditLog row on a FOUND reply', async () => {
     server = await startFakeClamdServer(() => 'stream: Eicar-Signature FOUND\0');
     const deps = fakeDeps({ clamdPort: server.port });

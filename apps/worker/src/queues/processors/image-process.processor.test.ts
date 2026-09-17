@@ -114,4 +114,30 @@ describe('createImageProcessProcessor', () => {
 
     expect(update).not.toHaveBeenCalled();
   });
+
+  it('refuses to write public variants for a chat attachment', async () => {
+    const buffer = await fakeJpegBuffer();
+    const { deps, update, putObject } = fakeDeps(buffer, {
+      ...BASE_UPLOAD,
+      purpose: 'chat_attachment',
+    });
+
+    await createImageProcessProcessor(deps)(fakeJob(), undefined, undefined);
+
+    expect(putObject).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('refuses to write public variants for a verification document', async () => {
+    const buffer = await fakeJpegBuffer();
+    const { deps, update, putObject } = fakeDeps(buffer, {
+      ...BASE_UPLOAD,
+      purpose: 'verification_document',
+    });
+
+    await createImageProcessProcessor(deps)(fakeJob(), undefined, undefined);
+
+    expect(putObject).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
 });
