@@ -97,7 +97,6 @@ describe('EmailJobSchema', () => {
 describe.each([
   ['file-scan', FileScanJobSchema] as const,
   ['image-process', ImageProcessJobSchema] as const,
-  ['uploads-cleanup', UploadsCleanupJobSchema] as const,
 ])('%s job schema', (_name, schema) => {
   it('accepts a valid uploadId', () => {
     expect(schema.safeParse({ uploadId: VALID_UPLOAD_ID }).success).toBe(true);
@@ -113,6 +112,16 @@ describe.each([
 
   it('rejects unknown extra keys', () => {
     expect(schema.safeParse({ uploadId: VALID_UPLOAD_ID, extra: 'nope' }).success).toBe(false);
+  });
+});
+
+describe('uploads-cleanup job schema', () => {
+  it('accepts an empty payload', () => {
+    expect(UploadsCleanupJobSchema.safeParse({}).success).toBe(true);
+  });
+
+  it('rejects unknown extra keys', () => {
+    expect(UploadsCleanupJobSchema.safeParse({ uploadId: VALID_UPLOAD_ID }).success).toBe(false);
   });
 });
 

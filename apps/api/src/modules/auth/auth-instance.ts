@@ -3,9 +3,9 @@ import type { PrismaClient } from '@photoo/db';
 import { SIGNUP_ROLES, SUPPORTED_LOCALES } from '@photoo/shared';
 import { betterAuth } from 'better-auth';
 import { bearer, twoFactor, type TwoFactorOptions } from 'better-auth/plugins';
-import type { Redis } from 'ioredis';
 import type { Logger } from 'nestjs-pino';
 import { z } from 'zod';
+import type { RedisRateLimiter } from '../../common/rate-limit/redis-rate-limiter.js';
 import type { Env } from '../../config/env.js';
 import { hardenAdapter } from './adapter/hardened-adapter.js';
 import { withEmailVerifiedBridge } from './adapter/user-email-verified-extension.js';
@@ -23,7 +23,7 @@ const THIRTY_DAYS_SECONDS = 30 * ONE_DAY_SECONDS;
 export interface BuildAuthDeps {
   config: Env;
   prisma: PrismaClient;
-  redis: Redis;
+  rateLimiter: RedisRateLimiter;
   emailQueue: EmailQueueService;
   logger: Logger;
 }
@@ -59,7 +59,13 @@ function buildSocialProviders(
   return providers;
 }
 
-export function buildAuth({ config, prisma: rawPrisma, redis, emailQueue, logger }: BuildAuthDeps) {
+export function buildAuth({
+  config,
+  prisma: rawPrisma,
+  rateLimiter,
+  emailQueue,
+  logger,
+}: BuildAuthDeps) {
   const prisma = withEmailVerifiedBridge(rawPrisma);
 
   const twoFactorOptions = {
@@ -169,7 +175,7 @@ export function buildAuth({ config, prisma: rawPrisma, redis, emailQueue, logger
     plugins: [bearer(), twoFactor(twoFactorOptions)],
     rateLimit: {
       enabled: true,
-      customStorage: createRedisRateLimitStorage(redis),
+      customStorage: createRedisRateLimitStorage(rateLimiter),
       window: 60,
       max: 30,
     },

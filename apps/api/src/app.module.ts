@@ -3,12 +3,15 @@ import { APP_FILTER } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import { buildPinoHttpOptions } from './common/logging/logger.options.js';
+import { RateLimitModule } from './common/rate-limit/rate-limit.module.js';
 import { EnvModule } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { UploadsModule } from './modules/uploads/uploads.module.js';
 import { OpenapiModule } from './openapi/openapi.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { RedisModule } from './redis/redis.module.js';
+import { StorageModule } from './storage/storage.module.js';
 
 @Module({
   imports: [
@@ -16,8 +19,11 @@ import { RedisModule } from './redis/redis.module.js';
     LoggerModule.forRoot({ pinoHttp: buildPinoHttpOptions() }),
     PrismaModule,
     RedisModule,
+    RateLimitModule,
+    StorageModule,
     HealthModule,
     AuthModule,
+    UploadsModule,
     OpenapiModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],

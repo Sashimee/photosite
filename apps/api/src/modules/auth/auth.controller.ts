@@ -39,19 +39,8 @@ import { AuthRateLimitService } from './auth-rate-limit.service.js';
 import { checkPasswordCompromised } from './hibp.js';
 import { isOAuthProvider, isProviderConfigured } from './oauth-providers.js';
 import { OriginGuard } from './origin-guard.js';
+import { requireSession, type BetterAuthUserRow } from './session.js';
 import { mapUser } from './user-mapper.js';
-
-interface BetterAuthUserRow {
-  id: string;
-  email: string;
-  emailVerifiedAt?: string | Date | null;
-  locale: string;
-  countryCode: string;
-  roles: string[];
-  status: string;
-  twoFactorEnabled?: boolean;
-  lastLoginAt?: string | Date | null;
-}
 
 interface BetterAuthSessionRow {
   expiresAt: string | Date;
@@ -77,17 +66,6 @@ export class AuthController {
     @Inject(AuthRateLimitService) private readonly rateLimit: AuthRateLimitService,
     @Inject(Logger) private readonly logger: Logger,
   ) {}
-
-  private async requireSession(
-    request: FastifyRequest,
-  ): Promise<{ user: BetterAuthUserRow; headers: Headers }> {
-    const headers = toFetchHeaders(request);
-    const session = await this.auth.api.getSession({ headers });
-    if (!session) {
-      throw new HttpException({ code: 'UNAUTHORIZED', message: 'Sign in required' }, 401);
-    }
-    return { user: session.user as unknown as BetterAuthUserRow, headers };
-  }
 
   private async signedInBody(
     token: string,
@@ -235,7 +213,7 @@ export class AuthController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: false }) reply: FastifyReply,
   ): Promise<void> {
-    await this.requireSession(request);
+    await requireSession(this.auth, request);
     try {
       const response = await this.auth.api.signOut({
         headers: toFetchHeaders(request),
@@ -254,7 +232,7 @@ export class AuthController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: false }) reply: FastifyReply,
   ): Promise<void> {
-    const { headers } = await this.requireSession(request);
+    const { headers } = await requireSession(this.auth, request);
     try {
       const response = await this.auth.api.revokeSessions({ headers, asResponse: true });
       await applyFetchResponse(response, reply);
@@ -267,7 +245,7 @@ export class AuthController {
 
   @Get('session')
   async session(@Req() request: FastifyRequest): Promise<{ user: ReturnType<typeof mapUser> }> {
-    const { user } = await this.requireSession(request);
+    const { user } = await requireSession(this.auth, request);
     return { user: mapUser(user) };
   }
 
@@ -367,7 +345,7 @@ export class AuthController {
     @Req() request: FastifyRequest,
   ): Promise<{ user: ReturnType<typeof mapUser> }> {
     const input = body as { role: UserRole };
-    const { user } = await this.requireSession(request);
+    const { user } = await requireSession(this.auth, request);
 
     if (!SIGNUP_ROLES.includes(input.role as (typeof SIGNUP_ROLES)[number])) {
       throw new HttpException(
@@ -415,7 +393,7 @@ export class AuthController {
     @Req() request: FastifyRequest,
   ): Promise<{ secret: string; otpauthUrl: string; backupCodes: string[] }> {
     const input = body as { password: string };
-    const { user } = await this.requireSession(request);
+    const { user } = await requireSession(this.auth, request);
     await this.rateLimit.enforce('totp-enroll', request.ip, user.id);
     try {
       const result = await this.auth.api.enableTwoFactor({
@@ -443,7 +421,7 @@ export class AuthController {
     @Res({ passthrough: false }) reply: FastifyReply,
   ): Promise<void> {
     const input = body as { code: string };
-    const { user } = await this.requireSession(request);
+    const { user } = await requireSession(this.auth, request);
     await this.rateLimit.enforce('totp-verify', request.ip, user.id);
     try {
       const response = await this.auth.api.verifyTOTP({
@@ -470,7 +448,7 @@ export class AuthController {
     @Req() request: FastifyRequest,
   ): Promise<{ user: ReturnType<typeof mapUser> }> {
     const input = body as { code: string; password: string };
-    const { user, headers } = await this.requireSession(request);
+    const { user, headers } = await requireSession(this.auth, request);
     await this.rateLimit.enforce('totp-disable', request.ip, user.id);
     try {
       await this.auth.api.verifyTOTP({ body: { code: input.code }, headers });

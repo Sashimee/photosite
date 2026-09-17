@@ -1,4 +1,5 @@
-import type { Redis } from 'ioredis';
+import { Inject, Injectable } from '@nestjs/common';
+import { RedisService } from '../../redis/redis.service.js';
 
 export interface RateLimitRule {
   windowSeconds: number;
@@ -25,19 +26,24 @@ const LOCKOUT_MAX_SECONDS = 60 * 60;
 // Redis-backed limiter with exponential-backoff lockout (SECURITY.md
 // "Account lockout with exponential backoff after repeated failures"): once
 // a scope+key goes over its rule, each further attempt doubles the lockout
-// window (capped) instead of just re-arming a fixed one.
+// window (capped) instead of just re-arming a fixed one. Shared by every
+// module that needs rate limiting (auth, uploads, ...); callers namespace
+// their own `scope` (e.g. "auth:sign-in:ip", "uploads:create:account") so
+// keys from different callers never collide.
+@Injectable()
 export class RedisRateLimiter {
-  constructor(private readonly redis: Redis) {}
+  constructor(@Inject(RedisService) private readonly redisService: RedisService) {}
 
   async consume(scope: string, key: string, rule: RateLimitRule): Promise<RateLimitResult> {
-    const lockoutKey = `auth:lockout:${scope}:${key}`;
-    const lockoutTtl = await this.redis.ttl(lockoutKey);
+    const redis = this.redisService.client;
+    const lockoutKey = `lockout:${scope}:${key}`;
+    const lockoutTtl = await redis.ttl(lockoutKey);
     if (lockoutTtl > 0) {
       return { allowed: false, retryAfterSeconds: lockoutTtl };
     }
 
-    const counterKey = `auth:rate-limit:${scope}:${key}`;
-    const [count, ttl] = (await this.redis.eval(
+    const counterKey = `rate-limit:${scope}:${key}`;
+    const [count, ttl] = (await redis.eval(
       CONSUME_SCRIPT,
       1,
       counterKey,
@@ -53,14 +59,15 @@ export class RedisRateLimiter {
       LOCKOUT_BASE_SECONDS * 2 ** (overflow - 1),
       LOCKOUT_MAX_SECONDS,
     );
-    await this.redis.set(lockoutKey, '1', 'EX', backoffSeconds);
+    await redis.set(lockoutKey, '1', 'EX', backoffSeconds);
     return { allowed: false, retryAfterSeconds: ttl > 0 ? ttl : backoffSeconds };
   }
 
   async reset(scope: string, key: string): Promise<void> {
+    const redis = this.redisService.client;
     await Promise.all([
-      this.redis.del(`auth:rate-limit:${scope}:${key}`),
-      this.redis.del(`auth:lockout:${scope}:${key}`),
+      redis.del(`rate-limit:${scope}:${key}`),
+      redis.del(`lockout:${scope}:${key}`),
     ]);
   }
 }

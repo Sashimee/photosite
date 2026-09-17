@@ -15,6 +15,13 @@ export const TEST_ENV: Env = {
   SMTP_HOST: 'localhost',
   SMTP_PORT: 1025,
   SMTP_FROM: 'dev@photoo.test',
+  S3_ENDPOINT: 'http://127.0.0.1:9000',
+  S3_REGION: 'eu-west-1',
+  S3_ACCESS_KEY_ID: 'photoo_dev',
+  S3_SECRET_ACCESS_KEY: 'photoo_dev_password',
+  S3_FORCE_PATH_STYLE: true,
+  S3_PRIVATE_BUCKET: 'photoo-private',
+  S3_PUBLIC_BUCKET: 'photoo-public',
 };
 
 export const UNREACHABLE_TEST_ENV: Env = {

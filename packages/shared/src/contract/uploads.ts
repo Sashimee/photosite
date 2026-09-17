@@ -1,4 +1,4 @@
-import { VIRUS_SCAN_STATUSES } from '../enums.js';
+import { UPLOAD_STATUSES, VIRUS_SCAN_STATUSES } from '../enums.js';
 import { IdSchema, IsoDateTimeSchema, errorResponses } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
@@ -54,10 +54,11 @@ export const UploadSchema = z
   .object({
     id: IdSchema,
     purpose: UploadPurposeSchema,
+    status: z.enum(UPLOAD_STATUSES).openapi({ example: 'processed' }),
     mimeType: MimeTypeSchema,
-    sizeBytes: z.int().positive(),
+    declaredSizeBytes: z.int().positive(),
+    actualSizeBytes: z.int().positive().nullable(),
     virusScanStatus: z.enum(VIRUS_SCAN_STATUSES),
-    processedAt: IsoDateTimeSchema.nullable(),
     createdAt: IsoDateTimeSchema,
   })
   .strict()
@@ -91,7 +92,15 @@ export const CreateUploadResponseSchema = z
   .object({
     uploadId: IdSchema,
     url: z.url().openapi({ example: 'https://storage.photoo.lu/uploads/abc123' }),
-    headers: z.record(z.string(), z.string()),
+    headers: z
+      .object({
+        'Content-Type': z.string().openapi({ example: 'image/jpeg' }),
+        'Content-Length': z.string().openapi({ example: '1024' }),
+      })
+      .strict()
+      .openapi({
+        description: 'Headers the client must send exactly as given on the presigned PUT',
+      }),
     expiresAt: IsoDateTimeSchema,
   })
   .strict()

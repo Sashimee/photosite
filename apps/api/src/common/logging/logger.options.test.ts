@@ -103,6 +103,31 @@ describe('buildPinoHttpOptions redaction', () => {
     expect(line.body.otpauthUrl).toBe('[Redacted]');
     expect(line.body.email).toBe('kept@example.com');
   });
+
+  it('redacts a presigned upload URL logged as body.url or presignedUrl', () => {
+    const { stream, lines } = collectLogs();
+    const logger = pino({ redact: getRedact() }, stream);
+
+    logger.info({
+      body: {
+        url: 'https://storage.photoo.lu/photoo-private/u/abc?X-Amz-Signature=secret',
+      },
+    });
+    logger.info({
+      presignedUrl: 'https://storage.photoo.lu/photoo-private/u/abc?X-Amz-Signature=secret',
+      upload: {
+        presignedUrl: 'https://storage.photoo.lu/photoo-public/v/abc?X-Amz-Signature=secret',
+      },
+    });
+
+    const [bodyLine, presignedLine] = lines() as [
+      { body: { url: string } },
+      { presignedUrl: string; upload: { presignedUrl: string } },
+    ];
+    expect(bodyLine.body.url).toBe('[Redacted]');
+    expect(presignedLine.presignedUrl).toBe('[Redacted]');
+    expect(presignedLine.upload.presignedUrl).toBe('[Redacted]');
+  });
 });
 
 describe('sanitizeLoggedUrl', () => {

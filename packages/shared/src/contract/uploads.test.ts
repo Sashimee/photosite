@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CreateUploadRequestSchema,
+  CreateUploadResponseSchema,
   UploadDownloadResponseSchema,
   UploadSchema,
 } from './uploads.js';
@@ -8,10 +9,11 @@ import {
 const validUpload = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   purpose: 'portfolio',
+  status: 'pending_upload',
   mimeType: 'image/jpeg',
-  sizeBytes: 1024,
+  declaredSizeBytes: 1024,
+  actualSizeBytes: null,
   virusScanStatus: 'pending',
-  processedAt: null,
   createdAt: '2026-09-16T12:00:00.000Z',
 };
 
@@ -107,6 +109,39 @@ describe('UploadSchema', () => {
     expect(UploadSchema.safeParse({ ...validUpload, virusScanStatus: 'unknown' }).success).toBe(
       false,
     );
+  });
+
+  it('rejects an unknown status', () => {
+    expect(UploadSchema.safeParse({ ...validUpload, status: 'unknown' }).success).toBe(false);
+  });
+
+  it('accepts a null actualSizeBytes and rejects zero', () => {
+    expect(UploadSchema.safeParse({ ...validUpload, actualSizeBytes: null }).success).toBe(true);
+    expect(UploadSchema.safeParse({ ...validUpload, actualSizeBytes: 0 }).success).toBe(false);
+  });
+});
+
+describe('CreateUploadResponseSchema', () => {
+  it('accepts exactly the Content-Type and Content-Length headers', () => {
+    const valid = {
+      uploadId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+      url: 'https://storage.photoo.lu/uploads/abc123',
+      headers: { 'Content-Type': 'image/jpeg', 'Content-Length': '1024' },
+      expiresAt: '2026-09-17T12:00:00.000Z',
+    };
+    expect(CreateUploadResponseSchema.safeParse(valid).success).toBe(true);
+    expect(
+      CreateUploadResponseSchema.safeParse({
+        ...valid,
+        headers: { ...valid.headers, 'X-Amz-Extra': 'nope' },
+      }).success,
+    ).toBe(false);
+    expect(
+      CreateUploadResponseSchema.safeParse({
+        ...valid,
+        headers: { 'Content-Type': 'image/jpeg' },
+      }).success,
+    ).toBe(false);
   });
 });
 

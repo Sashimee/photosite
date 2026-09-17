@@ -32,6 +32,12 @@ export const REDACT_PATHS = [
   'body.otpauthUrl',
   'err.url',
   'err.otpauthUrl',
+  // Presigned S3 PUT/GET URLs are bearer credentials (SECURITY.md "Logs...
+  // never log presigned URLs"): the uploads response bodies carry them as
+  // `url`, already covered by `body.url` above, plus a defensive
+  // `presignedUrl` in case a future log call names the field directly.
+  '*.presignedUrl',
+  'presignedUrl',
 ];
 
 export const REDACT_CENSOR = '[Redacted]';

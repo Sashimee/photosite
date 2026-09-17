@@ -2,6 +2,13 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // Multiple integration suites bootstrap the full AppModule (QueueWorkersService
+    // included) against the same real Redis, so their BullMQ Workers all listen on
+    // the same fixed queue names (file-scan, image-process, uploads-cleanup);
+    // running files in parallel lets one file's job get picked up by another
+    // file's worker instance instead. Same category of fix as packages/db's
+    // fileParallelism: false for its shared TEST_DATABASE_URL.
+    fileParallelism: false,
     testTimeout: 15000,
     hookTimeout: 15000,
     coverage: {

@@ -7019,8 +7019,12 @@ export interface components {
              * @example https://storage.photoo.lu/uploads/abc123
              */
             url: string;
+            /** @description Headers the client must send exactly as given on the presigned PUT */
             headers: {
-                [key: string]: string;
+                /** @example image/jpeg */
+                "Content-Type": string;
+                /** @example 1024 */
+                "Content-Length": string;
             };
             /**
              * Format: date-time
@@ -7041,17 +7045,17 @@ export interface components {
              * @enum {string}
              */
             purpose: "portfolio" | "avatar" | "cover" | "chat_attachment" | "verification_document" | "delivery_file";
+            /**
+             * @example processed
+             * @enum {string}
+             */
+            status: "pending_upload" | "uploaded" | "scanning" | "clean" | "infected" | "failed" | "processed";
             /** @example image/jpeg */
             mimeType: string;
-            sizeBytes: number;
+            declaredSizeBytes: number;
+            actualSizeBytes: number | null;
             /** @enum {string} */
             virusScanStatus: "pending" | "clean" | "infected" | "failed";
-            /**
-             * Format: date-time
-             * @description ISO 8601 date-time
-             * @example 2026-09-16T12:00:00.000Z
-             */
-            processedAt: string | null;
             /**
              * Format: date-time
              * @description ISO 8601 date-time

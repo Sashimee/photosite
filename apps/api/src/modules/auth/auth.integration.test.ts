@@ -18,8 +18,8 @@ function extractFragmentToken(link: string): string | null {
 }
 
 async function clearRateLimitKeys(redis: Redis): Promise<void> {
-  const keys = await redis.keys('auth:rate-limit:*');
-  const lockoutKeys = await redis.keys('auth:lockout:*');
+  const keys = await redis.keys('rate-limit:auth:*');
+  const lockoutKeys = await redis.keys('lockout:auth:*');
   const all = [...keys, ...lockoutKeys];
   if (all.length > 0) {
     await redis.del(...all);
