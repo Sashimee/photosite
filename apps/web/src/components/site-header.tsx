@@ -3,16 +3,19 @@ import Link from 'next/link';
 
 import { SUPPORTED_LOCALES, type Locale } from '@photoo/shared';
 
+import { AccountMenu } from '@/components/account-menu';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { MobileNav, type NavLink } from '@/components/mobile-nav';
 import { Wordmark } from '@/components/wordmark';
+import { getSession } from '@/lib/session';
 
 export async function SiteHeader({ locale }: { locale: Locale }) {
-  const [t, tCommon, tLocale, tSwitcher] = await Promise.all([
+  const [t, tCommon, tLocale, tSwitcher, user] = await Promise.all([
     getTranslations({ locale, namespace: 'web.nav' }),
     getTranslations({ locale, namespace: 'common' }),
     getTranslations({ locale, namespace: 'locale' }),
     getTranslations({ locale, namespace: 'web.localeSwitcher' }),
+    getSession(),
   ]);
 
   const links: NavLink[] = [
@@ -26,6 +29,11 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
   ) as Record<Locale, string>;
 
   const signInHref = `/${locale}/sign-in`;
+  const accountHref = `/${locale}/account`;
+  const authLink = {
+    href: user ? accountHref : signInHref,
+    label: user ? t('account') : t('signIn'),
+  };
 
   return (
     <header className="border-b border-border">
@@ -48,18 +56,21 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
             label={tSwitcher('label')}
             localeNames={localeNames}
           />
-          <Link
-            href={signInHref}
-            className="text-sm font-medium text-foreground hover:text-primary"
-          >
-            {t('signIn')}
-          </Link>
+          {user ? (
+            <AccountMenu locale={locale} user={user} />
+          ) : (
+            <Link
+              href={signInHref}
+              className="text-sm font-medium text-foreground hover:text-primary"
+            >
+              {t('signIn')}
+            </Link>
+          )}
         </div>
         <MobileNav
           locale={locale}
           links={links}
-          signInLabel={t('signIn')}
-          signInHref={signInHref}
+          authLink={authLink}
           openLabel={t('openMenu')}
           closeLabel={t('closeMenu')}
           menuTitle={t('menuTitle')}

@@ -22,13 +22,14 @@ const links = [
 ];
 
 describe('MobileNav', () => {
+  const authLink = { href: '/en/sign-in', label: 'Sign in' };
+
   it('is closed by default', () => {
     render(
       <MobileNav
         locale="en"
         links={links}
-        signInLabel="Sign in"
-        signInHref="/en/sign-in"
+        authLink={authLink}
         openLabel="Open menu"
         closeLabel="Close menu"
         menuTitle="Navigation"
@@ -46,8 +47,7 @@ describe('MobileNav', () => {
       <MobileNav
         locale="en"
         links={links}
-        signInLabel="Sign in"
-        signInHref="/en/sign-in"
+        authLink={authLink}
         openLabel="Open menu"
         closeLabel="Close menu"
         menuTitle="Navigation"
@@ -61,5 +61,26 @@ describe('MobileNav', () => {
     expect(await screen.findByRole('link', { name: 'Find a photographer' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'For photographers' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('shows the account link instead of sign-in when a user is provided', async () => {
+    const user = userEvent.setup();
+    render(
+      <MobileNav
+        locale="en"
+        links={links}
+        authLink={{ href: '/en/account', label: 'Account' }}
+        openLabel="Open menu"
+        closeLabel="Close menu"
+        menuTitle="Navigation"
+        switcherLabel="Change language"
+        localeNames={localeNames}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
+
+    expect(await screen.findByRole('link', { name: 'Account' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
   });
 });
