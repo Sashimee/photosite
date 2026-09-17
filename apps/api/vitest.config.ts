@@ -19,6 +19,7 @@ export default defineConfig({
         // requireIntegrationEnv keeps its own dedicated test and stays covered.
         'src/testing/create-test-app.ts',
         'src/testing/test-env.ts',
+        'src/testing/test-email-worker.module.ts',
         'src/testing/mailpit.ts',
         'src/testing/totp.ts',
       ],

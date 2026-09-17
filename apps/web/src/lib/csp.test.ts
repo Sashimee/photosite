@@ -32,6 +32,16 @@ describe('buildCspHeader', () => {
       "connect-src 'self' https://api.photoo.lu https://o1.ingest.sentry.io;",
     );
   });
+
+  it('only allows self, blob and data image sources when no media origin is set', () => {
+    const header = buildCspHeader('abc123', false);
+    expect(header).toContain("img-src 'self' blob: data:;");
+  });
+
+  it('allows the media origin in img-src when set', () => {
+    const header = buildCspHeader('abc123', false, [], ['https://footoo.bas.lu']);
+    expect(header).toContain("img-src 'self' blob: data: https://footoo.bas.lu;");
+  });
 });
 
 describe('originOf', () => {

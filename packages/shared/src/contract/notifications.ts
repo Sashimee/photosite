@@ -18,16 +18,20 @@ export const NotificationChannelSchema = z
   .enum(NOTIFICATION_CHANNELS)
   .openapi({ example: 'email' });
 
+export const NOTIFICATION_TEXT_MAX_LENGTH = 150;
+
 export const NotificationPayloadSchema = z
   .object({
     quoteId: IdSchema.optional(),
     requestId: IdSchema.optional(),
-    requestTitle: z.string().min(1).max(150).optional(),
+    requestTitle: z.string().min(1).max(NOTIFICATION_TEXT_MAX_LENGTH).optional(),
     total: MoneySchema.optional(),
-    counterpartName: z.string().min(1).max(150).optional(),
+    counterpartName: z.string().min(1).max(NOTIFICATION_TEXT_MAX_LENGTH).optional(),
   })
   .strict()
   .openapi('NotificationPayload');
+
+export type NotificationPayload = z.infer<typeof NotificationPayloadSchema>;
 
 export const NotificationSchema = z
   .object({
@@ -103,6 +107,8 @@ export const UpdateNotificationPreferencesRequestSchema = z
 
 export const ExpoPushTokenSchema = z
   .string()
+  .min(1)
+  .max(200)
   .regex(/^Expo(nent)?PushToken\[[^\]]+\]$/, 'must be a valid Expo push token')
   .openapi({
     description: 'Expo push token',
@@ -257,6 +263,6 @@ registry.registerPath({
   },
   responses: {
     '204': { description: 'Device removed' },
-    ...errorResponses([401, 403, 404]),
+    ...errorResponses([401, 404]),
   },
 });

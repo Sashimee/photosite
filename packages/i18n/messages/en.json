@@ -8,7 +8,63 @@
     "error": "An error occurred",
     "loading": "Loading...",
     "retry": "Retry",
-    "save": "Save"
+    "save": "Save",
+    "categories": {
+      "wedding": "Wedding",
+      "portrait": "Portrait",
+      "event": "Event",
+      "product": "Product",
+      "real-estate": "Real estate",
+      "corporate": "Corporate"
+    },
+    "licenceUsages": {
+      "personal": "Personal use",
+      "commercial": "Commercial use",
+      "editorial": "Editorial use",
+      "extended": "Extended use"
+    }
+  },
+  "email": {
+    "verifyEmail": {
+      "subject": "Verify your {appName} email",
+      "body": "Confirm your email by opening this link: {url}"
+    },
+    "resetPassword": {
+      "subject": "Reset your {appName} password",
+      "body": "Reset your password by opening this link: {url}"
+    },
+    "accountExists": {
+      "subject": "Someone tried to sign up with your {appName} email",
+      "body": "Someone tried to create a {appName} account with this email address. If that was you, sign in instead; if not, you can ignore this message."
+    },
+    "footer": {
+      "preferences": "Manage your notification preferences: {url}"
+    },
+    "notifications": {
+      "unknownCounterpart": "Someone",
+      "unknownClient": "A client",
+      "directQuoteLabel": "your booking",
+      "quoteReceived": {
+        "subject": "New quote from {counterpartName}",
+        "body": "{counterpartName} sent you a quote for {requestTitle}, totalling {total}. View it here: {url}"
+      },
+      "quoteAccepted": {
+        "subject": "{counterpartName} accepted your quote",
+        "body": "{counterpartName} accepted your quote for {requestTitle}, totalling {total}. View it here: {url}"
+      },
+      "quoteDeclined": {
+        "subject": "{counterpartName} declined your quote",
+        "body": "{counterpartName} declined your quote for {requestTitle}. View it here: {url}"
+      },
+      "quoteWithdrawn": {
+        "subject": "A quote was withdrawn",
+        "body": "{counterpartName} withdrew their quote for {requestTitle}. View it here: {url}"
+      },
+      "quoteExpired": {
+        "subject": "A quote has expired",
+        "body": "Your quote for {requestTitle} with {counterpartName} has expired. View it here: {url}"
+      }
+    }
   },
   "locale": {
     "de": "German",
@@ -28,6 +84,27 @@
       "title": "Page not found",
       "description": "This screen does not exist.",
       "backHome": "Go to home screen"
+    }
+  },
+  "push": {
+    "notifications": {
+      "quoteReceived": { "title": "New quote", "body": "{counterpartName} sent you a quote" },
+      "quoteAccepted": {
+        "title": "Quote accepted",
+        "body": "{counterpartName} accepted your quote"
+      },
+      "quoteDeclined": {
+        "title": "Quote declined",
+        "body": "{counterpartName} declined your quote"
+      },
+      "quoteWithdrawn": {
+        "title": "Quote withdrawn",
+        "body": "{counterpartName} withdrew their quote"
+      },
+      "quoteExpired": {
+        "title": "Quote expired",
+        "body": "Your quote with {counterpartName} has expired"
+      }
     }
   },
   "web": {
@@ -218,6 +295,32 @@
         "exportComingSoon": "Data export is coming soon.",
         "deleteAccount": "Delete account",
         "deleteComingSoon": "Account deletion is coming soon."
+      }
+    },
+    "profile": {
+      "metaTitle": "{displayName} – {city}",
+      "categoriesHeading": "Categories",
+      "portfolioHeading": "Portfolio",
+      "portfolioImageAlt": "Photo {index} by {displayName}",
+      "productsHeading": "Packages",
+      "noProducts": "No packages yet.",
+      "fromPrice": "From {price}",
+      "linksHeading": "Links",
+      "languages": "Speaks: {languages}",
+      "rating": "{ratingAvg, number, ::.0} ({ratingCount, plural, one {# review} other {# reviews}})",
+      "requestQuoteCta": "Request a quote",
+      "durationMinutes": "{minutes} min",
+      "notFound": {
+        "title": "Photographer not found",
+        "description": "This photographer profile doesn't exist, or isn't published yet.",
+        "backHome": "Back to home"
+      }
+    },
+    "requests": {
+      "placeholder": {
+        "title": "Requests are coming soon",
+        "description": "Sending booking requests isn't available yet. Check back soon.",
+        "backCta": "Go back"
       }
     }
   }

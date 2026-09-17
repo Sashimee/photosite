@@ -8,8 +8,12 @@ import {
   ImageProcessJobSchema,
   NOTIFICATIONS_CLEANUP_QUEUE_NAME,
   NotificationsCleanupJobSchema,
+  NOTIFY_JOB_ATTEMPTS,
+  NOTIFY_JOB_BACKOFF_DELAY_MS,
+  NOTIFY_JOB_FAILED_RETENTION_SECONDS,
   NOTIFY_QUEUE_NAME,
   NOTIFY_SWEEP_QUEUE_NAME,
+  notifyJobOptions,
   NotifyJobSchema,
   NotifySweepJobSchema,
   PORTFOLIO_IMAGE_CLEANUP_QUEUE_NAME,
@@ -213,6 +217,23 @@ describe('NotifyJobSchema', () => {
     expect(
       NotifyJobSchema.safeParse({ notificationId: VALID_UPLOAD_ID, extra: 'nope' }).success,
     ).toBe(false);
+  });
+});
+
+describe('notifyJobOptions', () => {
+  it('builds BullMQ options with the given jobId, attempts, backoff and retention', () => {
+    const options = notifyJobOptions(VALID_UPLOAD_ID);
+    expect(options).toEqual({
+      jobId: VALID_UPLOAD_ID,
+      attempts: NOTIFY_JOB_ATTEMPTS,
+      backoff: { type: 'exponential', delay: NOTIFY_JOB_BACKOFF_DELAY_MS },
+      removeOnComplete: true,
+      removeOnFail: { age: NOTIFY_JOB_FAILED_RETENTION_SECONDS },
+    });
+  });
+
+  it('accepts a distinct jobId, not just a notificationId (used by notify-sweep re-enqueues)', () => {
+    expect(notifyJobOptions('some-id:sweep:123').jobId).toBe('some-id:sweep:123');
   });
 });
 

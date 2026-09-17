@@ -25,6 +25,14 @@ Last updated: 2026-09-17.
 | 0.8 | Logo, colours, type, app icons, store screenshot template | O5 |
 | 1E.1 | Configure the production `photoo-public` bucket's read policy (anonymous/CDN `s3:GetObject` only, no `ListBucket`) with the EU object storage provider at deploy time; dev MinIO uses a custom bucket policy for this (`infra/docker/compose.dev.yml`) but production is provider-specific | 1E.1 staging/prod public image serving |
 
+## Accounts and access (2026-09-17)
+
+| Issue | Needed from Alex | Blocks | Workaround meanwhile |
+|-------|------------------|--------|----------------------|
+| GitHub Actions jobs are not starting: "recent account payments have failed or your spending limit needs to be increased" | Fix billing in GitHub Settings → Billing & plans, then re-run CI on `main` (or `gh workflow run ci.yml --ref main`) | CI on every PR (no merges on green), the Deploy preview workflow (images for the migrate fix from #71 aren't built, so api and worker stay down on footoo.bas.lu) | Local root checks before opening PRs; PRs stay open until CI runs |
+| The Dokploy API token was printed once in a tool output | Rotate it in Dokploy and replace `~/.config/dokploy/seil.token` | – | – |
+| `~/.config/ghcr/read.token` is root-owned and world-readable (644), and belongs to the personal account | `chmod 600` plus chown to your user; ideally replace it with a read:packages token from a machine user and update the `ghcr-sashimee-read` registry in Dokploy | – | Works as is |
+
 ## Local environment
 
 | Issue | Needed from Alex | Why deferred |
@@ -38,3 +46,5 @@ Last updated: 2026-09-17.
 | Sentry | `@sentry/nextjs` is a no-op without `SENTRY_DSN`; staging/prod set `SENTRY_REQUIRED=true` so a missing DSN fails the build. On mobile, `@sentry/react-native` is only initialised in `apps/mobile/src/lib/sentry.ts` when `EXPO_PUBLIC_SENTRY_DSN` is set; `expo-doctor` prints an organization/project warning for source-map upload until Alex adds those to the EAS/Sentry config |
 | Expo account + EAS project | `eas.json` and `app.config.ts` are committed (1C.1 done). `extra.eas.projectId` comes from `EAS_PROJECT_ID`, omitted when unset. Alex creates the Expo project at expo.dev, sets `EAS_PROJECT_ID` (and `EXPO_TOKEN` for CI), runs `eas init` once, then the first `eas build --profile development` for iOS/Android |
 | OAuth apps (Google, Apple, Facebook, Microsoft) | 1A.2 enables a provider only when its client id/secret env vars are set; email + password works without them |
+| Brevo SMTP relay credentials (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`) and sender domain authentication (SPF/DKIM/DMARC) | Production email delivery; local dev and the preview use Mailpit instead. Part of 0.6 and 2.4 |
+| `EXPO_ACCESS_TOKEN` | Optional; push notifications work without it once the Expo account exists (0.6) |

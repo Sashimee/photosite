@@ -12,10 +12,31 @@ describe('env', () => {
   });
 
   it('treats empty optional variables as unset', async () => {
-    const env = await loadEnv({ NEXT_PUBLIC_SENTRY_DSN: '', SENTRY_REQUIRED: '' });
+    const env = await loadEnv({
+      NEXT_PUBLIC_SENTRY_DSN: '',
+      SENTRY_REQUIRED: '',
+      NEXT_PUBLIC_MEDIA_BASE_URL: '',
+    });
 
     expect(env.NEXT_PUBLIC_SENTRY_DSN).toBeUndefined();
     expect(env.SENTRY_REQUIRED).toBeUndefined();
+    expect(env.NEXT_PUBLIC_MEDIA_BASE_URL).toBeUndefined();
+  });
+
+  it('requires a site URL', async () => {
+    await expect(loadEnv({ NEXT_PUBLIC_SITE_URL: '' })).rejects.toThrow(/NEXT_PUBLIC_SITE_URL/);
+  });
+
+  it('rejects a malformed site URL', async () => {
+    await expect(loadEnv({ NEXT_PUBLIC_SITE_URL: 'not a url' })).rejects.toThrow(
+      /NEXT_PUBLIC_SITE_URL/,
+    );
+  });
+
+  it('rejects a malformed media base URL', async () => {
+    await expect(loadEnv({ NEXT_PUBLIC_MEDIA_BASE_URL: 'not a url' })).rejects.toThrow(
+      /NEXT_PUBLIC_MEDIA_BASE_URL/,
+    );
   });
 
   it('rejects a malformed Sentry DSN', async () => {
