@@ -43,6 +43,7 @@ photoo.lu is a Luxembourg platform (supervisory authority: CNPD). This document 
 | Provenance vendor results | as long as the image is on the platform |
 | Server logs | 30 days |
 | Consent records | 5 years after last update |
+| Notifications (in-app/email/push records) | 12 months, deleted by the worker's `notifications-cleanup` job |
 
 ## Platform-specific obligations
 
