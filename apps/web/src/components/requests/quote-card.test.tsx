@@ -14,6 +14,16 @@ const baseQuote = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   requestId: '3fa85f64-5717-4562-b3fc-2c963f66aaaa',
   photographerId: '3fa85f64-5717-4562-b3fc-2c963f66bbbb',
+  photographer: {
+    id: '3fa85f64-5717-4562-b3fc-2c963f66bbbb',
+    slug: 'jane-doe',
+    displayName: 'Jane Doe',
+    avatarUrl: null,
+    city: 'Luxembourg',
+    countryCode: 'LU',
+    ratingAvg: 4.5,
+    ratingCount: 12,
+  },
   clientId: '3fa85f64-5717-4562-b3fc-2c963f66cccc',
   productId: null,
   productTierId: null,
@@ -32,10 +42,18 @@ describe('QuoteCard', () => {
     const element = await QuoteCard({ quote: baseQuote, locale: 'en' });
     render(element);
 
-    expect(screen.getByRole('link')).toHaveAttribute('href', `/en/quotes/${baseQuote.id}`);
+    const detailLink = screen
+      .getAllByRole('link')
+      .find((link) => link.getAttribute('href')?.startsWith('/en/quotes/'));
+    expect(detailLink).toHaveAttribute('href', `/en/quotes/${baseQuote.id}`);
     expect(screen.getByText('€1,575.00')).toBeInTheDocument();
     expect(screen.getByText('Looking forward to it!')).toBeInTheDocument();
     expect(screen.getByText(translate('web.quotes.status', 'sent'))).toBeInTheDocument();
+    expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Jane Doe/ })).toHaveAttribute(
+      'href',
+      '/en/photographers/jane-doe',
+    );
   });
 
   it('throws loudly instead of rendering a quote with no total', async () => {

@@ -34,6 +34,7 @@ interface RequestBody {
   location: { lat: number; lng: number };
   address?: unknown;
   hasQuoted?: boolean;
+  quoteCount?: number;
 }
 
 interface PaginatedBody<T> {
@@ -400,6 +401,79 @@ describe('requests integration', () => {
       expect(summary.hasQuoted).toBe(true);
       expect(isSnappedToGrid(summary.location.lat)).toBe(true);
       expect(isSnappedToGrid(summary.location.lng)).toBe(true);
+    });
+  });
+
+  describe('quoteCount', () => {
+    it('counts only sent quotes, excluding declined and accepted ones', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const created = (await createRequestAs(client.token)).json<RequestBody>();
+
+      const zero = await fastify().inject({
+        method: 'GET',
+        url: `/v1/requests/${created.id}`,
+        headers: authHeaders(client.token),
+      });
+      expect(zero.json<RequestBody>().quoteCount).toBe(0);
+
+      const photographerA = await createPublishedPhotographer(
+        'quote-count-a',
+        ['wedding'],
+        RUN_LAT,
+        RUN_LNG,
+      );
+      const photographerB = await createPublishedPhotographer(
+        'quote-count-b',
+        ['wedding'],
+        RUN_LAT,
+        RUN_LNG,
+      );
+      await sendQuote(photographerA.token, created.id);
+      const quoteB = (await sendQuote(photographerB.token, created.id)).json<{ id: string }>();
+
+      const bothSent = await fastify().inject({
+        method: 'GET',
+        url: `/v1/requests/${created.id}`,
+        headers: authHeaders(client.token),
+      });
+      expect(bothSent.json<RequestBody>().quoteCount).toBe(2);
+
+      const accept = await fastify().inject({
+        method: 'POST',
+        url: `/v1/quotes/${quoteB.id}/accept`,
+        remoteAddress: AUTH_FAKE_IP,
+        headers: authHeaders(client.token),
+      });
+      expect(accept.statusCode).toBe(200);
+
+      const afterAccept = await fastify().inject({
+        method: 'GET',
+        url: `/v1/requests/${created.id}`,
+        headers: authHeaders(client.token),
+      });
+      expect(afterAccept.json<RequestBody>().quoteCount).toBe(0);
+    });
+
+    it('reflects the count in GET /v1/requests/mine', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const created = (await createRequestAs(client.token)).json<RequestBody>();
+      const photographer = await createPublishedPhotographer(
+        'quote-count-mine',
+        ['wedding'],
+        RUN_LAT,
+        RUN_LNG,
+      );
+      await sendQuote(photographer.token, created.id);
+
+      const mine = await fastify().inject({
+        method: 'GET',
+        url: '/v1/requests/mine?limit=50',
+        headers: authHeaders(client.token),
+      });
+      const item = mine
+        .json<PaginatedBody<RequestBody>>()
+        .items.find((candidate) => candidate.id === created.id);
+      expect(item?.quoteCount).toBe(1);
     });
   });
 

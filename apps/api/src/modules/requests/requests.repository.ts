@@ -32,6 +32,7 @@ export interface RequestFullRow {
   createdAt: Date;
   lat: number;
   lng: number;
+  quoteCount: number;
 }
 
 export interface RequestSummaryRow {
@@ -91,7 +92,8 @@ const FULL_ROW_SELECT = Prisma.sql`
   r."expiresAt" AS "expiresAt",
   r."createdAt" AS "createdAt",
   ST_Y(r.location::geometry) AS "lat",
-  ST_X(r.location::geometry) AS "lng"
+  ST_X(r.location::geometry) AS "lng",
+  (SELECT COUNT(*)::int FROM "Quote" q WHERE q."requestId" = r.id AND q.status = 'sent') AS "quoteCount"
 `;
 
 @Injectable()

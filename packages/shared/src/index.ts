@@ -194,6 +194,7 @@ export {
   CreateQuoteRequestSchema,
   DirectQuoteRequestSchema,
   LineItemSchema,
+  QuotePhotographerSchema,
   QuoteSchema,
   QuotesMineQuerySchema,
 } from './contract/quotes.js';

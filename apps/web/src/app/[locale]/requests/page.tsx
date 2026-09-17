@@ -13,21 +13,8 @@ import { buildRobotsMetadata } from '@/lib/robots';
 import { getSession, serverApi } from '@/lib/session';
 
 type RequestDto = components['schemas']['Request'];
-type Api = Awaited<ReturnType<typeof serverApi>>;
 
 const REQUESTS_LIST_LIMIT = 20;
-// `Request`/`RequestSummary` carry no quote count, and a `limit: 1` probe
-// can only tell us "zero" from "one or more", not a real count, so this
-// stays a per-item fetch until the API adds one (#95).
-const QUOTE_COUNT_LIMIT = 100;
-
-async function loadQuoteCount(api: Api, requestId: string): Promise<number> {
-  const { data } = await api.GET('/v1/requests/{requestId}/quotes', {
-    params: { path: { requestId }, query: { limit: QUOTE_COUNT_LIMIT } },
-    cache: 'no-store',
-  });
-  return data?.items.length ?? 0;
-}
 
 export async function generateMetadata({
   params,
@@ -79,10 +66,6 @@ export default async function RequestsListPage({
     throw new Error(`Failed to load requests: HTTP ${String(result.response.status)}`);
   }
 
-  const quoteCounts = await Promise.all(
-    result.data.items.map((item) => loadQuoteCount(api, item.id)),
-  );
-
   return (
     <section className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-12">
       <div className="flex items-center justify-between gap-4">
@@ -102,7 +85,7 @@ export default async function RequestsListPage({
         <p className="text-muted-foreground">{t('empty')}</p>
       ) : (
         <ul className="flex flex-col gap-4">
-          {result.data.items.map((item: RequestDto, index: number) => (
+          {result.data.items.map((item: RequestDto) => (
             <li key={item.id} className="rounded-lg border border-border p-4">
               <Link href={`/${locale}/requests/${item.id}`} className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
@@ -120,7 +103,7 @@ export default async function RequestsListPage({
                   {formatMoney(item.budgetMax, locale)}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {t('quoteCount', { count: quoteCounts[index] ?? 0 })}
+                  {t('quoteCount', { count: item.quoteCount })}
                 </p>
               </Link>
             </li>

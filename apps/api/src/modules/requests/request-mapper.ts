@@ -18,6 +18,7 @@ export function mapFullRequest(row: RequestFullRow): z.infer<typeof RequestSchem
     usage: row.usage,
     status: row.status,
     expiresAt: row.expiresAt.toISOString(),
+    quoteCount: row.quoteCount,
   });
 }
 

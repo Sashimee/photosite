@@ -6,11 +6,18 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
 import { quoteEventsProvider } from './quote-events.js';
 import { QuotesController } from './quotes.controller.js';
 import { QuotesRateLimitService } from './quotes-rate-limit.service.js';
+import { QuotesRepository } from './quotes.repository.js';
 import { QuotesService } from './quotes.service.js';
 
 @Module({
   imports: [AuthModule, NotificationsModule, ChatModule],
   controllers: [QuotesController],
-  providers: [QuotesService, QuotesRateLimitService, quoteEventsProvider, OriginGuard],
+  providers: [
+    QuotesService,
+    QuotesRepository,
+    QuotesRateLimitService,
+    quoteEventsProvider,
+    OriginGuard,
+  ],
 })
 export class QuotesModule {}
