@@ -1,0 +1,44 @@
+import { z } from 'zod';
+import { IdSchema } from './contract/common.js';
+
+export const QUEUE_NAMES = ['email', 'file-scan', 'image-process', 'uploads-cleanup'] as const;
+
+export type QueueName = (typeof QUEUE_NAMES)[number];
+
+export const EMAIL_QUEUE_NAME = 'email' as const satisfies QueueName;
+export const FILE_SCAN_QUEUE_NAME = 'file-scan' as const satisfies QueueName;
+export const IMAGE_PROCESS_QUEUE_NAME = 'image-process' as const satisfies QueueName;
+export const UPLOADS_CLEANUP_QUEUE_NAME = 'uploads-cleanup' as const satisfies QueueName;
+
+export const EmailJobSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('verify-email'), to: z.email(), url: z.url() }).strict(),
+  z.object({ type: z.literal('reset-password'), to: z.email(), url: z.url() }).strict(),
+  z.object({ type: z.literal('account-exists'), to: z.email() }).strict(),
+]);
+
+export type EmailJob = z.infer<typeof EmailJobSchema>;
+
+// file-scan/image-process/uploads-cleanup all look the same at 1A.3a
+// (an upload to look up), but are kept as separate schemas rather than one
+// shared alias so each queue can grow its own payload independently once
+// 1A.3b adds the worker logic.
+export const FileScanJobSchema = z.object({ uploadId: IdSchema }).strict();
+
+export type FileScanJob = z.infer<typeof FileScanJobSchema>;
+
+export const ImageProcessJobSchema = z.object({ uploadId: IdSchema }).strict();
+
+export type ImageProcessJob = z.infer<typeof ImageProcessJobSchema>;
+
+export const UploadsCleanupJobSchema = z.object({ uploadId: IdSchema }).strict();
+
+export type UploadsCleanupJob = z.infer<typeof UploadsCleanupJobSchema>;
+
+export const QUEUE_JOB_SCHEMAS = {
+  [EMAIL_QUEUE_NAME]: EmailJobSchema,
+  [FILE_SCAN_QUEUE_NAME]: FileScanJobSchema,
+  [IMAGE_PROCESS_QUEUE_NAME]: ImageProcessJobSchema,
+  [UPLOADS_CLEANUP_QUEUE_NAME]: UploadsCleanupJobSchema,
+} as const satisfies Record<QueueName, z.ZodType>;
+
+export type QueueJobPayload<Name extends QueueName> = z.infer<(typeof QUEUE_JOB_SCHEMAS)[Name]>;

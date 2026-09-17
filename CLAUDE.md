@@ -37,7 +37,7 @@ pnpm lint           # eslint in every workspace (turbo)
 pnpm i18n:check     # check catalog consistency (strict mode added in 2.3)
 pnpm typecheck      # tsc --noEmit in every workspace
 pnpm test           # vitest run in every workspace (apps/mobile uses jest-expo instead)
-pnpm test:integration  # runs the db/api integration suites against the running local stack (pnpm stack:up); doesn't start the stack itself
+pnpm test:integration  # runs the db/api/worker integration suites against the running local stack (pnpm stack:up); doesn't start the stack itself
 pnpm build          # tsc builds to dist/ (apps/web builds to .next/ via next build); apps/mobile has no build script, native builds go through EAS
 pnpm format         # prettier --write (markdown is excluded)
 pnpm mock:api       # serve packages/api-client/openapi.json with Prism (Docker image) on 127.0.0.1:4010

@@ -80,6 +80,25 @@ export { buildOpenApiDocument, OPENAPI_INFO_VERSION } from './contract/generate.
 export { HealthResponseSchema, ReadyResponseSchema } from './contract/health.js';
 
 export {
+  EMAIL_QUEUE_NAME,
+  EmailJobSchema,
+  FILE_SCAN_QUEUE_NAME,
+  FileScanJobSchema,
+  IMAGE_PROCESS_QUEUE_NAME,
+  ImageProcessJobSchema,
+  QUEUE_JOB_SCHEMAS,
+  QUEUE_NAMES,
+  UPLOADS_CLEANUP_QUEUE_NAME,
+  UploadsCleanupJobSchema,
+  type EmailJob,
+  type FileScanJob,
+  type ImageProcessJob,
+  type QueueJobPayload,
+  type QueueName,
+  type UploadsCleanupJob,
+} from './queues.js';
+
+export {
   AddRoleRequestSchema,
   AddRoleResponseSchema,
   AuthSessionSchema,

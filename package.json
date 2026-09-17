@@ -21,7 +21,7 @@
     "stack:down": "docker compose -f infra/docker/compose.dev.yml down",
     "stack:reset": "docker compose -f infra/docker/compose.dev.yml down -v",
     "db:seed": "pnpm --filter @photoo/db run seed",
-    "test:integration": "set -a && . packages/db/.env && . apps/api/.env && set +a && pnpm --filter @photoo/db test && pnpm --filter @photoo/api test"
+    "test:integration": "set -a && . packages/db/.env && . apps/api/.env && set +a && pnpm --filter @photoo/db test && pnpm --filter @photoo/api test && pnpm --filter @photoo/worker test"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [
