@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { fileTypeFromBuffer } from 'file-type';
-import sharp from 'sharp';
+import sharp, { type Metadata } from 'sharp';
 import { extractExif, type ExtractedExif } from './exif-extractor.js';
 
 export const IMAGE_VARIANT_WIDTHS = { thumb: 320, medium: 1280, large: 2560 } as const;
@@ -28,6 +28,8 @@ export interface ImageVariantFile {
 export interface ProcessImageResult {
   exif: ExtractedExif;
   variants: ImageVariantFile[];
+  width: number;
+  height: number;
 }
 
 const JPEG_QUALITY = 82;
@@ -63,13 +65,15 @@ export async function processImage(input: ProcessImageInput): Promise<ProcessIma
     );
   }
 
+  let metadata: Metadata;
   try {
-    await sharp(input.buffer, { limitInputPixels: input.maxPixels }).metadata();
+    metadata = await sharp(input.buffer, { limitInputPixels: input.maxPixels }).metadata();
   } catch {
     throw new PixelLimitExceededError(
       `image exceeds the ${String(input.maxPixels)} pixel limit or could not be decoded`,
     );
   }
+  const { width, height } = metadata.autoOrient;
 
   const exif = await extractExif(input.buffer);
   const token = randomBytes(16).toString('hex');
@@ -85,5 +89,5 @@ export async function processImage(input: ProcessImageInput): Promise<ProcessIma
     }
   }
 
-  return { exif, variants };
+  return { exif, variants, width, height };
 }

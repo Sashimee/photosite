@@ -1,4 +1,4 @@
-import { S3Client } from '@aws-sdk/client-s3';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 export interface S3Config {
   endpoint: string;
@@ -25,4 +25,16 @@ export function createS3Client(config: S3Config): S3Client {
       secretAccessKey: config.secretAccessKey,
     },
   });
+}
+
+export async function putPublicObject(
+  client: S3Client,
+  bucket: string,
+  key: string,
+  body: Buffer,
+  contentType: string,
+): Promise<void> {
+  await client.send(
+    new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType }),
+  );
 }

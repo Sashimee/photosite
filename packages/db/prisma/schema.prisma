@@ -80,6 +80,37 @@ enum VirusScanStatus {
   failed
 }
 
+enum PhotographerCategory {
+  wedding
+  portrait
+  event
+  product
+  real_estate @map("real-estate")
+  corporate
+}
+
+enum VerificationStatus {
+  unverified
+  pending
+  verified
+  rejected
+}
+
+enum PortfolioImageStatus {
+  processing
+  pending_review
+  approved
+  flagged
+  rejected
+}
+
+enum LicenceUsage {
+  personal
+  commercial
+  editorial
+  extended
+}
+
 model Country {
   code              String   @id @db.Char(2)
   name              String
@@ -92,7 +123,8 @@ model Country {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  users User[]
+  users                User[]
+  photographerProfiles PhotographerProfile[]
 }
 
 model PlatformSetting {
@@ -132,6 +164,7 @@ model User {
   notifications           Notification[]
   updatedPlatformSettings PlatformSetting[]
   uploads                 Upload[]
+  photographerProfile     PhotographerProfile?
 
   @@index([countryCode])
   @@index([status])
@@ -277,6 +310,8 @@ model Notification {
 // private (SECURITY.md) and never serialised to clients; downloads are only
 // issued once `virusScanStatus = clean`. Uploads still `pending_upload` or
 // `uploaded` past `expiresAt` are removed by the worker's cleanup job.
+// `width`/`height` are set by the worker's image-process job once the
+// upload is processed.
 model Upload {
   id                String          @id @default(uuid(7))
   ownerId           String
@@ -286,6 +321,8 @@ model Upload {
   mimeType          String
   declaredSizeBytes Int
   actualSizeBytes   Int?
+  width             Int?
+  height            Int?
   objectKey         String          @unique
   variants          Json?
   exif              Json?
@@ -294,7 +331,115 @@ model Upload {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
+  avatarForProfile PhotographerProfile? @relation("PhotographerProfileAvatar")
+  coverForProfile  PhotographerProfile? @relation("PhotographerProfileCover")
+  portfolioImage   PortfolioImage?
+
   @@index([ownerId])
   @@index([status])
   @@index([status, expiresAt])
+}
+
+// `location` is `geography(Point, 4326)`, an `Unsupported` type Prisma
+// cannot index or write directly: the GiST index lives in hand-written
+// migration SQL and `location` is only ever set/read via raw queries.
+// `isPublished` requires `verificationStatus = verified` and
+// `stripePayoutsEnabled = true` (DATA-MODEL.md); enforced by callers, not
+// the database, since real profiles cannot flip either flag before 1A.8/1A.9.
+model PhotographerProfile {
+  id                       String                                 @id @default(uuid(7))
+  userId                   String                                 @unique
+  user                     User                                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug                     String                                 @unique
+  displayName              String
+  headline                 String?
+  bio                      Json
+  avatarUploadId           String?                                @unique
+  avatarUpload             Upload?                                @relation("PhotographerProfileAvatar", fields: [avatarUploadId], references: [id], onDelete: SetNull)
+  coverUploadId            String?                                @unique
+  coverUpload              Upload?                                @relation("PhotographerProfileCover", fields: [coverUploadId], references: [id], onDelete: SetNull)
+  links                    Json
+  categories               PhotographerCategory[]
+  languages                String[]
+  location                 Unsupported("geography(Point, 4326)")?
+  serviceRadiusKm          Int?
+  city                     String
+  countryCode              String                                 @db.Char(2)
+  country                  Country                                @relation(fields: [countryCode], references: [code])
+  verificationStatus       VerificationStatus                     @default(unverified)
+  stripeAccountId          String?
+  stripeOnboardingComplete Boolean                                @default(false)
+  stripePayoutsEnabled     Boolean                                @default(false)
+  ratingAvg                Decimal                                @default(0) @db.Decimal(3, 2)
+  ratingCount              Int                                    @default(0)
+  isPublished              Boolean                                @default(false)
+  deletedAt                DateTime?
+  createdAt                DateTime                               @default(now())
+  updatedAt                DateTime                               @updatedAt
+
+  portfolioImages PortfolioImage[]
+  products        Product[]
+
+  @@index([countryCode])
+  @@index([verificationStatus])
+  @@index([city])
+}
+
+// `width`/`height` are copied from `Upload` once the worker's image-process
+// job finishes, so the public profile response never has to join `Upload`.
+model PortfolioImage {
+  id        String               @id @default(uuid(7))
+  profileId String
+  profile   PhotographerProfile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  uploadId  String               @unique
+  upload    Upload               @relation(fields: [uploadId], references: [id], onDelete: Restrict)
+  width     Int?
+  height    Int?
+  order     Int
+  status    PortfolioImageStatus @default(processing)
+  deletedAt DateTime?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([profileId])
+  @@index([status])
+}
+
+model Product {
+  id              String               @id @default(uuid(7))
+  profileId       String
+  profile         PhotographerProfile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title           Json
+  description     Json?
+  category        PhotographerCategory
+  durationMinutes Int
+  deliverables    Json
+  basePriceCents  Int
+  currency        String               @db.Char(3)
+  isActive        Boolean              @default(true)
+  order           Int
+  deletedAt       DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tiers ProductTier[]
+
+  @@index([profileId])
+  @@index([isActive])
+}
+
+model ProductTier {
+  id                 String       @id @default(uuid(7))
+  productId          String
+  product            Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  usage              LicenceUsage
+  priceCents         Int
+  currency           String       @db.Char(3)
+  description        String?
+  licenceTextVersion String
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@unique([productId, usage])
+  @@index([productId])
 }
