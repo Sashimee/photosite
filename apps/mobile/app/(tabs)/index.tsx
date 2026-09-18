@@ -188,14 +188,14 @@ export default function DiscoverScreen() {
                 </Pressable>
               ) : null}
             </View>
-          ) : null
+          ) : undefined
         }
         ListFooterComponent={
           status === 'loadingMore' ? (
             <View className="items-center py-4" testID="discover-loading-more">
               <ActivityIndicator />
             </View>
-          ) : null
+          ) : undefined
         }
       />
       <FilterSheet
