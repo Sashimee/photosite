@@ -1374,6 +1374,36 @@ describe('chat integration', () => {
       expect(socketA.connected).toBe(false);
       expect(socketB.connected).toBe(false);
     });
+
+    it('disconnects the chat socket on a password reset', async () => {
+      const user = await signUpAndSignIn(['client'], 'm1-password-reset');
+      const socket = await connectSocket({ token: user.token });
+      const disconnected = new Promise<void>((resolve) => {
+        socket.once('disconnect', () => {
+          resolve();
+        });
+      });
+
+      await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/password-reset/request',
+        remoteAddress: AUTH_FAKE_IP,
+        payload: { email: user.email },
+      });
+      const link = await waitForLinkInEmail(user.email, /https?:\/\/\S*reset-password#token=\S+/);
+      const resetToken = extractFragmentToken(link);
+      if (!resetToken) throw new Error(`no token found in reset link: ${link}`);
+
+      await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/password-reset/confirm',
+        remoteAddress: AUTH_FAKE_IP,
+        payload: { token: resetToken, password: `photoo-test-new-${randomUUID()}` },
+      });
+
+      await disconnected;
+      expect(socket.connected).toBe(false);
+    });
   });
 
   describe('pagination', () => {

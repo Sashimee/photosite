@@ -213,6 +213,15 @@ describe('auth integration', () => {
     await signUp(email);
     await verifyByEmail(email);
 
+    const signInBeforeReset = await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/sign-in',
+      payload: { email, password: PASSWORD },
+    });
+    const { session: sessionBeforeReset } = signInBeforeReset.json<{
+      session: { token: string };
+    }>();
+
     const requestResponse = await fastify().inject({
       method: 'POST',
       url: '/v1/auth/password-reset/request',
@@ -231,6 +240,13 @@ describe('auth integration', () => {
       payload: { token, password: newPassword },
     });
     expect(confirmResponse.statusCode).toBe(200);
+
+    const sessionAfterReset = await fastify().inject({
+      method: 'GET',
+      url: '/v1/auth/session',
+      headers: { authorization: `Bearer ${sessionBeforeReset.token}` },
+    });
+    expect(sessionAfterReset.statusCode).toBe(401);
 
     const oldPasswordSignIn = await fastify().inject({
       method: 'POST',
