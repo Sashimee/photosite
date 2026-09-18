@@ -5,6 +5,7 @@ import { SUPPORTED_LOCALES, type Locale } from '@photoo/shared';
 
 import { AccountMenu } from '@/components/account-menu';
 import { LocaleSwitcher } from '@/components/locale-switcher';
+import { UnreadMessagesBadge } from '@/components/messages/unread-badge';
 import { MobileNav, type NavLink } from '@/components/mobile-nav';
 import { Wordmark } from '@/components/wordmark';
 import { getSession } from '@/lib/session';
@@ -18,10 +19,12 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
     getSession(),
   ]);
 
+  const messagesHref = `/${locale}/messages`;
   const links: NavLink[] = [
     { href: `/${locale}/photographers`, label: t('findPhotographer') },
     { href: `/${locale}/for-photographers`, label: t('forPhotographers') },
     { href: `/${locale}/jobs`, label: t('jobs') },
+    ...(user ? [{ href: messagesHref, label: t('messages') }] : []),
   ];
 
   const localeNames = Object.fromEntries(
@@ -44,9 +47,10 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-foreground hover:text-primary"
+              className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary"
             >
               {link.label}
+              {link.href === messagesHref ? <UnreadMessagesBadge /> : null}
             </Link>
           ))}
         </nav>

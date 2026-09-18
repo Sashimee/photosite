@@ -7,9 +7,15 @@ import { requireSession, type SessionContext } from '../../modules/auth/session.
 // before it must be re-proven: long enough for a single admin session
 // (SECURITY.md's 12h admin session lifetime), short enough that a stolen
 // long-lived session can't reuse an old TOTP check indefinitely.
-const TWO_FACTOR_VERIFICATION_WINDOW_MS = 12 * 60 * 60 * 1000;
+export const TWO_FACTOR_VERIFICATION_WINDOW_MS = 12 * 60 * 60 * 1000;
 
-function forbidden(message: string): HttpException {
+// `x-requires-2fa` operations (docs/steps/1A.11-admin-api.md) demand a
+// second factor proven more recently than the 12h admin-session window
+// above, so a role change or a refund re-prompts even inside an otherwise
+// valid admin session.
+export const TWO_FACTOR_FRESH_VERIFICATION_WINDOW_MS = 15 * 60 * 1000;
+
+export function forbidden(message: string): HttpException {
   return new HttpException({ code: 'FORBIDDEN', message }, 403);
 }
 
@@ -17,7 +23,7 @@ function forbidden(message: string): HttpException {
 // not an admin" (dead end) apart from "prove your second factor again"
 // (re-prompt for TOTP), without parsing the message string. 403 stays the
 // HTTP status since the caller is authenticated, just not authorized yet.
-function twoFactorRequired(message: string): HttpException {
+export function twoFactorRequired(message: string): HttpException {
   return new HttpException({ code: 'TWO_FACTOR_REQUIRED', message }, 403);
 }
 
