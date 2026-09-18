@@ -6,9 +6,17 @@ import { env } from './env';
 
 export type SessionUser = components['schemas']['User'];
 
-const sessionClient = createApiClient({ baseUrl: env.NEXT_PUBLIC_API_URL });
+const serverBaseUrl = env.API_INTERNAL_URL ?? env.NEXT_PUBLIC_API_URL;
+
+const sessionClient = createApiClient({ baseUrl: serverBaseUrl });
 
 const SESSION_COOKIE = 'photoo_session';
+// Better Auth prefixes the cookie with `__Secure-` whenever it sets it over
+// https (`useSecureCookies` in auth-instance.ts), so the name differs between
+// local http and every deployed environment. Matching only the bare name made
+// every signed-in page on the preview redirect back to sign-in while local
+// dev worked perfectly.
+const SESSION_COOKIE_NAMES = [`__Secure-${SESSION_COOKIE}`, SESSION_COOKIE];
 
 // Server-side `fetch` never sees the incoming request's cookies on its own
 // (unlike the browser, which attaches them via `credentials: 'include'`), so
@@ -16,8 +24,10 @@ const SESSION_COOKIE = 'photoo_session';
 // forward the session cookie by hand.
 async function sessionCookieHeader(): Promise<Record<string, string> | undefined> {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.getAll().find((cookie) => cookie.name === SESSION_COOKIE);
-  return sessionCookie ? { cookie: `${SESSION_COOKIE}=${sessionCookie.value}` } : undefined;
+  const sessionCookie = cookieStore
+    .getAll()
+    .find((cookie) => SESSION_COOKIE_NAMES.includes(cookie.name));
+  return sessionCookie ? { cookie: `${sessionCookie.name}=${sessionCookie.value}` } : undefined;
 }
 
 export async function getSession(): Promise<SessionUser | null> {
@@ -35,9 +45,15 @@ export async function getSession(): Promise<SessionUser | null> {
     return null;
   }
   if (!data) {
-    throw new Error(
-      `Session lookup failed with HTTP ${String(response.status)}; check the API at NEXT_PUBLIC_API_URL`,
+    // Anything other than 200/401 - a 403 from the edge, a 502, a blip -
+    // used to throw here, which blanked the whole page behind the error
+    // boundary just because the session could not be read. Degrade to
+    // signed-out and log instead: a visitor who cannot be identified is a
+    // visitor, not an outage.
+    console.error(
+      `Session lookup failed with HTTP ${String(response.status)}; treating the visitor as signed out`,
     );
+    return null;
   }
   return data.user;
 }
@@ -53,7 +69,7 @@ function noRedirectFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
 export async function serverApi() {
   const headers = (await sessionCookieHeader()) ?? {};
   return createApiClient({
-    baseUrl: env.NEXT_PUBLIC_API_URL,
+    baseUrl: serverBaseUrl,
     headers,
     fetch: noRedirectFetch,
   });

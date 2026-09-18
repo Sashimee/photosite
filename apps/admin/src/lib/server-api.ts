@@ -9,6 +9,12 @@ export type SessionUser = components['schemas']['User'];
 const sessionClient = createApiClient({ baseUrl: env.NEXT_PUBLIC_API_URL });
 
 const SESSION_COOKIE = 'photoo_session';
+// Better Auth prefixes the cookie with `__Secure-` whenever it sets it over
+// https (`useSecureCookies` in auth-instance.ts), so the name differs between
+// local http and every deployed environment. Matching only the bare name made
+// every signed-in page on the preview redirect back to sign-in while local
+// dev worked perfectly.
+const SESSION_COOKIE_NAMES = [`__Secure-${SESSION_COOKIE}`, SESSION_COOKIE];
 
 // Server-side `fetch` never sees the incoming request's cookies on its own
 // (unlike the browser, which attaches them via `credentials: 'include'`), so
@@ -16,8 +22,10 @@ const SESSION_COOKIE = 'photoo_session';
 // forward the session cookie by hand.
 async function sessionCookieHeader(): Promise<Record<string, string> | undefined> {
   const cookieStore = await cookies();
-  const sessionCookie = cookieStore.getAll().find((cookie) => cookie.name === SESSION_COOKIE);
-  return sessionCookie ? { cookie: `${SESSION_COOKIE}=${sessionCookie.value}` } : undefined;
+  const sessionCookie = cookieStore
+    .getAll()
+    .find((cookie) => SESSION_COOKIE_NAMES.includes(cookie.name));
+  return sessionCookie ? { cookie: `${sessionCookie.name}=${sessionCookie.value}` } : undefined;
 }
 
 export async function getSession(): Promise<SessionUser | null> {
