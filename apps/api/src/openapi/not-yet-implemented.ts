@@ -18,8 +18,6 @@ export const NOT_YET_IMPLEMENTED: readonly NotYetImplementedRoute[] = [
   { method: 'GET', path: '/v1/admin/bookings/:id' },
   { method: 'POST', path: '/v1/admin/bookings/:id/refund' },
   { method: 'POST', path: '/v1/admin/bookings/:id/reverse-transfer' },
-  { method: 'GET', path: '/v1/admin/reports' },
-  { method: 'POST', path: '/v1/admin/reports/:id/resolve' },
   { method: 'POST', path: '/v1/me/data-requests' },
   { method: 'GET', path: '/v1/me/data-requests' },
   { method: 'POST', path: '/v1/consents' },

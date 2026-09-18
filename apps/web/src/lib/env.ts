@@ -29,8 +29,30 @@ const EnvSchema = z.object({
     .transform((value) => value === 'true'),
 });
 
+// Every key the schema declares must also appear as a literal
+// `process.env.KEY` reference below, or Next leaves it undefined in the
+// client bundle. env.test.ts asserts that from this list, so adding a key to
+// the schema and forgetting the reference fails the suite instead of the
+// browser.
+export const ENV_KEYS = Object.keys(EnvSchema.shape) as (keyof typeof EnvSchema.shape)[];
+
 function loadEnv() {
-  const parsed = EnvSchema.safeParse(process.env);
+  // Next only substitutes *literal* `process.env.NEXT_PUBLIC_X` references
+  // when it builds the client bundle; handing the whole `process.env` object
+  // to zod leaves every public value `undefined` in the browser, so this
+  // module threw at evaluation and took down any page whose client bundle
+  // imported it. The home page survived only because none of its client
+  // components import this file. Each key must stay spelled out here.
+  const parsed = EnvSchema.safeParse({
+    NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+    NEXT_PUBLIC_MEDIA_BASE_URL: process.env.NEXT_PUBLIC_MEDIA_BASE_URL,
+    NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    NEXT_PUBLIC_ALLOW_INDEXING: process.env.NEXT_PUBLIC_ALLOW_INDEXING,
+    SENTRY_REQUIRED: process.env.SENTRY_REQUIRED,
+    API_INTERNAL_URL: process.env.API_INTERNAL_URL,
+  });
   if (!parsed.success) {
     const details = parsed.error.issues
       .map((issue) => `${issue.path.join('.') || '(unknown variable)'}: ${issue.message}`)

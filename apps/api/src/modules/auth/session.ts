@@ -27,18 +27,33 @@ export interface SessionContext {
   session: BetterAuthSessionRow;
 }
 
-// Shared by every module that needs to know who is calling (uploads, and
-// every controller-level check in auth.controller.ts itself): looks up the
-// Better Auth session for the request's cookie/bearer token, or throws 401.
-export async function requireSession(auth: Auth, request: FastifyRequest): Promise<SessionContext> {
+// Looks up the Better Auth session for the request's cookie/bearer token,
+// or returns null: for routes that must work signed out (e.g. public
+// reporting) but still attribute the action to an account when one is
+// present.
+export async function getOptionalSession(
+  auth: Auth,
+  request: FastifyRequest,
+): Promise<SessionContext | null> {
   const headers = toFetchHeaders(request);
   const session = await auth.api.getSession({ headers });
   if (!session) {
-    throw new HttpException({ code: 'UNAUTHORIZED', message: 'Sign in required' }, 401);
+    return null;
   }
   return {
     user: session.user as unknown as BetterAuthUserRow,
     headers,
     session: session.session as unknown as BetterAuthSessionRow,
   };
+}
+
+// Shared by every module that needs to know who is calling (uploads, and
+// every controller-level check in auth.controller.ts itself): looks up the
+// Better Auth session for the request's cookie/bearer token, or throws 401.
+export async function requireSession(auth: Auth, request: FastifyRequest): Promise<SessionContext> {
+  const session = await getOptionalSession(auth, request);
+  if (!session) {
+    throw new HttpException({ code: 'UNAUTHORIZED', message: 'Sign in required' }, 401);
+  }
+  return session;
 }
