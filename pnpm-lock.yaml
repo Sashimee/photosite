@@ -502,6 +502,9 @@ importers:
       react-hook-form:
         specifier: 7.85.0
         version: 7.85.0(react@19.3.0)
+      socket.io-client:
+        specifier: 4.8.3
+        version: 4.8.3(supports-color@7.2.0)
       tailwind-merge:
         specifier: 3.7.0
         version: 3.7.0
