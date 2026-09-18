@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CancelDataRequestRequestSchema,
   ConsentRecordSchema,
   ConsentsResponseSchema,
   CreateConsentRequestSchema,
@@ -81,6 +82,23 @@ describe('DataRequestSchema', () => {
     for (const status of ['pending', 'processing', 'ready', 'completed', 'failed', 'cancelled']) {
       expect(DataRequestSchema.safeParse({ ...validRequest, status }).success).toBe(true);
     }
+  });
+});
+
+describe('CancelDataRequestRequestSchema', () => {
+  it('defaults to an empty body for an ordinary in-session cancel', () => {
+    expect(CancelDataRequestRequestSchema.safeParse(undefined)).toEqual({
+      success: true,
+      data: {},
+    });
+  });
+
+  it('accepts a token for a soft-deleted account', () => {
+    expect(CancelDataRequestRequestSchema.safeParse({ token: 'abc123' }).success).toBe(true);
+  });
+
+  it('rejects an empty token', () => {
+    expect(CancelDataRequestRequestSchema.safeParse({ token: '' }).success).toBe(false);
   });
 });
 

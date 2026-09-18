@@ -41,6 +41,11 @@ export const EmailJobSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('verify-email'), to: z.email(), url: z.url() }).strict(),
   z.object({ type: z.literal('reset-password'), to: z.email(), url: z.url() }).strict(),
   z.object({ type: z.literal('account-exists'), to: z.email() }).strict(),
+  // `url` carries the single-use cancel link (docs/steps/1A.12-gdpr.md
+  // "Cancellable during the grace period"); like the other auth jobs, this
+  // is unconditional (no notification-preference gate) because a deletion
+  // confirmation is not optional mail.
+  z.object({ type: z.literal('account-deletion-requested'), to: z.email(), url: z.url() }).strict(),
 ]);
 
 export type EmailJob = z.infer<typeof EmailJobSchema>;

@@ -14491,7 +14491,7 @@
     },
     "/v1/me/data-requests/{id}/cancel": {
       "post": {
-        "summary": "Cancel a data request during its grace period. Only a deletion request can be cancelled, and only before anonymisation runs.",
+        "summary": "Cancel a data request during its grace period. Only a deletion request can be cancelled, and only before anonymisation runs. A soft-deleted account has no session, so `token` (the single-use value mailed at deletion time) is accepted in place of one.",
         "tags": [
           "gdpr"
         ],
@@ -14517,6 +14517,23 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "default": {},
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Data request cancelled",
@@ -14563,7 +14580,7 @@
     },
     "/v1/me/data-requests/{id}/download": {
       "get": {
-        "summary": "Get a 10-minute presigned download URL for a completed export. 409 while the export is not yet ready, 410 once the request's expiresAt has passed.",
+        "summary": "Get a 10-minute presigned download URL for a completed export. 403 for a data request that belongs to someone else, 409 while the export is not yet ready, 410 once the request's expiresAt has passed.",
         "tags": [
           "gdpr"
         ],
@@ -14602,6 +14619,16 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {

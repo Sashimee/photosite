@@ -342,6 +342,7 @@ export {
 } from './contract/reports.js';
 
 export {
+  CancelDataRequestRequestSchema,
   ConsentPurposeSchema,
   ConsentRecordSchema,
   ConsentsResponseSchema,
