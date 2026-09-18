@@ -14,7 +14,8 @@ describe('openapi document', () => {
       committed = JSON.parse(readFileSync(openapiPath, 'utf8'));
     } catch (error) {
       throw new Error(
-        `packages/api-client/openapi.json is missing or unreadable. Run "pnpm --filter @photoo/shared openapi:generate" first. ${String(error)}`,
+        'packages/api-client/openapi.json is missing or unreadable. Run "pnpm --filter @photoo/shared openapi:generate" first.',
+        { cause: error },
       );
     }
 
