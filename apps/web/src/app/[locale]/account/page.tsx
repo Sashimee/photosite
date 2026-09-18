@@ -7,6 +7,8 @@ import { isLocale, type Locale } from '@photoo/shared';
 import { getSession } from '@/lib/session';
 
 import { DangerZone } from './danger-zone';
+import { buildRobotsMetadata } from '@/lib/robots';
+
 import { RolesPanel } from './roles-panel';
 import { SessionsPanel } from './sessions-panel';
 import { TwoFactorPanel } from './two-factor-panel';
@@ -21,7 +23,7 @@ export async function generateMetadata({
     return {};
   }
   const t = await getTranslations({ locale, namespace: 'web.account' });
-  return { title: t('title') };
+  return { title: t('title'), robots: buildRobotsMetadata(false) };
 }
 
 export default async function AccountPage({ params }: { params: Promise<{ locale: string }> }) {
