@@ -77,7 +77,7 @@ export const ApiErrorSchema = z
   .strict()
   .openapi('ApiError');
 
-export const STANDARD_ERROR_STATUS_CODES = [400, 401, 403, 404, 409, 422, 429] as const;
+export const STANDARD_ERROR_STATUS_CODES = [400, 401, 403, 404, 409, 410, 422, 429] as const;
 
 export type StandardErrorStatusCode = (typeof STANDARD_ERROR_STATUS_CODES)[number];
 
@@ -87,6 +87,7 @@ const ERROR_STATUS_DESCRIPTIONS: Record<StandardErrorStatusCode, string> = {
   403: 'Forbidden',
   404: 'Not found',
   409: 'Conflict',
+  410: 'Gone',
   422: 'Unprocessable entity',
   429: 'Too many requests',
 };
