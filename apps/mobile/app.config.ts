@@ -36,12 +36,28 @@ const config: ExpoConfig = {
     'expo-secure-store',
     'expo-localization',
     'expo-status-bar',
+    'expo-image',
     [
       'expo-splash-screen',
       {
         image: './assets/splash.png',
         resizeMode: 'contain',
         backgroundColor: '#ffffff',
+      },
+    ],
+    [
+      'expo-location',
+      {
+        // Foreground-only: the "near me" search never runs in the background,
+        // so the Always/background keys and the unrelated motion permission
+        // are explicitly suppressed rather than left at the plugin's default.
+        locationAlwaysAndWhenInUsePermission: false,
+        locationAlwaysPermission: false,
+        locationWhenInUsePermission:
+          'Photoo uses your location, rounded to about 1 km, to sort photographers near you when you tap "Near me". It is never stored.',
+        motionUsagePermission: false,
+        isIosBackgroundLocationEnabled: false,
+        isAndroidBackgroundLocationEnabled: false,
       },
     ],
     '@sentry/react-native',

@@ -19,8 +19,15 @@ jest.mock('expo-secure-store', () => ({
 
 jest.mock('../../src/lib/api', () => ({
   api: {
-    GET: jest.fn(() =>
-      Promise.resolve({
+    GET: jest.fn((path: string) => {
+      if (path === '/v1/photographers') {
+        return Promise.resolve({
+          data: { items: [], nextCursor: null },
+          error: undefined,
+          response: new Response(null, { status: 200 }),
+        });
+      }
+      return Promise.resolve({
         data: {
           user: {
             id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
@@ -36,8 +43,8 @@ jest.mock('../../src/lib/api', () => ({
         },
         error: undefined,
         response: new Response(null, { status: 200 }),
-      }),
-    ),
+      });
+    }),
     POST: jest.fn(),
   },
   setUnauthorizedListener: jest.fn(),
