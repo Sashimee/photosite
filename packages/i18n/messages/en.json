@@ -365,6 +365,10 @@
       "subject": "Someone tried to sign up with your {appName} email",
       "body": "Someone tried to create a {appName} account with this email address. If that was you, sign in instead; if not, you can ignore this message."
     },
+    "accountDeletionRequested": {
+      "subject": "Your {appName} account deletion request",
+      "body": "We've received your request to delete your account. Your account is deactivated immediately. If you change your mind, you have 30 days to cancel by opening this link: {url}"
+    },
     "footer": {
       "preferences": "Manage your notification preferences: {url}"
     },
@@ -604,7 +608,46 @@
       "privacy": "Privacy policy",
       "terms": "Terms of service",
       "cookies": "Cookie policy",
+      "consentSettings": "Cookie settings",
       "rights": "© {year} {appName}. All rights reserved."
+    },
+    "consent": {
+      "categories": {
+        "necessary": {
+          "title": "Necessary",
+          "description": "Required to run the site, such as remembering your consent choice. Always on."
+        },
+        "analytics": {
+          "title": "Analytics",
+          "description": "Helps us understand how the site is used so we can improve it. Off until you allow it."
+        },
+        "adsMarketing": {
+          "title": "Ads and marketing",
+          "description": "Used to measure and personalise ads and marketing emails. Off until you allow it."
+        }
+      },
+      "banner": {
+        "title": "Your privacy choices",
+        "description": "We use cookies for analytics and ads/marketing only with your consent. Necessary cookies are always on.",
+        "acceptAll": "Accept all",
+        "rejectAll": "Reject all",
+        "manage": "Manage preferences"
+      },
+      "dialog": {
+        "title": "Manage your privacy preferences",
+        "description": "Choose which non-necessary categories you allow. You can change this at any time from the cookie settings page.",
+        "save": "Save preferences"
+      },
+      "settings": {
+        "title": "Cookie settings",
+        "intro": "Review or change what you've consented to at any time. Necessary cookies can't be turned off because the site needs them to run.",
+        "policyUpdated": "Our policy has changed since your last choice. Please review your preferences.",
+        "notDecidedYet": "Not decided yet.",
+        "decidedUnder": "Recorded on {date} under policy version {policyVersion}.",
+        "acceptAll": "Accept all",
+        "rejectAll": "Reject all",
+        "savePreferences": "Save preferences"
+      }
     },
     "legal": {
       "pending": "The full text of this document is being prepared with our legal advisers and will be published here before launch.",

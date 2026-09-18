@@ -59,6 +59,11 @@ const SIGNED_OUT_ROUTES: readonly SignedOutRoute[] = [
     path: '/legal/privacy',
     reason: 'legally required page, linked from the footer on every page',
   },
+  {
+    path: '/consent',
+    reason:
+      'the consent settings page - reachable from the footer, has to render (and its form submit) without JavaScript',
+  },
 ];
 
 export const SIGNED_OUT_PAGES: readonly SmokePage[] = SUPPORTED_LOCALES.flatMap((locale) =>

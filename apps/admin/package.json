@@ -15,7 +15,7 @@
     "@photoo/api-client": "workspace:*",
     "@photoo/i18n": "workspace:*",
     "@photoo/shared": "workspace:*",
-    "@hookform/resolvers": "5.2.2",
+    "@hookform/resolvers": "5.9.1",
     "@radix-ui/react-dialog": "1.1.23",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
@@ -23,7 +23,7 @@
     "next-intl": "4.14.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-hook-form": "7.85.0",
+    "react-hook-form": "7.88.0",
     "tailwind-merge": "3.7.0",
     "zod": "4.6.5"
   },

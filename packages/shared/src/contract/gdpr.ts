@@ -27,6 +27,19 @@ export const CreateDataRequestRequestSchema = z
   })
   .strict();
 
+// A soft-deleted account has no valid session (deletion revokes every one)
+// and cannot sign in again to get a new one (docs/steps/1A.12-gdpr.md
+// "Cancellable during the grace period"), so cancelling a deletion request
+// is authorized either by an ordinary session (the common case for the
+// other request type, and for a cancel issued moments before the requesting
+// session itself is revoked) or by the single-use `token` mailed at
+// deletion time. `.default({})` lets a normal in-session cancel call POST
+// with no body at all, matching every other no-payload action route.
+export const CancelDataRequestRequestSchema = z
+  .object({ token: z.string().min(1).optional() })
+  .strict()
+  .default({});
+
 export const DataRequestDownloadResponseSchema = z
   .object({
     url: z.url().openapi({ example: 'https://storage.photoo.lu/exports/abc123?signature=xyz' }),
@@ -163,11 +176,13 @@ registry.registerPath({
   path: apiPath('/me/data-requests/{id}/cancel'),
   summary:
     'Cancel a data request during its grace period. Only a deletion request can be cancelled, ' +
-    'and only before anonymisation runs.',
+    'and only before anonymisation runs. A soft-deleted account has no session, so `token` (the ' +
+    'single-use value mailed at deletion time) is accepted in place of one.',
   tags: ['gdpr'],
   security: AUTH_SECURITY,
   request: {
     params: z.object({ id: IdSchema }).strict(),
+    body: { content: { 'application/json': { schema: CancelDataRequestRequestSchema } } },
   },
   responses: {
     '200': {
@@ -182,8 +197,9 @@ registry.registerPath({
   method: 'get',
   path: apiPath('/me/data-requests/{id}/download'),
   summary:
-    'Get a 10-minute presigned download URL for a completed export. 409 while the export is ' +
-    "not yet ready, 410 once the request's expiresAt has passed.",
+    'Get a 10-minute presigned download URL for a completed export. 403 for a data request that ' +
+    "belongs to someone else, 409 while the export is not yet ready, 410 once the request's " +
+    'expiresAt has passed.',
   tags: ['gdpr'],
   security: AUTH_SECURITY,
   request: {
@@ -194,7 +210,7 @@ registry.registerPath({
       description: 'Presigned download URL issued',
       content: { 'application/json': { schema: DataRequestDownloadResponseSchema } },
     },
-    ...errorResponses([401, 404, 409, 410]),
+    ...errorResponses([401, 403, 404, 409, 410]),
   },
 });
 

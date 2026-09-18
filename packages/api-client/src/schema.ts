@@ -8361,7 +8361,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel a data request during its grace period. Only a deletion request can be cancelled, and only before anonymisation runs. */
+        /** Cancel a data request during its grace period. Only a deletion request can be cancelled, and only before anonymisation runs. A soft-deleted account has no session, so `token` (the single-use value mailed at deletion time) is accepted in place of one. */
         post: {
             parameters: {
                 query?: never;
@@ -8372,7 +8372,13 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        token?: string;
+                    };
+                };
+            };
             responses: {
                 /** @description Data request cancelled */
                 200: {
@@ -8425,7 +8431,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a 10-minute presigned download URL for a completed export. 409 while the export is not yet ready, 410 once the request's expiresAt has passed. */
+        /** Get a 10-minute presigned download URL for a completed export. 403 for a data request that belongs to someone else, 409 while the export is not yet ready, 410 once the request's expiresAt has passed. */
         get: {
             parameters: {
                 query?: never;
@@ -8449,6 +8455,15 @@ export interface paths {
                 };
                 /** @description Unauthorized */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };

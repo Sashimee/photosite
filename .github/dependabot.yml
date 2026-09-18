@@ -23,6 +23,10 @@ updates:
       - dependency-name: '@sentry/react-native'
       - dependency-name: jest
       - dependency-name: jest-expo
+      # Must track `jest` itself, which is pinned above: @jest/globals 30's
+      # `jest.mocked()` typings reject the api-client's result shape that 29
+      # accepts, so a bump on its own fails typecheck across the mobile tests.
+      - dependency-name: '@jest/globals'
       # Same reason, via the scope rather than the package: a minor bump of
       # `@react-native/jest-preset` in the grouped update left jest-expo unable
       # to resolve `@react-native/assets-registry/registry`, failing every
