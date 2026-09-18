@@ -1,6 +1,6 @@
 import { VerifyEmailRequestSchema } from '@photoo/shared';
-import { Link } from 'expo-router';
-import { useState } from 'react';
+import { Link, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text } from 'react-native';
 
@@ -12,10 +12,15 @@ import { api } from '../../src/lib/api';
 import { authErrorMessage, scopedAuthTranslate } from '../../src/lib/auth-errors';
 import { useAuth } from '../../src/lib/auth-context';
 import { fieldErrorMessages } from '../../src/lib/form-errors';
+import { getSessionToken } from '../../src/lib/session';
 
 export default function VerifyEmailScreen() {
   const { t } = useTranslation();
+  const router = useRouter();
   const { checkSession } = useAuth();
+  // Sign-up never returns a session, so the common path here has no token to
+  // re-check yet; only offer the re-check once a token is actually on file.
+  const [hasToken, setHasToken] = useState<boolean | null>(null);
   const [token, setToken] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
@@ -23,6 +28,18 @@ export default function VerifyEmailScreen() {
   const [isChecking, setIsChecking] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verified, setVerified] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getSessionToken().then((stored) => {
+      if (!cancelled) {
+        setHasToken(Boolean(stored));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleContinue() {
     setNotice(null);
@@ -82,12 +99,22 @@ export default function VerifyEmailScreen() {
               {submitError}
             </FormNotice>
           ) : null}
-          <PrimaryButton
-            testID="verify-email-continue"
-            label={t('mobile.auth.verifyEmail.continue')}
-            onPress={() => void handleContinue()}
-            loading={isChecking}
-          />
+          {hasToken ? (
+            <PrimaryButton
+              testID="verify-email-continue"
+              label={t('mobile.auth.verifyEmail.continue')}
+              onPress={() => void handleContinue()}
+              loading={isChecking}
+            />
+          ) : hasToken === false ? (
+            <PrimaryButton
+              testID="verify-email-go-to-sign-in"
+              label={t('mobile.auth.verifyEmail.continueToSignIn')}
+              onPress={() => {
+                router.push('/sign-in');
+              }}
+            />
+          ) : null}
           <TextField
             testID="verify-email-token"
             label={t('mobile.auth.verifyEmail.tokenLabel')}

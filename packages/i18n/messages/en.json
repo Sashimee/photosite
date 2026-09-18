@@ -167,6 +167,7 @@
         "title": "Check your email",
         "description": "We sent you a link to verify your email address. Come back here once you've clicked it.",
         "continue": "I've verified, continue",
+        "continueToSignIn": "I've verified my email — sign in",
         "notVerifiedYet": "We couldn't confirm your email is verified yet. Try again after clicking the link, or paste the code from the email below.",
         "tokenLabel": "Verification code",
         "tokenHint": "Paste the code from your email if the link doesn't work.",

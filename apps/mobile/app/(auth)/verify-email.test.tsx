@@ -1,6 +1,8 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 
+const TOKEN_KEY = 'photoo.session.token';
+
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(() => Promise.resolve(null)),
   setItemAsync: jest.fn(),
@@ -13,13 +15,30 @@ jest.mock('../../src/lib/api', () => ({
   setUnauthorizedListener: jest.fn(),
 }));
 
+import * as SecureStore from 'expo-secure-store';
+
 import { api } from '../../src/lib/api';
 
+const mockedGetItemAsync = jest.mocked(SecureStore.getItemAsync);
 const mockedGet = jest.mocked(api.GET);
 const mockedPost = jest.mocked(api.POST);
 
 describe('verify-email screen', () => {
-  it('shows a not-verified-yet notice when continue finds no session', async () => {
+  it('offers to sign in directly when there is no stored token', async () => {
+    renderRouter('./app', { initialUrl: '/verify-email' });
+
+    await waitFor(() => screen.getByTestId('verify-email-go-to-sign-in'));
+    expect(screen.queryByTestId('verify-email-continue')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('verify-email-go-to-sign-in'));
+
+    await waitFor(() => screen.getByTestId('sign-in-submit'));
+  });
+
+  it('retries the session check and shows a not-verified-yet notice when a token exists', async () => {
+    mockedGetItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(key === TOKEN_KEY ? 'token-abc' : null),
+    );
     mockedGet.mockResolvedValue({
       data: undefined,
       error: { code: 'UNAUTHORIZED', message: 'no session', requestId: 'req-1' },
