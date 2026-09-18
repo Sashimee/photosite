@@ -130,6 +130,18 @@ jobs:
 
       # Only step that requires the webhook secret, so a missing one still
       # lets the images build and push above.
+      - name: Build and push backup
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/backup.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/sashimee/photosite-backup:main
+            ghcr.io/sashimee/photosite-backup:${{ steps.sha.outputs.short }}
+          cache-from: type=gha,scope=backup
+          cache-to: type=gha,mode=max,scope=backup
+
       - name: Trigger Dokploy deploy webhook
         env:
           WEBHOOK_URL: ${{ secrets.DOKPLOY_PREVIEW_WEBHOOK_URL }}

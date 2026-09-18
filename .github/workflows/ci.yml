@@ -130,3 +130,110 @@ jobs:
       - run: pnpm build
       - run: pnpm --filter @photoo/api-client generate:check
       - run: pnpm audit --audit-level high
+
+  # Real test of infra/dokploy/backup/backup.sh: builds the same image the
+  # preview's `backup` service runs, so this also catches a broken
+  # infra/docker/backup.Dockerfile (docs/steps/1E.3-backups.md), then
+  # asserts the object it uploads decrypts and restores, and that the
+  # missing-BACKUP_AGE_RECIPIENT guard actually refuses to run.
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgis/postgis:16-3.5
+        env:
+          POSTGRES_USER: photoo
+          POSTGRES_PASSWORD: photoo_dev_password
+          POSTGRES_DB: photoo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U photoo -d photoo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      - name: Build the backup image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/backup.Dockerfile
+          tags: photosite-backup:ci
+          load: true
+          cache-from: type=gha,scope=backup
+          cache-to: type=gha,mode=max,scope=backup
+
+      - name: Start MinIO and create the backup bucket with a scoped user
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=rootuser -e MINIO_ROOT_PASSWORD=rootpassword123 \
+            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+          timeout 60 bash -c 'until curl -sf http://127.0.0.1:9000/minio/health/ready; do sleep 1; done'
+          cat > /tmp/photoo-backup-policy.json <<'EOF'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {"Effect": "Allow", "Action": ["s3:ListBucket"], "Resource": ["arn:aws:s3:::photoo-backups"]},
+              {"Effect": "Allow", "Action": ["s3:PutObject"], "Resource": ["arn:aws:s3:::photoo-backups/*"]}
+            ]
+          }
+          EOF
+          docker run --rm --network host \
+            --entrypoint sh \
+            -e MC_HOST_local=http://rootuser:rootpassword123@127.0.0.1:9000 \
+            -v /tmp/photoo-backup-policy.json:/tmp/photoo-backup-policy.json \
+            quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+            -c "mc mb --ignore-existing local/photoo-backups && mc anonymous set none local/photoo-backups && mc admin user add local backupuser backuppassword123 && mc admin policy create local photoo-backup /tmp/photoo-backup-policy.json && mc admin policy attach local photoo-backup --user backupuser"
+
+      - name: Seed rows past the size floor
+        env:
+          PGPASSWORD: photoo_dev_password
+        run: |
+          psql -h 127.0.0.1 -U photoo -d photoo -v ON_ERROR_STOP=1 -c "
+            CREATE TABLE demo (id serial primary key, name text);
+            INSERT INTO demo (name) SELECT 'row-with-padding-' || g FROM generate_series(1, 3000) g;
+          "
+
+      - name: Generate a throwaway age identity
+        run: |
+          docker run --rm --entrypoint age-keygen photosite-backup:ci >/tmp/identity.txt 2>/tmp/pubkey.txt
+          echo "recipient=$(sed -n 's/^Public key: //p' /tmp/pubkey.txt)" >>"$GITHUB_ENV"
+
+      - name: Run backup.sh
+        run: |
+          docker run --rm --network host --entrypoint backup.sh \
+            -e POSTGRES_HOST=127.0.0.1 -e POSTGRES_USER=photoo -e POSTGRES_PASSWORD=photoo_dev_password -e POSTGRES_DB=photoo \
+            -e BACKUP_AGE_RECIPIENT="${{ env.recipient }}" \
+            -e BACKUP_ENV=ci -e MINIO_ENDPOINT=http://127.0.0.1:9000 -e BACKUP_BUCKET=photoo-backups \
+            -e BACKUP_ACCESS_KEY=backupuser -e BACKUP_SECRET_KEY=backuppassword123 \
+            photosite-backup:ci
+
+      - name: Assert an encrypted, restorable object appears
+        run: |
+          object=$(docker run --rm --network host \
+            -e MC_HOST_local=http://rootuser:rootpassword123@127.0.0.1:9000 \
+            quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+            find local/photoo-backups/photoo/ci/ --name '*.dump.age')
+          test -n "$object"
+          mkdir -p /tmp/verify && chmod 777 /tmp/verify
+          docker run --rm --network host \
+            -e MC_HOST_local=http://rootuser:rootpassword123@127.0.0.1:9000 \
+            -v /tmp/verify:/verify \
+            quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z cp "$object" /verify/dump.age
+          docker run --rm -v /tmp/verify:/verify -v /tmp/identity.txt:/identity.txt \
+            --entrypoint sh photosite-backup:ci -c \
+            'age --decrypt -i /identity.txt -o /verify/dump.plain /verify/dump.age && pg_restore --list /verify/dump.plain | grep -q "TABLE DATA"'
+
+      - name: Confirm the missing-BACKUP_AGE_RECIPIENT guard refuses to run
+        run: |
+          if docker run --rm --network host --entrypoint backup.sh \
+              -e POSTGRES_HOST=127.0.0.1 -e POSTGRES_USER=photoo -e POSTGRES_PASSWORD=photoo_dev_password -e POSTGRES_DB=photoo \
+              -e BACKUP_ENV=ci -e MINIO_ENDPOINT=http://127.0.0.1:9000 -e BACKUP_BUCKET=photoo-backups \
+              -e BACKUP_ACCESS_KEY=backupuser -e BACKUP_SECRET_KEY=backuppassword123 \
+              photosite-backup:ci; then
+            echo "::error::backup.sh must refuse to run without BACKUP_AGE_RECIPIENT" >&2
+            exit 1
+          fi
