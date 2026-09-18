@@ -21,7 +21,9 @@
     "stack:down": "docker compose -f infra/docker/compose.dev.yml down",
     "stack:reset": "docker compose -f infra/docker/compose.dev.yml down -v",
     "db:seed": "pnpm --filter @photoo/db run seed",
-    "test:integration": "set -a && . packages/db/.env && . apps/api/.env && set +a && pnpm exec turbo run test --filter=@photoo/db && pnpm --filter @photoo/worker build && pnpm --filter @photoo/api test && pnpm --filter @photoo/worker test"
+    "test:integration": "set -a && . packages/db/.env && . apps/api/.env && set +a && pnpm exec turbo run test --filter=@photoo/db && pnpm --filter @photoo/worker build && pnpm --filter @photoo/api test && pnpm --filter @photoo/worker test",
+    "typecheck:smoke": "tsc --noEmit -p tsconfig.json",
+    "test:smoke": "playwright test --project=smoke"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [
@@ -32,6 +34,9 @@
   },
   "devDependencies": {
     "@photoo/config": "workspace:*",
+    "@photoo/shared": "workspace:*",
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.13.5",
     "eslint": "9.39.5",
     "husky": "9.1.7",
     "lint-staged": "17.5.1",
