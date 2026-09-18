@@ -55,7 +55,7 @@ interface MessageBody {
 
 interface ConversationParticipantBody {
   userId: string;
-  user: { id: string; displayName: string; avatarUrl: string | null };
+  user: { id: string; displayName: string | null; avatarUrl: string | null };
   lastReadAt: string | null;
 }
 
@@ -158,7 +158,7 @@ describe('chat integration', () => {
   async function signUpAndSignIn(
     roles: readonly string[],
     label: string,
-  ): Promise<{ token: string; id: string; cookie: string }> {
+  ): Promise<{ token: string; id: string; cookie: string; email: string }> {
     const email = uniqueEmail(label);
     const signUpResponse = await fastify().inject({
       method: 'POST',
@@ -187,7 +187,7 @@ describe('chat integration', () => {
     });
     const body = signInResponse.json<{ user: { id: string }; session: { token: string } }>();
     const cookie = signInResponse.cookies.map((c) => `${c.name}=${c.value}`).join('; ');
-    return { token: body.session.token, id: body.user.id, cookie };
+    return { token: body.session.token, id: body.user.id, cookie, email };
   }
 
   async function createConversation(userAId: string, userBId: string): Promise<string> {
@@ -1489,6 +1489,39 @@ describe('chat integration', () => {
       const conversation = response.json<ConversationBody>();
       const participant = conversation.participants.find((p) => p.userId === photographer.id);
       expect(participant?.user.displayName).toBe(`Fx Chat Photog ${suffix}`);
+    });
+
+    it('never leaks a client email through their participant displayName', async () => {
+      const client = await signUpAndSignIn(['client'], 'identity-no-leak-client');
+      const photographer = await signUpAndSignIn(['photographer'], 'identity-no-leak-photog');
+      const conversationId = await createConversation(client.id, photographer.id);
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/conversations/${conversationId}/messages`,
+        headers: authHeaders(client.token),
+        payload: { body: 'Hi, looking forward to it' },
+      });
+      const emailLocalPart = client.email.split('@')[0];
+      if (!emailLocalPart) throw new Error('expected a fixture email with a local part');
+
+      const conversationResponse = await fastify().inject({
+        method: 'GET',
+        url: `/v1/conversations/${conversationId}`,
+        headers: authHeaders(photographer.token),
+      });
+      expect(conversationResponse.statusCode).toBe(200);
+      const conversation = conversationResponse.json<ConversationBody>();
+      const clientParticipant = conversation.participants.find((p) => p.userId === client.id);
+      expect(clientParticipant?.user.displayName).toBeNull();
+      expect(conversationResponse.body).not.toContain(emailLocalPart);
+
+      const messagesResponse = await fastify().inject({
+        method: 'GET',
+        url: `/v1/conversations/${conversationId}/messages`,
+        headers: authHeaders(photographer.token),
+      });
+      expect(messagesResponse.statusCode).toBe(200);
+      expect(messagesResponse.body).not.toContain(emailLocalPart);
     });
   });
 

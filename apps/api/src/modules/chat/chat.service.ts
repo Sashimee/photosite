@@ -53,11 +53,14 @@ const MESSAGE_ATTACHMENTS_INCLUDE = {
   },
 } as const;
 
+// `User.name` is never selected here: it defaults to the account's email
+// local part at sign-up and must never reach another participant
+// (S6/compliance, quote-events.ts), so a client participant's displayName
+// stays null rather than falling back to it.
 const PARTICIPANT_USER_SELECT = {
   user: {
     select: {
       id: true,
-      name: true,
       photographerProfile: {
         select: { displayName: true, avatarUpload: { select: { variants: true } } },
       },

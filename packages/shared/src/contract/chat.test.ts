@@ -133,6 +133,15 @@ describe('ConversationParticipantSchema', () => {
       }).success,
     ).toBe(true);
   });
+
+  it('accepts a null displayName for a client with no public profile', () => {
+    expect(
+      ConversationParticipantSchema.safeParse({
+        ...validConversation.participants[0],
+        user: { ...validParticipantUser, displayName: null },
+      }).success,
+    ).toBe(true);
+  });
 });
 
 describe('MessageSchema', () => {

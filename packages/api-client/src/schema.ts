@@ -8802,7 +8802,7 @@ export interface components {
              * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
              */
             id: string;
-            displayName: string;
+            displayName: string | null;
             /** Format: uri */
             avatarUrl: string | null;
         };

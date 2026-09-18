@@ -37,7 +37,10 @@ export const MessageSchema = z
 export const ConversationParticipantUserSchema = z
   .object({
     id: IdSchema,
-    displayName: z.string().max(120),
+    // Null for a participant with no PhotographerProfile (a client): their
+    // only other name, User.name, defaults to their email local part at
+    // sign-up (S6/compliance) and must never reach another participant.
+    displayName: z.string().max(120).nullable(),
     avatarUrl: z.url().nullable(),
   })
   .strict()

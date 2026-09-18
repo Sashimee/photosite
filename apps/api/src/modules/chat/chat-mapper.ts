@@ -24,7 +24,7 @@ type MessageForMapping = Pick<
   'id' | 'conversationId' | 'senderId' | 'body' | 'editedAt' | 'deletedAt' | 'createdAt'
 > & { attachments: AttachmentForMapping[] };
 
-type ParticipantUserForMapping = Pick<User, 'id' | 'name'> & {
+type ParticipantUserForMapping = Pick<User, 'id'> & {
   photographerProfile:
     | (Pick<PhotographerProfile, 'displayName'> & { avatarUpload: Pick<Upload, 'variants'> | null })
     | null;
@@ -72,10 +72,11 @@ export interface ConversationMappingOptions {
   })[];
 }
 
-// A client has no PhotographerProfile, so their public identity falls back
-// to `User.name` (DATA-MODEL.md: the account's own display name). A
-// photographer's profile identity takes priority so both parties see the
-// same name and picture chat uses elsewhere on the site.
+// A client has no PhotographerProfile and no other public name: `User.name`
+// defaults to their email local part at sign-up (S6/compliance,
+// quote-events.ts) and must never be shown to another participant, so
+// displayName stays null rather than falling back to it. The UI labels a
+// nameless participant by role instead.
 function mapParticipantUser(
   user: ParticipantUserForMapping,
   baseUrl: string,
@@ -84,7 +85,7 @@ function mapParticipantUser(
     (user.photographerProfile?.avatarUpload?.variants as Record<string, string> | null) ?? null;
   return {
     id: user.id,
-    displayName: user.photographerProfile?.displayName ?? user.name ?? '',
+    displayName: user.photographerProfile?.displayName ?? null,
     avatarUrl: user.photographerProfile
       ? publicVariantUrl(baseUrl, avatarVariants, AVATAR_VARIANT_KEY)
       : null,
