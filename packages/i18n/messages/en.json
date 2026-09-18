@@ -111,6 +111,100 @@
           "redis": "Redis"
         }
       }
+    },
+    "users": {
+      "roles": {
+        "client": "Client",
+        "photographer": "Photographer",
+        "professional": "Professional",
+        "admin": "Admin"
+      },
+      "statuses": {
+        "active": "Active",
+        "suspended": "Suspended",
+        "deleted": "Deleted"
+      },
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "forbidden": "You don't have permission to do this.",
+        "notFound": "This couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "conflict": "That couldn't be completed because something changed. Please retry."
+      },
+      "list": {
+        "title": "Users",
+        "caption": "Users",
+        "columns": {
+          "id": "ID",
+          "email": "Email",
+          "roles": "Roles",
+          "status": "Status"
+        },
+        "empty": {
+          "title": "No users match your search.",
+          "hint": "Matches an exact id, an exact email, or the start of a name."
+        },
+        "filters": {
+          "formLabel": "User filters",
+          "searchLabel": "Search",
+          "searchPlaceholder": "Id, exact email, or name prefix",
+          "searchHint": "Matches an exact id, an exact email, or the start of a name.",
+          "roleLabel": "Role",
+          "allRoles": "All roles",
+          "statusLabel": "Status",
+          "allStatuses": "All statuses",
+          "submit": "Search"
+        }
+      },
+      "detail": {
+        "title": "User",
+        "fields": {
+          "email": "Email",
+          "roles": "Roles",
+          "status": "Status",
+          "country": "Country",
+          "twoFactorEnabled": "Two-factor enabled",
+          "emailVerifiedAt": "Email verified",
+          "lastLoginAt": "Last login",
+          "yes": "Yes",
+          "no": "No",
+          "never": "Never"
+        },
+        "suspend": {
+          "trigger": "Suspend",
+          "title": "Suspend this user?",
+          "consequences": "This signs them out of every device and drops their chat connections. It does not delete anything.",
+          "reasonLabel": "Reason",
+          "reasonHint": "This is recorded in the audit log together with your name.",
+          "confirm": "Suspend user"
+        },
+        "reactivate": {
+          "trigger": "Reactivate",
+          "title": "Reactivate this user?",
+          "consequences": "This restores their status only. It does not restore the sessions that suspension signed out.",
+          "confirm": "Reactivate user"
+        },
+        "roles": {
+          "trigger": "Edit roles",
+          "title": "Edit roles",
+          "description": "Choose the full set of roles for this user. This replaces their current roles.",
+          "resultingSet": "New roles: {roles}",
+          "none": "none",
+          "unpublishWarning": "If this user's photographer profile is published, removing the photographer role will unpublish it immediately.",
+          "confirm": "Save roles"
+        },
+        "auditTrail": {
+          "title": "Audit trail",
+          "caption": "Audit log entries for this user",
+          "empty": "No audit log entries for this user.",
+          "systemActor": "System",
+          "columns": {
+            "occurredAt": "When",
+            "action": "Action",
+            "actor": "Actor"
+          }
+        }
+      }
     }
   },
   "common": {
