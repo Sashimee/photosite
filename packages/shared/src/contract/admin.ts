@@ -1,4 +1,5 @@
 import {
+  ADMIN_PERMISSIONS,
   PROVENANCE_VERDICTS,
   REPORT_STATUSES,
   USER_ROLES,
@@ -13,6 +14,7 @@ import {
   CursorPaginationQuerySchema,
   IdSchema,
   IsoDateTimeSchema,
+  SlugSchema,
   errorResponses,
   paginatedResponseSchema,
 } from './common.js';
@@ -20,14 +22,39 @@ import { ADMIN_SECURITY, apiPath, registry } from './registry.js';
 import { AdminVerificationCaseSchema, AdminVerificationCaseSummarySchema } from './verification.js';
 import { z } from './zod.js';
 
-function adminOperation(permission: AdminPermission, options?: { requires2fa?: boolean }) {
+function adminOperation(permission?: AdminPermission, options?: { requires2fa?: boolean }) {
   return {
-    'x-required-permission': permission,
+    ...(permission ? { 'x-required-permission': permission } : {}),
     ...(options?.requires2fa ? { 'x-requires-2fa': true } : {}),
   };
 }
 
-export const AdminUserSchema = UserSchema;
+const AdminPhotographerProfileSummarySchema = z
+  .object({
+    slug: SlugSchema,
+    isPublished: z.boolean(),
+  })
+  .strict()
+  .openapi('AdminPhotographerProfileSummary');
+
+// Admin-only: `name` defaults to the account's email local part (#140,
+// apps/api/src/modules/chat/chat-mapper.ts) and must never reach another
+// *user*, but an admin with `support` already sees the full email on the
+// user detail page, so surfacing it here is not a new disclosure.
+export const AdminUserSchema = UserSchema.extend({
+  name: z.string().min(1).max(200).nullable(),
+  photographerProfile: AdminPhotographerProfileSummarySchema.nullable(),
+})
+  .strict()
+  .openapi('AdminUser');
+
+export const AdminMeSchema = z
+  .object({
+    permissions: z.array(z.enum(ADMIN_PERMISSIONS)),
+    twoFactorExpiresAt: IsoDateTimeSchema.nullable(),
+  })
+  .strict()
+  .openapi('AdminMe');
 
 export const AdminUserSearchQuerySchema = z
   .object({
@@ -169,6 +196,22 @@ export const AdminAuditLogEntrySchema = z
   })
   .strict()
   .openapi('AdminAuditLogEntry');
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/me'),
+  summary: "Get the caller's admin permissions and second-factor status",
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation(),
+  responses: {
+    '200': {
+      description: "The caller's granted permissions and second-factor expiry",
+      content: { 'application/json': { schema: AdminMeSchema } },
+    },
+    ...errorResponses([401, 403]),
+  },
+});
 
 registry.registerPath({
   method: 'get',

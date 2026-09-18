@@ -5777,6 +5777,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the caller's admin permissions and second-factor status */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The caller's granted permissions and second-factor expiry */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminMe"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/users": {
         parameters: {
             query?: never;
@@ -5807,7 +5861,7 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            items: components["schemas"]["User"][];
+                            items: components["schemas"]["AdminUser"][];
                             nextCursor: string | null;
                         };
                     };
@@ -5884,7 +5938,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["User"];
+                        "application/json": components["schemas"]["AdminUser"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5958,7 +6012,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["User"];
+                        "application/json": components["schemas"]["AdminUser"];
                     };
                 };
                 /** @description Bad request */
@@ -6051,7 +6105,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["User"];
+                        "application/json": components["schemas"]["AdminUser"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6131,7 +6185,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["User"];
+                        "application/json": components["schemas"]["AdminUser"];
                     };
                 };
                 /** @description Bad request */
@@ -9402,6 +9456,70 @@ export interface components {
              */
             uploadedAt: string;
         };
+        AdminMe: {
+            permissions: ("support" | "moderation" | "verification" | "finance" | "superadmin")[];
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            twoFactorExpiresAt: string | null;
+        };
+        AdminUser: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /**
+             * Format: email
+             * @example client@example.com
+             */
+            email: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            emailVerifiedAt: string | null;
+            /**
+             * @description BCP 47 locale
+             * @example en
+             * @enum {string}
+             */
+            locale: "en" | "fr" | "de" | "pt" | "es";
+            /**
+             * @description ISO 3166-1 alpha-2 country code
+             * @example LU
+             */
+            country: string;
+            /**
+             * @example [
+             *       "client"
+             *     ]
+             */
+            roles: ("client" | "photographer" | "professional" | "admin")[];
+            /** @enum {string} */
+            status: "active" | "suspended" | "deleted";
+            twoFactorEnabled: boolean;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            lastLoginAt: string | null;
+            name: string | null;
+            photographerProfile: components["schemas"]["AdminPhotographerProfileSummary"];
+        };
+        AdminPhotographerProfileSummary: {
+            /**
+             * @description URL-safe profile slug
+             * @example jane-doe-photography
+             */
+            slug: string;
+            isPublished: boolean;
+        } | null;
         AdminVerificationCaseSummary: {
             /**
              * Format: uuid
