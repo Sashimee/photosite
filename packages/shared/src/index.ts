@@ -25,6 +25,8 @@ export {
   DATA_REQUEST_TYPES,
   DATA_REQUEST_STATUSES,
   ADMIN_PERMISSIONS,
+  REPORT_STATUSES,
+  REPORT_TARGET_TYPES,
   DEVICE_PLATFORMS,
   CONSENT_PURPOSES,
   AUDIT_ACTOR_TYPES,
@@ -48,6 +50,8 @@ export {
   type DataRequestType,
   type DataRequestStatus,
   type AdminPermission,
+  type ReportStatus,
+  type ReportTargetType,
   type DevicePlatform,
   type ConsentPurpose,
   type AuditActorType,
@@ -278,6 +282,7 @@ export {
   AdminBookingSchema,
   AdminProvenanceCheckSchema,
   AdminReportSchema,
+  AdminReportsQuerySchema,
   AdminUserSchema,
   AdminUserSearchQuerySchema,
   AdminVerificationCasesQuerySchema,
@@ -289,8 +294,15 @@ export {
   ReverseBookingTransferRequestSchema,
   SetUserRolesRequestSchema,
   SuspendUserRequestSchema,
+  TakedownReportRequestSchema,
   UpdatePlatformSettingsRequestSchema,
 } from './contract/admin.js';
+
+export {
+  CreateReportRequestSchema,
+  CreateReportResponseSchema,
+  ReportTargetTypeSchema,
+} from './contract/reports.js';
 
 export {
   ConsentPurposeSchema,

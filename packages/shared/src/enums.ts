@@ -120,6 +120,14 @@ export const ADMIN_PERMISSIONS = [
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
 
+export const REPORT_STATUSES = ['open', 'resolved', 'dismissed'] as const;
+
+export type ReportStatus = (typeof REPORT_STATUSES)[number];
+
+export const REPORT_TARGET_TYPES = ['photographer_profile', 'portfolio_image', 'request'] as const;
+
+export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
+
 export const DEVICE_PLATFORMS = ['ios', 'android', 'web'] as const;
 
 export type DevicePlatform = (typeof DEVICE_PLATFORMS)[number];
