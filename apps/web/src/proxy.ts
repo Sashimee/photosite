@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { buildCspHeader, originOf } from './lib/csp';
+import { buildCspHeader, originOf, websocketOrigin } from './lib/csp';
 import { env } from './lib/env';
 import { buildLocaleRedirectPath } from './lib/locale-routing';
 
 const connectOrigins = [
   originOf(env.NEXT_PUBLIC_API_URL),
+  websocketOrigin(originOf(env.NEXT_PUBLIC_API_URL)),
   originOf(env.NEXT_PUBLIC_SENTRY_DSN),
 ].filter((origin): origin is string => origin !== null);
 

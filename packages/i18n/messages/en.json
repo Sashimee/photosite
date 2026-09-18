@@ -146,6 +146,7 @@
       "jobs": "Jobs",
       "signIn": "Sign in",
       "account": "Account",
+      "messages": "Messages",
       "openMenu": "Open menu",
       "closeMenu": "Close menu",
       "menuTitle": "Navigation"
@@ -274,6 +275,7 @@
         "account": "Account",
         "myRequests": "My requests",
         "quotes": "Quotes",
+        "messages": "Messages",
         "signOut": "Sign out"
       },
       "roles": {
@@ -531,6 +533,65 @@
         "notFound": "This quote could not be found.",
         "tooManyRequests": "You're doing that too fast. Slow down and try again.",
         "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      }
+    },
+    "messages": {
+      "list": {
+        "metaTitle": "Messages",
+        "title": "Messages",
+        "empty": "No conversations yet.",
+        "emptyArchived": "No archived conversations.",
+        "filterActive": "Active",
+        "filterArchived": "Archived",
+        "subjectQuote": "About: {title}",
+        "subjectQuoteUntitled": "About a quote",
+        "noMessagesYet": "No messages yet",
+        "unreadBadge": "{count, plural, one {# unread message} other {# unread messages}}",
+        "loadMore": "Next page"
+      },
+      "thread": {
+        "metaTitle": "Conversation",
+        "backToList": "Back to messages",
+        "typingIndicator": "{name} is typing…",
+        "loadOlderCta": "Load older messages",
+        "loadingOlder": "Loading…",
+        "deletedMessage": "This message was deleted.",
+        "sendingStatus": "Sending…",
+        "failedStatus": "Not sent.",
+        "retryCta": "Retry",
+        "reconnecting": "Reconnecting…"
+      },
+      "composer": {
+        "placeholder": "Write a message…",
+        "bodyLabel": "Message",
+        "sendCta": "Send",
+        "attachmentsLabel": "Attachments",
+        "uploadingHint": "Wait for attachments to finish uploading before sending."
+      },
+      "attachments": {
+        "attachCta": "Attach a file",
+        "removeCta": "Remove attachment",
+        "viewCta": "View attachment",
+        "downloadCta": "Download attachment",
+        "tooManyFiles": "You can attach up to {max} files.",
+        "unsupportedType": "Only images and PDF files can be attached.",
+        "uploadFailed": "This file couldn't be uploaded.",
+        "openFailed": "Couldn't open this attachment. Try again.",
+        "opening": "Opening…",
+        "imageAlt": "Shared image",
+        "closeCta": "Close"
+      },
+      "participant": {
+        "clientLabel": "Client"
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "conflict": "This message can't be changed right now.",
+        "invalid": "One of the attachments has a problem. Remove it and try again.",
+        "forbidden": "You don't have access to this conversation.",
+        "notFound": "This conversation is no longer available.",
+        "tooManyRequests": "You're sending messages too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're sending messages too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
       }
     }
   }
