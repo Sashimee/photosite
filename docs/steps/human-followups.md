@@ -88,3 +88,4 @@ Last updated: 2026-09-17.
 | Brevo SMTP relay credentials (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`) and sender domain authentication (SPF/DKIM/DMARC) | Production email delivery; local dev and the preview use Mailpit instead. Part of 0.6 and 2.4 |
 | `EXPO_ACCESS_TOKEN` | Optional; push notifications work without it once the Expo account exists (0.6) |
 | Universal links / App Links for auth emails (1C.2) | Needs the Apple Developer and Google Play accounts: publish `apple-app-site-association` and `assetlinks.json`, then switch verification and password-reset emails to universal links. Until then the mobile app verifies with a "continue" re-check plus a pasted token, so nothing is blocked |
+| Production superadmin (1A.11) | Created by a one-off script after the first production deploy, then its TOTP enrolled. There is deliberately no API endpoint that can mint a superadmin. Locally the seed grants every permission |
