@@ -83,6 +83,24 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # apps/mobile/app/(auth)/*.test.tsx calls renderRouter('./app', ...),
+      # which pulls in the whole react-native/expo module graph from cold.
+      # Caching jest's on-disk transform cache means only the first CI run
+      # (or the first one after a dependency/config bump) pays that cost.
+      # `jest --showConfig` is the source of truth for the path: it's derived
+      # from the runner's uid (jest-config's getCacheDirectory), not safe to
+      # hardcode (#201).
+      - name: Resolve the mobile app's jest transform cache directory
+        id: jest-cache-dir
+        run: echo "path=$(pnpm --filter @photoo/mobile exec jest --showConfig | jq -r '.configs[0].cacheDirectory')" >> "$GITHUB_OUTPUT"
+      - name: Cache the mobile app's jest transform cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.jest-cache-dir.outputs.path }}
+          # Keyed on the lockfile and on babel/jest config so a dependency
+          # bump or a config change invalidates the cache instead of reusing
+          # a transform compiled under the old rules.
+          key: mobile-jest-transform-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'apps/mobile/babel.config.js', 'apps/mobile/jest.config.js') }}
       - name: Start MinIO, create buckets and allow anonymous reads of photoo-public
         run: |
           docker run -d --name minio \
@@ -126,7 +144,17 @@ jobs:
         run: pnpm --filter @photoo/db run migrate:deploy
       - name: Seed the test database
         run: pnpm --filter @photoo/db run seed
-      - run: pnpm test
+      # `pnpm test` (turbo run test) fans out across all ~9 workspaces at
+      # turbo's default concurrency of 10, i.e. effectively unbounded. On this
+      # runner's core count that oversubscribes the CPU: apps/mobile's jest
+      # (renderRouter's cold react-native/expo transform, #201) gets starved
+      # by the vitest suites running at the same time, and a test that takes
+      # ~2s uncontended has measured at 21s+ under that contention locally.
+      # Bounding concurrency to the actual core count removes the starvation
+      # without changing total throughput (verified locally: same wall time,
+      # no more oversubscribed tail latency).
+      - name: Run tests (concurrency bounded to the runner's core count, see comment above)
+        run: pnpm exec turbo run test --concurrency="$(nproc)"
       - run: pnpm build
       - run: pnpm --filter @photoo/api-client generate:check
       - run: pnpm audit --audit-level high
