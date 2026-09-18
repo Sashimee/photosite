@@ -103,6 +103,94 @@
       "title": "Page not found",
       "description": "This screen does not exist.",
       "backHome": "Go to home screen"
+    },
+    "auth": {
+      "roles": {
+        "client": "Client looking to book a photographer",
+        "photographer": "Photographer"
+      },
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "invalidCredentials": "Incorrect email or password.",
+        "emailTaken": "An account with this email already exists.",
+        "emailNotVerified": "Please verify your email before signing in.",
+        "invalidToken": "This code is invalid.",
+        "tokenExpired": "This code has expired. Request a new one.",
+        "passwordTooShort": "Password is too short.",
+        "passwordTooLong": "Password is too long.",
+        "passwordCompromised": "This password has appeared in a data breach. Choose a different one.",
+        "invalidCode": "That code isn't correct.",
+        "invalidBackupCode": "That backup code isn't correct.",
+        "totpAlreadyEnabled": "Two-factor authentication is already enabled.",
+        "twoFactorNotEnabled": "Two-factor authentication isn't enabled.",
+        "tooManyAttempts": "Too many attempts. Request a new code.",
+        "accountLocked": "Your account is temporarily locked. Try again later.",
+        "roleAlreadyAssigned": "You already have this role.",
+        "validationError": "Please check the highlighted fields.",
+        "tooManyRequests": "Too many attempts. Try again later.",
+        "tooManyRequestsWithRetry": "Too many attempts. Try again in {seconds, plural, one {# second} other {# seconds}}.",
+        "forbidden": "This request was blocked for your protection. Please try again.",
+        "unauthorized": "Please sign in to continue.",
+        "notFound": "We couldn't find what you're looking for.",
+        "providerNotConfigured": "This sign-in method isn't available yet."
+      },
+      "signUp": {
+        "title": "Create your account",
+        "emailLabel": "Email",
+        "passwordLabel": "Password",
+        "passwordHint": "At least 10 characters.",
+        "roleLabel": "I am a…",
+        "localeLabel": "Preferred language",
+        "submit": "Create account",
+        "alreadyHaveAccount": "Already have an account?",
+        "signInLink": "Sign in"
+      },
+      "signIn": {
+        "title": "Sign in",
+        "emailLabel": "Email",
+        "passwordLabel": "Password",
+        "submit": "Sign in",
+        "forgotPassword": "Forgot your password?",
+        "noAccount": "Don't have an account?",
+        "signUpLink": "Create one"
+      },
+      "twoFactor": {
+        "title": "Two-factor verification",
+        "description": "Enter the 6-digit code from your authenticator app.",
+        "codeLabel": "Authenticator code",
+        "backupCodeLabel": "Backup code",
+        "useBackupCode": "Use a backup code instead",
+        "useAuthenticatorCode": "Use an authenticator code instead",
+        "submit": "Verify"
+      },
+      "verifyEmail": {
+        "title": "Check your email",
+        "description": "We sent you a link to verify your email address. Come back here once you've clicked it.",
+        "continue": "I've verified, continue",
+        "notVerifiedYet": "We couldn't confirm your email is verified yet. Try again after clicking the link, or paste the code from the email below.",
+        "tokenLabel": "Verification code",
+        "tokenHint": "Paste the code from your email if the link doesn't work.",
+        "tokenSubmit": "Verify with code",
+        "success": "Your email is verified.",
+        "signInLink": "Sign in"
+      },
+      "forgotPassword": {
+        "title": "Reset your password",
+        "description": "Enter your email and we'll send you a reset link if an account exists.",
+        "emailLabel": "Email",
+        "submit": "Send reset link",
+        "success": "If an account exists for that email, a reset link has been sent."
+      },
+      "resetPassword": {
+        "title": "Choose a new password",
+        "description": "Paste the code from your reset email, then choose a new password.",
+        "tokenLabel": "Reset code",
+        "passwordLabel": "New password",
+        "passwordHint": "At least 10 characters.",
+        "submit": "Reset password",
+        "success": "Password updated. You can now sign in.",
+        "signInLink": "Sign in"
+      }
     }
   },
   "push": {
