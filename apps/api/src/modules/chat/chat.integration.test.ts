@@ -49,16 +49,28 @@ interface MessageBody {
   conversationId: string;
   senderId: string;
   body: string | null;
-  attachments: { id: string; kind: string }[];
+  attachments: { id: string; kind: string; mimeType: string; sizeBytes: number }[];
   deletedAt: string | null;
+}
+
+interface ConversationParticipantBody {
+  userId: string;
+  user: { id: string; displayName: string | null; avatarUrl: string | null };
+  lastReadAt: string | null;
 }
 
 interface ConversationBody {
   id: string;
-  participants: { userId: string; lastReadAt: string | null }[];
+  subjectId: string | null;
+  subjectRef: { type: 'quote'; quoteId: string; requestTitle?: string } | null;
+  participants: ConversationParticipantBody[];
   unreadCount: number;
   archivedByMe: boolean;
   lastMessagePreview: string | null;
+}
+
+interface UnreadCountBody {
+  count: number;
 }
 
 interface PaginatedBody<T> {
@@ -101,6 +113,8 @@ describe('chat integration', () => {
   const createdUserIds: string[] = [];
   const createdConversationIds: string[] = [];
   const createdUploadIds: string[] = [];
+  const createdQuoteIds: string[] = [];
+  const createdRequestIds: string[] = [];
   const sockets: ClientSocket[] = [];
 
   function fastify() {
@@ -144,7 +158,7 @@ describe('chat integration', () => {
   async function signUpAndSignIn(
     roles: readonly string[],
     label: string,
-  ): Promise<{ token: string; id: string; cookie: string }> {
+  ): Promise<{ token: string; id: string; cookie: string; email: string }> {
     const email = uniqueEmail(label);
     const signUpResponse = await fastify().inject({
       method: 'POST',
@@ -173,7 +187,7 @@ describe('chat integration', () => {
     });
     const body = signInResponse.json<{ user: { id: string }; session: { token: string } }>();
     const cookie = signInResponse.cookies.map((c) => `${c.name}=${c.value}`).join('; ');
-    return { token: body.session.token, id: body.user.id, cookie };
+    return { token: body.session.token, id: body.user.id, cookie, email };
   }
 
   async function createConversation(userAId: string, userBId: string): Promise<string> {
@@ -182,6 +196,125 @@ describe('chat integration', () => {
         type: 'quote',
         subjectId: randomUUID(),
         participants: { create: [{ userId: userAId }, { userId: userBId }] },
+      },
+    });
+    createdConversationIds.push(conversation.id);
+    return conversation.id;
+  }
+
+  async function createPhotographerProfileDirect(userId: string, suffix: string): Promise<string> {
+    const profile = await prisma.photographerProfile.create({
+      data: {
+        userId,
+        slug: `fx-chat-photog-${suffix}`,
+        displayName: `Fx Chat Photog ${suffix}`,
+        bio: {},
+        links: {},
+        categories: ['wedding'],
+        languages: ['en'],
+        city: 'Luxembourg',
+        countryCode: 'LU',
+      },
+    });
+    return profile.id;
+  }
+
+  async function createRequestFixture(
+    clientId: string,
+    suffix: string,
+  ): Promise<{ id: string; title: string }> {
+    const eventDate = new Date();
+    eventDate.setUTCDate(eventDate.getUTCDate() + 30);
+    const expiresAt = new Date();
+    expiresAt.setUTCDate(expiresAt.getUTCDate() + 60);
+    const title = `Fx Chat Request ${suffix}`;
+    const request = await prisma.request.create({
+      data: {
+        clientId,
+        title,
+        category: 'wedding',
+        description: 'Fixture request for chat subjectRef tests.',
+        eventDate,
+        dateFlexible: false,
+        address: {
+          line1: '1 Fixture Way',
+          city: 'Luxembourg',
+          postalCode: 'L-1000',
+          countryCode: 'LU',
+        },
+        city: 'Luxembourg',
+        countryCode: 'LU',
+        budgetMinCents: 100000,
+        budgetMaxCents: 200000,
+        currency: 'EUR',
+        usage: 'personal',
+        status: 'open',
+        expiresAt,
+      },
+    });
+    createdRequestIds.push(request.id);
+    return { id: request.id, title };
+  }
+
+  async function createProductFixture(profileId: string, suffix: string): Promise<string> {
+    const product = await prisma.product.create({
+      data: {
+        profileId,
+        title: { en: `Fx Chat Product ${suffix}` },
+        category: 'wedding',
+        durationMinutes: 120,
+        deliverables: { photos: 50 },
+        basePriceCents: 50000,
+        currency: 'EUR',
+        order: 0,
+      },
+    });
+    return product.id;
+  }
+
+  // `Quote_request_or_product_check` requires requestId or productId, and
+  // `Quote_totalCents_eq_subtotalCents_check` requires totalCents to equal
+  // subtotalCents (the fee comes out of the photographer's share, not on
+  // top of what the client pays).
+  async function createQuoteFixture(params: {
+    photographerId: string;
+    clientId: string;
+    requestId: string | null;
+    productId?: string | null;
+  }): Promise<string> {
+    const validUntil = new Date();
+    validUntil.setUTCDate(validUntil.getUTCDate() + 5);
+    const quote = await prisma.quote.create({
+      data: {
+        requestId: params.requestId,
+        photographerId: params.photographerId,
+        clientId: params.clientId,
+        productId: params.productId ?? null,
+        lineItems: [{ label: 'Coverage', qty: 1, unitCents: 50000 }],
+        subtotalCents: 50000,
+        platformFeeCents: 2500,
+        totalCents: 50000,
+        feePercent: 5,
+        licenceUsage: 'personal',
+        currency: 'EUR',
+        validUntil,
+        status: 'sent',
+      },
+    });
+    createdQuoteIds.push(quote.id);
+    return quote.id;
+  }
+
+  async function createQuoteConversationFixture(
+    quoteId: string,
+    clientId: string,
+    photographerUserId: string,
+  ): Promise<string> {
+    const conversation = await prisma.conversation.create({
+      data: {
+        type: 'quote',
+        subjectId: quoteId,
+        participants: { create: [{ userId: clientId }, { userId: photographerUserId }] },
       },
     });
     createdConversationIds.push(conversation.id);
@@ -298,6 +431,12 @@ describe('chat integration', () => {
   afterAll(async () => {
     if (createdConversationIds.length > 0) {
       await prisma.conversation.deleteMany({ where: { id: { in: createdConversationIds } } });
+    }
+    if (createdQuoteIds.length > 0) {
+      await prisma.quote.deleteMany({ where: { id: { in: createdQuoteIds } } });
+    }
+    if (createdRequestIds.length > 0) {
+      await prisma.request.deleteMany({ where: { id: { in: createdRequestIds } } });
     }
     if (createdUploadIds.length > 0) {
       await prisma.upload.deleteMany({ where: { id: { in: createdUploadIds } } });
@@ -450,6 +589,12 @@ describe('chat integration', () => {
       const message = response.json<MessageBody>();
       expect(message.attachments).toHaveLength(1);
       expect(message.attachments[0]?.kind).toBe('image');
+
+      const upload = await prisma.upload.findUniqueOrThrow({ where: { id: uploadId } });
+      expect(message.attachments[0]?.mimeType).toBe(upload.mimeType);
+      expect(message.attachments[0]?.sizeBytes).toBe(
+        upload.actualSizeBytes ?? upload.declaredSizeBytes,
+      );
     });
 
     it('rejects an attachment owned by someone else with 422', async () => {
@@ -1307,6 +1452,220 @@ describe('chat integration', () => {
       expect(pages).toBeGreaterThanOrEqual(3);
       expect(new Set(seen).size).toBe(seen.length);
       expect([...seen].sort()).toEqual(messages.map((m) => m.id).sort());
+    });
+  });
+
+  describe('participant identity', () => {
+    it('exposes no email or role in a participant summary', async () => {
+      const client = await signUpAndSignIn(['client'], 'identity-client');
+      const photographer = await signUpAndSignIn(['photographer'], 'identity-photog');
+      const conversationId = await createConversation(client.id, photographer.id);
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/conversations/${conversationId}`,
+        headers: authHeaders(client.token),
+      });
+      expect(response.statusCode).toBe(200);
+      const conversation = response.json<ConversationBody>();
+      expect(conversation.participants.length).toBeGreaterThan(0);
+      for (const participant of conversation.participants) {
+        expect(Object.keys(participant.user).sort()).toEqual(['avatarUrl', 'displayName', 'id']);
+      }
+    });
+
+    it('uses the photographer profile displayName and avatar for a photographer participant', async () => {
+      const client = await signUpAndSignIn(['client'], 'identity-profile-client');
+      const photographer = await signUpAndSignIn(['photographer'], 'identity-profile-photog');
+      const suffix = `identity-${photographer.id.slice(0, 8)}`;
+      await createPhotographerProfileDirect(photographer.id, suffix);
+      const conversationId = await createConversation(client.id, photographer.id);
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/conversations/${conversationId}`,
+        headers: authHeaders(client.token),
+      });
+      const conversation = response.json<ConversationBody>();
+      const participant = conversation.participants.find((p) => p.userId === photographer.id);
+      expect(participant?.user.displayName).toBe(`Fx Chat Photog ${suffix}`);
+    });
+
+    it('never leaks a client email through their participant displayName', async () => {
+      const client = await signUpAndSignIn(['client'], 'identity-no-leak-client');
+      const photographer = await signUpAndSignIn(['photographer'], 'identity-no-leak-photog');
+      const conversationId = await createConversation(client.id, photographer.id);
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/conversations/${conversationId}/messages`,
+        headers: authHeaders(client.token),
+        payload: { body: 'Hi, looking forward to it' },
+      });
+      const emailLocalPart = client.email.split('@')[0];
+      if (!emailLocalPart) throw new Error('expected a fixture email with a local part');
+
+      const conversationResponse = await fastify().inject({
+        method: 'GET',
+        url: `/v1/conversations/${conversationId}`,
+        headers: authHeaders(photographer.token),
+      });
+      expect(conversationResponse.statusCode).toBe(200);
+      const conversation = conversationResponse.json<ConversationBody>();
+      const clientParticipant = conversation.participants.find((p) => p.userId === client.id);
+      expect(clientParticipant?.user.displayName).toBeNull();
+      expect(conversationResponse.body).not.toContain(emailLocalPart);
+
+      const messagesResponse = await fastify().inject({
+        method: 'GET',
+        url: `/v1/conversations/${conversationId}/messages`,
+        headers: authHeaders(photographer.token),
+      });
+      expect(messagesResponse.statusCode).toBe(200);
+      expect(messagesResponse.body).not.toContain(emailLocalPart);
+    });
+  });
+
+  describe('conversation subjectRef', () => {
+    it('includes the request title for a quote made on a request', async () => {
+      const client = await signUpAndSignIn(['client'], 'subjectref-req-client');
+      const photographer = await signUpAndSignIn(['photographer'], 'subjectref-req-photog');
+      const profileId = await createPhotographerProfileDirect(
+        photographer.id,
+        `subjectref-req-${photographer.id.slice(0, 8)}`,
+      );
+      const request = await createRequestFixture(client.id, `subjectref-${client.id.slice(0, 8)}`);
+      const quoteId = await createQuoteFixture({
+        photographerId: profileId,
+        clientId: client.id,
+        requestId: request.id,
+      });
+      const conversationId = await createQuoteConversationFixture(
+        quoteId,
+        client.id,
+        photographer.id,
+      );
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/conversations/${conversationId}`,
+        headers: authHeaders(client.token),
+      });
+      expect(response.statusCode).toBe(200);
+      const conversation = response.json<ConversationBody>();
+      expect(conversation.subjectRef).toEqual({
+        type: 'quote',
+        quoteId,
+        requestTitle: request.title,
+      });
+    });
+
+    it('omits requestTitle for a direct quote with no request', async () => {
+      const client = await signUpAndSignIn(['client'], 'subjectref-direct-client');
+      const photographer = await signUpAndSignIn(['photographer'], 'subjectref-direct-photog');
+      const suffix = `subjectref-direct-${photographer.id.slice(0, 8)}`;
+      const profileId = await createPhotographerProfileDirect(photographer.id, suffix);
+      const productId = await createProductFixture(profileId, suffix);
+      const quoteId = await createQuoteFixture({
+        photographerId: profileId,
+        clientId: client.id,
+        requestId: null,
+        productId,
+      });
+      const conversationId = await createQuoteConversationFixture(
+        quoteId,
+        client.id,
+        photographer.id,
+      );
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/conversations/${conversationId}`,
+        headers: authHeaders(photographer.token),
+      });
+      expect(response.statusCode).toBe(200);
+      const conversation = response.json<ConversationBody>();
+      expect(conversation.subjectRef).toEqual({ type: 'quote', quoteId });
+    });
+  });
+
+  describe('GET /v1/conversations/unread-count', () => {
+    it('requires a session', async () => {
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/conversations/unread-count',
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('matches the sum of unreadCount across the paged conversation list', async () => {
+      const client = await signUpAndSignIn(['client'], 'unread-total-client');
+      const photographerA = await signUpAndSignIn(['photographer'], 'unread-total-photog-a');
+      const photographerB = await signUpAndSignIn(['photographer'], 'unread-total-photog-b');
+      const conversationA = await createConversation(client.id, photographerA.id);
+      const conversationB = await createConversation(client.id, photographerB.id);
+
+      for (const body of ['From A: one', 'From A: two']) {
+        await fastify().inject({
+          method: 'POST',
+          url: `/v1/conversations/${conversationA}/messages`,
+          headers: authHeaders(photographerA.token),
+          payload: { body },
+        });
+      }
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/conversations/${conversationB}/messages`,
+        headers: authHeaders(photographerB.token),
+        payload: { body: 'From B: one' },
+      });
+
+      const { items } = await fetchAllPages<ConversationBody>(async (cursor) => {
+        const url = `/v1/conversations${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`;
+        const response = await fastify().inject({
+          method: 'GET',
+          url,
+          headers: authHeaders(client.token),
+        });
+        return response.json<PaginatedBody<ConversationBody>>();
+      });
+      const expectedTotal = items.reduce((sum, conversation) => sum + conversation.unreadCount, 0);
+      expect(expectedTotal).toBe(3);
+
+      const unreadResponse = await fastify().inject({
+        method: 'GET',
+        url: '/v1/conversations/unread-count',
+        headers: authHeaders(client.token),
+      });
+      expect(unreadResponse.statusCode).toBe(200);
+      expect(unreadResponse.json<UnreadCountBody>().count).toBe(expectedTotal);
+    });
+
+    it('is isolated per user', async () => {
+      const clientA = await signUpAndSignIn(['client'], 'unread-iso-client-a');
+      const clientB = await signUpAndSignIn(['client'], 'unread-iso-client-b');
+      const photographer = await signUpAndSignIn(['photographer'], 'unread-iso-photog');
+      const conversationA = await createConversation(clientA.id, photographer.id);
+      await createConversation(clientB.id, photographer.id);
+
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/conversations/${conversationA}/messages`,
+        headers: authHeaders(photographer.token),
+        payload: { body: 'Hi A' },
+      });
+
+      const countA = await fastify().inject({
+        method: 'GET',
+        url: '/v1/conversations/unread-count',
+        headers: authHeaders(clientA.token),
+      });
+      const countB = await fastify().inject({
+        method: 'GET',
+        url: '/v1/conversations/unread-count',
+        headers: authHeaders(clientB.token),
+      });
+      expect(countA.json<UnreadCountBody>().count).toBe(1);
+      expect(countB.json<UnreadCountBody>().count).toBe(0);
     });
   });
 });
