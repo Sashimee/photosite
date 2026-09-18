@@ -218,6 +218,37 @@
       "description": "This screen does not exist.",
       "backHome": "Go to home screen"
     },
+    "discovery": {
+      "title": "Find a photographer",
+      "searchLabel": "Search by city",
+      "searchPlaceholder": "e.g. Luxembourg",
+      "filtersButton": "Filters",
+      "clearFilters": "Clear filters",
+      "empty": "No photographers match your filters.",
+      "emptyNoFilters": "No photographers are published yet.",
+      "filters": {
+        "title": "Filters",
+        "categoryLabel": "Category",
+        "allCategories": "All categories",
+        "languageLabel": "Language",
+        "allLanguages": "Any language",
+        "priceMinLabel": "Min price",
+        "priceMaxLabel": "Max price",
+        "priceRangeInvalid": "Min price must be less than or equal to max price.",
+        "apply": "Apply filters",
+        "clear": "Clear filters"
+      },
+      "nearMe": {
+        "button": "Near me",
+        "deniedExplanation": "Photoo uses your location only to sort photographers near you. It's rounded to about 1 km and never stored.",
+        "openSettings": "Open settings"
+      },
+      "results": {
+        "avatarAlt": "{displayName}",
+        "fromPrice": "From {price}",
+        "rating": "{ratingAvg, number, ::.0} ({ratingCount, plural, one {# review} other {# reviews}})"
+      }
+    },
     "auth": {
       "roles": {
         "client": "Client looking to book a photographer",
