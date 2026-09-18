@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AdminModule } from '../admin/admin.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { OriginGuard } from '../auth/origin-guard.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
@@ -11,7 +12,7 @@ import { VerificationRepository } from './verification.repository.js';
 import { VerificationService } from './verification.service.js';
 
 @Module({
-  imports: [AuthModule, NotificationsModule],
+  imports: [AuthModule, AdminModule, NotificationsModule],
   controllers: [MyVerificationCaseController, AdminVerificationCasesController],
   providers: [
     VerificationService,
