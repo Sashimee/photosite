@@ -12,3 +12,6 @@ coverage/
 .expo/
 *.tsbuildinfo
 next-env.d.ts
+playwright-report/
+test-results/
+tests/smoke/.auth/

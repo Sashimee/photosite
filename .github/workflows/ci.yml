@@ -131,6 +131,129 @@ jobs:
       - run: pnpm --filter @photoo/api-client generate:check
       - run: pnpm audit --audit-level high
 
+  # Playwright against real, running apps/web + apps/api (docs/steps/1E.9-browser-smoke.md):
+  # curl and `next build` both saw a 200 for the env.ts bug that blanked the
+  # client bundle - only a real browser catches that class of bug, so this
+  # job builds and boots the actual servers and clicks around them.
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # 127.0.0.1 everywhere, never localhost: Better Auth's CORS allow-list
+      # (WEB_ORIGINS) is an exact origin match, and localhost/127.0.0.1 count
+      # as different origins - mixing them silently breaks the browser
+      # sign-in call with no error surfaced beyond a network-level CORS
+      # rejection.
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_MEDIA_BASE_URL: http://127.0.0.1:9000/photoo-public
+      NEXT_PUBLIC_ALLOW_INDEXING: 'false'
+      DATABASE_URL: postgresql://photoo:photoo_dev_password@127.0.0.1:5432/photoo_test
+      REDIS_URL: redis://127.0.0.1:6379
+      SEED_USER_PASSWORD: correct-horse-battery-staple
+      VERIFICATION_ENCRYPTION_KEY: 9DsORuh9HI1DUnXKM0DKVcgw36Y9NfbLBSlfPmQxwYs=
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_REGION: eu-west-1
+      S3_ACCESS_KEY_ID: photoo_dev
+      S3_SECRET_ACCESS_KEY: photoo_dev_password
+      S3_FORCE_PATH_STYLE: 'true'
+      S3_PRIVATE_BUCKET: photoo-private
+      S3_PUBLIC_BUCKET: photoo-public
+      S3_PUBLIC_BASE_URL: http://127.0.0.1:9000/photoo-public
+      PORT: 4000
+      PUBLIC_API_URL: http://127.0.0.1:4000
+      WEB_ORIGINS: http://127.0.0.1:3000
+      WEB_APP_URL: http://127.0.0.1:3000
+      NODE_ENV: development
+      TRUSTED_PROXIES: ''
+      AUTH_SECRET: dev-only-auth-secret-change-me-please-32-chars-min
+      AUTH_ENCRYPTION_KEY: qA5jxlkWykGDbMKLOSqgSGG+lbzsuDkUWUS8nV9twig=
+      SMOKE_BASE_URL: http://127.0.0.1:3000
+    services:
+      postgres:
+        image: postgis/postgis:16-3.5
+        env:
+          POSTGRES_USER: photoo
+          POSTGRES_PASSWORD: photoo_dev_password
+          POSTGRES_DB: photoo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U photoo -d photoo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Start MinIO, create buckets and allow anonymous reads of photoo-public
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=photoo_dev \
+            -e MINIO_ROOT_PASSWORD=photoo_dev_password \
+            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+          timeout 60 bash -c 'until curl -sf http://127.0.0.1:9000/minio/health/ready; do sleep 1; done'
+          cat > /tmp/photoo-public-anonymous-policy.json <<'EOF'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {"AWS": ["*"]},
+                "Action": ["s3:GetObject"],
+                "Resource": ["arn:aws:s3:::photoo-public/*"]
+              }
+            ]
+          }
+          EOF
+          docker run --rm --network host \
+            --entrypoint sh \
+            -e MC_HOST_local=http://photoo_dev:photoo_dev_password@127.0.0.1:9000 \
+            -v /tmp/photoo-public-anonymous-policy.json:/tmp/photoo-public-anonymous-policy.json \
+            quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+            -c "mc mb --ignore-existing local/photoo-private local/photoo-public && mc anonymous set none local/photoo-private && mc anonymous set-json /tmp/photoo-public-anonymous-policy.json local/photoo-public"
+      - name: Create the test database
+        env:
+          PGPASSWORD: photoo_dev_password
+        run: |
+          psql -h 127.0.0.1 -U photoo -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE photoo_test;'
+          psql -h 127.0.0.1 -U photoo -d photoo_test -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS postgis;'
+      - name: Apply Prisma migrations and seed the test database
+        run: pnpm --filter @photoo/db run migrate:deploy && pnpm --filter @photoo/db run seed
+      - name: Build api and web
+        run: pnpm exec turbo run build --filter=@photoo/api... --filter=@photoo/web...
+      - name: Start api and web, wait until both answer
+        run: |
+          pnpm --filter @photoo/api start &
+          pnpm --filter @photoo/web start &
+          timeout 60 bash -c 'until curl -sf http://127.0.0.1:4000/health; do sleep 1; done'
+          timeout 60 bash -c 'until curl -sf http://127.0.0.1:3000/en; do sleep 1; done'
+      - name: Install the smoke project's browser
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:smoke
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
   # Real test of infra/dokploy/backup/backup.sh: builds the same image the
   # preview's `backup` service runs, so this also catches a broken
   # infra/docker/backup.Dockerfile (docs/steps/1E.3-backups.md), then
