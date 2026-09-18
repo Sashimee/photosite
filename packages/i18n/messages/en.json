@@ -737,7 +737,8 @@
         "myRequests": "My requests",
         "quotes": "Quotes",
         "messages": "Messages",
-        "signOut": "Sign out"
+        "signOut": "Sign out",
+        "dashboard": "Dashboard"
       },
       "roles": {
         "title": "Roles",
@@ -1053,6 +1054,106 @@
         "notFound": "This conversation is no longer available.",
         "tooManyRequests": "You're sending messages too fast. Slow down and try again.",
         "tooManyRequestsWithRetry": "You're sending messages too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      }
+    },
+    "dashboard": {
+      "nav": {
+        "menuTitle": "Photographer dashboard",
+        "overview": "Overview",
+        "profile": "Profile"
+      },
+      "needsRole": {
+        "title": "Photographer dashboard",
+        "description": "Add the photographer role to your account to set up a profile.",
+        "cta": "Add the photographer role"
+      },
+      "overview": {
+        "metaTitle": "Photographer dashboard",
+        "title": "Your photographer dashboard",
+        "intro": "Finish these to get discoverable on Photoo. There's no required order.",
+        "publication": {
+          "publishedTitle": "Your profile is published",
+          "publishedDescription": "Clients can find and book you.",
+          "notPublishedTitle": "Your profile isn't published yet",
+          "notPublishedDescription": "Publishing depends on verification and the other requirements below — nothing on this page publishes it directly.",
+          "noProfileDescription": "Create your profile below to get started."
+        },
+        "checklist": {
+          "status": {
+            "done": "Done",
+            "todo": "Not started",
+            "comingSoon": "Coming soon"
+          },
+          "profile": {
+            "title": "Profile details",
+            "doneDescription": "Your display name, bio, categories, languages and location are set.",
+            "todoDescription": "Add your display name, bio, categories, languages and location.",
+            "cta": "Edit profile",
+            "startCta": "Create your profile"
+          },
+          "portfolio": {
+            "title": "Portfolio and packages",
+            "description": "Upload photos and set your packages and prices.",
+            "comingSoon": "Coming soon."
+          },
+          "verification": {
+            "title": "Verification",
+            "description": "We check your identity and photos before you can publish.",
+            "needsProfile": "Create your profile first.",
+            "unverified": "Not submitted yet.",
+            "pending": "Submitted, waiting for review.",
+            "verified": "Verified.",
+            "rejected": "Rejected. You'll be able to see why and resubmit here soon.",
+            "comingSoon": "Document upload is coming soon."
+          },
+          "payouts": {
+            "title": "Payouts",
+            "description": "Connect a bank account with Stripe so you can get paid.",
+            "comingSoon": "Not available yet."
+          }
+        }
+      },
+      "profile": {
+        "metaTitle": "Your profile",
+        "createTitle": "Create your photographer profile",
+        "editTitle": "Edit your profile",
+        "createIntro": "This is what clients see when they find you on Photoo.",
+        "backToOverview": "Back to overview",
+        "viewPublicProfileCta": "View public profile",
+        "slugPreviewLabel": "Your profile URL will be",
+        "slugPreviewHint": "Assigned automatically from your display name when you create your profile. It can't be changed afterwards.",
+        "slugFallbackHint": "Your display name doesn't have enough letters or numbers for a URL, so we'll assign a generic one instead.",
+        "displayNameLabel": "Display name",
+        "bioHeading": "Bio",
+        "bioHint": "Write a short bio in each language you want to offer it in. Leave a language blank to skip it.",
+        "bioLabel": "Bio ({language})",
+        "categoriesHeading": "Categories",
+        "categoriesHint": "Choose at least one.",
+        "languagesHeading": "Languages you work in",
+        "languagesHint": "Choose at least one.",
+        "locationHeading": "Location",
+        "locationExplanation": "Pick your city or share your location so clients know where to find you.",
+        "cityLabel": "City",
+        "useMyLocationCta": "Use my location",
+        "useMyLocationError": "We couldn't get your location. Try picking a city instead.",
+        "locationSet": "Location set.",
+        "locationRequired": "Choose a city or use your location before saving.",
+        "countryLabel": "Country",
+        "countryPlaceholder": "Choose a country",
+        "createCta": "Create profile",
+        "saveCta": "Save changes",
+        "saving": "Saving…",
+        "created": "Profile created.",
+        "saved": "Saved.",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "Your profile changed elsewhere. Reload and try again.",
+          "invalid": "Check the highlighted fields and try again.",
+          "forbidden": "You don't have access to this profile.",
+          "notFound": "Your profile could not be found.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
       }
     }
   }
