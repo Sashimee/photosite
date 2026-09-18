@@ -1,18 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ConversationParticipantSchema,
   ConversationSchema,
   ConversationsQuerySchema,
   MarkConversationReadRequestSchema,
+  MessageAttachmentSchema,
   MessageSchema,
   ReportConversationRequestSchema,
   SendMessageRequestSchema,
 } from './chat.js';
 
+const validParticipantUser = {
+  id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+  displayName: 'Jane Doe',
+  avatarUrl: null,
+};
+
 const validConversation = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   type: 'booking',
   subjectId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-  participants: [{ userId: '3fa85f64-5717-4562-b3fc-2c963f66afa6', lastReadAt: null }],
+  subjectRef: {
+    type: 'quote',
+    quoteId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+    requestTitle: 'Wedding photography in Luxembourg',
+  },
+  participants: [
+    {
+      userId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+      user: validParticipantUser,
+      lastReadAt: null,
+    },
+  ],
   lastMessageAt: '2026-09-16T12:00:00.000Z',
   lastMessagePreview: 'Hello there',
   unreadCount: 2,
@@ -55,6 +74,65 @@ describe('ConversationSchema', () => {
       false,
     );
   });
+
+  it('accepts a null subjectRef', () => {
+    expect(ConversationSchema.safeParse({ ...validConversation, subjectRef: null }).success).toBe(
+      true,
+    );
+  });
+
+  it('accepts a quote subjectRef without a requestTitle', () => {
+    expect(
+      ConversationSchema.safeParse({
+        ...validConversation,
+        subjectRef: { type: 'quote', quoteId: validConversation.id },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects an unknown subjectRef type', () => {
+    expect(
+      ConversationSchema.safeParse({
+        ...validConversation,
+        subjectRef: { type: 'booking', quoteId: validConversation.id },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('ConversationParticipantSchema', () => {
+  it('accepts a well-formed participant', () => {
+    expect(ConversationParticipantSchema.safeParse(validConversation.participants[0]).success).toBe(
+      true,
+    );
+  });
+
+  it('rejects a participant user with an email field', () => {
+    expect(
+      ConversationParticipantSchema.safeParse({
+        ...validConversation.participants[0],
+        user: { ...validParticipantUser, email: 'jane@example.com' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a participant user with a role field', () => {
+    expect(
+      ConversationParticipantSchema.safeParse({
+        ...validConversation.participants[0],
+        user: { ...validParticipantUser, role: 'photographer' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts a null avatarUrl', () => {
+    expect(
+      ConversationParticipantSchema.safeParse({
+        ...validConversation.participants[0],
+        user: { ...validParticipantUser, avatarUrl: null },
+      }).success,
+    ).toBe(true);
+  });
 });
 
 describe('MessageSchema', () => {
@@ -67,7 +145,9 @@ describe('MessageSchema', () => {
       MessageSchema.safeParse({
         ...validMessage,
         body: null,
-        attachments: [{ id: validMessage.id, kind: 'image' }],
+        attachments: [
+          { id: validMessage.id, kind: 'image', mimeType: 'image/jpeg', sizeBytes: 1024 },
+        ],
       }).success,
     ).toBe(true);
   });
@@ -86,7 +166,9 @@ describe('MessageSchema', () => {
     expect(
       MessageSchema.safeParse({
         ...validMessage,
-        attachments: [{ id: validMessage.id, kind: 'video' }],
+        attachments: [
+          { id: validMessage.id, kind: 'video', mimeType: 'video/mp4', sizeBytes: 1024 },
+        ],
       }).success,
     ).toBe(false);
   });
@@ -95,6 +177,31 @@ describe('MessageSchema', () => {
     expect(MessageSchema.safeParse({ ...validMessage, body: 'a'.repeat(4001) }).success).toBe(
       false,
     );
+  });
+});
+
+describe('MessageAttachmentSchema', () => {
+  const validAttachment = {
+    id: validMessage.id,
+    kind: 'image',
+    mimeType: 'image/jpeg',
+    sizeBytes: 1024,
+  };
+
+  it('accepts a well-formed attachment', () => {
+    expect(MessageAttachmentSchema.safeParse(validAttachment).success).toBe(true);
+  });
+
+  it('rejects a non-positive sizeBytes', () => {
+    expect(MessageAttachmentSchema.safeParse({ ...validAttachment, sizeBytes: 0 }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects a malformed mimeType', () => {
+    expect(
+      MessageAttachmentSchema.safeParse({ ...validAttachment, mimeType: 'not-a-mime' }).success,
+    ).toBe(false);
   });
 });
 

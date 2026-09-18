@@ -126,7 +126,10 @@ describe('server events', () => {
       id,
       type: 'direct',
       subjectId: null,
-      participants: [{ userId: id, lastReadAt: null }],
+      subjectRef: null,
+      participants: [
+        { userId: id, user: { id, displayName: 'Jane Doe', avatarUrl: null }, lastReadAt: null },
+      ],
       lastMessageAt: null,
       lastMessagePreview: null,
       unreadCount: 0,

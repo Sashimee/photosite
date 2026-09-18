@@ -7,13 +7,15 @@ import {
   paginatedResponseSchema,
 } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
-import { UploadDownloadResponseSchema } from './uploads.js';
+import { MimeTypeSchema, UploadDownloadResponseSchema } from './uploads.js';
 import { z } from './zod.js';
 
 export const MessageAttachmentSchema = z
   .object({
     id: IdSchema,
     kind: z.enum(ATTACHMENT_KINDS),
+    mimeType: MimeTypeSchema,
+    sizeBytes: z.int().positive(),
   })
   .strict()
   .openapi('MessageAttachment');
@@ -32,19 +34,43 @@ export const MessageSchema = z
   .strict()
   .openapi('Message');
 
+export const ConversationParticipantUserSchema = z
+  .object({
+    id: IdSchema,
+    displayName: z.string().max(120),
+    avatarUrl: z.url().nullable(),
+  })
+  .strict()
+  .openapi('ConversationParticipantUser');
+
 export const ConversationParticipantSchema = z
   .object({
     userId: IdSchema,
+    user: ConversationParticipantUserSchema,
     lastReadAt: IsoDateTimeSchema.nullable(),
   })
   .strict()
   .openapi('ConversationParticipant');
+
+export const QuoteConversationSubjectRefSchema = z
+  .object({
+    type: z.literal('quote'),
+    quoteId: IdSchema,
+    requestTitle: z.string().min(1).max(150).optional(),
+  })
+  .strict()
+  .openapi('QuoteConversationSubjectRef');
+
+export const ConversationSubjectRefSchema = z.discriminatedUnion('type', [
+  QuoteConversationSubjectRefSchema,
+]);
 
 export const ConversationSchema = z
   .object({
     id: IdSchema,
     type: z.enum(CONVERSATION_TYPES),
     subjectId: IdSchema.nullable(),
+    subjectRef: ConversationSubjectRefSchema.nullable(),
     participants: z.array(ConversationParticipantSchema).min(1),
     lastMessageAt: IsoDateTimeSchema.nullable(),
     lastMessagePreview: z.string().max(4000).nullable(),
@@ -53,6 +79,11 @@ export const ConversationSchema = z
   })
   .strict()
   .openapi('Conversation');
+
+export const ConversationsUnreadCountResponseSchema = z
+  .object({ count: z.int().nonnegative() })
+  .strict()
+  .openapi('ConversationsUnreadCount');
 
 export const MAX_ATTACHMENTS_PER_MESSAGE = 10;
 export const MAX_MESSAGE_BODY_LENGTH = 4000;
@@ -125,6 +156,21 @@ registry.registerPath({
       content: { 'application/json': { schema: paginatedResponseSchema(ConversationSchema) } },
     },
     ...errorResponses([400, 401]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/conversations/unread-count'),
+  summary: "Get the current user's unread message count across conversations",
+  tags: ['chat'],
+  security: AUTH_SECURITY,
+  responses: {
+    '200': {
+      description: 'The unread message count',
+      content: { 'application/json': { schema: ConversationsUnreadCountResponseSchema } },
+    },
+    ...errorResponses([401]),
   },
 });
 

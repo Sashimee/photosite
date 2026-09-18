@@ -1980,6 +1980,16 @@
             "description": "UUID identifier",
             "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
           },
+          "subjectRef": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QuoteConversationSubjectRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "participants": {
             "type": "array",
             "items": {
@@ -2015,11 +2025,39 @@
           "id",
           "type",
           "subjectId",
+          "subjectRef",
           "participants",
           "lastMessageAt",
           "lastMessagePreview",
           "unreadCount",
           "archivedByMe"
+        ],
+        "additionalProperties": false
+      },
+      "QuoteConversationSubjectRef": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "quote"
+            ]
+          },
+          "quoteId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "requestTitle": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 150
+          }
+        },
+        "required": [
+          "type",
+          "quoteId"
         ],
         "additionalProperties": false
       },
@@ -2031,6 +2069,9 @@
             "format": "uuid",
             "description": "UUID identifier",
             "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "user": {
+            "$ref": "#/components/schemas/ConversationParticipantUser"
           },
           "lastReadAt": {
             "type": [
@@ -2044,7 +2085,49 @@
         },
         "required": [
           "userId",
+          "user",
           "lastReadAt"
+        ],
+        "additionalProperties": false
+      },
+      "ConversationParticipantUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "avatarUrl"
+        ],
+        "additionalProperties": false
+      },
+      "ConversationsUnreadCount": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "count"
         ],
         "additionalProperties": false
       },
@@ -2135,11 +2218,24 @@
               "pdf",
               "other"
             ]
+          },
+          "mimeType": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 127,
+            "pattern": "^[a-z0-9.+-]+\\/[a-z0-9.+-]+$",
+            "example": "image/jpeg"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0
           }
         },
         "required": [
           "id",
-          "kind"
+          "kind",
+          "mimeType",
+          "sizeBytes"
         ],
         "additionalProperties": false
       },
@@ -8936,6 +9032,44 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/conversations/unread-count": {
+      "get": {
+        "summary": "Get the current user's unread message count across conversations",
+        "tags": [
+          "chat"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The unread message count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationsUnreadCount"
                 }
               }
             }
