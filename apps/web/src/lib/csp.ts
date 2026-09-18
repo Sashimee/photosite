@@ -2,6 +2,13 @@ export function originOf(url: string | undefined): string | null {
   return url ? new URL(url).origin : null;
 }
 
+// Modern browsers already map `wss:`/`ws:` sources onto `https:`/`http:`
+// connect-src entries, but Safari didn't reliably do so until recently, so
+// the API origin is listed under both schemes for the chat socket.
+export function websocketOrigin(origin: string | null): string | null {
+  return origin ? origin.replace(/^http/, 'ws') : null;
+}
+
 export function buildCspHeader(
   nonce: string,
   isDev: boolean,

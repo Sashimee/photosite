@@ -6,6 +6,7 @@ import { buildPinoHttpOptions } from './common/logging/logger.options.js';
 import { RateLimitModule } from './common/rate-limit/rate-limit.module.js';
 import { EnvModule } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
+import { AdminModule } from './modules/admin/admin.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { ChatModule } from './modules/chat/chat.module.js';
 import { CitiesModule } from './modules/cities/cities.module.js';
@@ -14,6 +15,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { ProductsModule } from './modules/products/products.module.js';
 import { ProfilesModule } from './modules/profiles/profiles.module.js';
 import { QuotesModule } from './modules/quotes/quotes.module.js';
+import { ReportsModule } from './modules/reports/reports.module.js';
 import { RequestsModule } from './modules/requests/requests.module.js';
 import { UploadsModule } from './modules/uploads/uploads.module.js';
 import { VerificationModule } from './modules/verification/verification.module.js';
@@ -42,6 +44,8 @@ import { StorageModule } from './storage/storage.module.js';
     NotificationsModule,
     ChatModule,
     VerificationModule,
+    AdminModule,
+    ReportsModule,
     OpenapiModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],

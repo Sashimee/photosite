@@ -151,9 +151,16 @@ describe('verification integration', () => {
   // session and only forwards the new value as a Set-Cookie header
   // (apps/api/src/modules/auth/auth.controller.ts totpVerify), so a bearer
   // client has no way to recover a usable token after enrolling 2FA.
-  async function makeAdmin(label: string, withTwoFactor: boolean) {
+  async function makeAdmin(label: string, withTwoFactor: boolean, grantVerification = true) {
     const admin = await signUpVerifyAndSignIn(['client'], label);
     await prisma.user.update({ where: { id: admin.id }, data: { roles: ['admin'] } });
+    if (grantVerification) {
+      await prisma.adminPermissionGrant.upsert({
+        where: { userId_permission: { userId: admin.id, permission: 'verification' } },
+        create: { userId: admin.id, permission: 'verification', grantedByAdminId: admin.id },
+        update: {},
+      });
+    }
 
     const signInResponse = await fastify().inject({
       method: 'POST',
@@ -755,11 +762,38 @@ describe('verification integration', () => {
       expect(response.json<{ code: string }>().code).toBe('TWO_FACTOR_REQUIRED');
     });
 
-    it('passes with a second factor verified within the window', async () => {
+    it('returns TWO_FACTOR_REQUIRED once the 15-minute fresh-verification window has expired', async () => {
+      const admin = await makeAdmin('stale-fresh-2fa', true);
+      await prisma.session.updateMany({
+        where: { userId: admin.id },
+        data: { twoFactorVerifiedAt: new Date(Date.now() - 20 * 60 * 1000) },
+      });
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/verification-cases',
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('TWO_FACTOR_REQUIRED');
+    });
+
+    it('returns 403 for an admin without the verification permission', async () => {
+      const admin = await makeAdmin('no-permission', true, false);
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/verification-cases',
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('FORBIDDEN');
+    });
+
+    it('passes with a second factor verified within the fresh window', async () => {
       const admin = await makeAdmin('fresh-2fa', true);
       await prisma.session.updateMany({
         where: { userId: admin.id },
-        data: { twoFactorVerifiedAt: new Date(Date.now() - 1 * 60 * 60 * 1000) },
+        data: { twoFactorVerifiedAt: new Date(Date.now() - 5 * 60 * 1000) },
       });
 
       const response = await fastify().inject({

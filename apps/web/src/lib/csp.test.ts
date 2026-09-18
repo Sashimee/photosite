@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildCspHeader, originOf } from './csp';
+import { buildCspHeader, originOf, websocketOrigin } from './csp';
 
 describe('buildCspHeader', () => {
   it('includes the nonce in script-src and style-src for production', () => {
@@ -52,5 +52,16 @@ describe('originOf', () => {
 
   it('returns null for an unset URL', () => {
     expect(originOf(undefined)).toBeNull();
+  });
+});
+
+describe('websocketOrigin', () => {
+  it('maps http to ws and https to wss', () => {
+    expect(websocketOrigin('http://127.0.0.1:4010')).toBe('ws://127.0.0.1:4010');
+    expect(websocketOrigin('https://api.photoo.lu')).toBe('wss://api.photoo.lu');
+  });
+
+  it('returns null for a null origin', () => {
+    expect(websocketOrigin(null)).toBeNull();
   });
 });

@@ -46,6 +46,9 @@ export function AccountMenu({ locale, user }: { locale: Locale; user: SessionUse
         <DropdownMenuItem asChild>
           <Link href={`/${locale}/quotes`}>{t('quotes')}</Link>
         </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/${locale}/messages`}>{t('messages')}</Link>
+        </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() => {
             void handleSignOut();
