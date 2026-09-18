@@ -7,6 +7,14 @@ const optional = <T extends z.ZodType>(schema: T) =>
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   NEXT_PUBLIC_API_URL: z.url(),
+  // Server-side base URL for API calls made inside the container. On the
+  // preview, NEXT_PUBLIC_API_URL is the public hostname, so every
+  // server-rendered page's fetch left the container, came back in through
+  // Traefik and its CrowdSec bouncer, and counted as public traffic - which
+  // is how a burst of SSR requests got the host's own IP banned and turned
+  // every data-driven page into an error. Server code uses this instead;
+  // unset it and behaviour is exactly as before.
+  API_INTERNAL_URL: optional(z.url()),
   // The app's own public origin (no path): required so canonical URLs,
   // hreflang alternates and JSON-LD resolve to the real deployment instead
   // of Next's http://localhost:3000 metadataBase default.

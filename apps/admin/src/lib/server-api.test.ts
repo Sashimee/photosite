@@ -55,6 +55,29 @@ describe('getSession', () => {
     expect(request.headers.get('cookie')).toBe('photoo_session=abc');
   });
 
+  // Better Auth renames the cookie to `__Secure-photoo_session` whenever it
+  // sets it over https, so every deployed environment sends that name and
+  // only local http sends the bare one. Matching the bare name alone made
+  // every signed-in page on the preview redirect back to sign-in.
+  it('forwards the __Secure- prefixed cookie that https environments send', async () => {
+    cookiesMock.mockResolvedValue({
+      getAll: () => [
+        { name: '__Secure-photoo_session', value: 'abc' },
+        { name: 'other', value: 'def' },
+      ],
+    });
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ user: sampleUser }), { status: 200 }),
+    );
+
+    const { getSession } = await import('./server-api');
+    const user = await getSession();
+
+    expect(user).toEqual(sampleUser);
+    const [request] = fetchMock.mock.calls[0] as [Request];
+    expect(request.headers.get('cookie')).toBe('__Secure-photoo_session=abc');
+  });
+
   it('returns null without calling the API when there is no session cookie', async () => {
     cookiesMock.mockResolvedValue({ getAll: () => [{ name: 'other', value: 'def' }] });
 

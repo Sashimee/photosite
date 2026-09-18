@@ -19,6 +19,13 @@ services:
       # Must match the image's build args (deploy-preview.yml): read again
       # at request time by apps/web's middleware, not just inlined at build.
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?copy infra/dokploy/preview/.env.example to .env}
+      # Server-rendered pages call the API over the internal network instead
+      # of going out to the public hostname and back through Traefik: that
+      # round trip made every SSR request look like public traffic to the
+      # CrowdSec bouncer, which banned the host's own IP and left every
+      # data-driven page showing the error boundary while the static home
+      # page kept working. The browser still uses NEXT_PUBLIC_API_URL.
+      API_INTERNAL_URL: http://api:4000
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://footoo.bas.lu}
       NEXT_PUBLIC_MEDIA_BASE_URL: ${NEXT_PUBLIC_MEDIA_BASE_URL:-https://footoo.bas.lu/photoo-public}
       NEXT_PUBLIC_ALLOW_INDEXING: ${NEXT_PUBLIC_ALLOW_INDEXING:-false}
@@ -26,6 +33,10 @@ services:
       SENTRY_REQUIRED: ${SENTRY_REQUIRED:-false}
     networks:
       - dokploy-network
+      # Also on `internal` so server-rendered pages can reach the api
+      # container directly (API_INTERNAL_URL above); Traefik still reaches
+      # this service over dokploy-network.
+      - internal
     labels:
       traefik.enable: 'true'
       traefik.docker.network: dokploy-network
