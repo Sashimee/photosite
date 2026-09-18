@@ -12,6 +12,10 @@ export function buildCspHeader(
     `default-src 'self'`,
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? ` 'unsafe-eval'` : ''}`,
     `style-src 'self' ${isDev ? `'unsafe-inline'` : `'nonce-${nonce}'`}`,
+    // Same reason as apps/web (#176): a nonce cannot cover a `style="..."`
+    // attribute, and Next's own runtime emits them. Style attributes only -
+    // inline <style> elements still need the nonce and script-src is strict.
+    `style-src-attr 'unsafe-inline'`,
     ['img-src', "'self'", 'blob:', 'data:', ...imgOrigins].join(' '),
     `font-src 'self'`,
     ['connect-src', "'self'", ...connectOrigins].join(' '),

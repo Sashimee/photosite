@@ -7,7 +7,9 @@ describe('buildCspHeader', () => {
     const header = buildCspHeader('abc123', false);
     expect(header).toContain(`script-src 'self' 'nonce-abc123' 'strict-dynamic'`);
     expect(header).toContain(`style-src 'self' 'nonce-abc123'`);
-    expect(header).not.toContain('unsafe-inline');
+    expect(header).not.toMatch(/script-src[^;]*unsafe-inline/);
+    expect(header).not.toMatch(/style-src [^;]*unsafe-inline/);
+    expect(header.match(/unsafe-inline/g)).toHaveLength(1);
     expect(header).not.toContain('unsafe-eval');
   });
 
