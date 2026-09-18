@@ -55,12 +55,62 @@
       }
     },
     "shell": {
-      "signedInAs": "Signed in as {email}"
+      "signedInAs": "Signed in as {email}",
+      "signOut": "Sign out",
+      "nav": {
+        "dashboard": "Dashboard",
+        "health": "Health",
+        "users": "Users",
+        "verification": "Verification",
+        "provenance": "Provenance",
+        "finance": "Finance",
+        "moderation": "Moderation",
+        "settings": "Settings",
+        "comingSoon": "Coming in step {step}",
+        "availableAfter": "Available after step {step}"
+      }
     },
     "notFound": {
       "title": "Not found",
       "description": "This page doesn't exist or you don't have access to it.",
       "backCta": "Back to admin home"
+    },
+    "error": {
+      "title": "Something went wrong",
+      "description": "An unexpected error occurred. Please try again."
+    },
+    "dataTable": {
+      "next": "Next",
+      "previous": "Previous",
+      "errors": {
+        "forbidden": "You don't have permission to view this.",
+        "notFound": "This couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "conflict": "That couldn't be completed because something changed. Please retry."
+      }
+    },
+    "health": {
+      "title": "System health",
+      "buildInfo": {
+        "title": "Build info",
+        "version": "Version",
+        "builtAt": "Built",
+        "unknown": "unknown"
+      },
+      "readiness": {
+        "caption": "Readiness checks",
+        "empty": "No checks reported.",
+        "columns": {
+          "check": "Check",
+          "status": "Status"
+        },
+        "statusOk": "OK",
+        "statusDown": "Down",
+        "checks": {
+          "database": "Database",
+          "redis": "Redis"
+        }
+      }
     }
   },
   "common": {

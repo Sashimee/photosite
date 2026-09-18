@@ -12,6 +12,12 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Component tests here render, drive `userEvent` and await a mocked
+    // fetch; that is comfortably under a second locally and close to (or
+    // over) vitest's 5s default on a CI runner, so they failed only on CI.
+    // The work is real - give it room rather than trimming assertions to
+    // fit an arbitrary limit. `apps/admin` carries the same setting.
+    testTimeout: 20000,
     env: {
       NEXT_PUBLIC_API_URL: 'http://127.0.0.1:4010',
       NEXT_PUBLIC_SITE_URL: 'http://127.0.0.1:3000',

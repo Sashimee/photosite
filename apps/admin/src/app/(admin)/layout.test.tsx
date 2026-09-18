@@ -10,6 +10,17 @@ vi.mock('@/lib/server-api', () => ({
 vi.mock('next/headers', () => ({
   headers: headersMock,
 }));
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+vi.mock('next-intl/server', async () => {
+  const { translate } = await import('@/testing/mock-translations');
+  return {
+    getTranslations: (namespace: string) => (key: string, values?: Record<string, unknown>) =>
+      translate(namespace, key, values),
+  };
+});
 
 function makeHeaders(pathname: string | null) {
   return {
@@ -86,5 +97,8 @@ describe('AdminLayout', () => {
     render(await AdminLayout({ children: <p>shell-content</p> }));
 
     expect(screen.getByText('shell-content')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/');
+    expect(screen.getByText('admin@example.com')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
   });
 });
