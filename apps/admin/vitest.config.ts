@@ -12,6 +12,12 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // The sign-in form tests render a client component, await a mocked fetch
+    // and assert on a re-render; that is ~1.5s locally and over vitest's 5s
+    // default on a CI runner, which made them fail only on CI (and only
+    // sometimes). The work is real, so give it room rather than trimming
+    // assertions to fit an arbitrary limit.
+    testTimeout: 20000,
     env: {
       NEXT_PUBLIC_API_URL: 'http://127.0.0.1:4010',
     },
