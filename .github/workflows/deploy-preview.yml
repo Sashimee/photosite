@@ -170,9 +170,11 @@ jobs:
             exit 1
           fi
 
-  # Reports only, never blocks: nothing downstream depends on this job, and
-  # every step is allowed to fail without turning the deploy itself red
-  # (docs/steps/1E.9-browser-smoke.md). Serial and rate-limited on purpose -
+  # Nothing downstream depends on this job, so a failure here never undoes a
+  # deploy that already happened - but it is no longer `continue-on-error`.
+  # That flag meant this job could fail every single run without anyone
+  # noticing, which is exactly what happened: it never once executed a test.
+  # A check nobody can see fail is not a check. Serial and rate-limited on purpose -
   # one Playwright worker plus a delay between navigations - because the
   # opposite traffic shape got a workstation IP banned by the host's
   # CrowdSec bouncer while investigating the 2026-09-18 outage.
@@ -180,10 +182,10 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
     env:
       SMOKE_BASE_URL: https://footoo.bas.lu
       SMOKE_NAV_DELAY_MS: '2000'
+      HAS_PREVIEW_SEED_PASSWORD: ${{ secrets.PREVIEW_SEED_USER_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -194,16 +196,36 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # tests/smoke/pages.ts imports @photoo/shared, which is a workspace
+      # package with no built dist in a fresh checkout. Without this the
+      # suite dies at import with "No tests found" - which is how it went
+      # silently red from the day it was added instead of ever running.
+      - name: Build the workspace packages the smoke suite imports
+        run: pnpm turbo run build --filter='@photoo/shared'
       - name: Wait for the Dokploy webhook to finish rolling the deploy out
         run: timeout 180 bash -c 'until curl -sf https://footoo.bas.lu/health; do sleep 5; done'
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Run the smoke suite against the live preview
+      - name: Run the signed-out smoke suite against the live preview
+        run: pnpm exec playwright test --project=smoke-public --workers=1
+      - name: Run the signed-in smoke suite against the live preview
+        if: env.HAS_PREVIEW_SEED_PASSWORD == 'true'
         env:
           # infra/dokploy/preview/README.md "Seed": the preview's seed run
           # uses a generated password, never the CI-only default, so this
           # needs its own repository secret (docs/steps/human-followups.md).
           SEED_USER_PASSWORD: ${{ secrets.PREVIEW_SEED_USER_PASSWORD }}
-        run: pnpm exec playwright test --project=smoke --workers=1
+        run: pnpm exec playwright test --project=smoke-authenticated --workers=1
+      # A step that only ever shows as grey "skipped" is easy to misread as
+      # fine, which is the exact failure mode this job exists to fix - so the
+      # gap gets its own always-run, unmissable step instead.
+      - name: Report signed-in smoke coverage was skipped
+        if: env.HAS_PREVIEW_SEED_PASSWORD != 'true'
+        run: |
+          echo "::warning::PREVIEW_SEED_USER_PASSWORD repository secret is not set (docs/steps/human-followups.md) - the signed-in pages (requests, quotes, messages, account) were NOT exercised by this deploy's smoke suite."
+          {
+            echo '### :warning: Signed-in smoke coverage skipped'
+            echo 'PREVIEW_SEED_USER_PASSWORD is not set, so the signed-in pages (requests, quotes, messages, account) were NOT checked this run. See docs/steps/human-followups.md.'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload the Playwright report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

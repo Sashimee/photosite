@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
 
-import { SIGNED_IN_PAGES, SIGNED_OUT_PAGES, type SmokePage } from './pages.js';
+import type { SmokePage } from './pages.js';
 
 // apps/web/src/app/[locale]/error.tsx, web.error.title (packages/i18n).
 // Matched against innerText, not textContent: the same string also sits
@@ -26,7 +26,7 @@ const NAV_DELAY_MS = Number(process.env.SMOKE_NAV_DELAY_MS ?? 0);
 // errors and page errors those failed prefetches and hydration produce.
 const SETTLE_MS = 1000;
 
-async function assertPageWorks(page: Page, baseURL: string | undefined, path: string) {
+export async function assertPageWorks(page: Page, baseURL: string | undefined, path: string) {
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
   const failedSameOriginRequests: string[] = [];
@@ -75,18 +75,10 @@ async function assertPageWorks(page: Page, baseURL: string | undefined, path: st
   expect(bodyText, 'error boundary rendered').not.toContain(ERROR_BOUNDARY_TEXT);
 }
 
-function registerRouteTests(pages: readonly SmokePage[]) {
+export function registerRouteTests(pages: readonly SmokePage[]) {
   for (const { path, reason } of pages) {
     test(`${path} works (${reason})`, async ({ page, baseURL }) => {
       await assertPageWorks(page, baseURL, path);
     });
   }
 }
-
-test.describe('signed out', () => {
-  registerRouteTests(SIGNED_OUT_PAGES);
-});
-
-test.describe('signed in as the seeded client', () => {
-  registerRouteTests(SIGNED_IN_PAGES);
-});

@@ -23,7 +23,7 @@
     "db:seed": "pnpm --filter @photoo/db run seed",
     "test:integration": "set -a && . packages/db/.env && . apps/api/.env && set +a && pnpm exec turbo run test --filter=@photoo/db && pnpm --filter @photoo/worker build && pnpm --filter @photoo/api test && pnpm --filter @photoo/worker test",
     "typecheck:smoke": "tsc --noEmit -p tsconfig.json",
-    "test:smoke": "playwright test --project=smoke"
+    "test:smoke": "playwright test --project=smoke-public --project=smoke-authenticated"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [
