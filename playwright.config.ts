@@ -18,6 +18,9 @@ export default defineConfig({
   },
   projects: [
     { name: 'setup', testMatch: /auth\.setup\.ts/ },
+    // Chromium only - WebKit will not install on this stack's host (missing
+    // system libraries). #180 (sign-in page downloading a file on a real
+    // browser) never reproduced under Chromium; this suite cannot see it.
     {
       name: 'smoke',
       dependencies: ['setup'],

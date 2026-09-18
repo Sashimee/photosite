@@ -47,9 +47,17 @@ async function assertPageWorks(page: Page, baseURL: string | undefined, path: st
     if (new URL(request.url()).origin !== targetOrigin) {
       return;
     }
-    failedSameOriginRequests.push(
-      `${request.url()} - ${request.failure()?.errorText ?? 'unknown'}`,
-    );
+    const errorText = request.failure()?.errorText ?? 'unknown';
+    // Every `?_rsc=` (Link prefetch) request on every page shows this exact
+    // pattern via the CDP Network domain: sent, then aborted within ~10ms,
+    // no response either way, on both requests for the same href. That is
+    // the App Router's own prefetch de-duplication, present on a healthy
+    // page, not a broken resource. Every other error code (refused, reset,
+    // name-not-resolved, blocked-by-client, ...) still fails the check.
+    if (errorText === 'net::ERR_ABORTED' && request.url().includes('_rsc=')) {
+      return;
+    }
+    failedSameOriginRequests.push(`${request.url()} - ${errorText}`);
   });
 
   if (NAV_DELAY_MS > 0) {

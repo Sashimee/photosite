@@ -164,6 +164,16 @@ jobs:
       PUBLIC_API_URL: http://127.0.0.1:4000
       WEB_ORIGINS: http://127.0.0.1:3000
       WEB_APP_URL: http://127.0.0.1:3000
+      # Local-MinIO workaround only, not a general "run in dev mode" pattern:
+      # `next build` always forces NODE_ENV=production regardless of this
+      # (verified - the CSP nonce logic below, baked into the edge-bundled
+      # proxy at build time, is unaffected), but `next start`'s image
+      # optimizer reads a live NODE_ENV, and without this it rejects every
+      # avatar/portfolio thumbnail from 127.0.0.1:9000 as a private-IP SSRF
+      # target ("url parameter is not allowed"), which real production never
+      # hits because its media host is a public domain. Whoever next touches
+      # this job: do not "clean this up" by removing it, and do not copy it
+      # anywhere that isn't pointed at a local MinIO.
       NODE_ENV: development
       TRUSTED_PROXIES: ''
       AUTH_SECRET: dev-only-auth-secret-change-me-please-32-chars-min
