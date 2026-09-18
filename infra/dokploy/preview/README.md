@@ -362,9 +362,15 @@ silently assumed to be covered.
 **Setting `BACKUP_AGE_RECIPIENT`** (`docs/steps/human-followups.md`): Alex
 runs `age-keygen` locally, keeps the private key in a password manager (it
 must never touch this server), and pastes the `age1...` public key into the
-Dokploy env as `BACKUP_AGE_RECIPIENT`. Until it's set, `backup` restarts in
-a crash loop, logging the same refusal each time - that is the intended
-failure mode, not a bug.
+Dokploy env as `BACKUP_AGE_RECIPIENT`. Until it's set, `backup` refuses to
+start and restarts in a crash loop, logging the same refusal each time -
+that is the intended failure mode, not a bug. The refusal is checked when
+the container starts, not when the 03:00 UTC run comes round, so an unset
+key is visible immediately instead of looking healthy all day and failing
+overnight. The variable deliberately has no `:?` default in `compose.yml`:
+compose interpolates the whole file before it filters services, so a
+required-but-unset variable there would abort the deploy of the entire
+stack rather than this one container.
 
 **Known limitation.** MinIO shares this host with Postgres, so this backup
 protects against a bad migration or a dropped database, not against losing
