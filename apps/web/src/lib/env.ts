@@ -29,6 +29,13 @@ const EnvSchema = z.object({
     .transform((value) => value === 'true'),
 });
 
+// Every key the schema declares must also appear as a literal
+// `process.env.KEY` reference below, or Next leaves it undefined in the
+// client bundle. env.test.ts asserts that from this list, so adding a key to
+// the schema and forgetting the reference fails the suite instead of the
+// browser.
+export const ENV_KEYS = Object.keys(EnvSchema.shape) as (keyof typeof EnvSchema.shape)[];
+
 function loadEnv() {
   // Next only substitutes *literal* `process.env.NEXT_PUBLIC_X` references
   // when it builds the client bundle; handing the whole `process.env` object

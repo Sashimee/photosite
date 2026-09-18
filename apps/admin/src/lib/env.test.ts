@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { ENV_KEYS } from './env';
+
 async function loadEnv(vars: Record<string, string>) {
   vi.resetModules();
   for (const [key, value] of Object.entries(vars)) vi.stubEnv(key, value);
@@ -47,6 +49,10 @@ describe('client bundle inlining', () => {
 
   it('does not hand the whole process.env object to the schema', () => {
     expect(source).not.toMatch(/safeParse\(\s*process\.env\s*\)/);
+  });
+
+  it.each(ENV_KEYS)('reads %s as a literal reference', (key) => {
+    expect(source).toContain(`process.env.${key}`);
   });
 
   it('reads NEXT_PUBLIC_API_URL as a literal reference', () => {
