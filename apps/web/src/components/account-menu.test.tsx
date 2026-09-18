@@ -13,6 +13,7 @@ vi.mock('next/navigation', () => ({
 
 const MENU_LABELS: Record<string, string> = {
   account: 'Account',
+  dashboard: 'Dashboard',
   myRequests: 'My requests',
   quotes: 'Quotes',
   signOut: 'Sign out',
@@ -67,6 +68,21 @@ describe('AccountMenu', () => {
       '/en/requests',
     );
     expect(screen.getByRole('menuitem', { name: 'Quotes' })).toHaveAttribute('href', '/en/quotes');
+    expect(screen.queryByRole('menuitem', { name: 'Dashboard' })).not.toBeInTheDocument();
+  });
+
+  it('offers the dashboard link to a user with the photographer role', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    const AccountMenu = await loadAccountMenu();
+    const user = userEvent.setup();
+
+    render(<AccountMenu locale="en" user={{ ...sampleUser, roles: ['client', 'photographer'] }} />);
+    await user.click(screen.getByRole('button', { name: 'client@example.com' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Dashboard' })).toHaveAttribute(
+      'href',
+      '/en/dashboard',
+    );
   });
 
   it('signs out, refreshes the session and navigates home', async () => {

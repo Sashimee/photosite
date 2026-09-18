@@ -40,6 +40,11 @@ export function AccountMenu({ locale, user }: { locale: Locale; user: SessionUse
         <DropdownMenuItem asChild>
           <Link href={`/${locale}/account`}>{t('account')}</Link>
         </DropdownMenuItem>
+        {currentUser?.roles.includes('photographer') ? (
+          <DropdownMenuItem asChild>
+            <Link href={`/${locale}/dashboard`}>{t('dashboard')}</Link>
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem asChild>
           <Link href={`/${locale}/requests`}>{t('myRequests')}</Link>
         </DropdownMenuItem>
