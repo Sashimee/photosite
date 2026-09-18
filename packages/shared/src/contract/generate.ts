@@ -13,6 +13,7 @@ import './uploads.js';
 import './chat.js';
 import './verification.js';
 import './admin.js';
+import './reports.js';
 import './gdpr.js';
 import './notifications.js';
 

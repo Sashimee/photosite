@@ -1,5 +1,6 @@
 import {
   PROVENANCE_VERDICTS,
+  REPORT_STATUSES,
   USER_ROLES,
   USER_STATUSES,
   VERIFICATION_CASE_STATUSES,
@@ -53,12 +54,10 @@ export const SetUserRolesRequestSchema = z
   })
   .strict();
 
-const REPORT_STATUSES = ['open', 'resolved', 'dismissed'] as const;
-
 export const AdminReportSchema = z
   .object({
     id: IdSchema,
-    reporterId: IdSchema,
+    reporterId: IdSchema.nullable(),
     targetType: z.string().min(1).max(60).openapi({ example: 'portfolio_image' }),
     targetId: IdSchema,
     reason: z.string().min(1).max(2000),
@@ -69,9 +68,21 @@ export const AdminReportSchema = z
   .strict()
   .openapi('AdminReport');
 
+export const AdminReportsQuerySchema = CursorPaginationQuerySchema.extend({
+  status: z.enum(REPORT_STATUSES).optional(),
+  targetType: z.string().min(1).max(60).optional(),
+  targetId: IdSchema.optional(),
+}).strict();
+
 export const ResolveReportRequestSchema = z
   .object({
     status: z.enum(['resolved', 'dismissed']),
+    resolution: z.string().min(1).max(2000),
+  })
+  .strict();
+
+export const TakedownReportRequestSchema = z
+  .object({
     resolution: z.string().min(1).max(2000),
   })
   .strict();
@@ -530,14 +541,14 @@ registry.registerPath({
   security: ADMIN_SECURITY,
   ...adminOperation('moderation'),
   request: {
-    query: CursorPaginationQuerySchema,
+    query: AdminReportsQuerySchema,
   },
   responses: {
     '200': {
       description: 'A page of reports',
       content: { 'application/json': { schema: paginatedResponseSchema(AdminReportSchema) } },
     },
-    ...errorResponses([401, 403]),
+    ...errorResponses([400, 401, 403, 422]),
   },
 });
 
@@ -555,6 +566,26 @@ registry.registerPath({
   responses: {
     '200': {
       description: 'Report resolved',
+      content: { 'application/json': { schema: AdminReportSchema } },
+    },
+    ...errorResponses([400, 401, 403, 404, 409, 422]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/admin/reports/{id}/takedown'),
+  summary: 'Resolve a report by taking down its target',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('moderation'),
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+    body: { content: { 'application/json': { schema: TakedownReportRequestSchema } } },
+  },
+  responses: {
+    '200': {
+      description: 'Report resolved and its target taken down',
       content: { 'application/json': { schema: AdminReportSchema } },
     },
     ...errorResponses([400, 401, 403, 404, 409, 422]),

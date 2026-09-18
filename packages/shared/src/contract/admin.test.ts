@@ -3,6 +3,7 @@ import {
   AdminBookingSchema,
   AdminProvenanceCheckSchema,
   AdminReportSchema,
+  AdminReportsQuerySchema,
   AdminUserSearchQuerySchema,
   AdminVerificationCasesQuerySchema,
   PlatformSettingsSchema,
@@ -11,6 +12,7 @@ import {
   ResolveReportRequestSchema,
   SetUserRolesRequestSchema,
   SuspendUserRequestSchema,
+  TakedownReportRequestSchema,
   UpdatePlatformSettingsRequestSchema,
 } from './admin.js';
 
@@ -70,6 +72,10 @@ describe('AdminReportSchema and ResolveReportRequestSchema', () => {
     expect(AdminReportSchema.safeParse(validReport).success).toBe(true);
   });
 
+  it('accepts a null reporterId for an anonymous notice', () => {
+    expect(AdminReportSchema.safeParse({ ...validReport, reporterId: null }).success).toBe(true);
+  });
+
   it('rejects an unknown status', () => {
     expect(AdminReportSchema.safeParse({ ...validReport, status: 'escalated' }).success).toBe(
       false,
@@ -86,6 +92,34 @@ describe('AdminReportSchema and ResolveReportRequestSchema', () => {
         resolution: 'Image removed',
       }).success,
     ).toBe(true);
+  });
+
+  it('takedown request requires a resolution', () => {
+    expect(TakedownReportRequestSchema.safeParse({ resolution: '' }).success).toBe(false);
+    expect(TakedownReportRequestSchema.safeParse({ resolution: 'Image removed' }).success).toBe(
+      true,
+    );
+  });
+});
+
+describe('AdminReportsQuerySchema', () => {
+  it('defaults limit to 20 with no filters', () => {
+    const result = AdminReportsQuerySchema.parse({});
+    expect(result.limit).toBe(20);
+  });
+
+  it('accepts status and target filters', () => {
+    expect(
+      AdminReportsQuerySchema.safeParse({
+        status: 'open',
+        targetType: 'portfolio_image',
+        targetId: id,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects an unknown status', () => {
+    expect(AdminReportsQuerySchema.safeParse({ status: 'escalated' }).success).toBe(false);
   });
 });
 

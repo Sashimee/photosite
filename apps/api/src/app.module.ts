@@ -15,6 +15,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { ProductsModule } from './modules/products/products.module.js';
 import { ProfilesModule } from './modules/profiles/profiles.module.js';
 import { QuotesModule } from './modules/quotes/quotes.module.js';
+import { ReportsModule } from './modules/reports/reports.module.js';
 import { RequestsModule } from './modules/requests/requests.module.js';
 import { UploadsModule } from './modules/uploads/uploads.module.js';
 import { VerificationModule } from './modules/verification/verification.module.js';
@@ -44,6 +45,7 @@ import { StorageModule } from './storage/storage.module.js';
     ChatModule,
     VerificationModule,
     AdminModule,
+    ReportsModule,
     OpenapiModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
