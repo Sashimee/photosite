@@ -34,6 +34,9 @@ function adminOperations(document: ReturnType<typeof buildOpenApiDocument>) {
   const operations: OperationLike[] = [];
   for (const [pathKey, pathItem] of Object.entries(document.paths ?? {})) {
     if (!pathKey.startsWith('/v1/admin/')) continue;
+    // An admin must always be able to ask what they may do, so this one
+    // route intentionally carries no permission requirement.
+    if (pathKey === '/v1/admin/me') continue;
     for (const value of Object.values(pathItem as Record<string, unknown>)) {
       if (value && typeof value === 'object' && 'responses' in value) {
         operations.push(value as OperationLike);

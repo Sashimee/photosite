@@ -300,6 +300,7 @@ export {
   AdminAuditLogEntrySchema,
   AdminAuditLogQuerySchema,
   AdminBookingSchema,
+  AdminMeSchema,
   AdminProvenanceCheckSchema,
   AdminReportSchema,
   AdminReportsQuerySchema,
