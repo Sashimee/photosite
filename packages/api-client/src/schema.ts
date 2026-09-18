@@ -4392,6 +4392,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/conversations/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the current user's unread message count across conversations */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The unread message count */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationsUnreadCount"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/conversations/{id}": {
         parameters: {
             query?: never;
@@ -8712,6 +8757,7 @@ export interface components {
              * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
              */
             subjectId: string | null;
+            subjectRef: components["schemas"]["QuoteConversationSubjectRef"] | null;
             participants: components["schemas"]["ConversationParticipant"][];
             /**
              * Format: date-time
@@ -8723,6 +8769,17 @@ export interface components {
             unreadCount: number;
             archivedByMe: boolean;
         };
+        QuoteConversationSubjectRef: {
+            /** @enum {string} */
+            type: "quote";
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            quoteId: string;
+            requestTitle?: string;
+        };
         ConversationParticipant: {
             /**
              * Format: uuid
@@ -8730,12 +8787,27 @@ export interface components {
              * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
              */
             userId: string;
+            user: components["schemas"]["ConversationParticipantUser"];
             /**
              * Format: date-time
              * @description ISO 8601 date-time
              * @example 2026-09-16T12:00:00.000Z
              */
             lastReadAt: string | null;
+        };
+        ConversationParticipantUser: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            displayName: string | null;
+            /** Format: uri */
+            avatarUrl: string | null;
+        };
+        ConversationsUnreadCount: {
+            count: number;
         };
         Message: {
             /**
@@ -8786,6 +8858,9 @@ export interface components {
             id: string;
             /** @enum {string} */
             kind: "image" | "pdf" | "other";
+            /** @example image/jpeg */
+            mimeType: string;
+            sizeBytes: number;
         };
         VerificationRequirements: {
             /**

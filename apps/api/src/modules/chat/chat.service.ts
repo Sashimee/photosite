@@ -5,6 +5,7 @@ import {
   truncateNotificationText,
   type ConversationSchema,
   type ConversationsQuerySchema,
+  type ConversationsUnreadCountResponseSchema,
   type CursorPaginationQuerySchema,
   type MarkConversationReadRequestSchema,
   type MessageSchema,
@@ -18,6 +19,7 @@ import {
   decodeCreatedAtCursor,
   encodeCreatedAtCursor,
 } from '../../common/pagination/created-at-cursor.js';
+import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { StorageService } from '../../storage/storage.service.js';
 import { ChatMembershipCache } from './chat-membership-cache.js';
@@ -41,9 +43,29 @@ type MarkReadInput = z.infer<typeof MarkConversationReadRequestSchema>;
 type ReportInput = z.infer<typeof ReportConversationRequestSchema>;
 type ConversationDto = z.infer<typeof ConversationSchema>;
 type MessageDto = z.infer<typeof MessageSchema>;
+type UnreadCountDto = z.infer<typeof ConversationsUnreadCountResponseSchema>;
 
 const MESSAGE_ATTACHMENTS_INCLUDE = {
-  attachments: { include: { upload: { select: { mimeType: true } } } },
+  attachments: {
+    include: {
+      upload: { select: { mimeType: true, actualSizeBytes: true, declaredSizeBytes: true } },
+    },
+  },
+} as const;
+
+// `User.name` is never selected here: it defaults to the account's email
+// local part at sign-up and must never reach another participant
+// (S6/compliance, quote-events.ts), so a client participant's displayName
+// stays null rather than falling back to it.
+const PARTICIPANT_USER_SELECT = {
+  user: {
+    select: {
+      id: true,
+      photographerProfile: {
+        select: { displayName: true, avatarUpload: { select: { variants: true } } },
+      },
+    },
+  },
 } as const;
 
 const DELETE_WINDOW_MS = 15 * 60 * 1000;
@@ -82,6 +104,8 @@ function isDuplicateKeyError(error: unknown): boolean {
 
 @Injectable()
 export class ChatService {
+  private readonly baseUrl: string;
+
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(StorageService) private readonly storage: StorageService,
@@ -94,7 +118,10 @@ export class ChatService {
     @Inject(NotificationsService) private readonly notifications: NotificationsService,
     @Inject(AuditLogService) private readonly auditLog: AuditLogService,
     @Inject(Logger) private readonly logger: Logger,
-  ) {}
+    @Inject(APP_CONFIG) config: Env,
+  ) {
+    this.baseUrl = config.S3_PUBLIC_BASE_URL;
+  }
 
   // Creates the (idempotent) quote conversation inside the caller's own
   // quote-creation transaction (docs/steps/1A.6-chat.md "created in the same
@@ -144,6 +171,12 @@ export class ChatService {
     const nextCursor =
       hasMore && last ? encodeConversationCursor(last.lastMessageAt, last.id) : null;
     return { items, nextCursor };
+  }
+
+  async unreadCount(user: SessionUser): Promise<UnreadCountDto> {
+    await this.rateLimit.enforceRead(user.id);
+    const count = await this.repository.countUnreadMessages(user.id);
+    return { count };
   }
 
   async get(user: SessionUser, id: string): Promise<ConversationDto> {
@@ -540,6 +573,7 @@ export class ChatService {
     }
     const participants = await this.prisma.client.conversationParticipant.findMany({
       where: { conversationId: { in: rows.map((row) => row.id) } },
+      include: PARTICIPANT_USER_SELECT,
     });
     const byConversation = new Map<string, typeof participants>();
     for (const participant of participants) {
@@ -554,7 +588,7 @@ export class ChatService {
       if (!rowParticipants.some((p) => p.userId === userId)) {
         continue;
       }
-      dtos.push(mapConversationRow(row, { participants: rowParticipants }));
+      dtos.push(mapConversationRow(row, { participants: rowParticipants }, this.baseUrl));
     }
     return dtos;
   }
