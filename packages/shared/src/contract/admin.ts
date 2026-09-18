@@ -48,10 +48,20 @@ export const AdminUserSchema = UserSchema.extend({
   .strict()
   .openapi('AdminUser');
 
+// Two distinct expiries, both derived from the session's
+// `twoFactorVerifiedAt` (apps/api/src/common/auth/require-admin.ts):
+// `sessionExpiresAt` is when `requireAdminSession` itself starts refusing
+// the session (the 12h window, after which the admin is signed out of
+// admin routes entirely); `twoFactorFreshUntil` is the much shorter 15min
+// window `x-requires-2fa` routes enforce, so a refund or role change
+// starts re-prompting well before the session itself goes stale. A single
+// `twoFactorExpiresAt` field would have to pick one and silently mislead
+// about the other.
 export const AdminMeSchema = z
   .object({
     permissions: z.array(z.enum(ADMIN_PERMISSIONS)),
-    twoFactorExpiresAt: IsoDateTimeSchema.nullable(),
+    sessionExpiresAt: IsoDateTimeSchema.nullable(),
+    twoFactorFreshUntil: IsoDateTimeSchema.nullable(),
   })
   .strict()
   .openapi('AdminMe');

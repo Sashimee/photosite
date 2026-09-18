@@ -7,7 +7,10 @@ import { Redis } from 'ioredis';
 import { io, type Socket as ClientSocket } from 'socket.io-client';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module.js';
-import { TWO_FACTOR_VERIFICATION_WINDOW_MS } from '../../common/auth/require-admin.js';
+import {
+  TWO_FACTOR_FRESH_VERIFICATION_WINDOW_MS,
+  TWO_FACTOR_VERIFICATION_WINDOW_MS,
+} from '../../common/auth/require-admin.js';
 import { configureApp } from '../../bootstrap/configure-app.js';
 import { createFastifyAdapter } from '../../bootstrap/fastify-adapter.js';
 import { APP_CONFIG, type Env } from '../../config/env.js';
@@ -47,7 +50,8 @@ interface UserBody {
 
 interface AdminMeBody {
   permissions: string[];
-  twoFactorExpiresAt: string | null;
+  sessionExpiresAt: string | null;
+  twoFactorFreshUntil: string | null;
 }
 
 interface PageBody<T> {
@@ -373,7 +377,7 @@ describe('admin integration', () => {
       expect(response.json<AdminMeBody>().permissions).toEqual([]);
     });
 
-    it('derives twoFactorExpiresAt from the admin two-factor verification window', async () => {
+    it('derives sessionExpiresAt and twoFactorFreshUntil from their own windows, and they differ', async () => {
       const admin = await makeAdmin('me-2fa-expiry', ['support']);
       const before = Date.now();
       const response = await fastify().inject({
@@ -383,11 +387,58 @@ describe('admin integration', () => {
       });
       const after = Date.now();
       expect(response.statusCode).toBe(200);
-      const { twoFactorExpiresAt } = response.json<AdminMeBody>();
-      if (!twoFactorExpiresAt) throw new Error('expected a twoFactorExpiresAt value');
-      const expiresAtMs = new Date(twoFactorExpiresAt).getTime();
-      expect(expiresAtMs).toBeGreaterThanOrEqual(before + TWO_FACTOR_VERIFICATION_WINDOW_MS - 1000);
-      expect(expiresAtMs).toBeLessThanOrEqual(after + TWO_FACTOR_VERIFICATION_WINDOW_MS + 1000);
+      const { sessionExpiresAt, twoFactorFreshUntil } = response.json<AdminMeBody>();
+      if (!sessionExpiresAt) throw new Error('expected a sessionExpiresAt value');
+      if (!twoFactorFreshUntil) throw new Error('expected a twoFactorFreshUntil value');
+
+      const sessionExpiresAtMs = new Date(sessionExpiresAt).getTime();
+      expect(sessionExpiresAtMs).toBeGreaterThanOrEqual(
+        before + TWO_FACTOR_VERIFICATION_WINDOW_MS - 1000,
+      );
+      expect(sessionExpiresAtMs).toBeLessThanOrEqual(
+        after + TWO_FACTOR_VERIFICATION_WINDOW_MS + 1000,
+      );
+
+      const freshUntilMs = new Date(twoFactorFreshUntil).getTime();
+      expect(freshUntilMs).toBeGreaterThanOrEqual(
+        before + TWO_FACTOR_FRESH_VERIFICATION_WINDOW_MS - 1000,
+      );
+      expect(freshUntilMs).toBeLessThanOrEqual(
+        after + TWO_FACTOR_FRESH_VERIFICATION_WINDOW_MS + 1000,
+      );
+
+      expect(freshUntilMs).toBeLessThan(sessionExpiresAtMs);
+    });
+
+    it('twoFactorFreshUntil matches the window the x-requires-2fa guard actually enforces', async () => {
+      const admin = await makeAdmin('me-2fa-fresh-parity', ['verification']);
+      await prisma.session.updateMany({
+        where: { userId: admin.id },
+        data: {
+          twoFactorVerifiedAt: new Date(
+            Date.now() - TWO_FACTOR_FRESH_VERIFICATION_WINDOW_MS - 1000,
+          ),
+        },
+      });
+
+      const meResponse = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/me',
+        headers: admin.headers,
+      });
+      const { sessionExpiresAt, twoFactorFreshUntil } = meResponse.json<AdminMeBody>();
+      if (!sessionExpiresAt) throw new Error('expected a sessionExpiresAt value');
+      if (!twoFactorFreshUntil) throw new Error('expected a twoFactorFreshUntil value');
+      expect(new Date(twoFactorFreshUntil).getTime()).toBeLessThan(Date.now());
+      expect(new Date(sessionExpiresAt).getTime()).toBeGreaterThan(Date.now());
+
+      const guardedResponse = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/verification-cases',
+        headers: admin.headers,
+      });
+      expect(guardedResponse.statusCode).toBe(403);
+      expect(guardedResponse.json<{ code: string }>().code).toBe('TWO_FACTOR_REQUIRED');
     });
   });
 

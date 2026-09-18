@@ -9463,7 +9463,13 @@ export interface components {
              * @description ISO 8601 date-time
              * @example 2026-09-16T12:00:00.000Z
              */
-            twoFactorExpiresAt: string | null;
+            sessionExpiresAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            twoFactorFreshUntil: string | null;
         };
         AdminUser: {
             /**

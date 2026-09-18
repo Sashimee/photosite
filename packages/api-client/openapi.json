@@ -2585,7 +2585,16 @@
               ]
             }
           },
-          "twoFactorExpiresAt": {
+          "sessionExpiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "twoFactorFreshUntil": {
             "type": [
               "string",
               "null"
@@ -2597,7 +2606,8 @@
         },
         "required": [
           "permissions",
-          "twoFactorExpiresAt"
+          "sessionExpiresAt",
+          "twoFactorFreshUntil"
         ],
         "additionalProperties": false
       },
