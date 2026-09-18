@@ -14,6 +14,8 @@ export const QUEUE_NAMES = [
   'notifications-cleanup',
   'booking-release',
   'receipt-pdf',
+  'gdpr-export',
+  'gdpr-sweep',
 ] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];
@@ -32,6 +34,8 @@ export const NOTIFICATIONS_CLEANUP_QUEUE_NAME =
   'notifications-cleanup' as const satisfies QueueName;
 export const BOOKING_RELEASE_QUEUE_NAME = 'booking-release' as const satisfies QueueName;
 export const RECEIPT_PDF_QUEUE_NAME = 'receipt-pdf' as const satisfies QueueName;
+export const GDPR_EXPORT_QUEUE_NAME = 'gdpr-export' as const satisfies QueueName;
+export const GDPR_SWEEP_QUEUE_NAME = 'gdpr-sweep' as const satisfies QueueName;
 
 export const EmailJobSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('verify-email'), to: z.email(), url: z.url() }).strict(),
@@ -102,6 +106,22 @@ export const ReceiptPdfJobSchema = z.object({ bookingId: IdSchema }).strict();
 
 export type ReceiptPdfJob = z.infer<typeof ReceiptPdfJobSchema>;
 
+// Carries only the dataRequestId; `jobId = dataRequestId` and `status` on
+// the row is the source of truth (pending/processing/ready/failed/
+// cancelled/completed), so a retry resumes rather than duplicating
+// (docs/steps/1A.12-gdpr.md "Export job shape carries the id only").
+export const GdprExportJobSchema = z.object({ dataRequestId: IdSchema }).strict();
+
+export type GdprExportJob = z.infer<typeof GdprExportJobSchema>;
+
+// A single repeatable sweep with explicit phases (anonymise deletions past
+// 30 days, purge chat past 90, expire export objects, fail stuck exports),
+// not a lookup of one row, so it carries no id
+// (docs/steps/1A.12-gdpr.md "One repeatable sweep, explicit phases").
+export const GdprSweepJobSchema = z.object({}).strict();
+
+export type GdprSweepJob = z.infer<typeof GdprSweepJobSchema>;
+
 export const NOTIFY_JOB_ATTEMPTS = 5;
 export const NOTIFY_JOB_BACKOFF_DELAY_MS = 5000;
 export const NOTIFY_JOB_FAILED_RETENTION_SECONDS = 24 * 60 * 60;
@@ -145,6 +165,8 @@ export const QUEUE_JOB_SCHEMAS = {
   [NOTIFICATIONS_CLEANUP_QUEUE_NAME]: NotificationsCleanupJobSchema,
   [BOOKING_RELEASE_QUEUE_NAME]: BookingReleaseJobSchema,
   [RECEIPT_PDF_QUEUE_NAME]: ReceiptPdfJobSchema,
+  [GDPR_EXPORT_QUEUE_NAME]: GdprExportJobSchema,
+  [GDPR_SWEEP_QUEUE_NAME]: GdprSweepJobSchema,
 } as const satisfies Record<QueueName, z.ZodType>;
 
 export type QueueJobPayload<Name extends QueueName> = z.infer<(typeof QUEUE_JOB_SCHEMAS)[Name]>;

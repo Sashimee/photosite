@@ -3,6 +3,10 @@ import { IdSchema, IsoDateTimeSchema, errorResponses } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
 
+// `exportKey` is the private S3 object key and is never returned to a
+// client: `GET .../download` issues a short-lived presigned URL from it
+// instead (docs/steps/1A.12-gdpr.md "The export is a zip..."). `failureReason`
+// is a stable code, never a stack trace.
 export const DataRequestSchema = z
   .object({
     id: IdSchema,
@@ -10,6 +14,9 @@ export const DataRequestSchema = z
     status: z.enum(DATA_REQUEST_STATUSES),
     requestedAt: IsoDateTimeSchema,
     completedAt: IsoDateTimeSchema.nullable(),
+    expiresAt: IsoDateTimeSchema.nullable(),
+    failureReason: z.string().min(1).max(200).nullable(),
+    cancelledAt: IsoDateTimeSchema.nullable(),
   })
   .strict()
   .openapi('DataRequest');
@@ -20,17 +27,31 @@ export const CreateDataRequestRequestSchema = z
   })
   .strict();
 
+export const DataRequestDownloadResponseSchema = z
+  .object({
+    url: z.url().openapi({ example: 'https://storage.photoo.lu/exports/abc123?signature=xyz' }),
+    expiresAt: IsoDateTimeSchema,
+  })
+  .strict()
+  .openapi('DataRequestDownload');
+
 export const ConsentPurposeSchema = z.enum(CONSENT_PURPOSES).openapi({ example: 'analytics' });
 
+// `policyVersion` is never accepted here: it always comes from
+// `PlatformSetting` on the server, because a client-supplied version would
+// let the caller forge what they agreed to (docs/steps/1A.12-gdpr.md
+// "Consent records").
 export const CreateConsentRequestSchema = z
   .object({
     anonymousId: z.string().min(1).max(100).optional(),
     purpose: ConsentPurposeSchema,
     granted: z.boolean(),
-    policyVersion: z.string().min(1).max(20).openapi({ example: '2026-01-01' }),
   })
   .strict();
 
+// `ip`/`userAgent` are recorded server-side as evidence of consent but are
+// never returned: they are PII, redacted from logs the same way
+// (docs/steps/1A.12-gdpr.md "Consent records").
 export const ConsentRecordSchema = z
   .object({
     id: IdSchema,
@@ -42,16 +63,60 @@ export const ConsentRecordSchema = z
   .strict()
   .openapi('ConsentRecord');
 
+// One entry per purpose, always present, so the client can render every
+// toggle without special-casing a purpose that was never decided
+// (`granted: false`, `recordedAt: null`) — mirrors the notification
+// preference matrix in contract/notifications.ts.
+export const ConsentStateEntrySchema = z
+  .object({
+    purpose: ConsentPurposeSchema,
+    granted: z.boolean(),
+    policyVersion: z.string().min(1).max(20).nullable(),
+    recordedAt: IsoDateTimeSchema.nullable(),
+  })
+  .strict()
+  .openapi('ConsentStateEntry');
+
+export const ConsentsResponseSchema = z
+  .object({
+    consents: z.array(ConsentStateEntrySchema).length(CONSENT_PURPOSES.length),
+  })
+  .strict()
+  .openapi('Consents');
+
+function hasUniquePurposes(entries: { purpose: string }[]): boolean {
+  return new Set(entries.map((entry) => entry.purpose)).size === entries.length;
+}
+
+// Append-only writes for only the purposes that changed, not a full-matrix
+// replace: `GET`/`PUT /v1/me/consents` "PUT appends new records for the
+// purposes that changed" (docs/steps/1A.12-gdpr.md).
+export const UpdateConsentsRequestSchema = z
+  .object({
+    consents: z
+      .array(z.object({ purpose: ConsentPurposeSchema, granted: z.boolean() }).strict())
+      .min(1)
+      .max(CONSENT_PURPOSES.length)
+      .refine(hasUniquePurposes, { message: 'purpose must not repeat' }),
+  })
+  .strict();
+
 registry.registerPath({
   method: 'post',
   path: apiPath('/me/data-requests'),
-  summary: 'Create a data export or deletion request',
+  summary:
+    'Create a data export or deletion request. Returns the existing row (200) if one of the ' +
+    'same type is already pending or processing, instead of creating a second one.',
   tags: ['gdpr'],
   security: AUTH_SECURITY,
   request: {
     body: { content: { 'application/json': { schema: CreateDataRequestRequestSchema } } },
   },
   responses: {
+    '200': {
+      description: 'An existing pending or processing request of the same type',
+      content: { 'application/json': { schema: DataRequestSchema } },
+    },
     '201': {
       description: 'Data request created',
       content: { 'application/json': { schema: DataRequestSchema } },
@@ -76,9 +141,102 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'get',
+  path: apiPath('/me/data-requests/{id}'),
+  summary: 'Get a data request',
+  tags: ['gdpr'],
+  security: AUTH_SECURITY,
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+  },
+  responses: {
+    '200': {
+      description: 'The data request',
+      content: { 'application/json': { schema: DataRequestSchema } },
+    },
+    ...errorResponses([401, 404]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/me/data-requests/{id}/cancel'),
+  summary:
+    'Cancel a data request during its grace period. Only a deletion request can be cancelled, ' +
+    'and only before anonymisation runs.',
+  tags: ['gdpr'],
+  security: AUTH_SECURITY,
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+  },
+  responses: {
+    '200': {
+      description: 'Data request cancelled',
+      content: { 'application/json': { schema: DataRequestSchema } },
+    },
+    ...errorResponses([401, 404, 409]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/me/data-requests/{id}/download'),
+  summary:
+    'Get a 10-minute presigned download URL for a completed export. 409 while the export is ' +
+    "not yet ready, 410 once the request's expiresAt has passed.",
+  tags: ['gdpr'],
+  security: AUTH_SECURITY,
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+  },
+  responses: {
+    '200': {
+      description: 'Presigned download URL issued',
+      content: { 'application/json': { schema: DataRequestDownloadResponseSchema } },
+    },
+    ...errorResponses([401, 404, 409, 410]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/me/consents'),
+  summary: "Get the current user's consent state per purpose (latest record wins)",
+  tags: ['gdpr'],
+  security: AUTH_SECURITY,
+  responses: {
+    '200': {
+      description: 'The current consent state',
+      content: { 'application/json': { schema: ConsentsResponseSchema } },
+    },
+    ...errorResponses([401]),
+  },
+});
+
+registry.registerPath({
+  method: 'put',
+  path: apiPath('/me/consents'),
+  summary: 'Append consent records for the purposes that changed. policyVersion is server-set.',
+  tags: ['gdpr'],
+  security: AUTH_SECURITY,
+  request: {
+    body: { content: { 'application/json': { schema: UpdateConsentsRequestSchema } } },
+  },
+  responses: {
+    '200': {
+      description: 'The updated consent state',
+      content: { 'application/json': { schema: ConsentsResponseSchema } },
+    },
+    ...errorResponses([400, 401, 422]),
+  },
+});
+
+registry.registerPath({
   method: 'post',
   path: apiPath('/consents'),
-  summary: 'Record a consent decision',
+  summary:
+    'Record a consent decision, anonymous (keyed by anonymousId) or for the current session. ' +
+    'policyVersion is server-set, never accepted from the client.',
   tags: ['gdpr'],
   request: {
     body: { content: { 'application/json': { schema: CreateConsentRequestSchema } } },
