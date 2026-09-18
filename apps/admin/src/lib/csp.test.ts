@@ -25,6 +25,11 @@ describe('buildCspHeader', () => {
     expect(header).toContain(`object-src 'none'`);
   });
 
+  it('only allows framing self and blob content, for the sandboxed document viewer', () => {
+    const header = buildCspHeader('abc123', false);
+    expect(header).toContain(`frame-src 'self' blob:;`);
+  });
+
   it('allows connections to the API and Sentry origins only in addition to self', () => {
     const header = buildCspHeader('abc123', false, [
       'https://api.photoo.lu',

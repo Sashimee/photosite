@@ -16,6 +16,11 @@ const EnvSchema = z.object({
   // health page falls back to "dev" rather than a commit sha.
   NEXT_PUBLIC_BUILD_SHA: optional(z.string()),
   NEXT_PUBLIC_BUILD_TIME: optional(z.string()),
+  // Origin of apps/api's S3_ENDPOINT (never exposed to this app directly),
+  // needed in the CSP's connect-src so the browser can fetch a presigned
+  // verification-document URL into a revocable object URL. Unset locally,
+  // where the API origin already covers it through a reverse proxy.
+  NEXT_PUBLIC_STORAGE_ORIGIN: optional(z.url()),
 });
 
 // Every key the schema declares must also appear as a literal
@@ -37,6 +42,7 @@ function loadEnv() {
     ADMIN_BASE_PATH: process.env.ADMIN_BASE_PATH,
     NEXT_PUBLIC_BUILD_SHA: process.env.NEXT_PUBLIC_BUILD_SHA,
     NEXT_PUBLIC_BUILD_TIME: process.env.NEXT_PUBLIC_BUILD_TIME,
+    NEXT_PUBLIC_STORAGE_ORIGIN: process.env.NEXT_PUBLIC_STORAGE_ORIGIN,
   });
   if (!parsed.success) {
     const details = parsed.error.issues

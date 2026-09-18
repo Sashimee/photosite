@@ -205,6 +205,119 @@
           }
         }
       }
+    },
+    "verification": {
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "forbidden": "You don't have permission to do this.",
+        "notFound": "This couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "conflict": "That couldn't be completed because something changed. Please retry."
+      },
+      "statuses": {
+        "draft": "Draft",
+        "submitted": "Submitted",
+        "in_review": "In review",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "expired": "Expired"
+      },
+      "list": {
+        "title": "Verification queue",
+        "caption": "Verification cases awaiting review, oldest submission first",
+        "columns": {
+          "photographer": "Photographer",
+          "email": "Email",
+          "country": "Country",
+          "status": "Status",
+          "submittedAt": "Submitted",
+          "reviewer": "Reviewer"
+        },
+        "claim": {
+          "unclaimed": "Unclaimed",
+          "you": "You",
+          "another": "Claimed by {id}"
+        },
+        "empty": {
+          "title": "No verification cases match this filter.",
+          "hint": "The queue defaults to submitted cases, oldest first."
+        },
+        "filters": {
+          "formLabel": "Verification filters",
+          "statusLabel": "Status",
+          "countryLabel": "Country code",
+          "countryPlaceholder": "e.g. LU",
+          "countryHint": "Two-letter ISO country code.",
+          "submit": "Filter"
+        }
+      },
+      "detail": {
+        "title": "Verification case",
+        "fields": {
+          "applicant": "Applicant",
+          "country": "Country",
+          "status": "Status",
+          "submittedAt": "Submitted",
+          "notSubmitted": "Not submitted",
+          "businessName": "Business name",
+          "vatNumber": "VAT number",
+          "businessRegistrationNumber": "Business registration number",
+          "notProvided": "Not provided",
+          "rejectionReason": "Rejection reason"
+        },
+        "documents": {
+          "title": "Documents",
+          "empty": "No documents uploaded yet.",
+          "uploadedAt": "Uploaded {date}",
+          "view": "View",
+          "viewerTitle": "{documentKey}",
+          "previewAlt": "Preview of the {documentKey} document",
+          "loading": "Loading document…",
+          "scanning": "This document is still being scanned for viruses. Check back shortly.",
+          "loadFailed": "Couldn't load this document. Please retry.",
+          "unsupportedType": "This file type can't be previewed here."
+        },
+        "claim": {
+          "start": "Start review",
+          "warning": "Another admin is already reviewing this case. You can still review it, but coordinate with them first to avoid duplicate work.",
+          "youAreReviewing": "You are reviewing this case.",
+          "claimedWhileOpen": "This case was claimed by another admin while you were viewing it."
+        },
+        "approve": {
+          "trigger": "Approve",
+          "title": "Approve this verification?",
+          "consequences": "This marks {applicantId}'s profile as verified. Whether it publishes is decided by the platform's own rules, not by this screen.",
+          "confirm": "Approve verification"
+        },
+        "reject": {
+          "trigger": "Reject",
+          "title": "Reject this verification?",
+          "consequences": "This is recorded against {applicantId} and cannot be undone from here.",
+          "categoryLabel": "Reason category",
+          "categoryPlaceholder": "Choose a category",
+          "categories": {
+            "illegible": "Illegible document",
+            "expired": "Expired document",
+            "nameMismatch": "Name doesn't match",
+            "wrongDocument": "Wrong document type",
+            "suspectedForgery": "Suspected forgery"
+          },
+          "textLabel": "Explanation",
+          "textHint": "Shown to the applicant together with the category above. Write it for them.",
+          "confirm": "Reject verification"
+        },
+        "history": {
+          "title": "Decision history",
+          "caption": "Audit log entries for this verification case",
+          "empty": "No audit log entries for this case.",
+          "systemActor": "System",
+          "columns": {
+            "occurredAt": "When",
+            "action": "Action",
+            "actor": "Actor"
+          }
+        }
+      }
     }
   },
   "common": {
