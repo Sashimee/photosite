@@ -149,6 +149,10 @@ jobs:
       NEXT_PUBLIC_MEDIA_BASE_URL: http://127.0.0.1:9000/photoo-public
       NEXT_PUBLIC_ALLOW_INDEXING: 'false'
       DATABASE_URL: postgresql://photoo:photoo_dev_password@127.0.0.1:5432/photoo_test
+      # `prisma migrate deploy` never touches a shadow database, but this
+      # repo's prisma.config.ts validates the variable at load time, so the
+      # job fails without it (see the `checks` job, which sets the same).
+      SHADOW_DATABASE_URL: postgresql://photoo:photoo_dev_password@127.0.0.1:5432/photoo_shadow
       REDIS_URL: redis://127.0.0.1:6379
       SEED_USER_PASSWORD: correct-horse-battery-staple
       VERIFICATION_ENCRYPTION_KEY: 9DsORuh9HI1DUnXKM0DKVcgw36Y9NfbLBSlfPmQxwYs=
