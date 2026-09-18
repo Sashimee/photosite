@@ -46,7 +46,7 @@
     "@nestjs/testing": "12.0.3",
     "@photoo/config": "workspace:*",
     "@types/archiver": "7.0.0",
-    "@types/node": "24.13.5",
+    "@types/node": "26.5.1",
     "@types/nodemailer": "8.0.2",
     "@types/yauzl-promise": "4.0.1",
     "@vitest/coverage-v8": "5.0.1",
