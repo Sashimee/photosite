@@ -347,8 +347,9 @@ docker run --rm --network <project>_internal \
 The backup user can list and write but has no `s3:GetObject` at all, so it
 cannot download an object's contents - use the root credentials (Dokploy
 env) or the prune user (which can read under this prefix) if you need to
-fetch an object for a restore; see `docs/runbooks/restore.md` once 1E.3b
-lands.
+fetch an object for a restore. See `docs/runbooks/restore.md` for the full
+restore procedure (whole database, single table, disaster recovery,
+verification) and the measured time from its drill.
 
 **How to read a failure.** `docker logs` (or Dokploy's Logs tab) on the
 `backup` container: every guard prints which variable or check failed,
