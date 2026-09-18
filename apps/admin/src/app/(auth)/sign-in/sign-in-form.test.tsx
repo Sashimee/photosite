@@ -37,6 +37,14 @@ async function loadSignInForm() {
   return SignInForm;
 }
 
+// userEvent's default per-keystroke delay puts these renders within a few
+// hundred ms of vitest's 5s timeout locally, and over it on a slower CI
+// runner; the typing delay buys nothing here because nothing in the form is
+// debounced.
+function setupUser() {
+  return userEvent.setup({ delay: null });
+}
+
 describe('SignInForm', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -51,7 +59,7 @@ describe('SignInForm', () => {
       vi.fn().mockResolvedValue(jsonResponse({ code: 'INVALID_EMAIL_OR_PASSWORD' }, 401)),
     );
     const SignInForm = await loadSignInForm();
-    const user = userEvent.setup();
+    const user = setupUser();
 
     render(<SignInForm initialMode="signIn" />);
     await user.type(screen.getByLabelText('Email'), 'admin@example.com');
@@ -68,7 +76,7 @@ describe('SignInForm', () => {
       vi.fn().mockResolvedValue(jsonResponse({ twoFactorRequired: true }, 200)),
     );
     const SignInForm = await loadSignInForm();
-    const user = userEvent.setup();
+    const user = setupUser();
 
     render(<SignInForm initialMode="signIn" next="/reports" />);
     await user.type(screen.getByLabelText('Email'), 'admin@example.com');
@@ -86,7 +94,7 @@ describe('SignInForm', () => {
       .mockResolvedValueOnce(jsonResponse({ code: 'INVALID_CODE' }, 401));
     vi.stubGlobal('fetch', fetchMock);
     const SignInForm = await loadSignInForm();
-    const user = userEvent.setup();
+    const user = setupUser();
 
     render(<SignInForm initialMode="signIn" />);
     await user.type(screen.getByLabelText('Email'), 'admin@example.com');
@@ -105,7 +113,7 @@ describe('SignInForm', () => {
       vi.fn().mockResolvedValue(jsonResponse({ user: ADMIN_USER, session: SESSION }, 200)),
     );
     const SignInForm = await loadSignInForm();
-    const user = userEvent.setup();
+    const user = setupUser();
 
     render(<SignInForm initialMode="signIn" />);
     await user.type(screen.getByLabelText('Email'), 'admin@example.com');
@@ -125,7 +133,7 @@ describe('SignInForm', () => {
       vi.fn().mockResolvedValue(jsonResponse({ user: nonAdminUser, session: SESSION }, 200)),
     );
     const SignInForm = await loadSignInForm();
-    const user = userEvent.setup();
+    const user = setupUser();
 
     render(<SignInForm initialMode="signIn" next="//evil.com" />);
     await user.type(screen.getByLabelText('Email'), 'client@example.com');
@@ -150,7 +158,7 @@ describe('SignInForm', () => {
       .mockResolvedValueOnce(jsonResponse({ user: ADMIN_USER }, 200));
     vi.stubGlobal('fetch', fetchMock);
     const SignInForm = await loadSignInForm();
-    const user = userEvent.setup();
+    const user = setupUser();
 
     render(<SignInForm initialMode="enroll" next="/reports" />);
     await user.type(screen.getByLabelText('Password'), 'correct horse battery staple');
@@ -169,7 +177,7 @@ describe('SignInForm', () => {
   it('re-verifies a stale second factor and returns to the intended page', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ user: ADMIN_USER }, 200)));
     const SignInForm = await loadSignInForm();
-    const user = userEvent.setup();
+    const user = setupUser();
 
     render(<SignInForm initialMode="reverify" next="/reports" />);
     await user.type(screen.getByLabelText('Authenticator code'), '123456');
@@ -183,7 +191,7 @@ describe('SignInForm', () => {
   it('shows the mapped error for a wrong re-verify code', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ code: 'INVALID_CODE' }, 401)));
     const SignInForm = await loadSignInForm();
-    const user = userEvent.setup();
+    const user = setupUser();
 
     render(<SignInForm initialMode="reverify" />);
     await user.type(screen.getByLabelText('Authenticator code'), '000000');
