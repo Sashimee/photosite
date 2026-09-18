@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { hash } from '@node-rs/argon2';
-import { quoteTotals, type UserRole } from '@photoo/shared';
+import { ADMIN_PERMISSIONS, quoteTotals, type UserRole } from '@photoo/shared';
 import { encryptAesGcm } from '@photoo/shared/crypto';
 import { createS3Client, putPublicObject } from '@photoo/shared/storage';
 import { createPrismaClient, type LicenceUsage, type PhotographerCategory } from './index.js';
@@ -182,6 +182,33 @@ async function seedUsers(prisma: ReturnType<typeof createPrismaClient>): Promise
   for (const { email, roles } of SEED_USERS) {
     const user = await seedUser(prisma, email, roles);
     await seedCredentialAccount(prisma, user.id, passwordHash);
+  }
+}
+
+export const SEED_ADMIN_EMAIL = 'admin@photoo.test';
+
+// The seeded admin gets every permission so local development and the
+// preview environment can exercise every `/admin` route. This is a
+// local/preview-only convenience: `seedDatabase`'s production guard above
+// means this can never run in production. There is deliberately no API
+// endpoint that can grant the first `superadmin` permission
+// (docs/steps/1A.11-admin-api.md); the production superadmin is created by
+// a one-off script after the first deploy instead (docs/steps/human-followups.md).
+// Self-referential `grantedByAdminId` (the admin granting themselves every
+// permission) is only possible here because this runs outside the API's
+// `requirePermission` checks, which forbid an admin granting their own.
+async function seedAdminPermissions(prisma: ReturnType<typeof createPrismaClient>): Promise<void> {
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email: SEED_ADMIN_EMAIL } });
+  for (const permission of ADMIN_PERMISSIONS) {
+    await prisma.adminPermissionGrant.upsert({
+      where: { userId_permission: { userId: admin.id, permission } },
+      create: {
+        userId: admin.id,
+        permission,
+        grantedByAdminId: admin.id,
+      },
+      update: {},
+    });
   }
 }
 
@@ -446,9 +473,11 @@ export async function seedPhotographerProfile(
     return;
   }
 
+  const avatarObjectKey = `seed/${spec.slug}/avatar/original.jpg`;
   const avatarVariants = placeholderVariants(`seed/${spec.slug}/avatar`);
-  const avatarUpload = await prisma.upload.create({
-    data: {
+  const avatarUpload = await prisma.upload.upsert({
+    where: { objectKey: avatarObjectKey },
+    create: {
       ownerId: user.id,
       purpose: 'avatar',
       status: 'processed',
@@ -457,16 +486,19 @@ export async function seedPhotographerProfile(
       actualSizeBytes: 2048,
       width: 512,
       height: 512,
-      objectKey: `seed/${spec.slug}/avatar/original.jpg`,
+      objectKey: avatarObjectKey,
       variants: avatarVariants,
       virusScanStatus: 'clean',
     },
+    update: {},
   });
   await uploadPlaceholderVariants(storage, avatarVariants);
 
+  const coverObjectKey = `seed/${spec.slug}/cover/original.jpg`;
   const coverVariants = placeholderVariants(`seed/${spec.slug}/cover`);
-  const coverUpload = await prisma.upload.create({
-    data: {
+  const coverUpload = await prisma.upload.upsert({
+    where: { objectKey: coverObjectKey },
+    create: {
       ownerId: user.id,
       purpose: 'cover',
       status: 'processed',
@@ -475,10 +507,11 @@ export async function seedPhotographerProfile(
       actualSizeBytes: 4096,
       width: 2560,
       height: 853,
-      objectKey: `seed/${spec.slug}/cover/original.jpg`,
+      objectKey: coverObjectKey,
       variants: coverVariants,
       virusScanStatus: 'clean',
     },
+    update: {},
   });
   await uploadPlaceholderVariants(storage, coverVariants);
 
@@ -517,8 +550,10 @@ export async function seedPhotographerProfile(
     const portfolioVariants = placeholderVariants(
       `seed/${spec.slug}/portfolio-${String(image.order)}`,
     );
-    const upload = await prisma.upload.create({
-      data: {
+    const portfolioObjectKey = `seed/${spec.slug}/portfolio-${String(image.order)}/original.jpg`;
+    const upload = await prisma.upload.upsert({
+      where: { objectKey: portfolioObjectKey },
+      create: {
         ownerId: user.id,
         purpose: 'portfolio',
         status: 'processed',
@@ -527,10 +562,11 @@ export async function seedPhotographerProfile(
         actualSizeBytes: 8192,
         width: image.width,
         height: image.height,
-        objectKey: `seed/${spec.slug}/portfolio-${String(image.order)}/original.jpg`,
+        objectKey: portfolioObjectKey,
         variants: portfolioVariants,
         virusScanStatus: 'clean',
       },
+      update: {},
     });
     await uploadPlaceholderVariants(storage, portfolioVariants);
     await prisma.portfolioImage.create({
@@ -660,17 +696,20 @@ export async function seedVerificationCase(
   });
 
   for (const document of LUXEMBOURG_REQUIRED_DOCUMENTS) {
-    const upload = await prisma.upload.create({
-      data: {
+    const documentObjectKey = `seed/verification/${profileId}/${document.key}.pdf`;
+    const upload = await prisma.upload.upsert({
+      where: { objectKey: documentObjectKey },
+      create: {
         ownerId: userId,
         purpose: 'verification_document',
         status: 'clean',
         mimeType: 'application/pdf',
         declaredSizeBytes: 4096,
         actualSizeBytes: 4096,
-        objectKey: `seed/verification/${profileId}/${document.key}.pdf`,
+        objectKey: documentObjectKey,
         virusScanStatus: 'clean',
       },
+      update: {},
     });
     await prisma.verificationDocument.create({
       data: {
@@ -880,6 +919,7 @@ export async function seedDatabase(prisma: ReturnType<typeof createPrismaClient>
   }
   await seedCountry(prisma);
   await seedUsers(prisma);
+  await seedAdminPermissions(prisma);
   await seedPhotographerProfiles(prisma);
   await seedPlatformSetting(prisma, 'feePercent', 5);
   await seedPlatformSetting(prisma, 'autoReleaseDays', 7);

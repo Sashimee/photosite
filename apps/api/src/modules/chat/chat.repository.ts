@@ -7,6 +7,7 @@ export interface ConversationListRow {
   id: string;
   type: string;
   subjectId: string | null;
+  subjectRequestTitle: string | null;
   lastMessageAt: Date | null;
   myLastReadAt: Date | null;
   myArchivedAt: Date | null;
@@ -19,6 +20,7 @@ const CONVERSATION_ROW_SELECT = Prisma.sql`
   c.id AS "id",
   c."type"::text AS "type",
   c."subjectId" AS "subjectId",
+  sr."requestTitle" AS "subjectRequestTitle",
   c."lastMessageAt" AS "lastMessageAt",
   p."lastReadAt" AS "myLastReadAt",
   p."archivedAt" AS "myArchivedAt",
@@ -27,10 +29,13 @@ const CONVERSATION_ROW_SELECT = Prisma.sql`
   COALESCE(uc.count, 0)::int AS "unreadCount"
 `;
 
-// One JOIN plus two LATERAL subqueries per conversation, instead of a
-// separate last-message query and a separate count query per row in the
-// page (the N+1 flagged in the 1A.6b review): each lateral still uses the
-// (conversationId, createdAt desc, id) index the way the split queries did.
+// One JOIN plus three LATERAL subqueries per conversation, instead of a
+// separate last-message query, a separate count query and a separate
+// quote/request lookup per row in the page (the N+1 flagged in the 1A.6b
+// review): each lateral still uses the (conversationId, createdAt desc, id)
+// index the way the split queries did. The subjectRef lateral only matches
+// `quote` conversations (the only creatable type in the MVP); it stays a
+// no-op join for any other type.
 function conversationJoins(userId: string): Prisma.Sql {
   return Prisma.sql`
     FROM "Conversation" c
@@ -50,6 +55,12 @@ function conversationJoins(userId: string): Prisma.Sql {
         AND m2."deletedAt" IS NULL
         AND (p."lastReadAt" IS NULL OR m2."createdAt" > p."lastReadAt")
     ) uc ON true
+    LEFT JOIN LATERAL (
+      SELECT r.title AS "requestTitle"
+      FROM "Quote" q
+      LEFT JOIN "Request" r ON r.id = q."requestId"
+      WHERE c."type" = 'quote' AND q.id = c."subjectId"
+    ) sr ON true
   `;
 }
 
@@ -99,5 +110,26 @@ export class ChatRepository {
       ORDER BY c."lastMessageAt" DESC NULLS LAST, c.id ASC
       LIMIT ${limit}
     `;
+  }
+
+  // GROUP BY conversation then SUM, so this stays one query regardless of
+  // how many conversations the user has (docs/steps/1B.6-chat-ui.md "the
+  // unread count is one grouped query").
+  async countUnreadMessages(userId: string): Promise<number> {
+    const rows = await this.prisma.client.$queryRaw<{ count: number }[]>`
+      SELECT COALESCE(SUM(sub.unread), 0)::int AS count
+      FROM (
+        SELECT COUNT(m.id)::int AS unread
+        FROM "ConversationParticipant" p
+        JOIN "Message" m ON m."conversationId" = p."conversationId"
+        WHERE p."userId" = ${userId}
+          AND p."archivedAt" IS NULL
+          AND m."senderId" != ${userId}
+          AND m."deletedAt" IS NULL
+          AND (p."lastReadAt" IS NULL OR m."createdAt" > p."lastReadAt")
+        GROUP BY p."conversationId"
+      ) sub
+    `;
+    return rows[0]?.count ?? 0;
   }
 }

@@ -296,6 +296,14 @@ services:
       MINIO_API_SECRET_KEY: ${MINIO_API_SECRET_KEY:?set in .env}
       MINIO_WORKER_ACCESS_KEY: ${MINIO_WORKER_ACCESS_KEY:?set in .env}
       MINIO_WORKER_SECRET_KEY: ${MINIO_WORKER_SECRET_KEY:?set in .env}
+      # Two users for `backup` (README.md "Backups"): one that can only
+      # write and list, one that can only delete under the backup prefix -
+      # so the same job that writes a backup can never also be the job that
+      # deletes it (docs/steps/1E.3-backups.md).
+      MINIO_BACKUP_ACCESS_KEY: ${MINIO_BACKUP_ACCESS_KEY:?set in .env}
+      MINIO_BACKUP_SECRET_KEY: ${MINIO_BACKUP_SECRET_KEY:?set in .env}
+      MINIO_PRUNE_ACCESS_KEY: ${MINIO_PRUNE_ACCESS_KEY:?set in .env}
+      MINIO_PRUNE_SECRET_KEY: ${MINIO_PRUNE_SECRET_KEY:?set in .env}
     entrypoint:
       - sh
       - -c
@@ -304,7 +312,9 @@ services:
         mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
         mc mb --ignore-existing local/photoo-private
         mc mb --ignore-existing local/photoo-public
+        mc mb --ignore-existing local/photoo-backups
         mc anonymous set none local/photoo-private
+        mc anonymous set none local/photoo-backups
         cat > /tmp/photoo-public-anonymous-policy.json <<'EOF'
         {
           "Version": "2012-10-17",
@@ -356,6 +366,75 @@ services:
         mc admin user add local "$$MINIO_WORKER_ACCESS_KEY" "$$MINIO_WORKER_SECRET_KEY"
         mc admin policy create local photoo-worker /tmp/photoo-worker-policy.json
         mc admin policy attach local photoo-worker --user "$$MINIO_WORKER_ACCESS_KEY"
+
+        cat > /tmp/photoo-backup-policy.json <<'EOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {"Effect": "Allow", "Action": ["s3:ListBucket"], "Resource": ["arn:aws:s3:::photoo-backups"]},
+            {"Effect": "Allow", "Action": ["s3:PutObject"], "Resource": ["arn:aws:s3:::photoo-backups/*"]}
+          ]
+        }
+        EOF
+        mc admin user add local "$$MINIO_BACKUP_ACCESS_KEY" "$$MINIO_BACKUP_SECRET_KEY"
+        mc admin policy create local photoo-backup /tmp/photoo-backup-policy.json
+        mc admin policy attach local photoo-backup --user "$$MINIO_BACKUP_ACCESS_KEY"
+
+        cat > /tmp/photoo-prune-policy.json <<'EOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {"Effect": "Allow", "Action": ["s3:ListBucket"], "Resource": ["arn:aws:s3:::photoo-backups"]},
+            {"Effect": "Allow", "Action": ["s3:GetObject", "s3:DeleteObject"], "Resource": ["arn:aws:s3:::photoo-backups/photoo/*"]}
+          ]
+        }
+        EOF
+        mc admin user add local "$$MINIO_PRUNE_ACCESS_KEY" "$$MINIO_PRUNE_SECRET_KEY"
+        mc admin policy create local photoo-prune /tmp/photoo-prune-policy.json
+        mc admin policy attach local photoo-prune --user "$$MINIO_PRUNE_ACCESS_KEY"
+    networks:
+      - internal
+
+  # Same postgis/postgis digest as `postgres` (infra/docker/backup.Dockerfile),
+  # so pg_dump/pg_restore match the server exactly. `restart: unless-stopped`
+  # with the schedule kept inside the container (schedule.sh), not a Dokploy
+  # scheduled task: we could not verify one exists on this Dokploy instance
+  # (docs/steps/1E.3-backups.md) - README.md "Backups" has the fallback if
+  # Dokploy gains one later.
+  backup:
+    image: ghcr.io/sashimee/photosite-backup:${IMAGE_TAG:?set IMAGE_TAG (e.g. main or sha-abc1234) in the Dokploy project env}
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set in .env}
+      # The single most important variable in this service: backup.sh
+      # refuses to run without it rather than ever writing a plaintext dump
+      # (README.md "Backups"). Alex generates the age keypair and keeps the
+      # private half off this host; only the public recipient goes here.
+      # Left without a `:?` default on purpose: compose interpolates the
+      # whole file before it filters services, so a required-but-unset
+      # variable here aborts the deploy of the ENTIRE stack, not just this
+      # service. schedule.sh refuses to start without it instead, which
+      # fails loudly in one container and leaves the site up.
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
+      BACKUP_ENV: preview
+      MINIO_ENDPOINT: http://minio:9000
+      BACKUP_BUCKET: photoo-backups
+      # Put+List only, created by minio-init; see README.md "Object storage users".
+      BACKUP_ACCESS_KEY: ${MINIO_BACKUP_ACCESS_KEY:?set in .env}
+      BACKUP_SECRET_KEY: ${MINIO_BACKUP_SECRET_KEY:?set in .env}
+      # Delete only under photoo/* - a different user so the nightly job
+      # itself never holds delete rights.
+      PRUNE_ACCESS_KEY: ${MINIO_PRUNE_ACCESS_KEY:?set in .env}
+      PRUNE_SECRET_KEY: ${MINIO_PRUNE_SECRET_KEY:?set in .env}
     networks:
       - internal
 

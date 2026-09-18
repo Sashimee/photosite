@@ -4,7 +4,7 @@ jest.mock('./session', () => ({
   getSessionToken: jest.fn(),
 }));
 
-import { api } from './api';
+import { api, setUnauthorizedListener } from './api';
 import { getSessionToken } from './session';
 
 const mockedGetSessionToken = jest.mocked(getSessionToken);
@@ -38,5 +38,29 @@ describe('api client', () => {
     await api.GET('/v1/photographers', { fetch: fetchStub });
 
     expect(get()?.headers.has('Authorization')).toBe(false);
+  });
+
+  it('notifies the unauthorized listener when an authenticated request gets a 401', async () => {
+    mockedGetSessionToken.mockResolvedValue('token-123');
+    const listener = jest.fn();
+    setUnauthorizedListener(listener);
+    const fetchStub = () => Promise.resolve(new Response(JSON.stringify({}), { status: 401 }));
+
+    await api.GET('/v1/photographers', { fetch: fetchStub });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    setUnauthorizedListener(null);
+  });
+
+  it('does not notify the unauthorized listener for a 401 without a bearer token', async () => {
+    mockedGetSessionToken.mockResolvedValue(null);
+    const listener = jest.fn();
+    setUnauthorizedListener(listener);
+    const fetchStub = () => Promise.resolve(new Response(JSON.stringify({}), { status: 401 }));
+
+    await api.GET('/v1/photographers', { fetch: fetchStub });
+
+    expect(listener).not.toHaveBeenCalled();
+    setUnauthorizedListener(null);
   });
 });

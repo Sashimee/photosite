@@ -1,18 +1,45 @@
-import type { ConversationParticipant, Message, MessageAttachment, Upload } from '@photoo/db';
+import type {
+  ConversationParticipant,
+  Message,
+  MessageAttachment,
+  PhotographerProfile,
+  Upload,
+  User,
+} from '@photoo/db';
 import { ConversationSchema, MessageSchema } from '@photoo/shared';
 import type { z } from 'zod';
+import { publicVariantUrl } from '../../storage/public-url.js';
 import type { ConversationListRow } from './chat.repository.js';
 
-type AttachmentForMapping = Pick<MessageAttachment, 'id'> & { upload: Pick<Upload, 'mimeType'> };
+// Matches the variant key profiles.repository.ts and quotes.repository.ts
+// use for avatars, so a chat participant renders the same image as their
+// profile card.
+const AVATAR_VARIANT_KEY = 'thumb_jpeg';
+
+type AttachmentForMapping = Pick<MessageAttachment, 'id'> & {
+  upload: Pick<Upload, 'mimeType' | 'actualSizeBytes' | 'declaredSizeBytes'>;
+};
 type MessageForMapping = Pick<
   Message,
   'id' | 'conversationId' | 'senderId' | 'body' | 'editedAt' | 'deletedAt' | 'createdAt'
 > & { attachments: AttachmentForMapping[] };
 
+type ParticipantUserForMapping = Pick<User, 'id'> & {
+  photographerProfile:
+    | (Pick<PhotographerProfile, 'displayName'> & { avatarUpload: Pick<Upload, 'variants'> | null })
+    | null;
+};
+
 function attachmentKind(mimeType: string): 'image' | 'pdf' | 'other' {
   if (mimeType.startsWith('image/')) return 'image';
   if (mimeType === 'application/pdf') return 'pdf';
   return 'other';
+}
+
+function attachmentSizeBytes(
+  upload: Pick<Upload, 'actualSizeBytes' | 'declaredSizeBytes'>,
+): number {
+  return upload.actualSizeBytes ?? upload.declaredSizeBytes;
 }
 
 // Blanking happens here, never in the database (S4, docs/COMPLIANCE.md): the
@@ -30,6 +57,8 @@ export function mapMessage(message: MessageForMapping): z.infer<typeof MessageSc
       : message.attachments.map((attachment) => ({
           id: attachment.id,
           kind: attachmentKind(attachment.upload.mimeType),
+          mimeType: attachment.upload.mimeType,
+          sizeBytes: attachmentSizeBytes(attachment.upload),
         })),
     editedAt: message.editedAt ? message.editedAt.toISOString() : null,
     deletedAt: message.deletedAt ? message.deletedAt.toISOString() : null,
@@ -38,20 +67,56 @@ export function mapMessage(message: MessageForMapping): z.infer<typeof MessageSc
 }
 
 export interface ConversationMappingOptions {
-  participants: Pick<ConversationParticipant, 'userId' | 'lastReadAt'>[];
+  participants: (Pick<ConversationParticipant, 'userId' | 'lastReadAt'> & {
+    user: ParticipantUserForMapping;
+  })[];
+}
+
+// A client has no PhotographerProfile and no other public name: `User.name`
+// defaults to their email local part at sign-up (S6/compliance,
+// quote-events.ts) and must never be shown to another participant, so
+// displayName stays null rather than falling back to it. The UI labels a
+// nameless participant by role instead.
+function mapParticipantUser(
+  user: ParticipantUserForMapping,
+  baseUrl: string,
+): z.infer<typeof ConversationSchema>['participants'][number]['user'] {
+  const avatarVariants =
+    (user.photographerProfile?.avatarUpload?.variants as Record<string, string> | null) ?? null;
+  return {
+    id: user.id,
+    displayName: user.photographerProfile?.displayName ?? null,
+    avatarUrl: user.photographerProfile
+      ? publicVariantUrl(baseUrl, avatarVariants, AVATAR_VARIANT_KEY)
+      : null,
+  };
+}
+
+function mapSubjectRef(row: ConversationListRow): z.infer<typeof ConversationSchema>['subjectRef'] {
+  if (row.type !== 'quote' || row.subjectId === null) {
+    return null;
+  }
+  return {
+    type: 'quote',
+    quoteId: row.subjectId,
+    requestTitle: row.subjectRequestTitle ?? undefined,
+  };
 }
 
 export function mapConversationRow(
   row: ConversationListRow,
   options: ConversationMappingOptions,
+  baseUrl: string,
 ): z.infer<typeof ConversationSchema> {
   const lastMessagePreview = row.lastMessageDeletedAt ? null : row.lastMessageBody;
   return ConversationSchema.parse({
     id: row.id,
     type: row.type,
     subjectId: row.subjectId,
+    subjectRef: mapSubjectRef(row),
     participants: options.participants.map((participant) => ({
       userId: participant.userId,
+      user: mapParticipantUser(participant.user, baseUrl),
       lastReadAt: participant.lastReadAt ? participant.lastReadAt.toISOString() : null,
     })),
     lastMessageAt: row.lastMessageAt ? row.lastMessageAt.toISOString() : null,
