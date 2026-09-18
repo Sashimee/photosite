@@ -4,6 +4,7 @@ import { Catch, Inject } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Logger } from 'nestjs-pino';
 import { buildApiErrorBody, normalizeException } from '../errors/api-error.js';
+import { reportException } from '../monitoring/sentry-report.js';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -18,15 +19,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const normalized = normalizeException(exception);
 
+    let eventId: string | undefined;
     if (normalized.status >= 500) {
+      eventId = reportException(exception);
       this.logger.error(
-        { err: exception, requestId, path: request.url, method: request.method },
+        { err: exception, requestId, eventId, path: request.url, method: request.method },
         normalized.message,
       );
     }
 
     reply
       .status(normalized.status)
-      .send(buildApiErrorBody(normalized.code, normalized.message, requestId, normalized.details));
+      .send(
+        buildApiErrorBody(
+          normalized.code,
+          normalized.message,
+          requestId,
+          normalized.details,
+          eventId,
+        ),
+      );
   }
 }
