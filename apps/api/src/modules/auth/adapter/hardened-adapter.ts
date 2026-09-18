@@ -10,19 +10,25 @@ function isPlainObject(value: unknown): value is Row {
   );
 }
 
-const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
-
-// better-auth's own token generator (`generateId(32)`) never produces a
-// 64-char lowercase hex string, so this shape is an unambiguous signal that
-// a `token` value already went through sha256Hex — e.g. it round-tripped via
-// `listSessions`/`findMany` (queried by `userId`, not `token`), which never
-// had a raw token to restore. Hashing it again here would silently stop it
-// from matching the row it came from (see #127). The hashed value is still a
-// perfectly usable lookup key against this same adapter (the DB only ever
-// stores the hash), so passing it straight through is enough to make
-// `listSessions` -> `revokeSession`/`delete` round-trip correctly.
-function isHashedToken(value: string): boolean {
-  return SHA256_HEX_PATTERN.test(value);
+// A `token` where-clause value must always be hashed before it reaches the
+// database, with no exception for a value that already looks like one of
+// our own hashes: `requireSession`/better-auth hand a bearer/cookie value
+// straight into this same code path, so treating a hash-shaped string as
+// "already hashed, pass it through" would let anyone holding a leaked
+// session hash (e.g. from a read-only DB dump) authenticate with it
+// directly — the exact thing hashing at rest exists to prevent (#127
+// follow-up). Hashing it again instead makes a leaked hash cryptographically
+// useless as a credential, same as any other wrong token.
+function assertRawTokenValue(value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(
+      'hardened-adapter: session lookup by token requires a raw token string, got ' +
+        (value === null
+          ? 'null (this session row never had a raw token to hand back — see restoreSessionToken)'
+          : typeof value),
+    );
+  }
+  return value;
 }
 
 function hashTokenInData(data: Row): { data: Row; rawToken: string | undefined } {
@@ -46,21 +52,16 @@ function hashTokenInWhere(where: readonly Where[] | undefined): {
       return clause;
     }
     if (Array.isArray(clause.value)) {
-      const values = clause.value as unknown[];
-      const hashed = values.map((value) => {
-        if (typeof value !== 'string' || isHashedToken(value)) {
-          return value;
-        }
-        rawToken = value;
-        return sha256Hex(value);
+      const hashed = (clause.value as unknown[]).map((value) => {
+        const raw = assertRawTokenValue(value);
+        rawToken = raw;
+        return sha256Hex(raw);
       });
-      return { ...clause, value: hashed } as Where;
+      return { ...clause, value: hashed };
     }
-    if (typeof clause.value === 'string' && !isHashedToken(clause.value)) {
-      rawToken = clause.value;
-      return { ...clause, value: sha256Hex(clause.value) };
-    }
-    return clause;
+    const raw = assertRawTokenValue(clause.value);
+    rawToken = raw;
+    return { ...clause, value: sha256Hex(raw) };
   });
   return { where: mapped, rawToken };
 }
@@ -112,11 +113,18 @@ function decryptTwoFactorSecretInRow<T>(row: T, key: Buffer): T {
   return { ...row, secret: decryptAesGcm(row.secret, key) };
 }
 
+// A session row this adapter didn't look up by token (e.g. `listSessions`,
+// keyed on `userId`) never had a raw token to give back — only the DB's
+// hash, which must never leave this file looking like a usable token (see
+// assertRawTokenValue above). Redact it to `null` instead of the hash: a
+// caller now needs the row's `id` to act on it, and any code that tries to
+// feed the redacted value back into a token lookup fails loudly there
+// rather than silently matching nothing (or, worse, matching something).
 function restoreSessionToken<T>(row: T, rawToken: string | undefined): T {
-  if (!rawToken || !isPlainObject(row) || !('token' in row)) {
+  if (!isPlainObject(row) || !('token' in row)) {
     return row;
   }
-  return { ...row, token: rawToken };
+  return { ...row, token: rawToken ?? null };
 }
 
 function transformWriteData(model: string, data: Row, authEncryptionKey: Buffer): Row {

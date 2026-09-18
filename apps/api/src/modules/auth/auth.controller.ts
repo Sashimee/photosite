@@ -447,10 +447,10 @@ export class AuthController {
     try {
       // A session that predates 2FA must not keep admin access once it's on,
       // but the session that just called this endpoint must survive it.
-      // auth.api.revokeOtherSessions can't tell those apart with a hashed
-      // token adapter (its own userId-vs-token comparison never matches, see
-      // hardened-adapter.ts / #127), so it revokes every session including
-      // the caller's own. Deleting by userId/id directly sidesteps that.
+      // auth.api.revokeOtherSessions can do neither here: it lists sessions
+      // by userId, hardened-adapter.ts refuses to hand back their tokens
+      // (see #127), and better-auth has no token to delete by. userId/id is
+      // the only field this can reliably revoke by.
       if (isEnabling) {
         await this.prisma.client.session.deleteMany({
           where: { userId: user.id, id: { not: session.id } },

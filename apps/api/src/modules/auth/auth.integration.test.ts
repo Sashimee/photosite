@@ -839,61 +839,50 @@ describe('auth integration', () => {
     }, 20_000);
   });
 
-  // Issue #127: revokeOtherSessions() lists sessions by userId, so
-  // hardened-adapter.ts never gets a raw token to restore on those rows; the
-  // hashed token it hands back must still work as a `where: { token }` value
-  // downstream instead of being hashed a second time into a dead end.
-  describe('issue #127: revoke-other-sessions and listSessions share the token path', () => {
-    it('revokeOtherSessions deletes the other session row for the user (no longer a silent no-op)', async () => {
-      const email = uniqueEmail('revoke-other');
+  // Issue #127: hardened-adapter.ts used to hash a `where: { token }` value
+  // only when it didn't already look like one of its own sha256 hashes, so a
+  // hash round-tripped out of a userId-keyed `listSessions` read could be fed
+  // straight back in without being mangled by a second hash. That also meant
+  // a *stolen* hash (e.g. from a read-only DB leak) could be presented as a
+  // bearer token and pass straight through unhashed, authenticating with it
+  // directly — trading "revokeOtherSessions silently does nothing" for
+  // "a leaked hash is a working session token", which is worse. The fix
+  // hashes every token value unconditionally (a stolen hash just gets hashed
+  // into something that matches nothing) and never hands back a hash
+  // pretending to be a raw token: a session row not looked up by `token`
+  // gets `token: null` instead of its stored hash.
+  describe('issue #127: hashed session tokens never work as raw ones', () => {
+    it("rejects a bearer token that is actually a session's stored hash, not its raw token", async () => {
+      const email = uniqueEmail('hash-as-bearer');
       await signUp(email);
       await verifyByEmail(email);
 
-      const firstSignIn = await fastify().inject({
+      const signInResponse = await fastify().inject({
         method: 'POST',
         url: '/v1/auth/sign-in',
         payload: { email, password: PASSWORD },
       });
-      const secondSignIn = await fastify().inject({
-        method: 'POST',
-        url: '/v1/auth/sign-in',
-        payload: { email, password: PASSWORD },
+      const { session } = signInResponse.json<{ session: { token: string } }>();
+      const stolenHash = sha256Hex(session.token);
+      expect(await prisma.session.findUnique({ where: { tokenHash: stolenHash } })).not.toBeNull();
+
+      const asRawBearer = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${stolenHash}` },
       });
-      const { session: currentSession } = firstSignIn.json<{ session: { token: string } }>();
-      const { session: otherSession } = secondSignIn.json<{ session: { token: string } }>();
+      expect(asRawBearer.statusCode).toBe(401);
 
-      const otherTokenHash = sha256Hex(otherSession.token);
-      expect(
-        await prisma.session.findUnique({ where: { tokenHash: otherTokenHash } }),
-      ).not.toBeNull();
-
-      const headers = new Headers({ authorization: `Bearer ${currentSession.token}` });
-      const result = await auth.api.revokeOtherSessions({ headers });
-      expect(result.status).toBe(true);
-
-      expect(await prisma.session.findUnique({ where: { tokenHash: otherTokenHash } })).toBeNull();
-
-      // Known residual limitation, separate from #127's "deletes nothing" bug:
-      // better-auth's own revokeOtherSessions excludes the caller's session by
-      // comparing the *raw* token on ctx.context.session (from an earlier
-      // token-keyed lookup) against the *hashed* token every userId-keyed
-      // `listSessions` row carries (see isHashedToken in hardened-adapter.ts).
-      // That comparison never matches, so the caller's own session is swept
-      // into "other sessions" and deleted too. Fixing that would need the
-      // adapter to reliably tell "the caller's current session" apart from
-      // any other row without ever caching a raw token across requests (a
-      // cross-user token leak risk we measured and rejected), which needs
-      // request-scoped plumbing beyond this file. Application code should
-      // keep doing what totpVerify already does (auth.controller.ts) and
-      // revoke by userId/id directly instead of calling this endpoint.
-      const currentTokenHash = sha256Hex(currentSession.token);
-      expect(
-        await prisma.session.findUnique({ where: { tokenHash: currentTokenHash } }),
-      ).toBeNull();
+      const asRealBearer = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${session.token}` },
+      });
+      expect(asRealBearer.statusCode).toBe(200);
     }, 20_000);
 
-    it('revokeSession deletes the row for a token round-tripped through listSessions', async () => {
-      const email = uniqueEmail('revoke-listed');
+    it('redacts the token on a session row not looked up by token, and cannot be tricked into revoking it', async () => {
+      const email = uniqueEmail('redact-token');
       await signUp(email);
       await verifyByEmail(email);
 
@@ -909,23 +898,37 @@ describe('auth integration', () => {
       });
       const { session: currentSession } = firstSignIn.json<{ session: { token: string } }>();
       const { session: otherSession } = secondSignIn.json<{ session: { token: string } }>();
-      const headers = new Headers({ authorization: `Bearer ${currentSession.token}` });
-
-      const sessions = await auth.api.listSessions({ headers });
       const otherTokenHash = sha256Hex(otherSession.token);
-      const listedOther = sessions.find((session) => session.token === otherTokenHash);
+      const otherRow = await prisma.session.findUniqueOrThrow({
+        where: { tokenHash: otherTokenHash },
+      });
+
+      const headers = new Headers({ authorization: `Bearer ${currentSession.token}` });
+      const sessions = await auth.api.listSessions({ headers });
+      const listedOther = sessions.find((listed) => listed.id === otherRow.id);
       if (!listedOther) {
         throw new Error('expected listSessions to return the other session');
       }
-      expect(listedOther.token).not.toBe(otherSession.token);
+      expect(listedOther.token).toBeNull();
 
-      const revokeResult = await auth.api.revokeSession({
-        headers,
-        body: { token: listedOther.token },
-      });
-      expect(revokeResult.status).toBe(true);
-
-      expect(await prisma.session.findUnique({ where: { tokenHash: otherTokenHash } })).toBeNull();
+      // better-auth's revokeOtherSessions takes exactly this redacted `null`
+      // and hands it to deleteSession, whose own pre-delete lookup swallows
+      // whatever the adapter throws (see with-hooks.mjs deleteWithHooks) and
+      // treats "not found" as "nothing to delete". So neither session is
+      // touched: safely inert, rather than either exploitable (accepting the
+      // hash as a credential) or destructively wrong (deleting the wrong
+      // session). Application code should keep doing what totpVerify already
+      // does (auth.controller.ts) and revoke by userId/id directly instead
+      // of relying on this helper.
+      const result = await auth.api.revokeOtherSessions({ headers });
+      expect(result.status).toBe(true);
+      expect(
+        await prisma.session.findUnique({ where: { tokenHash: otherTokenHash } }),
+      ).not.toBeNull();
+      const currentTokenHash = sha256Hex(currentSession.token);
+      expect(
+        await prisma.session.findUnique({ where: { tokenHash: currentTokenHash } }),
+      ).not.toBeNull();
     }, 20_000);
   });
 });
