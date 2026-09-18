@@ -40,10 +40,23 @@ const PROFILE = {
   stripePayoutsEnabled: false,
 };
 
-function mockProfile(status: number, data?: unknown) {
+function mockProfile(
+  status: number,
+  data?: unknown,
+  { portfolioItems = [], products = [] }: { portfolioItems?: unknown[]; products?: unknown[] } = {},
+) {
   apiGetMock.mockImplementation((url: string) => {
     if (url === '/v1/me/photographer-profile') {
       return Promise.resolve({ data, response: { status } });
+    }
+    if (url === '/v1/me/photographer-profile/portfolio') {
+      return Promise.resolve({
+        data: { items: portfolioItems, nextCursor: null },
+        response: { status: 200 },
+      });
+    }
+    if (url === '/v1/me/products') {
+      return Promise.resolve({ data: products, response: { status: 200 } });
     }
     throw new Error(`unexpected GET ${url}`);
   });
@@ -107,6 +120,42 @@ describe('DashboardOverviewPage', () => {
       '/en/dashboard/profile',
     );
     expect(screen.getAllByText('Not started').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Create your profile first.').length).toBeGreaterThan(0);
+  });
+
+  it('reports the portfolio checklist item as not started until there is a photo and a package', async () => {
+    getSessionMock.mockResolvedValue({ id: 'user-1' });
+    mockProfile(200, PROFILE);
+    const Page = await loadPage();
+
+    render(await Page({ params: Promise.resolve({ locale: 'en' }) }));
+
+    expect(screen.getByText('Upload photos and set your packages and prices.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Add photos and packages' })).toHaveAttribute(
+      'href',
+      '/en/dashboard/portfolio',
+    );
+  });
+
+  it('reports the portfolio checklist item as done once there is a photo and a package', async () => {
+    getSessionMock.mockResolvedValue({ id: 'user-1' });
+    mockProfile(200, PROFILE, {
+      portfolioItems: [
+        { id: 'image-1', url: null, width: null, height: null, order: 1, status: 'processing' },
+      ],
+      products: [{ id: 'product-1' }],
+    });
+    const Page = await loadPage();
+
+    render(await Page({ params: Promise.resolve({ locale: 'en' }) }));
+
+    expect(
+      screen.getByText("You've uploaded photos and added at least one package."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Manage portfolio' })).toHaveAttribute(
+      'href',
+      '/en/dashboard/portfolio',
+    );
   });
 
   it('reports an unpublished profile honestly, without implying this page can publish it', async () => {
