@@ -32,6 +32,8 @@ export {
   AUDIT_ACTOR_TYPES,
   NOTIFICATION_CHANNELS,
   NOTIFICATION_TYPES,
+  LEDGER_ENTRY_TYPES,
+  DISPUTE_STATUSES,
   type UserRole,
   type UserStatus,
   type PhotographerCategory,
@@ -57,9 +59,19 @@ export {
   type AuditActorType,
   type NotificationChannel,
   type NotificationType,
+  type LedgerEntryType,
+  type DisputeStatus,
 } from './enums.js';
 
-export { calculatePlatformFee, quoteTotals, type LineItem, type QuoteTotals } from './fee.js';
+export {
+  calculatePlatformFee,
+  quoteTotals,
+  type LineItem,
+  type PlatformFeeOptions,
+  type QuoteTotals,
+} from './fee.js';
+
+export { BOOKING_STATUS_TRANSITIONS, isValidBookingTransition } from './booking-state-machine.js';
 
 export { SLUG_MAX_LENGTH, slugify, type SlugifyOptions } from './slug.js';
 
@@ -212,6 +224,14 @@ export {
   DeliverySchema,
   PaymentIntentResponseSchema,
 } from './contract/bookings.js';
+
+export {
+  CreateRefundRequestSchema,
+  CreateRefundResponseSchema,
+  StripeAccountLinkResponseSchema,
+  StripeWebhookAckResponseSchema,
+  StripeWebhookEventSchema,
+} from './contract/payments.js';
 
 export {
   UPLOAD_PURPOSES,

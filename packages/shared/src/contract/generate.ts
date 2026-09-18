@@ -9,6 +9,7 @@ import './products.js';
 import './requests.js';
 import './quotes.js';
 import './bookings.js';
+import './payments.js';
 import './uploads.js';
 import './chat.js';
 import './verification.js';

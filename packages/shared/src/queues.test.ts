@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BOOKING_RELEASE_QUEUE_NAME,
+  BookingReleaseJobSchema,
   EMAIL_QUEUE_NAME,
   EmailJobSchema,
   FILE_SCAN_QUEUE_NAME,
@@ -24,6 +26,8 @@ import {
   QUEUE_NAMES,
   QUOTE_EXPIRY_QUEUE_NAME,
   QuoteExpiryJobSchema,
+  RECEIPT_PDF_QUEUE_NAME,
+  ReceiptPdfJobSchema,
   UPLOADS_CLEANUP_QUEUE_NAME,
   UploadsCleanupJobSchema,
 } from './queues.js';
@@ -43,6 +47,8 @@ describe('QUEUE_NAMES', () => {
       'notify-sweep',
       'push-receipts',
       'notifications-cleanup',
+      'booking-release',
+      'receipt-pdf',
     ]);
     expect(new Set(QUEUE_NAMES).size).toBe(QUEUE_NAMES.length);
   });
@@ -59,6 +65,8 @@ describe('QUEUE_NAMES', () => {
       NOTIFY_SWEEP_QUEUE_NAME,
       PUSH_RECEIPTS_QUEUE_NAME,
       NOTIFICATIONS_CLEANUP_QUEUE_NAME,
+      BOOKING_RELEASE_QUEUE_NAME,
+      RECEIPT_PDF_QUEUE_NAME,
     ]).toEqual(QUEUE_NAMES);
   });
 });
@@ -241,6 +249,7 @@ describe.each([
   ['notify-sweep', NotifySweepJobSchema] as const,
   ['push-receipts', PushReceiptsJobSchema] as const,
   ['notifications-cleanup', NotificationsCleanupJobSchema] as const,
+  ['booking-release', BookingReleaseJobSchema] as const,
 ])('%s job schema', (_name, schema) => {
   it('accepts an empty payload', () => {
     expect(schema.safeParse({}).success).toBe(true);
@@ -248,6 +257,26 @@ describe.each([
 
   it('rejects unknown extra keys', () => {
     expect(schema.safeParse({ uploadId: VALID_UPLOAD_ID }).success).toBe(false);
+  });
+});
+
+describe('ReceiptPdfJobSchema', () => {
+  it('accepts a valid bookingId', () => {
+    expect(ReceiptPdfJobSchema.safeParse({ bookingId: VALID_UPLOAD_ID }).success).toBe(true);
+  });
+
+  it('rejects a missing bookingId', () => {
+    expect(ReceiptPdfJobSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects a non-uuid bookingId', () => {
+    expect(ReceiptPdfJobSchema.safeParse({ bookingId: 'not-a-uuid' }).success).toBe(false);
+  });
+
+  it('rejects unknown extra keys', () => {
+    expect(
+      ReceiptPdfJobSchema.safeParse({ bookingId: VALID_UPLOAD_ID, extra: 'nope' }).success,
+    ).toBe(false);
   });
 });
 
