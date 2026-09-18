@@ -247,6 +247,12 @@ jobs:
         run: |
           psql -h 127.0.0.1 -U photoo -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE photoo_test;'
           psql -h 127.0.0.1 -U photoo -d photoo_test -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS postgis;'
+      # The seed is TypeScript that imports @photoo/shared, so those packages
+      # must be built before it compiles. The `checks` job gets this for free
+      # because `pnpm typecheck` runs first and turbo builds dependencies on
+      # the way; this job has no typecheck step, so it asks explicitly.
+      - name: Build the workspace packages the seed imports
+        run: pnpm turbo run build --filter='@photoo/db^...'
       - name: Apply Prisma migrations and seed the test database
         run: pnpm --filter @photoo/db run migrate:deploy && pnpm --filter @photoo/db run seed
       - name: Build api and web
