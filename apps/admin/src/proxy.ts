@@ -3,9 +3,10 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { buildCspHeader, originOf } from './lib/csp';
 import { env } from './lib/env';
 
-const connectOrigins = [originOf(env.NEXT_PUBLIC_API_URL)].filter(
-  (origin): origin is string => origin !== null,
-);
+const connectOrigins = [
+  originOf(env.NEXT_PUBLIC_API_URL),
+  originOf(env.NEXT_PUBLIC_STORAGE_ORIGIN),
+].filter((origin): origin is string => origin !== null);
 
 export function proxy(request: NextRequest): NextResponse {
   const isDev = process.env.NODE_ENV === 'development';
