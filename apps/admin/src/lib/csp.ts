@@ -19,6 +19,10 @@ export function buildCspHeader(
     ['img-src', "'self'", 'blob:', 'data:', ...imgOrigins].join(' '),
     `font-src 'self'`,
     ['connect-src', "'self'", ...connectOrigins].join(' '),
+    // The verification document viewer renders a PDF in a sandboxed iframe
+    // pointed at a blob: object URL (docs/steps/1D.3-verification-queue.md);
+    // frame-src has no other reason to diverge from denying everything else.
+    `frame-src 'self' blob:`,
     `object-src 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
