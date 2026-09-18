@@ -445,13 +445,12 @@ export class AuthController {
     await this.rateLimit.enforce('totp-verify', request.ip, user.id);
     const isEnabling = !user.twoFactorEnabled;
     try {
-      // A session that predates 2FA must not keep admin access once it's on.
-      // Deletes the rows directly rather than calling
-      // auth.api.revokeOtherSessions: that helper lists sessions by userId,
-      // and hardened-adapter.ts only restores the raw session token on a
-      // lookup that already filters by token, so the tokens it gets back
-      // are still hashed and its own subsequent delete-by-token never
-      // matches a row.
+      // A session that predates 2FA must not keep admin access once it's on,
+      // but the session that just called this endpoint must survive it.
+      // auth.api.revokeOtherSessions can do neither here: it lists sessions
+      // by userId, hardened-adapter.ts refuses to hand back their tokens
+      // (see #127), and better-auth has no token to delete by. userId/id is
+      // the only field this can reliably revoke by.
       if (isEnabling) {
         await this.prisma.client.session.deleteMany({
           where: { userId: user.id, id: { not: session.id } },
