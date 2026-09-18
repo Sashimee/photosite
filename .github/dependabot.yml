@@ -23,6 +23,12 @@ updates:
       - dependency-name: '@sentry/react-native'
       - dependency-name: jest
       - dependency-name: jest-expo
+      # Same reason, via the scope rather than the package: a minor bump of
+      # `@react-native/jest-preset` in the grouped update left jest-expo unable
+      # to resolve `@react-native/assets-registry/registry`, failing every
+      # mobile suite. These move with the SDK too. Only apps/mobile uses the
+      # scope, so the other 15 packages in that group still come through.
+      - dependency-name: '@react-native/*'
   - package-ecosystem: github-actions
     directory: /
     target-branch: dev
