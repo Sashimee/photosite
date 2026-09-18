@@ -83,7 +83,29 @@ export default async function DashboardOverviewPage({
   }
   const profile = result.data ?? null;
 
+  let hasPortfolioAndProducts = false;
+  if (profile) {
+    const [portfolioResult, productsResult] = await Promise.all([
+      api.GET('/v1/me/photographer-profile/portfolio', {
+        params: { query: { limit: 1 } },
+        cache: 'no-store',
+      }),
+      api.GET('/v1/me/products', { cache: 'no-store' }),
+    ]);
+    if (!portfolioResult.data) {
+      throw new Error(
+        `Failed to load the portfolio: HTTP ${String(portfolioResult.response.status)}`,
+      );
+    }
+    if (!productsResult.data) {
+      throw new Error(`Failed to load packages: HTTP ${String(productsResult.response.status)}`);
+    }
+    hasPortfolioAndProducts =
+      portfolioResult.data.items.length > 0 && productsResult.data.length > 0;
+  }
+
   const profileHref = `/${locale}/dashboard/profile`;
+  const portfolioHref = `/${locale}/dashboard/portfolio`;
 
   return (
     <div className="flex flex-col gap-8">
@@ -131,13 +153,32 @@ export default async function DashboardOverviewPage({
 
         <ChecklistRow
           title={overview('checklist.portfolio.title')}
-          status="comingSoon"
-          statusLabel={overview('checklist.status.comingSoon')}
-          description={overview('checklist.portfolio.description')}
+          status={profile && hasPortfolioAndProducts ? 'done' : 'todo'}
+          statusLabel={overview(
+            profile && hasPortfolioAndProducts ? 'checklist.status.done' : 'checklist.status.todo',
+          )}
+          description={overview(
+            profile && hasPortfolioAndProducts
+              ? 'checklist.portfolio.doneDescription'
+              : 'checklist.portfolio.todoDescription',
+          )}
           action={
-            <span className="text-sm text-muted-foreground">
-              {overview('checklist.portfolio.comingSoon')}
-            </span>
+            profile ? (
+              <Link
+                href={portfolioHref}
+                className="self-start text-sm font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {overview(
+                  hasPortfolioAndProducts
+                    ? 'checklist.portfolio.cta'
+                    : 'checklist.portfolio.startCta',
+                )}
+              </Link>
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                {overview('checklist.portfolio.needsProfile')}
+              </span>
+            )
           }
         />
 
