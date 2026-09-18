@@ -161,6 +161,26 @@ enum ReportStatus {
   dismissed
 }
 
+enum DataRequestType {
+  export
+  delete
+}
+
+// `ready`/`cancelled` are required by docs/steps/1A.12-gdpr.md's "Export job
+// shape" and "Deletion is immediate" decisions: a finished export sits at
+// `ready` until downloaded or swept, and a deletion cancelled during its
+// grace period is a terminal state of its own, not a failure.
+// `DATA_REQUEST_STATUSES` in packages/shared/src/enums.ts predates that plan
+// and lists only four; #197 tracks bringing it back in line.
+enum DataRequestStatus {
+  pending
+  processing
+  ready
+  completed
+  failed
+  cancelled
+}
+
 enum BookingStatus {
   pending_payment
   paid_held
@@ -260,9 +280,11 @@ model User {
   bookings                  Booking[]
   disputesOpened            Dispute[]                 @relation("DisputeOpenedBy")
   resolvedDisputes          Dispute[]                 @relation("DisputeAdmin")
+  dataRequests              DataRequest[]
 
   @@index([countryCode])
   @@index([status])
+  @@index([deletedAt])
 }
 
 // Better Auth "account" table: OAuth links and the credential (email+password)
@@ -476,6 +498,35 @@ model NotificationPreference {
   updatedAt DateTime            @updatedAt
 
   @@unique([userId, type, channel])
+}
+
+// docs/steps/1A.12-gdpr.md. `status` is the source of truth for the export
+// worker and the `gdpr-sweep` queue, never re-derived from `completedAt`/
+// `cancelledAt` alone. `exportKey`/`expiresAt` are only ever set for a
+// `type = export` row once it reaches `ready`; `failureReason` is a stable
+// code, never a stack trace. `cancelledAt` is set by the cancel endpoint
+// during a deletion's 30-day grace period. A hand-written partial unique
+// index (Prisma has no declarative partial index support, like
+// `VerificationCase`) enforces at most one `pending`/`processing` request
+// per `(userId, type)`, so a second export or delete call while one is
+// already in flight returns the existing row instead of racing a new one.
+model DataRequest {
+  id            String            @id @default(uuid(7))
+  userId        String
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          DataRequestType
+  status        DataRequestStatus @default(pending)
+  requestedAt   DateTime          @default(now())
+  completedAt   DateTime?
+  exportKey     String?
+  expiresAt     DateTime?
+  failureReason String?
+  cancelledAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status, requestedAt])
 }
 
 // Generic upload record referenced by id from Attachment, VerificationDocument,

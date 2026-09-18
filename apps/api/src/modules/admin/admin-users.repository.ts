@@ -3,6 +3,10 @@ import type { Prisma, UserRole, UserStatus } from '@photoo/db';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AdminUserCursor } from './admin-user-cursor.js';
 
+const PHOTOGRAPHER_PROFILE_SUMMARY_INCLUDE = {
+  photographerProfile: { select: { slug: true, isPublished: true } },
+} as const;
+
 export interface AdminUserSearchFilters {
   q?: string;
   role?: UserRole;
@@ -54,10 +58,14 @@ export class AdminUsersRepository {
       where,
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       take: filters.limit + 1,
+      include: PHOTOGRAPHER_PROFILE_SUMMARY_INCLUDE,
     });
   }
 
   findById(id: string) {
-    return this.prisma.client.user.findUnique({ where: { id } });
+    return this.prisma.client.user.findUnique({
+      where: { id },
+      include: PHOTOGRAPHER_PROFILE_SUMMARY_INCLUDE,
+    });
   }
 }
