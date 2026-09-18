@@ -419,7 +419,12 @@ services:
       # refuses to run without it rather than ever writing a plaintext dump
       # (README.md "Backups"). Alex generates the age keypair and keeps the
       # private half off this host; only the public recipient goes here.
-      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?generate with `age-keygen`, keep the private key off this server - see README.md "Backups"}
+      # Left without a `:?` default on purpose: compose interpolates the
+      # whole file before it filters services, so a required-but-unset
+      # variable here aborts the deploy of the ENTIRE stack, not just this
+      # service. schedule.sh refuses to start without it instead, which
+      # fails loudly in one container and leaves the site up.
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
       BACKUP_ENV: preview
       MINIO_ENDPOINT: http://minio:9000
       BACKUP_BUCKET: photoo-backups

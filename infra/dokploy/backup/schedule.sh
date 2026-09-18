@@ -13,6 +13,16 @@ set -eu
 BACKUP_HOUR_UTC=${BACKUP_HOUR_UTC:-3}
 PRUNE_HOUR_UTC=${PRUNE_HOUR_UTC:-4}
 
+# Validated here, not only inside backup.sh: without this the container
+# would idle looking healthy all day and fail at 03:00 UTC, which is the
+# green-dashboard-over-an-outage shape this whole step exists to avoid.
+if [ -z "${BACKUP_AGE_RECIPIENT:-}" ]; then
+  echo "schedule.sh: refusing to start - BACKUP_AGE_RECIPIENT is not set." >&2
+  echo "schedule.sh: generate a keypair with \`age-keygen\`, keep the private key off this server," >&2
+  echo "schedule.sh: and set the public age1... value in the Dokploy env. No dump is ever written unencrypted." >&2
+  exit 1
+fi
+
 next_daily_epoch() {
   hour=$1
   now=$(date -u +%s)

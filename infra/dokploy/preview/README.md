@@ -347,8 +347,9 @@ docker run --rm --network <project>_internal \
 The backup user can list and write but has no `s3:GetObject` at all, so it
 cannot download an object's contents - use the root credentials (Dokploy
 env) or the prune user (which can read under this prefix) if you need to
-fetch an object for a restore; see `docs/runbooks/restore.md` once 1E.3b
-lands.
+fetch an object for a restore. See `docs/runbooks/restore.md` for the full
+restore procedure (whole database, single table, disaster recovery,
+verification) and the measured time from its drill.
 
 **How to read a failure.** `docker logs` (or Dokploy's Logs tab) on the
 `backup` container: every guard prints which variable or check failed,
@@ -362,9 +363,15 @@ silently assumed to be covered.
 **Setting `BACKUP_AGE_RECIPIENT`** (`docs/steps/human-followups.md`): Alex
 runs `age-keygen` locally, keeps the private key in a password manager (it
 must never touch this server), and pastes the `age1...` public key into the
-Dokploy env as `BACKUP_AGE_RECIPIENT`. Until it's set, `backup` restarts in
-a crash loop, logging the same refusal each time - that is the intended
-failure mode, not a bug.
+Dokploy env as `BACKUP_AGE_RECIPIENT`. Until it's set, `backup` refuses to
+start and restarts in a crash loop, logging the same refusal each time -
+that is the intended failure mode, not a bug. The refusal is checked when
+the container starts, not when the 03:00 UTC run comes round, so an unset
+key is visible immediately instead of looking healthy all day and failing
+overnight. The variable deliberately has no `:?` default in `compose.yml`:
+compose interpolates the whole file before it filters services, so a
+required-but-unset variable there would abort the deploy of the entire
+stack rather than this one container.
 
 **Known limitation.** MinIO shares this host with Postgres, so this backup
 protects against a bad migration or a dropped database, not against losing

@@ -238,6 +238,7 @@ export {
   QuoteConversationSubjectRefSchema,
   ReportConversationRequestSchema,
   SendMessageRequestSchema,
+  atLeastOneOfBodyOrAttachments,
 } from './contract/chat.js';
 
 export {

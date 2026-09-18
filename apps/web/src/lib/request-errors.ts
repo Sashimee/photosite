@@ -1,6 +1,6 @@
 export interface ApiErrorLike {
-  code?: string;
-  message?: string;
+  code?: string | undefined;
+  message?: string | undefined;
   details?: unknown;
 }
 
@@ -22,12 +22,13 @@ function retryAfterSeconds(details: unknown): number | undefined {
 
 export type TranslateFn = (key: string, values?: Record<string, string | number | Date>) => string;
 
-// Maps an ApiError from the requests/quotes API onto a translated message.
-// `t` is expected to be scoped to `web.requests` or `web.quotes` (their
-// `errors.*` keys); see packages/i18n/messages/en.json. Every business-rule
-// failure the API can throw for these endpoints uses one of these generic
-// codes (see apps/api/src/modules/{requests,quotes}), never a field-specific
-// one, so unlike auth there's no larger enumeration to map here.
+// Maps an ApiError from the requests/quotes/chat API onto a translated
+// message. `t` is expected to be scoped to `web.requests`, `web.quotes` or
+// `web.messages` (their `errors.*` keys); see packages/i18n/messages/en.json.
+// Every business-rule failure the API (or a chat socket ack) can throw for
+// these endpoints uses one of these generic codes (see
+// apps/api/src/modules/{requests,quotes,chat}), never a field-specific one,
+// so unlike auth there's no larger enumeration to map here.
 export function requestErrorMessage(t: TranslateFn, error: ApiErrorLike | undefined): string {
   if (!error?.code) {
     return t('errors.generic');
