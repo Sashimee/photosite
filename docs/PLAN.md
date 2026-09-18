@@ -132,6 +132,7 @@ Parallel groups in lane D: `{1D.1}` -> `{1D.2, 1D.3, 1D.4, 1D.5, 1D.6, 1D.7}` ->
 | 1E.6 | Security review checkpoints: after 1A.2, 1A.3, 1A.6, 1A.8, 1B.7, 1C.6, 1D.5; findings filed as GitHub issues | security-reviewer | continuous | – |
 | 1E.7 | Compliance review checkpoints: after 1A.12, 1B.10, 1C.8, 1A.10 (DPIA input) | compliance-reviewer | continuous | – |
 | 1E.8 | Docs sync: keep `CLAUDE.md`, `README.md`, `docs/` and agents current after each merged step | docs-sync | continuous | – |
+| 1E.9 | Browser smoke test in CI: load every locale's key routes in Chromium, signed out and signed in, and fail on an uncaught error, a console error, a failed same-origin request or the error boundary. Added after three bugs reached the preview that no server-side check could see (see `docs/steps/1E.9-browser-smoke.md`) | test-writer + devops-engineer | S | 0.2, 1E.4 |
 
 ---
 
