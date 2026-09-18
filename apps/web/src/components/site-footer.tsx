@@ -14,6 +14,7 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
     { href: `/${locale}/legal/privacy`, label: t('privacy') },
     { href: `/${locale}/legal/terms`, label: t('terms') },
     { href: `/${locale}/legal/cookies`, label: t('cookies') },
+    { href: `/${locale}/consent`, label: t('consentSettings') },
   ];
 
   return (
