@@ -185,4 +185,52 @@ describe('loadEnv', () => {
       loadEnv({ ...validEnv, SMTP_INSECURE_INTERNAL_RELAY: 'true' }).SMTP_INSECURE_INTERNAL_RELAY,
     ).toBe(true);
   });
+
+  it('leaves Sentry unconfigured and defaults the trace sample rate to 0 when unset', () => {
+    const env = loadEnv(validEnv);
+    expect(env.SENTRY_DSN).toBeUndefined();
+    expect(env.SENTRY_ENVIRONMENT).toBeUndefined();
+    expect(env.SENTRY_TRACES_SAMPLE_RATE).toBe(0);
+    expect(env.SENTRY_REQUIRED).toBe(false);
+  });
+
+  it('treats an empty-string SENTRY_DSN as unset', () => {
+    expect(loadEnv({ ...validEnv, SENTRY_DSN: '' }).SENTRY_DSN).toBeUndefined();
+  });
+
+  it('rejects a malformed SENTRY_DSN', () => {
+    expect(() => loadEnv({ ...validEnv, SENTRY_DSN: 'not-a-url' })).toThrow(/SENTRY_DSN/);
+  });
+
+  const productionSmtpEnv = {
+    NODE_ENV: 'production',
+    WEB_APP_URL: 'https://photoo.lu',
+    SMTP_HOST: 'smtp-relay.brevo.com',
+    SMTP_PORT: '587',
+    SMTP_SECURE: 'true',
+    SMTP_USER: 'apikey',
+    SMTP_PASSWORD: 'secret',
+    SMTP_FROM: 'no-reply@photoo.lu',
+  };
+
+  it('boots fine in production without a Sentry DSN when SENTRY_REQUIRED is unset', () => {
+    const env = loadEnv({ ...validEnv, ...productionSmtpEnv });
+    expect(env.SENTRY_DSN).toBeUndefined();
+  });
+
+  it('refuses to boot in production when SENTRY_REQUIRED is true and SENTRY_DSN is unset', () => {
+    expect(() => loadEnv({ ...validEnv, ...productionSmtpEnv, SENTRY_REQUIRED: 'true' })).toThrow(
+      /SENTRY_DSN/,
+    );
+  });
+
+  it('boots in production when SENTRY_REQUIRED is true and SENTRY_DSN is set', () => {
+    const env = loadEnv({
+      ...validEnv,
+      ...productionSmtpEnv,
+      SENTRY_REQUIRED: 'true',
+      SENTRY_DSN: 'https://public@o0.ingest.sentry.io/1',
+    });
+    expect(env.SENTRY_DSN).toBe('https://public@o0.ingest.sentry.io/1');
+  });
 });

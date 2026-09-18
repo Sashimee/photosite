@@ -24,6 +24,7 @@
     "@photoo/db": "workspace:*",
     "@photoo/i18n": "workspace:*",
     "@photoo/shared": "workspace:*",
+    "@sentry/node": "10.74.0",
     "bullmq": "6.3.6",
     "dotenv": "17.4.2",
     "exifr": "7.1.3",

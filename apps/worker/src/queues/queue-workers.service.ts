@@ -15,6 +15,7 @@ import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import { Logger } from 'nestjs-pino';
 import { AuditLogService } from '../common/audit-log.service.js';
+import { reportJobFailure } from '../common/monitoring/report-job-failure.js';
 import { APP_CONFIG, type Env } from '../config/env.js';
 import { createMailTransport } from '../email/mail-transport.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -297,6 +298,7 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
     ] as const) {
       worker.on('failed', (job, err) => {
         this.logger.error({ err, jobId: job?.id, queue: name }, 'worker: job failed');
+        reportJobFailure(name, job, err);
       });
       worker.on('error', (err) => {
         this.logger.error({ err, queue: name }, 'worker: connection error');

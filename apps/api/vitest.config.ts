@@ -13,6 +13,10 @@ export default defineConfig({
         // bootstrap pieces (configureApp, createFastifyAdapter) are exercised
         // directly by src/testing/create-test-app.ts in every integration test.
         'src/main.ts',
+        // Runs initSentry() as an import side effect so it executes before
+        // any other module; initSentry() itself is covered directly by
+        // sentry-init.test.ts.
+        'src/instrument.ts',
         // Test-only fixtures with no branching logic of their own: a fixed
         // env object, a thin createTestApp wrapper, a Mailpit HTTP poller and
         // a TOTP code generator used only to simulate an authenticator app.

@@ -71,4 +71,25 @@ describe('buildApiErrorBody', () => {
       requestId: 'req-1',
     });
   });
+
+  it('omits eventId when none is given', () => {
+    const body = buildApiErrorBody('INTERNAL_SERVER_ERROR', 'Internal server error', 'req-1');
+    expect('eventId' in body).toBe(false);
+  });
+
+  it('includes eventId when given, without leaking it into details', () => {
+    const body = buildApiErrorBody(
+      'INTERNAL_SERVER_ERROR',
+      'Internal server error',
+      'req-1',
+      undefined,
+      'event-123',
+    );
+    expect(body).toEqual({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Internal server error',
+      requestId: 'req-1',
+      eventId: 'event-123',
+    });
+  });
 });
