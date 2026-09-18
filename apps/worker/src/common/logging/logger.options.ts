@@ -24,6 +24,13 @@ export const REDACT_PATHS = [
   'err.response',
   'err.envelope',
   'err.accepted',
+  // ConsentRecord's `ip`/`userAgent` are stored as evidence of consent
+  // (docs/steps/1A.12-gdpr.md "Consent records"), which makes them PII even
+  // though neither is a secret.
+  '*.ip',
+  '*.userAgent',
+  'ip',
+  'userAgent',
 ];
 
 export const REDACT_CENSOR = '[Redacted]';
