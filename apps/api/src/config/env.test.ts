@@ -236,4 +236,70 @@ describe('loadEnv', () => {
     delete withoutBaseUrl.S3_PUBLIC_BASE_URL;
     expect(() => loadEnv(withoutBaseUrl)).toThrow(/S3_PUBLIC_BASE_URL/);
   });
+
+  it('leaves Sentry unconfigured and defaults the trace sample rate to 0 when unset', () => {
+    const env = loadEnv(validEnv);
+    expect(env.SENTRY_DSN).toBeUndefined();
+    expect(env.SENTRY_ENVIRONMENT).toBeUndefined();
+    expect(env.SENTRY_TRACES_SAMPLE_RATE).toBe(0);
+    expect(env.SENTRY_REQUIRED).toBe(false);
+  });
+
+  it('treats an empty-string SENTRY_DSN as unset', () => {
+    const env = loadEnv({ ...validEnv, SENTRY_DSN: '' });
+    expect(env.SENTRY_DSN).toBeUndefined();
+  });
+
+  it('rejects a malformed SENTRY_DSN', () => {
+    expect(() => loadEnv({ ...validEnv, SENTRY_DSN: 'not-a-url' })).toThrow(/SENTRY_DSN/);
+  });
+
+  it('accepts a well-formed SENTRY_DSN and a custom trace sample rate', () => {
+    const env = loadEnv({
+      ...validEnv,
+      SENTRY_DSN: 'https://public@o0.ingest.sentry.io/1',
+      SENTRY_ENVIRONMENT: 'preview',
+      SENTRY_TRACES_SAMPLE_RATE: '0.2',
+    });
+    expect(env.SENTRY_DSN).toBe('https://public@o0.ingest.sentry.io/1');
+    expect(env.SENTRY_ENVIRONMENT).toBe('preview');
+    expect(env.SENTRY_TRACES_SAMPLE_RATE).toBe(0.2);
+  });
+
+  it('boots fine in production without a Sentry DSN when SENTRY_REQUIRED is unset', () => {
+    const env = loadEnv({
+      ...validEnv,
+      NODE_ENV: 'production',
+      AUTH_SECRET: 'b'.repeat(32),
+      AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+      WEB_APP_URL: 'https://photoo.lu',
+    });
+    expect(env.SENTRY_DSN).toBeUndefined();
+  });
+
+  it('refuses to boot in production when SENTRY_REQUIRED is true and SENTRY_DSN is unset', () => {
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: 'production',
+        AUTH_SECRET: 'b'.repeat(32),
+        AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+        WEB_APP_URL: 'https://photoo.lu',
+        SENTRY_REQUIRED: 'true',
+      }),
+    ).toThrow(/SENTRY_DSN/);
+  });
+
+  it('boots in production when SENTRY_REQUIRED is true and SENTRY_DSN is set', () => {
+    const env = loadEnv({
+      ...validEnv,
+      NODE_ENV: 'production',
+      AUTH_SECRET: 'b'.repeat(32),
+      AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+      WEB_APP_URL: 'https://photoo.lu',
+      SENTRY_REQUIRED: 'true',
+      SENTRY_DSN: 'https://public@o0.ingest.sentry.io/1',
+    });
+    expect(env.SENTRY_DSN).toBe('https://public@o0.ingest.sentry.io/1');
+  });
 });

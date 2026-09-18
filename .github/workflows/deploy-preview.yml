@@ -169,3 +169,45 @@ jobs:
             echo "::error::Dokploy deploy webhook returned HTTP $status" >&2
             exit 1
           fi
+
+  # Reports only, never blocks: nothing downstream depends on this job, and
+  # every step is allowed to fail without turning the deploy itself red
+  # (docs/steps/1E.9-browser-smoke.md). Serial and rate-limited on purpose -
+  # one Playwright worker plus a delay between navigations - because the
+  # opposite traffic shape got a workstation IP banned by the host's
+  # CrowdSec bouncer while investigating the 2026-09-18 outage.
+  post-deploy-smoke:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    env:
+      SMOKE_BASE_URL: https://footoo.bas.lu
+      SMOKE_NAV_DELAY_MS: '2000'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Wait for the Dokploy webhook to finish rolling the deploy out
+        run: timeout 180 bash -c 'until curl -sf https://footoo.bas.lu/health; do sleep 5; done'
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Run the smoke suite against the live preview
+        env:
+          # infra/dokploy/preview/README.md "Seed": the preview's seed run
+          # uses a generated password, never the CI-only default, so this
+          # needs its own repository secret (docs/steps/human-followups.md).
+          SEED_USER_PASSWORD: ${{ secrets.PREVIEW_SEED_USER_PASSWORD }}
+        run: pnpm exec playwright test --project=smoke --workers=1
+      - name: Upload the Playwright report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: post-deploy-smoke-report
+          path: playwright-report/
+          retention-days: 7

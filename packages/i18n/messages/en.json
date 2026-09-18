@@ -111,6 +111,213 @@
           "redis": "Redis"
         }
       }
+    },
+    "users": {
+      "roles": {
+        "client": "Client",
+        "photographer": "Photographer",
+        "professional": "Professional",
+        "admin": "Admin"
+      },
+      "statuses": {
+        "active": "Active",
+        "suspended": "Suspended",
+        "deleted": "Deleted"
+      },
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "forbidden": "You don't have permission to do this.",
+        "notFound": "This couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "conflict": "That couldn't be completed because something changed. Please retry."
+      },
+      "list": {
+        "title": "Users",
+        "caption": "Users",
+        "columns": {
+          "id": "ID",
+          "email": "Email",
+          "roles": "Roles",
+          "status": "Status"
+        },
+        "empty": {
+          "title": "No users match your search.",
+          "hint": "Matches an exact id, an exact email, or the start of a name."
+        },
+        "filters": {
+          "formLabel": "User filters",
+          "searchLabel": "Search",
+          "searchPlaceholder": "Id, exact email, or name prefix",
+          "searchHint": "Matches an exact id, an exact email, or the start of a name.",
+          "roleLabel": "Role",
+          "allRoles": "All roles",
+          "statusLabel": "Status",
+          "allStatuses": "All statuses",
+          "submit": "Search"
+        }
+      },
+      "detail": {
+        "title": "User",
+        "fields": {
+          "email": "Email",
+          "roles": "Roles",
+          "status": "Status",
+          "country": "Country",
+          "twoFactorEnabled": "Two-factor enabled",
+          "emailVerifiedAt": "Email verified",
+          "lastLoginAt": "Last login",
+          "yes": "Yes",
+          "no": "No",
+          "never": "Never"
+        },
+        "suspend": {
+          "trigger": "Suspend",
+          "title": "Suspend this user?",
+          "consequences": "This signs them out of every device and drops their chat connections. It does not delete anything.",
+          "reasonLabel": "Reason",
+          "reasonHint": "This is recorded in the audit log together with your name.",
+          "confirm": "Suspend user"
+        },
+        "reactivate": {
+          "trigger": "Reactivate",
+          "title": "Reactivate this user?",
+          "consequences": "This restores their status only. It does not restore the sessions that suspension signed out.",
+          "confirm": "Reactivate user"
+        },
+        "roles": {
+          "trigger": "Edit roles",
+          "title": "Edit roles",
+          "description": "Choose the full set of roles for this user. This replaces their current roles.",
+          "resultingSet": "New roles: {roles}",
+          "none": "none",
+          "unpublishWarning": "If this user's photographer profile is published, removing the photographer role will unpublish it immediately.",
+          "confirm": "Save roles"
+        },
+        "auditTrail": {
+          "title": "Audit trail",
+          "caption": "Audit log entries for this user",
+          "empty": "No audit log entries for this user.",
+          "systemActor": "System",
+          "columns": {
+            "occurredAt": "When",
+            "action": "Action",
+            "actor": "Actor"
+          }
+        }
+      }
+    },
+    "verification": {
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "forbidden": "You don't have permission to do this.",
+        "notFound": "This couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "conflict": "That couldn't be completed because something changed. Please retry."
+      },
+      "statuses": {
+        "draft": "Draft",
+        "submitted": "Submitted",
+        "in_review": "In review",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "expired": "Expired"
+      },
+      "list": {
+        "title": "Verification queue",
+        "caption": "Verification cases awaiting review, oldest submission first",
+        "columns": {
+          "photographer": "Photographer",
+          "email": "Email",
+          "country": "Country",
+          "status": "Status",
+          "submittedAt": "Submitted",
+          "reviewer": "Reviewer"
+        },
+        "claim": {
+          "unclaimed": "Unclaimed",
+          "you": "You",
+          "another": "Claimed by {id}"
+        },
+        "empty": {
+          "title": "No verification cases match this filter.",
+          "hint": "The queue defaults to submitted cases, oldest first."
+        },
+        "filters": {
+          "formLabel": "Verification filters",
+          "statusLabel": "Status",
+          "countryLabel": "Country code",
+          "countryPlaceholder": "e.g. LU",
+          "countryHint": "Two-letter ISO country code.",
+          "submit": "Filter"
+        }
+      },
+      "detail": {
+        "title": "Verification case",
+        "fields": {
+          "applicant": "Applicant",
+          "country": "Country",
+          "status": "Status",
+          "submittedAt": "Submitted",
+          "notSubmitted": "Not submitted",
+          "businessName": "Business name",
+          "vatNumber": "VAT number",
+          "businessRegistrationNumber": "Business registration number",
+          "notProvided": "Not provided",
+          "rejectionReason": "Rejection reason"
+        },
+        "documents": {
+          "title": "Documents",
+          "empty": "No documents uploaded yet.",
+          "uploadedAt": "Uploaded {date}",
+          "view": "View",
+          "viewerTitle": "{documentKey}",
+          "previewAlt": "Preview of the {documentKey} document",
+          "loading": "Loading document…",
+          "scanning": "This document is still being scanned for viruses. Check back shortly.",
+          "loadFailed": "Couldn't load this document. Please retry.",
+          "unsupportedType": "This file type can't be previewed here."
+        },
+        "claim": {
+          "start": "Start review",
+          "warning": "Another admin is already reviewing this case. You can still review it, but coordinate with them first to avoid duplicate work.",
+          "youAreReviewing": "You are reviewing this case.",
+          "claimedWhileOpen": "This case was claimed by another admin while you were viewing it."
+        },
+        "approve": {
+          "trigger": "Approve",
+          "title": "Approve this verification?",
+          "consequences": "This marks {applicantId}'s profile as verified. Whether it publishes is decided by the platform's own rules, not by this screen.",
+          "confirm": "Approve verification"
+        },
+        "reject": {
+          "trigger": "Reject",
+          "title": "Reject this verification?",
+          "consequences": "This is recorded against {applicantId} and cannot be undone from here.",
+          "categoryLabel": "Reason category",
+          "categoryPlaceholder": "Choose a category",
+          "categories": {
+            "illegible": "Illegible document",
+            "expired": "Expired document",
+            "nameMismatch": "Name doesn't match",
+            "wrongDocument": "Wrong document type",
+            "suspectedForgery": "Suspected forgery"
+          },
+          "textLabel": "Explanation",
+          "textHint": "Shown to the applicant together with the category above. Write it for them.",
+          "confirm": "Reject verification"
+        },
+        "history": {
+          "title": "Decision history",
+          "caption": "Audit log entries for this verification case",
+          "empty": "No audit log entries for this case.",
+          "systemActor": "System",
+          "columns": {
+            "occurredAt": "When",
+            "action": "Action",
+            "actor": "Actor"
+          }
+        }
+      }
     }
   },
   "common": {
@@ -398,6 +605,23 @@
       "terms": "Terms of service",
       "cookies": "Cookie policy",
       "rights": "© {year} {appName}. All rights reserved."
+    },
+    "legal": {
+      "pending": "The full text of this document is being prepared with our legal advisers and will be published here before launch.",
+      "contactIntro": "In the meantime, you can reach us with any question about this document at",
+      "contactEmail": "hello@photoo.lu",
+      "imprint": {
+        "title": "Imprint"
+      },
+      "privacy": {
+        "title": "Privacy policy"
+      },
+      "terms": {
+        "title": "Terms of service"
+      },
+      "cookies": {
+        "title": "Cookie policy"
+      }
     },
     "home": {
       "heroTitle": "Book trusted photographers in Luxembourg",

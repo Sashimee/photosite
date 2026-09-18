@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BOOKING_RELEASE_QUEUE_NAME,
+  BookingReleaseJobSchema,
   EMAIL_QUEUE_NAME,
   EmailJobSchema,
   FILE_SCAN_QUEUE_NAME,
   FileScanJobSchema,
+  GDPR_EXPORT_QUEUE_NAME,
+  GDPR_SWEEP_QUEUE_NAME,
+  GdprExportJobSchema,
+  GdprSweepJobSchema,
   IMAGE_PROCESS_QUEUE_NAME,
   ImageProcessJobSchema,
   NOTIFICATIONS_CLEANUP_QUEUE_NAME,
@@ -24,6 +30,8 @@ import {
   QUEUE_NAMES,
   QUOTE_EXPIRY_QUEUE_NAME,
   QuoteExpiryJobSchema,
+  RECEIPT_PDF_QUEUE_NAME,
+  ReceiptPdfJobSchema,
   UPLOADS_CLEANUP_QUEUE_NAME,
   UploadsCleanupJobSchema,
 } from './queues.js';
@@ -43,6 +51,10 @@ describe('QUEUE_NAMES', () => {
       'notify-sweep',
       'push-receipts',
       'notifications-cleanup',
+      'booking-release',
+      'receipt-pdf',
+      'gdpr-export',
+      'gdpr-sweep',
     ]);
     expect(new Set(QUEUE_NAMES).size).toBe(QUEUE_NAMES.length);
   });
@@ -59,6 +71,10 @@ describe('QUEUE_NAMES', () => {
       NOTIFY_SWEEP_QUEUE_NAME,
       PUSH_RECEIPTS_QUEUE_NAME,
       NOTIFICATIONS_CLEANUP_QUEUE_NAME,
+      BOOKING_RELEASE_QUEUE_NAME,
+      RECEIPT_PDF_QUEUE_NAME,
+      GDPR_EXPORT_QUEUE_NAME,
+      GDPR_SWEEP_QUEUE_NAME,
     ]).toEqual(QUEUE_NAMES);
   });
 });
@@ -241,6 +257,7 @@ describe.each([
   ['notify-sweep', NotifySweepJobSchema] as const,
   ['push-receipts', PushReceiptsJobSchema] as const,
   ['notifications-cleanup', NotificationsCleanupJobSchema] as const,
+  ['booking-release', BookingReleaseJobSchema] as const,
 ])('%s job schema', (_name, schema) => {
   it('accepts an empty payload', () => {
     expect(schema.safeParse({}).success).toBe(true);
@@ -248,6 +265,56 @@ describe.each([
 
   it('rejects unknown extra keys', () => {
     expect(schema.safeParse({ uploadId: VALID_UPLOAD_ID }).success).toBe(false);
+  });
+});
+
+describe('ReceiptPdfJobSchema', () => {
+  it('accepts a valid bookingId', () => {
+    expect(ReceiptPdfJobSchema.safeParse({ bookingId: VALID_UPLOAD_ID }).success).toBe(true);
+  });
+
+  it('rejects a missing bookingId', () => {
+    expect(ReceiptPdfJobSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects a non-uuid bookingId', () => {
+    expect(ReceiptPdfJobSchema.safeParse({ bookingId: 'not-a-uuid' }).success).toBe(false);
+  });
+
+  it('rejects unknown extra keys', () => {
+    expect(
+      ReceiptPdfJobSchema.safeParse({ bookingId: VALID_UPLOAD_ID, extra: 'nope' }).success,
+    ).toBe(false);
+  });
+});
+
+describe('GdprExportJobSchema', () => {
+  it('accepts a valid dataRequestId', () => {
+    expect(GdprExportJobSchema.safeParse({ dataRequestId: VALID_UPLOAD_ID }).success).toBe(true);
+  });
+
+  it('rejects a missing dataRequestId', () => {
+    expect(GdprExportJobSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects a non-uuid dataRequestId', () => {
+    expect(GdprExportJobSchema.safeParse({ dataRequestId: 'not-a-uuid' }).success).toBe(false);
+  });
+
+  it('rejects unknown extra keys', () => {
+    expect(
+      GdprExportJobSchema.safeParse({ dataRequestId: VALID_UPLOAD_ID, extra: 'nope' }).success,
+    ).toBe(false);
+  });
+});
+
+describe('gdpr-sweep job schema', () => {
+  it('accepts an empty payload', () => {
+    expect(GdprSweepJobSchema.safeParse({}).success).toBe(true);
+  });
+
+  it('rejects unknown extra keys', () => {
+    expect(GdprSweepJobSchema.safeParse({ uploadId: VALID_UPLOAD_ID }).success).toBe(false);
   });
 });
 

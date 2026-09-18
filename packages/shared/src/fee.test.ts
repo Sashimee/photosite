@@ -45,6 +45,39 @@ describe('calculatePlatformFee', () => {
   });
 });
 
+describe('calculatePlatformFee with VAT on the fee', () => {
+  it('is off by default: passing no options matches passing an empty object', () => {
+    expect(calculatePlatformFee(1000, 5)).toBe(calculatePlatformFee(1000, 5, {}));
+  });
+
+  it('leaves the fee unchanged when vatOnFeeRatePercent is 0', () => {
+    expect(calculatePlatformFee(1000, 5, { vatOnFeeRatePercent: 0 })).toBe(
+      calculatePlatformFee(1000, 5),
+    );
+  });
+
+  it('applies VAT on top of the base fee', () => {
+    // baseFee = round(2000 * 5 / 100) = 100; 100 * 1.17 = 117 exactly.
+    expect(calculatePlatformFee(2000, 5, { vatOnFeeRatePercent: 17 })).toBe(117);
+  });
+
+  it('rounds half up at exactly .5 cents after VAT is applied', () => {
+    // baseFee = round(1000 * 5 / 100) = 50; 50 * 1.01 = 50.5 exactly, which
+    // must round up to 51, not down to 50 (banker's rounding is not used).
+    expect(calculatePlatformFee(1000, 5, { vatOnFeeRatePercent: 1 })).toBe(51);
+  });
+
+  it('rejects a negative vatOnFeeRatePercent', () => {
+    expect(() => calculatePlatformFee(1000, 5, { vatOnFeeRatePercent: -1 })).toThrow(RangeError);
+  });
+
+  it('rejects a non-finite vatOnFeeRatePercent', () => {
+    expect(() => calculatePlatformFee(1000, 5, { vatOnFeeRatePercent: Number.NaN })).toThrow(
+      RangeError,
+    );
+  });
+});
+
 describe('quoteTotals', () => {
   it('sums line items into a subtotal and computes the fee', () => {
     const totals = quoteTotals(
@@ -100,5 +133,12 @@ describe('quoteTotals', () => {
     expect(() => quoteTotals([{ label: 'Session', qty: 1, unitCents: 100 }], 200)).toThrow(
       RangeError,
     );
+  });
+
+  it('passes the VAT-on-fee option through to platformFeeCents', () => {
+    const totals = quoteTotals([{ label: 'Session', qty: 1, unitCents: 2000 }], 5, {
+      vatOnFeeRatePercent: 17,
+    });
+    expect(totals.platformFeeCents).toBe(117);
   });
 });

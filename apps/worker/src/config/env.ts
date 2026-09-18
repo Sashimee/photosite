@@ -17,6 +17,11 @@ function optionalStrictBoolean() {
     .transform((value) => (value === undefined ? undefined : value === 'true'));
 }
 
+const OptionalUrlSchema = z.preprocess(
+  (value) => (typeof value === 'string' && value.length === 0 ? undefined : value),
+  z.url().optional(),
+);
+
 const BaseEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']),
   DATABASE_URL: z.url(),
@@ -97,6 +102,14 @@ const BaseEnvSchema = z.object({
     .int()
     .positive()
     .default(24 * 60 * 60 * 1000),
+
+  SENTRY_DSN: OptionalUrlSchema,
+  SENTRY_ENVIRONMENT: optionalNonEmpty(),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
+  SENTRY_REQUIRED: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => value === 'true'),
 });
 
 const EnvSchema = BaseEnvSchema.superRefine((value, ctx) => {
@@ -121,6 +134,13 @@ const EnvSchema = BaseEnvSchema.superRefine((value, ctx) => {
       code: 'custom',
       path: ['WEB_APP_URL'],
       message: 'must be an https:// URL in production',
+    });
+  }
+  if (value.SENTRY_REQUIRED && !value.SENTRY_DSN) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['SENTRY_DSN'],
+      message: 'SENTRY_DSN is required when NODE_ENV=production and SENTRY_REQUIRED=true',
     });
   }
 }).transform((value) => ({

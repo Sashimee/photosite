@@ -7,6 +7,10 @@ import { Redis } from 'ioredis';
 import { io, type Socket as ClientSocket } from 'socket.io-client';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../../app.module.js';
+import {
+  TWO_FACTOR_FRESH_VERIFICATION_WINDOW_MS,
+  TWO_FACTOR_VERIFICATION_WINDOW_MS,
+} from '../../common/auth/require-admin.js';
 import { configureApp } from '../../bootstrap/configure-app.js';
 import { createFastifyAdapter } from '../../bootstrap/fastify-adapter.js';
 import { APP_CONFIG, type Env } from '../../config/env.js';
@@ -40,6 +44,14 @@ interface UserBody {
   email: string;
   status: string;
   roles: string[];
+  name: string | null;
+  photographerProfile: { slug: string; isPublished: boolean } | null;
+}
+
+interface AdminMeBody {
+  permissions: string[];
+  sessionExpiresAt: string | null;
+  twoFactorFreshUntil: string | null;
 }
 
 interface PageBody<T> {
@@ -325,6 +337,111 @@ describe('admin integration', () => {
     await app.close();
   });
 
+  describe('GET /v1/admin/me', () => {
+    it('returns 403 for a non-admin', async () => {
+      const client = await signUpVerifyAndSignIn(['client'], 'me-non-admin');
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/me',
+        headers: authHeaders(client.token),
+      });
+      expect(response.statusCode).toBe(403);
+    });
+
+    it("returns exactly the caller's own grants, and nothing about another admin", async () => {
+      const admin = await makeAdmin('me-own-grants', ['support', 'moderation']);
+      const otherAdmin = await makeAdmin('me-other-grants', ['finance', 'superadmin']);
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/me',
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(200);
+      const body = response.json<AdminMeBody>();
+      expect(body.permissions.sort()).toEqual(['moderation', 'support']);
+      expect(JSON.stringify(body)).not.toContain(otherAdmin.id);
+      for (const permission of ['finance', 'superadmin']) {
+        expect(body.permissions).not.toContain(permission);
+      }
+    });
+
+    it('returns no permissions for an admin with none granted', async () => {
+      const admin = await makeAdmin('me-no-grants', []);
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/me',
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json<AdminMeBody>().permissions).toEqual([]);
+    });
+
+    it('derives sessionExpiresAt and twoFactorFreshUntil from their own windows, and they differ', async () => {
+      const admin = await makeAdmin('me-2fa-expiry', ['support']);
+      const before = Date.now();
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/me',
+        headers: admin.headers,
+      });
+      const after = Date.now();
+      expect(response.statusCode).toBe(200);
+      const { sessionExpiresAt, twoFactorFreshUntil } = response.json<AdminMeBody>();
+      if (!sessionExpiresAt) throw new Error('expected a sessionExpiresAt value');
+      if (!twoFactorFreshUntil) throw new Error('expected a twoFactorFreshUntil value');
+
+      const sessionExpiresAtMs = new Date(sessionExpiresAt).getTime();
+      expect(sessionExpiresAtMs).toBeGreaterThanOrEqual(
+        before + TWO_FACTOR_VERIFICATION_WINDOW_MS - 1000,
+      );
+      expect(sessionExpiresAtMs).toBeLessThanOrEqual(
+        after + TWO_FACTOR_VERIFICATION_WINDOW_MS + 1000,
+      );
+
+      const freshUntilMs = new Date(twoFactorFreshUntil).getTime();
+      expect(freshUntilMs).toBeGreaterThanOrEqual(
+        before + TWO_FACTOR_FRESH_VERIFICATION_WINDOW_MS - 1000,
+      );
+      expect(freshUntilMs).toBeLessThanOrEqual(
+        after + TWO_FACTOR_FRESH_VERIFICATION_WINDOW_MS + 1000,
+      );
+
+      expect(freshUntilMs).toBeLessThan(sessionExpiresAtMs);
+    });
+
+    it('twoFactorFreshUntil matches the window the x-requires-2fa guard actually enforces', async () => {
+      const admin = await makeAdmin('me-2fa-fresh-parity', ['verification']);
+      await prisma.session.updateMany({
+        where: { userId: admin.id },
+        data: {
+          twoFactorVerifiedAt: new Date(
+            Date.now() - TWO_FACTOR_FRESH_VERIFICATION_WINDOW_MS - 1000,
+          ),
+        },
+      });
+
+      const meResponse = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/me',
+        headers: admin.headers,
+      });
+      const { sessionExpiresAt, twoFactorFreshUntil } = meResponse.json<AdminMeBody>();
+      if (!sessionExpiresAt) throw new Error('expected a sessionExpiresAt value');
+      if (!twoFactorFreshUntil) throw new Error('expected a twoFactorFreshUntil value');
+      expect(new Date(twoFactorFreshUntil).getTime()).toBeLessThan(Date.now());
+      expect(new Date(sessionExpiresAt).getTime()).toBeGreaterThan(Date.now());
+
+      const guardedResponse = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/verification-cases',
+        headers: admin.headers,
+      });
+      expect(guardedResponse.statusCode).toBe(403);
+      expect(guardedResponse.json<{ code: string }>().code).toBe('TWO_FACTOR_REQUIRED');
+    });
+  });
+
   describe('GET /v1/admin/users', () => {
     it('returns 403 for a non-admin', async () => {
       const client = await signUpVerifyAndSignIn(['client'], 'search-non-admin');
@@ -375,7 +492,11 @@ describe('admin integration', () => {
         url: `/v1/admin/users?q=${encodeURIComponent(`Zz Search Target ${suffix}`)}`,
         headers: admin.headers,
       });
-      expect(byNamePrefix.json<PageBody<UserBody>>().items.map((u) => u.id)).toContain(target.id);
+      const namePrefixItems = byNamePrefix.json<PageBody<UserBody>>().items;
+      expect(namePrefixItems.map((u) => u.id)).toContain(target.id);
+      expect(namePrefixItems.find((u) => u.id === target.id)?.name).toBe(
+        `Zz Search Target ${suffix}`,
+      );
 
       const localPart = target.email.split('@')[0] ?? '';
       const bySubstring = await fastify().inject({
@@ -450,7 +571,7 @@ describe('admin integration', () => {
       expect(response.statusCode).toBe(404);
     });
 
-    it('returns the user', async () => {
+    it('returns the user, including their name and no photographer profile', async () => {
       const admin = await makeAdmin('get-ok', ['support']);
       const target = await createTargetUser('get-target');
       const response = await fastify().inject({
@@ -459,7 +580,29 @@ describe('admin integration', () => {
         headers: admin.headers,
       });
       expect(response.statusCode).toBe(200);
-      expect(response.json<UserBody>().id).toBe(target.id);
+      const body = response.json<UserBody>();
+      expect(body.id).toBe(target.id);
+      expect(body.name).toBe(target.email.split('@')[0]);
+      expect(body.photographerProfile).toBeNull();
+    });
+
+    it("includes the photographer profile's slug and published state", async () => {
+      const admin = await makeAdmin('get-with-profile', ['support']);
+      const photographer = await signUpVerifyAndSignIn(['photographer'], 'get-with-profile-target');
+      const profile = await createPhotographerProfile(photographer.token, 'get-with-profile');
+      await prisma.photographerProfile.update({
+        where: { id: profile.id },
+        data: { isPublished: true },
+      });
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/users/${photographer.id}`,
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(200);
+      const body = response.json<UserBody>();
+      expect(body.photographerProfile).toEqual({ slug: profile.slug, isPublished: true });
     });
   });
 

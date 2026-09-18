@@ -161,6 +161,54 @@ enum ReportStatus {
   dismissed
 }
 
+enum DataRequestType {
+  export
+  delete
+}
+
+// `ready`/`cancelled` are required by docs/steps/1A.12-gdpr.md's "Export job
+// shape" and "Deletion is immediate" decisions: a finished export sits at
+// `ready` until downloaded or swept, and a deletion cancelled during its
+// grace period is a terminal state of its own, not a failure.
+// `DATA_REQUEST_STATUSES` in packages/shared/src/enums.ts predates that plan
+// and lists only four; #197 tracks bringing it back in line.
+enum DataRequestStatus {
+  pending
+  processing
+  ready
+  completed
+  failed
+  cancelled
+}
+
+enum BookingStatus {
+  pending_payment
+  paid_held
+  in_progress
+  delivered
+  released
+  refunded
+  disputed
+  cancelled
+}
+
+enum LedgerEntryType {
+  charge
+  platform_fee
+  transfer
+  refund
+  reversal
+  payout
+}
+
+// Our own simplified dispute lifecycle, not Stripe's full `dispute.status`
+// enum. Mirrors `DISPUTE_STATUSES` in packages/shared/src/enums.ts.
+enum DisputeStatus {
+  open
+  won
+  lost
+}
+
 model Country {
   code              String   @id @db.Char(2)
   name              String
@@ -229,9 +277,14 @@ model User {
   grantedPermissionGrants   AdminPermissionGrant[]    @relation("AdminPermissionGrantGrantedBy")
   reports                   Report[]                  @relation("ReportReporter")
   resolvedReports           Report[]                  @relation("ReportResolvedByAdmin")
+  bookings                  Booking[]
+  disputesOpened            Dispute[]                 @relation("DisputeOpenedBy")
+  resolvedDisputes          Dispute[]                 @relation("DisputeAdmin")
+  dataRequests              DataRequest[]
 
   @@index([countryCode])
   @@index([status])
+  @@index([deletedAt])
 }
 
 // Better Auth "account" table: OAuth links and the credential (email+password)
@@ -447,6 +500,35 @@ model NotificationPreference {
   @@unique([userId, type, channel])
 }
 
+// docs/steps/1A.12-gdpr.md. `status` is the source of truth for the export
+// worker and the `gdpr-sweep` queue, never re-derived from `completedAt`/
+// `cancelledAt` alone. `exportKey`/`expiresAt` are only ever set for a
+// `type = export` row once it reaches `ready`; `failureReason` is a stable
+// code, never a stack trace. `cancelledAt` is set by the cancel endpoint
+// during a deletion's 30-day grace period. A hand-written partial unique
+// index (Prisma has no declarative partial index support, like
+// `VerificationCase`) enforces at most one `pending`/`processing` request
+// per `(userId, type)`, so a second export or delete call while one is
+// already in flight returns the existing row instead of racing a new one.
+model DataRequest {
+  id            String            @id @default(uuid(7))
+  userId        String
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          DataRequestType
+  status        DataRequestStatus @default(pending)
+  requestedAt   DateTime          @default(now())
+  completedAt   DateTime?
+  exportKey     String?
+  expiresAt     DateTime?
+  failureReason String?
+  cancelledAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status, requestedAt])
+}
+
 // Generic upload record referenced by id from Attachment, VerificationDocument,
 // PortfolioImage and Delivery once 1A.3b lands. `objectKey` and `exif` are
 // private (SECURITY.md) and never serialised to clients; downloads are only
@@ -478,6 +560,7 @@ model Upload {
   portfolioImage       PortfolioImage?
   messageAttachment    MessageAttachment?
   verificationDocument VerificationDocument?
+  deliveryFile         DeliveryFile?
 
   @@index([ownerId])
   @@index([status])
@@ -524,6 +607,7 @@ model PhotographerProfile {
   portfolioImages PortfolioImage[]
   products        Product[]
   quotes          Quote[]
+  bookings        Booking[]
 
   @@index([countryCode])
   @@index([verificationStatus])
@@ -720,6 +804,8 @@ model Quote {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
+  booking Booking?
+
   @@index([requestId])
   @@index([clientId, createdAt])
   @@index([photographerId, createdAt])
@@ -807,4 +893,143 @@ model MessageAttachment {
   updatedAt DateTime @updatedAt
 
   @@index([messageId])
+}
+
+// `location` is `geography(Point, 4326)`, an `Unsupported` type Prisma
+// cannot index or write directly: the GiST index lives in hand-written
+// migration SQL, like `Request`/`PhotographerProfile`. `photographerId`
+// references `PhotographerProfile`, not `User`, like `Quote.photographerId`,
+// so a booking survives the photographer's profile identity changing shape.
+// Money is never duplicated here: the accepted `Quote`
+// (subtotalCents/platformFeeCents/totalCents/currency) is the source of
+// truth, read inside the same transaction that creates the `PaymentIntent`
+// (1A.8c). The allowed `status` transitions are the table in
+// packages/shared/src/booking-state-machine.ts, not enforced by the
+// database. `Booking` rows are never hard-deleted (no `deletedAt`, no delete
+// path), so `Restrict` on every child relation back to it is a safety net,
+// not a real-world constraint.
+model Booking {
+  id                 String                                 @id @default(uuid(7))
+  quoteId            String                                 @unique
+  quote              Quote                                  @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  clientId           String
+  client             User                                   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  photographerId     String
+  photographer       PhotographerProfile                    @relation(fields: [photographerId], references: [id], onDelete: Restrict)
+  scheduledAt        DateTime
+  location           Unsupported("geography(Point, 4326)")?
+  status             BookingStatus                          @default(pending_payment)
+  paymentIntentId    String?                                @unique
+  chargeId           String?
+  transferId         String?
+  releaseDueAt       DateTime?
+  deliveredAt        DateTime?
+  releasedAt         DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  createdAt          DateTime                               @default(now())
+  updatedAt          DateTime                               @updatedAt
+
+  delivery      Delivery?
+  ledgerEntries LedgerEntry[]
+  disputes      Dispute[]
+
+  @@index([clientId, createdAt])
+  @@index([photographerId, createdAt])
+  @@index([status, releaseDueAt])
+  @@index([status, createdAt])
+}
+
+// One delivery per booking (`bookingId` unique): the photographer resubmits
+// by replacing this row's message/files, not by adding a second delivery.
+model Delivery {
+  id           String    @id @default(uuid(7))
+  bookingId    String    @unique
+  booking      Booking   @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  message      String
+  externalLink String?
+  deliveredAt  DateTime  @default(now())
+  acceptedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  files DeliveryFile[]
+}
+
+// Mirrors `MessageAttachment`/`VerificationDocument`: an `Upload` (purpose
+// `delivery_file`) attaches to at most one delivery (`uploadId` unique),
+// `Restrict` so a delivered file can't be deleted out from under the
+// booking.
+model DeliveryFile {
+  id         String   @id @default(uuid(7))
+  deliveryId String
+  delivery   Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  uploadId   String   @unique
+  upload     Upload   @relation(fields: [uploadId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+
+  @@index([deliveryId])
+}
+
+// Append-only: no `updatedAt`, no update or delete path anywhere (CLAUDE.md;
+// like `AuditLog` and `ConsentRecord`). One row per money movement; the
+// unique constraint on `(bookingId, type, stripeObjectId)` makes a replayed
+// webhook a no-op at the database level, and a test asserts the ledger sums
+// to zero against the charge for a completed booking (1A.8d).
+model LedgerEntry {
+  id             String          @id @default(uuid(7))
+  bookingId      String
+  booking        Booking         @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  type           LedgerEntryType
+  amountCents    Int
+  currency       String          @db.Char(3)
+  stripeObjectId String
+  occurredAt     DateTime        @default(now())
+
+  @@unique([bookingId, type, stripeObjectId])
+  @@index([bookingId])
+}
+
+// Idempotency store for the webhook (docs/PAYMENTS.md): `id` is the Stripe
+// event id itself, not a generated uuid, and is inserted before the event is
+// processed, in the same transaction as any state change it causes. A
+// duplicate insert means "already handled"; the handler returns 200 without
+// redoing the work. No `updatedAt`: `processedAt` is the only field ever set
+// after insert, and only once, by the stuck-event sweep or the handler
+// itself.
+model StripeEvent {
+  id          String    @id
+  type        String
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  payload     Json
+
+  @@index([type, receivedAt])
+  @@index([processedAt])
+}
+
+// `openedById` is required: a dispute is always opened by the cardholder on
+// one side of a real booking, so it's always the booking's client, recorded
+// by the webhook handler rather than left null. `status` is our own
+// simplified lifecycle (`open` from `charge.dispute.created`, `won`/`lost`
+// from `charge.dispute.closed`), not Stripe's full `dispute.status` enum; no
+// automatic refund or reversal follows a dispute, a human decides
+// (docs/PAYMENTS.md).
+model Dispute {
+  id                  String        @id @default(uuid(7))
+  bookingId           String
+  booking             Booking       @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  openedById          String
+  openedBy            User          @relation("DisputeOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
+  reason              String
+  status              DisputeStatus @default(open)
+  resolution          String?
+  adminId             String?
+  admin               User?         @relation("DisputeAdmin", fields: [adminId], references: [id], onDelete: SetNull)
+  amountRefundedCents Int?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([bookingId])
+  @@index([status, createdAt])
 }

@@ -63,6 +63,25 @@ export const BOOKING_STATUSES = [
 
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
+export const LEDGER_ENTRY_TYPES = [
+  'charge',
+  'platform_fee',
+  'transfer',
+  'refund',
+  'reversal',
+  'payout',
+] as const;
+
+export type LedgerEntryType = (typeof LEDGER_ENTRY_TYPES)[number];
+
+// Our own simplified dispute lifecycle, not Stripe's full `dispute.status`
+// enum (docs/PAYMENTS.md): `open` from `charge.dispute.created`, `won`/`lost`
+// from `charge.dispute.closed`. No automatic refund or reversal follows a
+// dispute; a human decides.
+export const DISPUTE_STATUSES = ['open', 'won', 'lost'] as const;
+
+export type DisputeStatus = (typeof DISPUTE_STATUSES)[number];
+
 export const CONVERSATION_TYPES = ['request', 'quote', 'booking', 'direct'] as const;
 
 export type ConversationType = (typeof CONVERSATION_TYPES)[number];
@@ -106,7 +125,14 @@ export const DATA_REQUEST_TYPES = ['export', 'delete'] as const;
 
 export type DataRequestType = (typeof DATA_REQUEST_TYPES)[number];
 
-export const DATA_REQUEST_STATUSES = ['pending', 'processing', 'completed', 'failed'] as const;
+export const DATA_REQUEST_STATUSES = [
+  'pending',
+  'processing',
+  'ready',
+  'completed',
+  'failed',
+  'cancelled',
+] as const;
 
 export type DataRequestStatus = (typeof DATA_REQUEST_STATUSES)[number];
 

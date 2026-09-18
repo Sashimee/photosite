@@ -7,7 +7,9 @@ describe('buildCspHeader', () => {
     const header = buildCspHeader('abc123', false);
     expect(header).toContain(`script-src 'self' 'nonce-abc123' 'strict-dynamic'`);
     expect(header).toContain(`style-src 'self' 'nonce-abc123'`);
-    expect(header).not.toContain('unsafe-inline');
+    expect(header).not.toMatch(/script-src[^;]*unsafe-inline/);
+    expect(header).not.toMatch(/style-src [^;]*unsafe-inline/);
+    expect(header.match(/unsafe-inline/g)).toHaveLength(1);
     expect(header).not.toContain('unsafe-eval');
   });
 
@@ -21,6 +23,11 @@ describe('buildCspHeader', () => {
     const header = buildCspHeader('abc123', false);
     expect(header).toContain(`frame-ancestors 'none'`);
     expect(header).toContain(`object-src 'none'`);
+  });
+
+  it('only allows framing self and blob content, for the sandboxed document viewer', () => {
+    const header = buildCspHeader('abc123', false);
+    expect(header).toContain(`frame-src 'self' blob:;`);
   });
 
   it('allows connections to the API and Sentry origins only in addition to self', () => {

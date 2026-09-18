@@ -9,25 +9,35 @@ function fakeT() {
 }
 
 describe('resolveNavSections', () => {
-  it('marks the dashboard and health sections as available with no note', () => {
+  it('marks the dashboard, health, users and verification sections as available with no note', () => {
     const sections = resolveNavSections(fakeT());
 
     const dashboard = sections.find((section) => section.id === 'dashboard');
     const health = sections.find((section) => section.id === 'health');
+    const users = sections.find((section) => section.id === 'users');
+    const verification = sections.find((section) => section.id === 'verification');
 
     expect(dashboard).toMatchObject({ href: '/', label: 'nav.dashboard', available: true });
     expect(dashboard?.note).toBeUndefined();
     expect(health).toMatchObject({ href: '/health', label: 'nav.health', available: true });
     expect(health?.note).toBeUndefined();
+    expect(users).toMatchObject({ href: '/users', label: 'nav.users', available: true });
+    expect(users?.note).toBeUndefined();
+    expect(verification).toMatchObject({
+      href: '/verification',
+      label: 'nav.verification',
+      available: true,
+    });
+    expect(verification?.note).toBeUndefined();
   });
 
   it('labels a section blocked on our own UI work as coming soon, not API-unavailable', () => {
     const sections = resolveNavSections(fakeT());
 
-    const users = sections.find((section) => section.id === 'users');
+    const settings = sections.find((section) => section.id === 'settings');
 
-    expect(users?.available).toBe(false);
-    expect(users?.note).toBe('nav.comingSoon:{"step":"1D.2"}');
+    expect(settings?.available).toBe(false);
+    expect(settings?.note).toBe('nav.comingSoon:{"step":"1D.7"}');
   });
 
   it('labels a section blocked on a missing endpoint as available after that step', () => {

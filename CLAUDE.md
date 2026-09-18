@@ -38,6 +38,8 @@ pnpm i18n:check     # check catalog consistency (strict mode added in 2.3)
 pnpm typecheck      # tsc --noEmit in every workspace
 pnpm test           # vitest run in every workspace (apps/mobile uses jest-expo instead)
 pnpm test:integration  # runs the db/api/worker integration suites against the running local stack (pnpm stack:up); doesn't start the stack itself
+pnpm exec playwright install --with-deps chromium   # once, before the first pnpm test:smoke
+pnpm test:smoke     # Playwright browser smoke tests (tests/smoke/) against apps/web + apps/api already built and started (pnpm stack:up, migrate, seed, then `pnpm --filter @photoo/api start` and `pnpm --filter @photoo/web start`); needs SEED_USER_PASSWORD and SMOKE_BASE_URL (defaults to http://127.0.0.1:3000)
 pnpm build          # tsc builds to dist/ (apps/web builds to .next/ via next build); apps/mobile has no build script, native builds go through EAS
 pnpm format         # prettier --write (markdown is excluded)
 pnpm mock:api       # serve packages/api-client/openapi.json with Prism (Docker image) on 127.0.0.1:4010
