@@ -280,7 +280,7 @@ it - not just the read-only path this compose file adds.
 
 ## Object storage users
 
-`minio-init` creates two IAM users on top of the root pair, matching what
+`minio-init` creates four IAM users on top of the root pair, matching what
 each app actually calls (`apps/api/src/storage/storage.service.ts`,
 `apps/worker/src/storage/storage.service.ts`):
 
@@ -288,10 +288,90 @@ each app actually calls (`apps/api/src/storage/storage.service.ts`,
 |------|--------|---------|
 | `MINIO_API_ACCESS_KEY` (`api`) | `photoo-private` | Get, Put, Delete (covers presigned PUT/GET, HEAD, and same-bucket Copy) |
 | `MINIO_WORKER_ACCESS_KEY` (`worker`, and `seed` which only calls the same public-write path) | `photoo-private`: Get, Delete; `photoo-public`: Put | |
+| `MINIO_BACKUP_ACCESS_KEY` (`backup`'s `backup.sh`) | `photoo-backups` | List, Put - no Get, no Delete |
+| `MINIO_PRUNE_ACCESS_KEY` (`backup`'s `prune.sh`) | `photoo-backups` (`photoo/*` only) | List (whole bucket), Get, Delete (`photoo/*` only) |
 
 Root credentials (`MINIO_ROOT_USER`/`PASSWORD`) are used only by `minio`
 itself and by `minio-init` to create the buckets, the anonymous read policy
-on `photoo-public`, and these two users - never by `api` or `worker`.
+on `photoo-public`, and these four users - never by `api`, `worker` or
+`backup`.
+
+## Backups
+
+Background and decisions: `docs/steps/1E.3-backups.md`. This section is the
+"how".
+
+**What runs.** The `backup` compose service is a long-running sidecar
+(`infra/dokploy/backup/schedule.sh`, `restart: unless-stopped`) built from
+`infra/docker/backup.Dockerfile` - the same `postgis/postgis` digest as
+`postgres`, so `pg_dump`/`pg_restore` match the server exactly, plus `age`
+and `mc` layered on top (that base has no `age` package and the `internal`
+network has no internet at runtime to install one). It schedules itself
+rather than relying on a Dokploy scheduled-task feature, which we could not
+verify exists on this Dokploy instance - if one is confirmed later, switch
+to a `restart: "no"` one-shot service triggered by that instead and drop
+`schedule.sh`. Inside the container:
+
+- `backup.sh` runs daily at `BACKUP_HOUR_UTC` (default 3am UTC): `pg_dump
+  -Fc`, `pg_restore --list` against the plaintext dump to catch a corrupt
+  dump before it's ever uploaded, encrypts with `age` for
+  `BACKUP_AGE_RECIPIENT`, uploads, then writes a heartbeat object. It
+  refuses to run - and never writes a plaintext dump - if
+  `BACKUP_AGE_RECIPIENT` is unset, if the bucket is unreachable, or if the
+  dump (plaintext or encrypted) is smaller than `BACKUP_MIN_BYTES` (10 KiB
+  default; an empty database's dump already clears this).
+- `prune.sh` runs weekly on Sundays at `PRUNE_HOUR_UTC` (default 4am UTC):
+  keeps the newest 7 daily, 4 weekly, 6 monthly dumps and deletes the rest,
+  using a separate MinIO user that can only delete under the backup prefix
+  - the backup user itself cannot delete anything, so a compromised backup
+    job can't destroy its own history.
+
+**Where objects land.** Bucket `photoo-backups`, private (no anonymous
+access, unlike `photoo-public`). Key format:
+`photoo/preview/<YYYY>/<MM>/<YYYY-MM-DDTHH-mm-ssZ>.dump.age`, plus a
+`photoo/preview/heartbeat.json` overwritten on every successful run. Staging
+and production reuse the same image and scripts with `BACKUP_ENV` set to
+`staging`/`production`, so their objects live under a different top-level
+prefix in the same or a different bucket and can never collide.
+
+**How to list them**, from a shell with SSH access to the VPS (or the
+`minio` container's exec/terminal in the Dokploy UI):
+
+```bash
+docker run --rm --network <project>_internal \
+  -e MC_HOST_local=http://<MINIO_BACKUP_ACCESS_KEY>:<MINIO_BACKUP_SECRET_KEY>@minio:9000 \
+  quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+  find local/photoo-backups/photoo/preview/ --name '*.dump.age'
+```
+
+The backup user can list and write but has no `s3:GetObject` at all, so it
+cannot download an object's contents - use the root credentials (Dokploy
+env) or the prune user (which can read under this prefix) if you need to
+fetch an object for a restore; see `docs/runbooks/restore.md` once 1E.3b
+lands.
+
+**How to read a failure.** `docker logs` (or Dokploy's Logs tab) on the
+`backup` container: every guard prints which variable or check failed,
+never a secret. A missing or stale `photoo/preview/heartbeat.json` (compare
+its `ranAt` to "now minus a day") means the last run never got as far as
+uploading - check the log for which guard fired. There is no alert on a
+missing heartbeat yet: `docs/steps/1E.3-backups.md` "Failure is visible
+without a person watching" tracks this as blocked on 1E.2 monitoring, not
+silently assumed to be covered.
+
+**Setting `BACKUP_AGE_RECIPIENT`** (`docs/steps/human-followups.md`): Alex
+runs `age-keygen` locally, keeps the private key in a password manager (it
+must never touch this server), and pastes the `age1...` public key into the
+Dokploy env as `BACKUP_AGE_RECIPIENT`. Until it's set, `backup` restarts in
+a crash loop, logging the same refusal each time - that is the intended
+failure mode, not a bug.
+
+**Known limitation.** MinIO shares this host with Postgres, so this backup
+protects against a bad migration or a dropped database, not against losing
+the machine. Off-host replication (a second S3 target in the EU) is a
+production follow-up, not implemented here. Redis and MinIO's own object
+contents (user uploads) are not backed up by this step either -
+`docs/steps/1E.3-backups.md` "Decisions for this step" records why.
 
 ## ClamAV
 
