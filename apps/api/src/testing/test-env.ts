@@ -23,6 +23,10 @@ export const TEST_ENV: Env = {
   S3_PRIVATE_BUCKET: 'photoo-private',
   S3_PUBLIC_BUCKET: 'photoo-public',
   S3_PUBLIC_BASE_URL: 'http://127.0.0.1:9000/photoo-public',
+  SENTRY_DSN: undefined,
+  SENTRY_ENVIRONMENT: undefined,
+  SENTRY_TRACES_SAMPLE_RATE: 0,
+  SENTRY_REQUIRED: false,
 };
 
 export const UNREACHABLE_TEST_ENV: Env = {

@@ -105,6 +105,10 @@ services:
       FACEBOOK_CLIENT_SECRET: ${FACEBOOK_CLIENT_SECRET:-}
       MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
       MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      SENTRY_DSN: ${API_SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: preview
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}
+      SENTRY_REQUIRED: ${SENTRY_REQUIRED:-false}
     networks:
       - dokploy-network
       - internal
@@ -161,6 +165,10 @@ services:
       # See README.md "ClamAV": only reachable with that profile enabled.
       CLAMAV_HOST: clamav
       CLAMAV_PORT: '3310'
+      SENTRY_DSN: ${WORKER_SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: preview
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}
+      SENTRY_REQUIRED: ${SENTRY_REQUIRED:-false}
     networks:
       - internal
 

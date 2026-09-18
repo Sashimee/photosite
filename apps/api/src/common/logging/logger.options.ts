@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
 import type { Options } from 'pino-http';
+import { buildSensitiveKeyRedactPaths } from './redaction.js';
 
 export const REDACT_PATHS = [
   'req.headers.authorization',
@@ -8,16 +9,7 @@ export const REDACT_PATHS = [
   'req.headers["set-cookie"]',
   'res.headers["set-cookie"]',
   'res.headers["set-auth-token"]',
-  'password',
-  'token',
-  'secret',
-  'authorization',
-  'cookie',
-  '*.password',
-  '*.token',
-  '*.secret',
-  '*.authorization',
-  '*.cookie',
+  ...buildSensitiveKeyRedactPaths(),
   '*.code',
   '*.backupCode',
   '*.backupCodes',

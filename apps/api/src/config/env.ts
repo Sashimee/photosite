@@ -78,6 +78,11 @@ const BooleanFlagSchema = z
   .optional()
   .transform((value) => value === 'true');
 
+const OptionalUrlSchema = z.preprocess(
+  (value) => (typeof value === 'string' && value.length === 0 ? undefined : value),
+  z.url().optional(),
+);
+
 const EXAMPLE_AUTH_SECRET = 'dev-only-auth-secret-change-me-please-32-chars-min';
 const EXAMPLE_AUTH_ENCRYPTION_KEYS = [
   'qA5jxlkWykGDbMKLOSqgSGG+lbzsuDkUWUS8nV9twig=',
@@ -117,6 +122,11 @@ const EnvSchema = z
     S3_PRIVATE_BUCKET: z.string().min(1),
     S3_PUBLIC_BUCKET: z.string().min(1),
     S3_PUBLIC_BASE_URL: z.url(),
+
+    SENTRY_DSN: OptionalUrlSchema,
+    SENTRY_ENVIRONMENT: optionalNonEmpty(),
+    SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
+    SENTRY_REQUIRED: BooleanFlagSchema,
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== 'production') {
@@ -134,6 +144,13 @@ const EnvSchema = z
         code: 'custom',
         path: ['WEB_APP_URL'],
         message: 'must be an https:// URL in production',
+      });
+    }
+    if (value.SENTRY_REQUIRED && !value.SENTRY_DSN) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SENTRY_DSN'],
+        message: 'SENTRY_DSN is required when NODE_ENV=production and SENTRY_REQUIRED=true',
       });
     }
   });

@@ -12,6 +12,7 @@ export interface ApiErrorBody {
   message: string;
   details?: unknown;
   requestId: string;
+  eventId?: string;
 }
 
 const DEFAULT_CODES_BY_STATUS: Record<number, string> = {
@@ -74,8 +75,14 @@ export function buildApiErrorBody(
   message: string,
   requestId: string,
   details?: unknown,
+  eventId?: string,
 ): ApiErrorBody {
-  return details !== undefined
-    ? { code, message, details, requestId }
-    : { code, message, requestId };
+  const body: ApiErrorBody = { code, message, requestId };
+  if (details !== undefined) {
+    body.details = details;
+  }
+  if (eventId !== undefined) {
+    body.eventId = eventId;
+  }
+  return body;
 }

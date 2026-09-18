@@ -1,4 +1,5 @@
 import type { Options } from 'pino-http';
+import { buildSensitiveKeyRedactPaths } from './redaction.js';
 
 // Duplicated from apps/api/src/common/logging/logger.options.ts rather than
 // shared from packages/shared: that package is also bundled into apps/web
@@ -7,16 +8,7 @@ import type { Options } from 'pino-http';
 // has no inbound HTTP requests to log, so it only needs the redaction list,
 // not the request serializer or URL sanitizer the API builds on top of it.
 export const REDACT_PATHS = [
-  'password',
-  'token',
-  'secret',
-  'authorization',
-  'cookie',
-  '*.password',
-  '*.token',
-  '*.secret',
-  '*.authorization',
-  '*.cookie',
+  ...buildSensitiveKeyRedactPaths(),
   '*.code',
   '*.backupCode',
   '*.backupCodes',
