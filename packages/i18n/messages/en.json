@@ -399,6 +399,23 @@
       "cookies": "Cookie policy",
       "rights": "© {year} {appName}. All rights reserved."
     },
+    "legal": {
+      "pending": "The full text of this document is being prepared with our legal advisers and will be published here before launch.",
+      "contactIntro": "In the meantime, you can reach us with any question about this document at",
+      "contactEmail": "hello@photoo.lu",
+      "imprint": {
+        "title": "Imprint"
+      },
+      "privacy": {
+        "title": "Privacy policy"
+      },
+      "terms": {
+        "title": "Terms of service"
+      },
+      "cookies": {
+        "title": "Cookie policy"
+      }
+    },
     "home": {
       "heroTitle": "Book trusted photographers in Luxembourg",
       "heroSubtitle": "Compare quotes from verified photographers and professionals for your next shoot.",
