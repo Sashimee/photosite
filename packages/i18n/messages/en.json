@@ -1,4 +1,68 @@
 {
+  "admin": {
+    "meta": {
+      "title": "Photoo admin"
+    },
+    "signIn": {
+      "title": "Admin sign in",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "submit": "Sign in",
+      "twoFactor": {
+        "title": "Two-factor verification",
+        "description": "Enter the 6-digit code from your authenticator app.",
+        "codeLabel": "Authenticator code",
+        "backupCodeLabel": "Backup code",
+        "useBackupCode": "Use a backup code instead",
+        "useAuthenticatorCode": "Use an authenticator code instead",
+        "submit": "Verify"
+      },
+      "reverify": {
+        "title": "Confirm it's you",
+        "description": "Your two-factor verification has expired. Enter a new code to continue.",
+        "codeLabel": "Authenticator code",
+        "submit": "Verify"
+      },
+      "enroll": {
+        "passwordTitle": "Admin accounts require two-factor authentication",
+        "passwordDescription": "Confirm your password to set up an authenticator app.",
+        "passwordLabel": "Password",
+        "startCta": "Continue",
+        "scanTitle": "Set up your authenticator app",
+        "scanDescription": "This key can't be shown again. Enter it manually in your authenticator app (Google Authenticator, 1Password, Authy, …), since scanning a QR code isn't supported yet.",
+        "secretLabel": "Setup key",
+        "backupCodesTitle": "Backup codes",
+        "backupCodesDescription": "Save these codes somewhere safe. Each can be used once if you lose access to your authenticator app. They won't be shown again.",
+        "backupCodesConfirm": "I've saved my backup codes",
+        "verifyCodeLabel": "6-digit code from your authenticator app",
+        "verifyCta": "Enable two-factor authentication"
+      },
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "invalidCredentials": "Incorrect email or password.",
+        "invalidCode": "That code isn't correct.",
+        "invalidBackupCode": "That backup code isn't correct.",
+        "totpAlreadyEnabled": "Two-factor authentication is already enabled.",
+        "twoFactorNotEnabled": "Two-factor authentication isn't enabled.",
+        "tooManyAttempts": "Too many attempts. Request a new code.",
+        "accountLocked": "Your account is temporarily locked. Try again later.",
+        "validationError": "Please check the highlighted fields.",
+        "tooManyRequests": "Too many attempts. Try again later.",
+        "tooManyRequestsWithRetry": "Too many attempts. Try again in {seconds, plural, one {# second} other {# seconds}}.",
+        "forbidden": "This request was blocked for your protection. Please reload the page and try again.",
+        "unauthorized": "Please sign in to continue.",
+        "notFound": "We couldn't find what you're looking for."
+      }
+    },
+    "shell": {
+      "signedInAs": "Signed in as {email}"
+    },
+    "notFound": {
+      "title": "Not found",
+      "description": "This page doesn't exist or you don't have access to it.",
+      "backCta": "Back to admin home"
+    }
+  },
   "common": {
     "appName": "Photoo",
     "cancel": "Cancel",
@@ -196,7 +260,10 @@
   },
   "push": {
     "notifications": {
-      "quoteReceived": { "title": "New quote", "body": "{counterpartName} sent you a quote" },
+      "quoteReceived": {
+        "title": "New quote",
+        "body": "{counterpartName} sent you a quote"
+      },
       "quoteAccepted": {
         "title": "Quote accepted",
         "body": "{counterpartName} accepted your quote"
