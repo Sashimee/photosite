@@ -16,18 +16,18 @@ import {
   RejectVerificationCaseRequestSchema,
 } from '@photoo/shared';
 import type { FastifyRequest } from 'fastify';
-import { requireAdminSession } from '../../common/auth/require-admin.js';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe.js';
-import { AUTH_INSTANCE } from '../auth/auth-instance.provider.js';
-import type { Auth } from '../auth/auth-instance.js';
+import { AdminAccessService } from '../admin/admin-access.service.js';
 import { OriginGuard } from '../auth/origin-guard.js';
 import { AdminVerificationService } from './admin-verification.service.js';
+
+const REQUIRES_2FA = { requires2fa: true } as const;
 
 @Controller('admin/verification-cases')
 @UseGuards(OriginGuard)
 export class AdminVerificationCasesController {
   constructor(
-    @Inject(AUTH_INSTANCE) private readonly auth: Auth,
+    @Inject(AdminAccessService) private readonly adminAccess: AdminAccessService,
     @Inject(AdminVerificationService) private readonly adminVerification: AdminVerificationService,
   ) {}
 
@@ -37,7 +37,7 @@ export class AdminVerificationCasesController {
     query: ReturnType<(typeof AdminVerificationCasesQuerySchema)['parse']>,
     @Req() request: FastifyRequest,
   ) {
-    await requireAdminSession(this.auth, request);
+    await this.adminAccess.requirePermission(request, 'verification', REQUIRES_2FA);
     return this.adminVerification.list(query);
   }
 
@@ -46,7 +46,11 @@ export class AdminVerificationCasesController {
     @Param('id', new ZodValidationPipe(IdSchema)) id: string,
     @Req() request: FastifyRequest,
   ) {
-    const { user } = await requireAdminSession(this.auth, request);
+    const { user } = await this.adminAccess.requirePermission(
+      request,
+      'verification',
+      REQUIRES_2FA,
+    );
     return this.adminVerification.get(user, id, request.ip);
   }
 
@@ -56,7 +60,11 @@ export class AdminVerificationCasesController {
     @Param('id', new ZodValidationPipe(IdSchema)) id: string,
     @Req() request: FastifyRequest,
   ) {
-    const { user } = await requireAdminSession(this.auth, request);
+    const { user } = await this.adminAccess.requirePermission(
+      request,
+      'verification',
+      REQUIRES_2FA,
+    );
     return this.adminVerification.startReview(user, id, request.ip);
   }
 
@@ -66,7 +74,11 @@ export class AdminVerificationCasesController {
     @Param('id', new ZodValidationPipe(IdSchema)) id: string,
     @Req() request: FastifyRequest,
   ) {
-    const { user } = await requireAdminSession(this.auth, request);
+    const { user } = await this.adminAccess.requirePermission(
+      request,
+      'verification',
+      REQUIRES_2FA,
+    );
     return this.adminVerification.approve(user, id, request.ip);
   }
 
@@ -78,7 +90,11 @@ export class AdminVerificationCasesController {
     body: ReturnType<(typeof RejectVerificationCaseRequestSchema)['parse']>,
     @Req() request: FastifyRequest,
   ) {
-    const { user } = await requireAdminSession(this.auth, request);
+    const { user } = await this.adminAccess.requirePermission(
+      request,
+      'verification',
+      REQUIRES_2FA,
+    );
     return this.adminVerification.reject(user, id, body.reason, request.ip);
   }
 }
