@@ -8,6 +8,8 @@ import {
   DEV_VERIFICATION_ENCRYPTION_KEY,
   LUXEMBOURG_REQUIRED_DOCUMENTS,
   SEED_ADMIN_EMAIL,
+  SEED_BOOKING_CLIENT_EMAIL,
+  SEED_BOOKING_PHOTOGRAPHER_SLUG,
   SEED_UNVERIFIED_PHOTOGRAPHER_EMAIL,
   SEED_USERS,
   SEED_VERIFICATION_BUSINESS_NAME,
@@ -222,5 +224,72 @@ describe('seedDatabase', () => {
       where: { caseId: verificationCase.id },
     });
     expect(documents).toHaveLength(LUXEMBOURG_REQUIRED_DOCUMENTS.length);
+  });
+
+  it('seeds a released, paid booking with a delivery and a balanced ledger', async () => {
+    await seedDatabase(prisma);
+
+    const client = await prisma.user.findUniqueOrThrow({
+      where: { email: SEED_BOOKING_CLIENT_EMAIL },
+    });
+    const photographer = await prisma.photographerProfile.findUniqueOrThrow({
+      where: { slug: SEED_BOOKING_PHOTOGRAPHER_SLUG },
+    });
+
+    const booking = await prisma.booking.findFirstOrThrow({
+      where: { clientId: client.id, photographerId: photographer.id },
+      include: { quote: true, delivery: true, ledgerEntries: true },
+    });
+
+    expect(booking.status).toBe('released');
+    expect(booking.paymentIntentId).not.toBeNull();
+    expect(booking.chargeId).not.toBeNull();
+    expect(booking.transferId).not.toBeNull();
+    expect(booking.deliveredAt).not.toBeNull();
+    expect(booking.releasedAt).not.toBeNull();
+
+    expect(booking.delivery).not.toBeNull();
+    expect(booking.delivery?.acceptedAt).not.toBeNull();
+
+    expect(booking.ledgerEntries).toHaveLength(3);
+    const charge = booking.ledgerEntries.find((entry) => entry.type === 'charge');
+    const platformFee = booking.ledgerEntries.find((entry) => entry.type === 'platform_fee');
+    const transfer = booking.ledgerEntries.find((entry) => entry.type === 'transfer');
+    if (!charge || !platformFee || !transfer) {
+      throw new Error('expected a charge, platform_fee and transfer ledger entry');
+    }
+
+    // The ledger balances: what the client was charged equals what the
+    // photographer is paid plus the platform's cut.
+    expect(charge.amountCents).toBe(booking.quote.totalCents);
+    expect(platformFee.amountCents).toBe(booking.quote.platformFeeCents);
+    expect(transfer.amountCents).toBe(charge.amountCents - platformFee.amountCents);
+  });
+
+  it('is idempotent: running the seed again does not duplicate the paid booking or its ledger', async () => {
+    await seedDatabase(prisma);
+    const client = await prisma.user.findUniqueOrThrow({
+      where: { email: SEED_BOOKING_CLIENT_EMAIL },
+    });
+    const photographer = await prisma.photographerProfile.findUniqueOrThrow({
+      where: { slug: SEED_BOOKING_PHOTOGRAPHER_SLUG },
+    });
+    const before = await prisma.booking.findFirstOrThrow({
+      where: { clientId: client.id, photographerId: photographer.id },
+    });
+
+    await seedDatabase(prisma);
+
+    const bookingCount = await prisma.booking.count({
+      where: { clientId: client.id, photographerId: photographer.id },
+    });
+    const after = await prisma.booking.findFirstOrThrow({ where: { id: before.id } });
+    const ledgerCount = await prisma.ledgerEntry.count({ where: { bookingId: before.id } });
+    const deliveryCount = await prisma.delivery.count({ where: { bookingId: before.id } });
+
+    expect(bookingCount).toBe(1);
+    expect(after.updatedAt).toEqual(before.updatedAt);
+    expect(ledgerCount).toBe(3);
+    expect(deliveryCount).toBe(1);
   });
 });
