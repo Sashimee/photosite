@@ -737,7 +737,8 @@
         "myRequests": "My requests",
         "quotes": "Quotes",
         "messages": "Messages",
-        "signOut": "Sign out"
+        "signOut": "Sign out",
+        "dashboard": "Dashboard"
       },
       "roles": {
         "title": "Roles",
@@ -1053,6 +1054,238 @@
         "notFound": "This conversation is no longer available.",
         "tooManyRequests": "You're sending messages too fast. Slow down and try again.",
         "tooManyRequestsWithRetry": "You're sending messages too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      }
+    },
+    "dashboard": {
+      "nav": {
+        "menuTitle": "Photographer dashboard",
+        "overview": "Overview",
+        "profile": "Profile",
+        "portfolio": "Portfolio",
+        "products": "Packages"
+      },
+      "needsRole": {
+        "title": "Photographer dashboard",
+        "description": "Add the photographer role to your account to set up a profile.",
+        "cta": "Add the photographer role"
+      },
+      "overview": {
+        "metaTitle": "Photographer dashboard",
+        "title": "Your photographer dashboard",
+        "intro": "Finish these to get discoverable on Photoo. There's no required order.",
+        "publication": {
+          "publishedTitle": "Your profile is published",
+          "publishedDescription": "Clients can find and book you.",
+          "notPublishedTitle": "Your profile isn't published yet",
+          "notPublishedDescription": "Publishing depends on verification and the other requirements below — nothing on this page publishes it directly.",
+          "noProfileDescription": "Create your profile below to get started."
+        },
+        "checklist": {
+          "status": {
+            "done": "Done",
+            "todo": "Not started",
+            "comingSoon": "Coming soon"
+          },
+          "profile": {
+            "title": "Profile details",
+            "doneDescription": "Your display name, bio, categories, languages and location are set.",
+            "todoDescription": "Add your display name, bio, categories, languages and location.",
+            "cta": "Edit profile",
+            "startCta": "Create your profile"
+          },
+          "portfolio": {
+            "title": "Portfolio and packages",
+            "doneDescription": "You've uploaded photos and added at least one package.",
+            "todoDescription": "Upload photos and set your packages and prices.",
+            "needsProfile": "Create your profile first.",
+            "cta": "Manage portfolio",
+            "startCta": "Add photos and packages"
+          },
+          "verification": {
+            "title": "Verification",
+            "description": "We check your identity and photos before you can publish.",
+            "needsProfile": "Create your profile first.",
+            "unverified": "Not submitted yet.",
+            "pending": "Submitted, waiting for review.",
+            "verified": "Verified.",
+            "rejected": "Rejected. You'll be able to see why and resubmit here soon.",
+            "comingSoon": "Document upload is coming soon."
+          },
+          "payouts": {
+            "title": "Payouts",
+            "description": "Connect a bank account with Stripe so you can get paid.",
+            "comingSoon": "Not available yet."
+          }
+        }
+      },
+      "profile": {
+        "metaTitle": "Your profile",
+        "createTitle": "Create your photographer profile",
+        "editTitle": "Edit your profile",
+        "createIntro": "This is what clients see when they find you on Photoo.",
+        "backToOverview": "Back to overview",
+        "viewPublicProfileCta": "View public profile",
+        "slugPreviewLabel": "Your profile URL will be",
+        "slugPreviewHint": "Assigned automatically from your display name when you create your profile. It can't be changed afterwards.",
+        "slugFallbackHint": "Your display name doesn't have enough letters or numbers for a URL, so we'll assign a generic one instead.",
+        "displayNameLabel": "Display name",
+        "bioHeading": "Bio",
+        "bioHint": "Write a short bio in each language you want to offer it in. Leave a language blank to skip it.",
+        "bioLabel": "Bio ({language})",
+        "categoriesHeading": "Categories",
+        "categoriesHint": "Choose at least one.",
+        "languagesHeading": "Languages you work in",
+        "languagesHint": "Choose at least one.",
+        "locationHeading": "Location",
+        "locationExplanation": "Pick your city or share your location so clients know where to find you.",
+        "cityLabel": "City",
+        "useMyLocationCta": "Use my location",
+        "useMyLocationError": "We couldn't get your location. Try picking a city instead.",
+        "locationSet": "Location set.",
+        "locationRequired": "Choose a city or use your location before saving.",
+        "countryLabel": "Country",
+        "countryPlaceholder": "Choose a country",
+        "createCta": "Create profile",
+        "saveCta": "Save changes",
+        "saving": "Saving…",
+        "created": "Profile created.",
+        "saved": "Saved.",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "Your profile changed elsewhere. Reload and try again.",
+          "invalid": "Check the highlighted fields and try again.",
+          "forbidden": "You don't have access to this profile.",
+          "notFound": "Your profile could not be found.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "portfolio": {
+        "metaTitle": "Your portfolio",
+        "title": "Portfolio",
+        "backToOverview": "Back to overview",
+        "intro": "Upload photos for clients to see on your public profile. Photos are reviewed before they're shown publicly.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Your portfolio lives on your photographer profile, so set that up before adding photos.",
+        "needsProfileCta": "Create your profile",
+        "uploadCta": "Upload photos",
+        "dismissCta": "Dismiss",
+        "uploading": "Uploading… {percent}%",
+        "scanning": "Scanning for viruses…",
+        "attaching": "Adding to your portfolio…",
+        "processing": "Processing…",
+        "empty": "You haven't uploaded any photos yet.",
+        "imageAlt": "Portfolio photo",
+        "moveUpCta": "Move up",
+        "moveDownCta": "Move down",
+        "deleteCta": "Delete",
+        "deleteConfirmTitle": "Delete this photo?",
+        "deleteConfirmDescription": "This photo will be removed from your portfolio. This can't be undone.",
+        "deleteConfirmCta": "Yes, delete photo",
+        "deletePending": "Deleting…",
+        "deleteDismissCta": "Keep photo",
+        "status": {
+          "processing": "Processing",
+          "pending_review": "Pending review",
+          "approved": "Approved",
+          "flagged": "Flagged",
+          "rejected": "Rejected"
+        },
+        "unsupportedType": "Only JPEG, PNG and WEBP images can be uploaded.",
+        "tooLarge": "This file is too large.",
+        "uploadErrors": {
+          "infected": "This file failed a virus scan and wasn't added.",
+          "scanFailed": "The scan couldn't complete. Try again.",
+          "scanTimeout": "The scan is taking longer than expected. Try again shortly."
+        },
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "Your portfolio changed elsewhere. Reload and try again.",
+          "invalid": "That couldn't be completed. Try again.",
+          "forbidden": "You don't have access to this portfolio.",
+          "notFound": "This photo could not be found.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "products": {
+        "metaTitle": "Your packages",
+        "title": "Packages",
+        "backToOverview": "Back to overview",
+        "intro": "Packages are the services clients can request a quote for, each with usage-based pricing tiers.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Packages are attached to your photographer profile, so set that up before adding one.",
+        "needsProfileCta": "Create your profile",
+        "newCta": "Add a package",
+        "empty": "You haven't added any packages yet.",
+        "editCta": "Edit",
+        "fromPrice": "From {price}",
+        "durationMinutes": "{minutes} min",
+        "inactiveLabel": "Inactive",
+        "deleteCta": "Delete",
+        "deleteConfirmTitle": "Delete this package?",
+        "deleteConfirmDescription": "Clients won't be able to request a quote for it any more. This can't be undone.",
+        "deleteConfirmCta": "Yes, delete package",
+        "deletePending": "Deleting…",
+        "deleteDismissCta": "Keep package",
+        "form": {
+          "createTitle": "Add a package",
+          "editTitle": "Edit package",
+          "backToList": "Back to packages",
+          "titleHeading": "Title",
+          "titleHint": "Write a short title in each language you want to offer it in.",
+          "titleLabel": "Title ({language})",
+          "titleRequired": "Add a title in at least one language.",
+          "descriptionHeading": "Description",
+          "descriptionHint": "Optional. Leave a language blank to skip it.",
+          "descriptionLabel": "Description ({language})",
+          "categoryLabel": "Category",
+          "categoryPlaceholder": "Choose a category",
+          "durationMinutesLabel": "Duration (minutes)",
+          "basePriceLabel": "Starting price",
+          "currencyHint": "Prices are in {currency}, set by your profile's country.",
+          "isActiveLabel": "Visible to clients",
+          "deliverablesHeading": "Deliverables",
+          "deliverablesHint": "List what's included, e.g. number of photos or turnaround time.",
+          "deliverableKeyLabel": "Label",
+          "deliverableKeyPlaceholder": "e.g. photos",
+          "deliverableTypeLabel": "Type",
+          "deliverableType": {
+            "text": "Text",
+            "number": "Number",
+            "boolean": "Yes/No"
+          },
+          "deliverableValueLabel": "Value",
+          "deliverableValueYes": "Yes",
+          "deliverableValueNo": "No",
+          "addDeliverableCta": "Add a deliverable",
+          "removeDeliverableCta": "Remove deliverable",
+          "duplicateDeliverableKey": "Each deliverable needs a unique label.",
+          "tiersHeading": "Pricing tiers",
+          "tiersHint": "At least one tier is required. Each usage can only be offered once.",
+          "tierUsageLabel": "Usage",
+          "tierUsagePlaceholder": "Choose a usage",
+          "tierPriceLabel": "Price",
+          "tierDescriptionLabel": "What's included",
+          "tierLicenceTextVersionLabel": "Licence text version",
+          "addTierCta": "Add a tier",
+          "removeTierCta": "Remove tier",
+          "duplicateTierUsage": "Each usage can only be used once.",
+          "createCta": "Add package",
+          "saveCta": "Save changes",
+          "saving": "Saving…",
+          "created": "Package added.",
+          "saved": "Saved."
+        },
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "This package changed elsewhere. Reload and try again.",
+          "invalid": "Check the highlighted fields and try again.",
+          "forbidden": "You don't have access to this package.",
+          "notFound": "This package could not be found.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
       }
     }
   }

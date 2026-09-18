@@ -59,9 +59,16 @@ interface PageBody<T> {
   nextCursor: string | null;
 }
 
+interface FeatureFlagBody {
+  key: string;
+  description: string;
+  enabled: boolean;
+}
+
 interface PlatformSettingsBody {
-  feePercent: number;
+  feePercent: number | null;
   autoReleaseDays: number;
+  featureFlags: FeatureFlagBody[];
 }
 
 interface AuditLogEntryBody {
@@ -811,7 +818,7 @@ describe('admin integration', () => {
       expect(response.statusCode).toBe(403);
     });
 
-    it('returns the current settings', async () => {
+    it('returns the current settings, including the known feature flags', async () => {
       const admin = await makeAdmin('settings-get', ['superadmin']);
       const response = await fastify().inject({
         method: 'GET',
@@ -822,6 +829,65 @@ describe('admin integration', () => {
       const body = response.json<PlatformSettingsBody>();
       expect(typeof body.feePercent).toBe('number');
       expect(typeof body.autoReleaseDays).toBe('number');
+      expect(body.featureFlags.map((flag) => flag.key).sort()).toEqual([
+        'maintenanceMode',
+        'newSignupsPaused',
+      ]);
+      for (const flag of body.featureFlags) {
+        expect(typeof flag.description).toBe('string');
+        expect(typeof flag.enabled).toBe('boolean');
+      }
+    });
+
+    // #193: the settings screen must be able to tell a configured fee apart
+    // from an absent one instead of rendering a plausible-looking 5%.
+    it('reports feePercent as unconfigured (null), not a default, when the row is missing', async () => {
+      const admin = await makeAdmin('settings-fee-unconfigured', ['superadmin']);
+      const before = await prisma.platformSetting.findUniqueOrThrow({
+        where: { key: 'feePercent' },
+      });
+      await prisma.platformSetting.delete({ where: { key: 'feePercent' } });
+      try {
+        const response = await fastify().inject({
+          method: 'GET',
+          url: '/v1/admin/settings',
+          headers: admin.headers,
+        });
+        expect(response.statusCode).toBe(200);
+        expect(response.json<PlatformSettingsBody>().feePercent).toBeNull();
+      } finally {
+        await prisma.platformSetting.create({
+          data: { key: before.key, value: before.value as number, updatedByAdminId: null },
+        });
+      }
+    });
+
+    // #193: no in-process cache means a write from any source - here, a
+    // direct DB write standing in for a second API replica or the worker -
+    // is visible on the very next read, not up to 30s later.
+    it('reads a value written directly to the row with no cache lag', async () => {
+      const admin = await makeAdmin('settings-no-cache', ['superadmin']);
+      const before = await prisma.platformSetting.findUniqueOrThrow({
+        where: { key: 'autoReleaseDays' },
+      });
+      const nextValue = before.value === 10 ? 11 : 10;
+      await prisma.platformSetting.update({
+        where: { key: 'autoReleaseDays' },
+        data: { value: nextValue },
+      });
+      try {
+        const response = await fastify().inject({
+          method: 'GET',
+          url: '/v1/admin/settings',
+          headers: admin.headers,
+        });
+        expect(response.json<PlatformSettingsBody>().autoReleaseDays).toBe(nextValue);
+      } finally {
+        await prisma.platformSetting.update({
+          where: { key: 'autoReleaseDays' },
+          data: { value: before.value as number },
+        });
+      }
     });
 
     it('rejects an unknown key', async () => {
@@ -868,10 +934,74 @@ describe('admin integration', () => {
       );
       expect((auditRow?.after as unknown as PlatformSettingsBody).feePercent).toBe(nextFeePercent);
 
+      if (beforeBody.feePercent === null) {
+        throw new Error('expected the seeded feePercent to be configured');
+      }
       await prisma.platformSetting.update({
         where: { key: 'feePercent' },
         data: { value: beforeBody.feePercent },
       });
+    });
+
+    it('toggles a feature flag and records the old and new value', async () => {
+      const admin = await makeAdmin('settings-flag-patch', ['superadmin']);
+      const existingRow = await prisma.platformSetting.findUnique({
+        where: { key: 'featureFlag.maintenanceMode' },
+      });
+      const before = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/settings',
+        headers: admin.headers,
+      });
+      const beforeFlag = before
+        .json<PlatformSettingsBody>()
+        .featureFlags.find((flag) => flag.key === 'maintenanceMode');
+      if (!beforeFlag) {
+        throw new Error('expected maintenanceMode in the known feature flags');
+      }
+      const nextEnabled = !beforeFlag.enabled;
+
+      const response = await fastify().inject({
+        method: 'PATCH',
+        url: '/v1/admin/settings',
+        headers: admin.headers,
+        remoteAddress: FAKE_IP,
+        payload: { featureFlags: [{ key: 'maintenanceMode', enabled: nextEnabled }] },
+      });
+      expect(response.statusCode).toBe(200);
+      const afterFlags = response.json<PlatformSettingsBody>().featureFlags;
+      expect(afterFlags.find((flag) => flag.key === 'maintenanceMode')?.enabled).toBe(nextEnabled);
+      expect(afterFlags.find((flag) => flag.key === 'newSignupsPaused')?.enabled).toBe(false);
+
+      const auditRow = await prisma.auditLog.findFirst({
+        where: { action: 'platform_settings.updated' },
+        orderBy: { occurredAt: 'desc' },
+      });
+      expect(auditRow).not.toBeNull();
+      const after = auditRow?.after as unknown as PlatformSettingsBody;
+      expect(after.featureFlags.find((flag) => flag.key === 'maintenanceMode')?.enabled).toBe(
+        nextEnabled,
+      );
+
+      if (existingRow) {
+        await prisma.platformSetting.update({
+          where: { key: 'featureFlag.maintenanceMode' },
+          data: { value: beforeFlag.enabled },
+        });
+      } else {
+        await prisma.platformSetting.delete({ where: { key: 'featureFlag.maintenanceMode' } });
+      }
+    });
+
+    it('rejects a feature flag update naming an unknown key', async () => {
+      const admin = await makeAdmin('settings-flag-unknown', ['superadmin']);
+      const response = await fastify().inject({
+        method: 'PATCH',
+        url: '/v1/admin/settings',
+        headers: admin.headers,
+        payload: { featureFlags: [{ key: 'notARealFlag', enabled: true }] },
+      });
+      expect(response.statusCode).toBe(400);
     });
   });
 

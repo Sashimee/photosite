@@ -1,18 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
   AdminBookingSchema,
+  AdminCountryLegalTextsResponseSchema,
+  AdminCountrySchema,
+  AdminLegalTextVersionSchema,
   AdminProvenanceCheckSchema,
   AdminReportSchema,
   AdminReportsQuerySchema,
   AdminUserSearchQuerySchema,
   AdminVerificationCasesQuerySchema,
   PlatformSettingsSchema,
+  PublishLegalTextRequestSchema,
   RefundBookingRequestSchema,
   RejectVerificationCaseRequestSchema,
   ResolveReportRequestSchema,
   SetUserRolesRequestSchema,
   SuspendUserRequestSchema,
   TakedownReportRequestSchema,
+  UpdateCountryRequestSchema,
+  UpdateFeatureFlagsRequestSchema,
   UpdatePlatformSettingsRequestSchema,
 } from './admin.js';
 
@@ -195,26 +201,105 @@ describe('RefundBookingRequestSchema', () => {
 });
 
 describe('PlatformSettingsSchema and UpdatePlatformSettingsRequestSchema', () => {
+  const featureFlags = [{ key: 'maintenanceMode' as const, description: 'x', enabled: false }];
+
   it('accepts feePercent and autoReleaseDays within range', () => {
-    expect(PlatformSettingsSchema.safeParse({ feePercent: 5, autoReleaseDays: 7 }).success).toBe(
-      true,
-    );
+    expect(
+      PlatformSettingsSchema.safeParse({ feePercent: 5, autoReleaseDays: 7, featureFlags }).success,
+    ).toBe(true);
+  });
+
+  it('accepts a null feePercent, distinguishing unconfigured from a default', () => {
+    expect(
+      PlatformSettingsSchema.safeParse({ feePercent: null, autoReleaseDays: 7, featureFlags })
+        .success,
+    ).toBe(true);
   });
 
   it('rejects a feePercent outside 0..100', () => {
-    expect(PlatformSettingsSchema.safeParse({ feePercent: 101, autoReleaseDays: 7 }).success).toBe(
-      false,
-    );
+    expect(
+      PlatformSettingsSchema.safeParse({ feePercent: 101, autoReleaseDays: 7, featureFlags })
+        .success,
+    ).toBe(false);
   });
 
   it('rejects an autoReleaseDays outside 1..60', () => {
-    expect(PlatformSettingsSchema.safeParse({ feePercent: 5, autoReleaseDays: 61 }).success).toBe(
-      false,
-    );
+    expect(
+      PlatformSettingsSchema.safeParse({ feePercent: 5, autoReleaseDays: 61, featureFlags })
+        .success,
+    ).toBe(false);
   });
 
   it('accepts a partial update', () => {
     expect(UpdatePlatformSettingsRequestSchema.safeParse({ feePercent: 6 }).success).toBe(true);
+  });
+
+  it('rejects an update with an unknown feature flag key', () => {
+    expect(
+      UpdatePlatformSettingsRequestSchema.safeParse({
+        featureFlags: [{ key: 'notARealFlag', enabled: true }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a repeated feature flag key in the same update', () => {
+    expect(
+      UpdateFeatureFlagsRequestSchema.safeParse([
+        { key: 'maintenanceMode', enabled: true },
+        { key: 'maintenanceMode', enabled: false },
+      ]).success,
+    ).toBe(false);
+  });
+});
+
+describe('AdminCountrySchema and UpdateCountryRequestSchema', () => {
+  it('accepts a full admin country row', () => {
+    expect(
+      AdminCountrySchema.safeParse({
+        code: 'LU',
+        name: 'Luxembourg',
+        enabled: true,
+        currency: 'EUR',
+        vatRate: 17,
+        defaultLocale: 'fr',
+        accountCount: 42,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts a partial update naming only enabled', () => {
+    expect(UpdateCountryRequestSchema.safeParse({ enabled: false }).success).toBe(true);
+  });
+
+  it('rejects an unknown field', () => {
+    expect(UpdateCountryRequestSchema.safeParse({ code: 'LU' }).success).toBe(false);
+  });
+});
+
+describe('AdminLegalTextVersionSchema, AdminCountryLegalTextsResponseSchema and PublishLegalTextRequestSchema', () => {
+  it('accepts a published version', () => {
+    expect(
+      AdminLegalTextVersionSchema.safeParse({
+        version: '1',
+        kind: 'terms',
+        locale: 'en',
+        content: 'Terms of service.',
+        publishedAt: '2026-01-01T00:00:00.000Z',
+        publishedByAdminId: id,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts a history response with no versions yet', () => {
+    expect(
+      AdminCountryLegalTextsResponseSchema.safeParse({ countryCode: 'LU', versions: [] }).success,
+    ).toBe(true);
+  });
+
+  it('rejects an empty content body when publishing', () => {
+    expect(
+      PublishLegalTextRequestSchema.safeParse({ kind: 'terms', locale: 'en', content: '' }).success,
+    ).toBe(false);
   });
 });
 

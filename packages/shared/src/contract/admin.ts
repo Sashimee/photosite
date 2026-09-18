@@ -1,19 +1,23 @@
 import {
   ADMIN_PERMISSIONS,
+  FEATURE_FLAG_KEYS,
   PROVENANCE_VERDICTS,
   REPORT_STATUSES,
   USER_ROLES,
   USER_STATUSES,
   VERIFICATION_CASE_STATUSES,
   type AdminPermission,
+  type FeatureFlagKey,
 } from '../enums.js';
 import { UserSchema } from './auth.js';
 import { BookingBaseSchema } from './bookings.js';
 import {
   CountryCodeSchema,
+  CurrencyCodeSchema,
   CursorPaginationQuerySchema,
   IdSchema,
   IsoDateTimeSchema,
+  LocaleSchema,
   SlugSchema,
   errorResponses,
   paginatedResponseSchema,
@@ -170,15 +174,111 @@ export const ReverseBookingTransferRequestSchema = z
   })
   .strict();
 
+// A free-text key/value editor on a table the API reads by key invites a
+// flag nothing reads, or a typo turning a live one off, so the known flags
+// live here instead (docs/steps/1D.7-settings.md).
+export const FEATURE_FLAG_DESCRIPTIONS: Record<FeatureFlagKey, string> = {
+  maintenanceMode: 'Shows a maintenance banner on the public site.',
+  newSignupsPaused: 'Pauses new account sign-ups platform-wide, independent of any single country.',
+};
+
+export const FeatureFlagStateSchema = z
+  .object({
+    key: z.enum(FEATURE_FLAG_KEYS),
+    description: z.string().min(1).max(500),
+    enabled: z.boolean(),
+  })
+  .strict()
+  .openapi('FeatureFlagState');
+
+// `feePercent` is nullable so the caller can tell a configured value from an
+// absent one (#193): a missing row is a misconfiguration, not the launch
+// default. Booking.feePercent snapshots whatever quoting read at the time,
+// so a fee change here is never retroactive.
 export const PlatformSettingsSchema = z
   .object({
-    feePercent: z.number().min(0).max(100),
+    feePercent: z.number().min(0).max(100).nullable(),
     autoReleaseDays: z.int().min(1).max(60),
+    featureFlags: z.array(FeatureFlagStateSchema),
   })
   .strict()
   .openapi('PlatformSettings');
 
-export const UpdatePlatformSettingsRequestSchema = PlatformSettingsSchema.partial();
+function hasUniqueFlagKeys(entries: { key: string }[]): boolean {
+  return new Set(entries.map((entry) => entry.key)).size === entries.length;
+}
+
+export const UpdateFeatureFlagsRequestSchema = z
+  .array(z.object({ key: z.enum(FEATURE_FLAG_KEYS), enabled: z.boolean() }).strict())
+  .min(1)
+  .max(FEATURE_FLAG_KEYS.length)
+  .refine(hasUniqueFlagKeys, { message: 'key must not repeat' });
+
+export const UpdatePlatformSettingsRequestSchema = z
+  .object({
+    feePercent: z.number().min(0).max(100).optional(),
+    autoReleaseDays: z.int().min(1).max(60).optional(),
+    featureFlags: UpdateFeatureFlagsRequestSchema.optional(),
+  })
+  .strict();
+
+export const AdminCountrySchema = z
+  .object({
+    code: CountryCodeSchema,
+    name: z.string().min(1).max(120),
+    enabled: z.boolean(),
+    currency: CurrencyCodeSchema,
+    vatRate: z.number().min(0).max(100),
+    defaultLocale: LocaleSchema,
+    accountCount: z.int().nonnegative(),
+  })
+  .strict()
+  .openapi('AdminCountry');
+
+// Disabling a country gates new sign-ups, profiles and requests in it; it
+// never hides existing users or breaks their bookings
+// (docs/steps/1D.7-settings.md). `accountCount` on the response is the
+// blast radius the confirmation dialog names, not something this request
+// can change.
+export const UpdateCountryRequestSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    vatRate: z.number().min(0).max(100).optional(),
+    defaultLocale: LocaleSchema.optional(),
+  })
+  .strict();
+
+// Append-only (docs/steps/1D.7-settings.md "Legal text versions"):
+// `ConsentRecord.policyVersion` points at what a user actually agreed to, so
+// a version that could be edited after the fact would make every consent
+// record referencing it meaningless.
+export const AdminLegalTextVersionSchema = z
+  .object({
+    version: z.string().min(1).max(20),
+    kind: z.string().min(1).max(60).openapi({ example: 'terms' }),
+    locale: LocaleSchema,
+    content: z.string().min(1).max(200_000),
+    publishedAt: IsoDateTimeSchema,
+    publishedByAdminId: IdSchema,
+  })
+  .strict()
+  .openapi('AdminLegalTextVersion');
+
+export const AdminCountryLegalTextsResponseSchema = z
+  .object({
+    countryCode: CountryCodeSchema,
+    versions: z.array(AdminLegalTextVersionSchema),
+  })
+  .strict()
+  .openapi('AdminCountryLegalTexts');
+
+export const PublishLegalTextRequestSchema = z
+  .object({
+    kind: z.string().min(1).max(60).openapi({ example: 'terms' }),
+    locale: LocaleSchema,
+    content: z.string().min(1).max(200_000),
+  })
+  .strict();
 
 export const AdminAuditLogQuerySchema = z
   .object({
@@ -677,6 +777,81 @@ registry.registerPath({
       content: { 'application/json': { schema: PlatformSettingsSchema } },
     },
     ...errorResponses([400, 401, 403, 422]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/countries'),
+  summary: 'List all countries, enabled or not, with their account counts',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('superadmin'),
+  responses: {
+    '200': {
+      description: 'Every country',
+      content: { 'application/json': { schema: z.array(AdminCountrySchema) } },
+    },
+    ...errorResponses([401, 403]),
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: apiPath('/admin/countries/{code}'),
+  summary: 'Update a country: enabled, VAT rate or default locale',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('superadmin'),
+  request: {
+    params: z.object({ code: CountryCodeSchema }).strict(),
+    body: { content: { 'application/json': { schema: UpdateCountryRequestSchema } } },
+  },
+  responses: {
+    '200': {
+      description: 'Country updated',
+      content: { 'application/json': { schema: AdminCountrySchema } },
+    },
+    ...errorResponses([400, 401, 403, 404, 422]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/countries/{code}/legal-texts'),
+  summary: 'List the published legal text versions for a country',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('superadmin'),
+  request: {
+    params: z.object({ code: CountryCodeSchema }).strict(),
+  },
+  responses: {
+    '200': {
+      description: 'The published versions, oldest first',
+      content: { 'application/json': { schema: AdminCountryLegalTextsResponseSchema } },
+    },
+    ...errorResponses([401, 403, 404]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/admin/countries/{code}/legal-texts'),
+  summary: 'Publish a new legal text version for a country',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('superadmin'),
+  request: {
+    params: z.object({ code: CountryCodeSchema }).strict(),
+    body: { content: { 'application/json': { schema: PublishLegalTextRequestSchema } } },
+  },
+  responses: {
+    '201': {
+      description: 'The new version, appended to the country’s history',
+      content: { 'application/json': { schema: AdminCountryLegalTextsResponseSchema } },
+    },
+    ...errorResponses([400, 401, 403, 404, 422]),
   },
 });
 

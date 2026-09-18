@@ -3,12 +3,15 @@ import {
   CountrySummarySchema,
   RequiredDocumentSchema,
   VerificationRequirementsResponseSchema,
+  type PolicyVersionResponseSchema,
 } from '@photoo/shared';
 import type { z } from 'zod';
+import { PrismaService } from '../../prisma/prisma.service.js';
 import { CountriesRepository } from './countries.repository.js';
 
 type CountrySummary = z.infer<typeof CountrySummarySchema>;
 type VerificationRequirements = z.infer<typeof VerificationRequirementsResponseSchema>;
+type PolicyVersionResponse = z.infer<typeof PolicyVersionResponseSchema>;
 
 function notFound(): HttpException {
   return new HttpException({ code: 'NOT_FOUND', message: 'Country not found' }, 404);
@@ -16,7 +19,10 @@ function notFound(): HttpException {
 
 @Injectable()
 export class CountriesService {
-  constructor(@Inject(CountriesRepository) private readonly repository: CountriesRepository) {}
+  constructor(
+    @Inject(CountriesRepository) private readonly repository: CountriesRepository,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+  ) {}
 
   async list(): Promise<CountrySummary[]> {
     const rows = await this.repository.listEnabled();
@@ -32,5 +38,12 @@ export class CountriesService {
       countryCode: country.code,
       documents: RequiredDocumentSchema.array().parse(country.requiredDocuments),
     });
+  }
+
+  async getPolicyVersion(): Promise<PolicyVersionResponse> {
+    const setting = await this.prisma.client.platformSetting.findUnique({
+      where: { key: 'policyVersion' },
+    });
+    return { policyVersion: typeof setting?.value === 'string' ? setting.value : null };
   }
 }
