@@ -206,6 +206,46 @@ describe('photographer profile schema', () => {
     });
   });
 
+  // Deleting only the profile row reproduces the interrupted-run shape from
+  // issue #121: the avatar, cover and portfolio Upload rows it referenced
+  // stay behind (PhotographerProfile -> Upload is onDelete: SetNull /
+  // Restrict, never cascaded), the same state an aborted mid-seed process
+  // leaves. Before the fix, re-running collided on `Upload_objectKey_key`.
+  it('recovers from an interrupted run that left orphan Upload rows with no profile', async () => {
+    await deleteFixtureProfile();
+    const passwordHash = await hash(getSeedUserPassword());
+
+    await seedPhotographerProfile(prisma, TEST_FIXTURE_PROFILE, passwordHash, null);
+    const firstRun = await prisma.photographerProfile.findUniqueOrThrow({
+      where: { slug: TEST_FIXTURE_PROFILE.slug },
+    });
+
+    await prisma.photographerProfile.delete({ where: { id: firstRun.id } });
+
+    const orphanUploads = await prisma.upload.count({
+      where: { objectKey: { startsWith: `seed/${TEST_FIXTURE_PROFILE.slug}/` } },
+    });
+    expect(orphanUploads).toBe(TEST_FIXTURE_PROFILE.portfolioImages.length + 2);
+
+    await expect(
+      seedPhotographerProfile(prisma, TEST_FIXTURE_PROFILE, passwordHash, null),
+    ).resolves.toBeUndefined();
+
+    const recovered = await prisma.photographerProfile.findUniqueOrThrow({
+      where: { slug: TEST_FIXTURE_PROFILE.slug },
+      include: { portfolioImages: true, products: { include: { tiers: true } } },
+    });
+    expect(recovered.avatarUploadId).not.toBeNull();
+    expect(recovered.coverUploadId).not.toBeNull();
+    expect(recovered.portfolioImages).toHaveLength(TEST_FIXTURE_PROFILE.portfolioImages.length);
+    expect(recovered.products).toHaveLength(TEST_FIXTURE_PROFILE.products.length);
+
+    const uploadCountAfterRecovery = await prisma.upload.count({
+      where: { objectKey: { startsWith: `seed/${TEST_FIXTURE_PROFILE.slug}/` } },
+    });
+    expect(uploadCountAfterRecovery).toBe(orphanUploads);
+  });
+
   describe('location ST_DWithin radius search', () => {
     it('returns only the Luxembourg City profile within a 10km radius', async () => {
       await seedDatabase(prisma);
