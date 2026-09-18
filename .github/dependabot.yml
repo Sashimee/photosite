@@ -8,6 +8,21 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    # Expo pins these to the installed SDK, so they are upgraded together with
+    # `expo install` at an SDK bump, never one at a time. Dependabot proposed
+    # major bumps for all three and each broke a different thing: Sentry 8
+    # shipped untransformed ESM, gesture-handler 3 wanted a reanimated API that
+    # is not there, and jest 30 pulled a build script outside `allowBuilds`.
+    # Every name here belongs to apps/mobile alone, so this cannot hold back a
+    # web or admin update. Security advisories still come through - `ignore`
+    # only suppresses version updates.
+    ignore:
+      - dependency-name: react-native
+      - dependency-name: react-native-gesture-handler
+      - dependency-name: react-native-reanimated
+      - dependency-name: '@sentry/react-native'
+      - dependency-name: jest
+      - dependency-name: jest-expo
   - package-ecosystem: github-actions
     directory: /
     target-branch: dev
