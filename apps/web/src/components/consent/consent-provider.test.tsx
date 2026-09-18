@@ -39,7 +39,7 @@ function stubFetch({ consentStatus = 201 }: { consentStatus?: number } = {}) {
   const fetchMock = vi.fn((input: RequestInfo | URL) => {
     const url = requestUrl(input);
     if (url.includes('/v1/auth/session')) {
-      return new Response(null, { status: 401 });
+      return new Response(JSON.stringify({ user: null }), { status: 200 });
     }
     if (url.includes('/v1/me/consents')) {
       return new Response(JSON.stringify({ consents: [] }), { status: 200 });
@@ -69,7 +69,7 @@ function stubFetchWithConsentFailure(failingPurpose: string) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = requestUrl(input);
     if (url.includes('/v1/auth/session')) {
-      return new Response(null, { status: 401 });
+      return new Response(JSON.stringify({ user: null }), { status: 200 });
     }
     if (url.includes('/v1/consents')) {
       const body = (await (input as Request).clone().json()) as { purpose: string };

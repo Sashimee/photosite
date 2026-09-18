@@ -214,6 +214,28 @@
         ],
         "additionalProperties": false
       },
+      "SessionQueryResponse": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "additionalProperties": false
+      },
       "TotpEnrollment": {
         "type": "object",
         "properties": {
@@ -4567,7 +4589,7 @@
     },
     "/v1/auth/session": {
       "get": {
-        "summary": "Get the current session user",
+        "summary": "Get the current session user, or null when signed out",
         "tags": [
           "auth"
         ],
@@ -4577,24 +4599,16 @@
           },
           {
             "bearerAuth": []
-          }
+          },
+          {}
         ],
         "responses": {
           "200": {
-            "description": "Current session user",
+            "description": "Current session user, or a null user for an anonymous caller",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  },
-                  "required": [
-                    "user"
-                  ],
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/SessionQueryResponse"
                 }
               }
             }

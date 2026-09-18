@@ -1,4 +1,5 @@
 import { HttpException } from '@nestjs/common';
+import { getCookies } from 'better-auth/cookies';
 import type { FastifyRequest } from 'fastify';
 import { toFetchHeaders } from './auth-http.js';
 import type { Auth } from './auth-instance.js';
@@ -56,4 +57,21 @@ export async function requireSession(auth: Auth, request: FastifyRequest): Promi
     throw new HttpException({ code: 'UNAUTHORIZED', message: 'Sign in required' }, 401);
   }
   return session;
+}
+
+// `getOptionalSession` returns null both when no credential was sent and
+// when one was sent but is invalid or expired; GET /auth/session has to
+// treat those two differently (anonymous vs. rejected), so it checks for
+// the presence of a credential first, without validating it.
+export function hasSessionCredential(auth: Auth, request: FastifyRequest): boolean {
+  const authorization = request.headers.authorization;
+  if (typeof authorization === 'string' && authorization.trim().length > 0) {
+    return true;
+  }
+  const cookieHeader = request.headers.cookie;
+  if (typeof cookieHeader !== 'string' || cookieHeader.length === 0) {
+    return false;
+  }
+  const sessionCookieName = getCookies(auth.options).sessionToken.name;
+  return cookieHeader.split(';').some((part) => part.trim().startsWith(`${sessionCookieName}=`));
 }

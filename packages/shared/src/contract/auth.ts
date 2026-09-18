@@ -122,6 +122,16 @@ export const SessionResponseSchema = z
   })
   .strict();
 
+// "am I signed in?" is a query, not a protected resource: an anonymous
+// caller gets 200 with `user: null` rather than 401. A caller presenting an
+// invalid or expired credential still gets 401 (auth.controller.ts).
+export const SessionQueryResponseSchema = z
+  .object({
+    user: UserSchema.nullable(),
+  })
+  .strict()
+  .openapi('SessionQueryResponse');
+
 export const VerifyEmailRequestSchema = z
   .object({
     token: z.string().min(1).openapi({ example: 'a1b2c3d4e5f6' }),
@@ -279,13 +289,13 @@ registry.registerPath({
 registry.registerPath({
   method: 'get',
   path: apiPath('/auth/session'),
-  summary: 'Get the current session user',
+  summary: 'Get the current session user, or null when signed out',
   tags: ['auth'],
-  security: AUTH_SECURITY,
+  security: [...AUTH_SECURITY, {}],
   responses: {
     '200': {
-      description: 'Current session user',
-      content: { 'application/json': { schema: SessionResponseSchema } },
+      description: 'Current session user, or a null user for an anonymous caller',
+      content: { 'application/json': { schema: SessionQueryResponseSchema } },
     },
     ...errorResponses([401]),
   },

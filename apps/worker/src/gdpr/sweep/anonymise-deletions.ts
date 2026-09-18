@@ -1,0 +1,181 @@
+import type { PrismaClient } from '@photoo/db';
+import { PUBLIC_UPLOAD_PURPOSES } from '@photoo/shared';
+import type { Logger } from 'nestjs-pino';
+import type { RecordAuditLogInput } from '../../common/audit-log.service.js';
+
+export interface AnonymiseStorage {
+  config: { privateBucket: string; publicBucket: string };
+  deleteObject(bucket: string, key: string): Promise<void>;
+}
+
+export interface AnonymiseDeletionsDeps {
+  prisma: { client: PrismaClient };
+  storage: AnonymiseStorage;
+  auditLog: { record(input: RecordAuditLogInput): Promise<void> };
+  logger: Logger;
+}
+
+export interface AnonymiseDeletionsResult {
+  usersAnonymised: number;
+  usersFailed: number;
+}
+
+// docs/steps/1A.12-gdpr.md "anonymise deletions past 30 days".
+const GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+// `en` is the source-of-truth locale (CLAUDE.md), not a nullable field.
+const ANONYMISED_LOCALE = 'en';
+
+interface AnonymisationCounts {
+  sessions: number;
+  devices: number;
+  accounts: number;
+  twoFactors: number;
+  notifications: number;
+  notificationPreferences: number;
+  products: number;
+  portfolioImages: number;
+  uploads: number;
+}
+
+async function anonymiseOne(
+  deps: AnonymiseDeletionsDeps,
+  dataRequestId: string,
+  userId: string,
+): Promise<void> {
+  const objectsToDelete: { bucket: string; key: string }[] = [];
+
+  const counts = await deps.prisma.client.$transaction(async (tx) => {
+    const profile = await tx.photographerProfile.findUnique({
+      where: { userId },
+      select: { id: true, avatarUploadId: true, coverUploadId: true },
+    });
+
+    let productsCount = 0;
+    let portfolioImagesCount = 0;
+    if (profile) {
+      const portfolioImages = await tx.portfolioImage.findMany({
+        where: { profileId: profile.id },
+        select: { id: true },
+      });
+      portfolioImagesCount = portfolioImages.length;
+      await tx.portfolioImage.deleteMany({ where: { profileId: profile.id } });
+
+      const products = await tx.product.deleteMany({ where: { profileId: profile.id } });
+      productsCount = products.count;
+
+      await tx.photographerProfile.update({
+        where: { id: profile.id },
+        data: { headline: null, bio: {}, links: [], languages: [] },
+      });
+    }
+
+    const sessions = await tx.session.deleteMany({ where: { userId } });
+    const devices = await tx.device.deleteMany({ where: { userId } });
+    const accounts = await tx.account.deleteMany({ where: { userId } });
+    const twoFactors = await tx.twoFactor.deleteMany({ where: { userId } });
+    const notifications = await tx.notification.deleteMany({ where: { userId } });
+    const notificationPreferences = await tx.notificationPreference.deleteMany({
+      where: { userId },
+    });
+
+    const orphanableUploads = await tx.upload.findMany({
+      where: {
+        ownerId: userId,
+        messageAttachment: null,
+        verificationDocument: null,
+        deliveryFile: null,
+      },
+      select: { id: true, objectKey: true, purpose: true, variants: true },
+    });
+    for (const upload of orphanableUploads) {
+      objectsToDelete.push({ bucket: deps.storage.config.privateBucket, key: upload.objectKey });
+      if ((PUBLIC_UPLOAD_PURPOSES as readonly string[]).includes(upload.purpose)) {
+        const variants = upload.variants as Record<string, string> | null;
+        for (const key of Object.values(variants ?? {})) {
+          objectsToDelete.push({ bucket: deps.storage.config.publicBucket, key });
+        }
+      }
+    }
+    await tx.upload.deleteMany({
+      where: { id: { in: orphanableUploads.map((upload) => upload.id) } },
+    });
+
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        email: `deleted-${userId}@deleted.invalid`,
+        name: null,
+        locale: ANONYMISED_LOCALE,
+      },
+    });
+
+    await tx.dataRequest.update({
+      where: { id: dataRequestId },
+      data: { status: 'completed', completedAt: new Date() },
+    });
+
+    const result: AnonymisationCounts = {
+      sessions: sessions.count,
+      devices: devices.count,
+      accounts: accounts.count,
+      twoFactors: twoFactors.count,
+      notifications: notifications.count,
+      notificationPreferences: notificationPreferences.count,
+      products: productsCount,
+      portfolioImages: portfolioImagesCount,
+      uploads: orphanableUploads.length,
+    };
+    return result;
+  });
+
+  for (const object of objectsToDelete) {
+    try {
+      await deps.storage.deleteObject(object.bucket, object.key);
+    } catch (error) {
+      deps.logger.warn(
+        { err: error, dataRequestId },
+        'gdpr-sweep: failed to delete an anonymised upload object, leaving the DB row gone',
+      );
+    }
+  }
+
+  await deps.auditLog.record({
+    actorType: 'system',
+    actorId: null,
+    action: 'gdpr_sweep.anonymised',
+    targetType: 'User',
+    targetId: userId,
+    after: counts,
+  });
+}
+
+export async function anonymiseDeletions(
+  deps: AnonymiseDeletionsDeps,
+): Promise<AnonymiseDeletionsResult> {
+  const cutoff = new Date(Date.now() - GRACE_PERIOD_MS);
+  const due = await deps.prisma.client.dataRequest.findMany({
+    where: { type: 'delete', status: 'pending', requestedAt: { lte: cutoff } },
+    select: { id: true, userId: true },
+  });
+
+  let usersAnonymised = 0;
+  let usersFailed = 0;
+  for (const request of due) {
+    try {
+      await anonymiseOne(deps, request.id, request.userId);
+      usersAnonymised += 1;
+    } catch (error) {
+      usersFailed += 1;
+      deps.logger.error(
+        { err: error, dataRequestId: request.id },
+        'gdpr-sweep: failed to anonymise a deletion request',
+      );
+    }
+  }
+
+  deps.logger.log(
+    { usersAnonymised, usersFailed },
+    'gdpr-sweep: anonymise-deletions phase complete',
+  );
+  return { usersAnonymised, usersFailed };
+}

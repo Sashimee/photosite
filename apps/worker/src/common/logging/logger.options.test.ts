@@ -85,4 +85,27 @@ describe('buildPinoOptions redaction', () => {
     expect(line.consent.ip).toBe('[Redacted]');
     expect(line.consent.userAgent).toBe('[Redacted]');
   });
+
+  it('redacts a GDPR export key and anonymous consent id, at top level and one level deep', () => {
+    const { stream, lines } = collectLogs();
+    const logger = pino({ redact: getRedact() }, stream);
+
+    logger.info({
+      exportKey: 'gdpr-exports/abc123.zip',
+      anonymousId: 'anon-123',
+      dataRequest: { exportKey: 'gdpr-exports/abc123.zip', anonymousId: 'anon-123' },
+    });
+
+    const [line] = lines() as [
+      {
+        exportKey: string;
+        anonymousId: string;
+        dataRequest: { exportKey: string; anonymousId: string };
+      },
+    ];
+    expect(line.exportKey).toBe('[Redacted]');
+    expect(line.anonymousId).toBe('[Redacted]');
+    expect(line.dataRequest.exportKey).toBe('[Redacted]');
+    expect(line.dataRequest.anonymousId).toBe('[Redacted]');
+  });
 });
