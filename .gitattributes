@@ -1,0 +1,4 @@
+# Every step plan appends a row to this table, so parallel branches conflict on
+# the last line without ever disagreeing about content. Union keeps both sides'
+# rows; the file is append-only by construction, so there is nothing to lose.
+docs/steps/human-followups.md merge=union
