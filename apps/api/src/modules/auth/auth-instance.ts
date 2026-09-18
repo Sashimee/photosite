@@ -7,6 +7,7 @@ import type { Logger } from 'nestjs-pino';
 import { z } from 'zod';
 import type { RedisRateLimiter } from '../../common/rate-limit/redis-rate-limiter.js';
 import type { Env } from '../../config/env.js';
+import type { ChatSocketBridge } from '../chat/chat-socket-bridge.js';
 import { hardenAdapter } from './adapter/hardened-adapter.js';
 import { withEmailVerifiedBridge } from './adapter/user-email-verified-extension.js';
 import { createBackupCodesCipher } from './crypto/backup-codes-cipher.js';
@@ -25,6 +26,7 @@ export interface BuildAuthDeps {
   prisma: PrismaClient;
   rateLimiter: RedisRateLimiter;
   emailQueue: EmailQueueService;
+  chatSocketBridge: ChatSocketBridge;
   logger: Logger;
 }
 
@@ -64,6 +66,7 @@ export function buildAuth({
   prisma: rawPrisma,
   rateLimiter,
   emailQueue,
+  chatSocketBridge,
   logger,
 }: BuildAuthDeps) {
   const prisma = withEmailVerifiedBridge(rawPrisma);
@@ -163,6 +166,12 @@ export function buildAuth({
       },
       resetPasswordTokenExpiresIn: ONE_HOUR_SECONDS,
       revokeSessionsOnPasswordReset: true,
+      // Runs after Better Auth has already resolved the reset token to a
+      // user (issue #101); no need to verify the token ourselves.
+      onPasswordReset: ({ user }) => {
+        chatSocketBridge.disconnectUser(user.id);
+        return Promise.resolve();
+      },
       onExistingUserSignUp: async ({ user }) => {
         await emailQueue.enqueue({ type: 'account-exists', to: user.email });
       },
