@@ -1,7 +1,10 @@
+import { getTranslations } from 'next-intl/server';
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { AdminShell } from '@/components/admin-shell';
+import { resolveNavSections } from '@/lib/admin-nav';
 import { getSession } from '@/lib/server-api';
 import { buildSignInRedirect } from '@/lib/sign-in-path';
 
@@ -27,5 +30,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     redirect(buildSignInRedirect(pathname, 'enroll'));
   }
 
-  return <>{children}</>;
+  const t = await getTranslations('admin.shell');
+
+  return (
+    <AdminShell email={user.email} navSections={resolveNavSections(t)} signOutLabel={t('signOut')}>
+      {children}
+    </AdminShell>
+  );
 }
