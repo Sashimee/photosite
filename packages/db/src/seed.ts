@@ -913,6 +913,172 @@ export async function seedQuoteConversation(
   });
 }
 
+// A different photographer than `seedRequestAndQuote`'s (`sofia-martins`):
+// requests-quotes.test.ts deletes and recounts quotes by (clientId,
+// photographerId), and `Booking.quote` is `Restrict`, so a second quote
+// booked for that same pair would make its deletes fail.
+export const SEED_BOOKING_CLIENT_EMAIL = SEED_REQUEST_CLIENT_EMAIL;
+export const SEED_BOOKING_PHOTOGRAPHER_SLUG = 'karim-diallo';
+export const SEED_BOOKING_PRODUCT_TITLE = 'Corporate headshot session';
+
+const SEED_BOOKING_LOCATION = SEED_REQUEST_LOCATION;
+
+interface SeedLedgerRow {
+  type: 'charge' | 'platform_fee' | 'transfer';
+  amountCents: number;
+  stripeObjectId: string;
+}
+
+// A released, fully paid booking for the seeded client and a second seeded
+// product (distinct from `seedRequestAndQuote`'s wedding quote, which stays
+// `sent`, relied on by requests-quotes.test.ts), so 1B.7 (web) and 1D.5
+// (admin) have a complete booking, delivery and ledger to render without
+// creating their own fixtures. Deterministic Stripe-shaped ids (`_seed_` +
+// the quote id) stand in for the real ones 1A.8c/d will write. Idempotent:
+// the quote is found by its natural key (clientId, photographerId,
+// productId, status), never created twice, and the booking/delivery/ledger
+// rows are each upserted on their own unique key, so an interrupted run can
+// be re-run (#135).
+export async function seedPaidBooking(
+  prisma: ReturnType<typeof createPrismaClient>,
+): Promise<void> {
+  const client = await prisma.user.findUniqueOrThrow({
+    where: { email: SEED_BOOKING_CLIENT_EMAIL },
+  });
+  const photographer = await prisma.photographerProfile.findUniqueOrThrow({
+    where: { slug: SEED_BOOKING_PHOTOGRAPHER_SLUG },
+    include: { products: { include: { tiers: true } } },
+  });
+
+  const product = photographer.products.find(
+    (candidate) => (candidate.title as { en: string }).en === SEED_BOOKING_PRODUCT_TITLE,
+  );
+  const tier = product?.tiers.find((candidate) => candidate.usage === 'personal');
+  if (!product || !tier) {
+    throw new Error(
+      `db seed: no personal-usage tier found for product "${SEED_BOOKING_PRODUCT_TITLE}" on photographer "${SEED_BOOKING_PHOTOGRAPHER_SLUG}"`,
+    );
+  }
+
+  const feePercentSetting = await prisma.platformSetting.findUniqueOrThrow({
+    where: { key: 'feePercent' },
+  });
+  const feePercent = feePercentSetting.value as number;
+
+  let quote = await prisma.quote.findFirst({
+    where: {
+      clientId: client.id,
+      photographerId: photographer.id,
+      productId: product.id,
+      status: 'accepted',
+    },
+  });
+  if (!quote) {
+    const productTitle = (product.title as { en: string }).en;
+    const lineItems = [{ label: productTitle, qty: 1, unitCents: tier.priceCents }];
+    const totals = quoteTotals(lineItems, feePercent);
+    const validUntil = new Date();
+    validUntil.setUTCDate(validUntil.getUTCDate() + 7);
+
+    quote = await prisma.quote.create({
+      data: {
+        photographerId: photographer.id,
+        clientId: client.id,
+        productId: product.id,
+        productTierId: tier.id,
+        lineItems,
+        subtotalCents: totals.subtotalCents,
+        platformFeeCents: totals.platformFeeCents,
+        totalCents: totals.totalCents,
+        feePercent,
+        licenceUsage: tier.usage,
+        licenceTextVersion: tier.licenceTextVersion,
+        currency: 'EUR',
+        validUntil,
+        status: 'accepted',
+      },
+    });
+  }
+
+  const scheduledAt = new Date();
+  scheduledAt.setUTCDate(scheduledAt.getUTCDate() + 14);
+  const deliveredAt = new Date();
+  deliveredAt.setUTCDate(deliveredAt.getUTCDate() - 1);
+  const releasedAt = new Date();
+
+  const booking = await prisma.booking.upsert({
+    where: { quoteId: quote.id },
+    create: {
+      quoteId: quote.id,
+      clientId: client.id,
+      photographerId: photographer.id,
+      scheduledAt,
+      status: 'released',
+      paymentIntentId: `pi_seed_${quote.id}`,
+      chargeId: `ch_seed_${quote.id}`,
+      transferId: `tr_seed_${quote.id}`,
+      deliveredAt,
+      releasedAt,
+    },
+    update: {},
+  });
+
+  await prisma.$executeRaw`
+    UPDATE "Booking"
+    SET location = ST_SetSRID(ST_MakePoint(${SEED_BOOKING_LOCATION.lng}, ${SEED_BOOKING_LOCATION.lat}), 4326)::geography
+    WHERE id = ${booking.id}
+  `;
+
+  await prisma.delivery.upsert({
+    where: { bookingId: booking.id },
+    create: {
+      bookingId: booking.id,
+      message: 'Here is your full gallery, thank you for booking!',
+      externalLink: 'https://example.com/gallery/seed-booking',
+      deliveredAt,
+      acceptedAt: releasedAt,
+    },
+    update: {},
+  });
+
+  // Mirrors the release job's ledger writes (docs/PAYMENTS.md): the charge
+  // for the full total, the platform's cut, and the transfer to the
+  // photographer for the remainder. `stripeObjectId` reuses the booking's
+  // own seeded charge/transfer ids since this seed never talks to Stripe.
+  const ledgerRows: SeedLedgerRow[] = [
+    { type: 'charge', amountCents: quote.totalCents, stripeObjectId: `ch_seed_${quote.id}` },
+    {
+      type: 'platform_fee',
+      amountCents: quote.platformFeeCents,
+      stripeObjectId: `tr_seed_${quote.id}`,
+    },
+    {
+      type: 'transfer',
+      amountCents: quote.subtotalCents - quote.platformFeeCents,
+      stripeObjectId: `tr_seed_${quote.id}`,
+    },
+  ];
+  for (const row of ledgerRows) {
+    await prisma.ledgerEntry.upsert({
+      where: {
+        bookingId_type_stripeObjectId: {
+          bookingId: booking.id,
+          type: row.type,
+          stripeObjectId: row.stripeObjectId,
+        },
+      },
+      create: {
+        bookingId: booking.id,
+        type: row.type,
+        amountCents: row.amountCents,
+        currency: 'EUR',
+        stripeObjectId: row.stripeObjectId,
+      },
+      update: {},
+    });
+  }
+}
+
 export async function seedDatabase(prisma: ReturnType<typeof createPrismaClient>): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('db seed: refusing to run with NODE_ENV=production');
@@ -926,6 +1092,7 @@ export async function seedDatabase(prisma: ReturnType<typeof createPrismaClient>
   await seedRequestAndQuote(prisma);
   await seedQuoteConversation(prisma);
   await seedVerificationCase(prisma);
+  await seedPaidBooking(prisma);
 }
 
 async function main(): Promise<void> {
