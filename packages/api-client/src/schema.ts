@@ -459,7 +459,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get the current session user */
+        /** Get the current session user, or null when signed out */
         get: {
             parameters: {
                 query?: never;
@@ -469,15 +469,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Current session user */
+                /** @description Current session user, or a null user for an anonymous caller */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            user: components["schemas"]["User"];
-                        };
+                        "application/json": components["schemas"]["SessionQueryResponse"];
                     };
                 };
                 /** @description Unauthorized */
@@ -9221,6 +9219,9 @@ export interface components {
              * @example 2026-09-16T12:00:00.000Z
              */
             expiresAt: string;
+        };
+        SessionQueryResponse: {
+            user: components["schemas"]["User"] & (Record<string, never> | null);
         };
         TotpEnrollment: {
             /** @example JBSWY3DPEHPK3PXP */

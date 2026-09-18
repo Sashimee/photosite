@@ -23,13 +23,8 @@ export function useSession(initialUser: SessionUser | null = null): UseSessionRe
   const refresh = useCallback(async () => {
     setStatus('loading');
     const { data } = await api.GET('/v1/auth/session', { cache: 'no-store' });
-    if (data) {
-      setUser(data.user);
-      setStatus('authenticated');
-    } else {
-      setUser(null);
-      setStatus('unauthenticated');
-    }
+    setUser(data?.user ?? null);
+    setStatus(data?.user ? 'authenticated' : 'unauthenticated');
   }, []);
 
   // Only run on mount: `initialUser` seeds the very first render, later

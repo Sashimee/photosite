@@ -40,7 +40,12 @@ import { AuthRateLimitService } from './auth-rate-limit.service.js';
 import { checkPasswordCompromised } from './hibp.js';
 import { isOAuthProvider, isProviderConfigured } from './oauth-providers.js';
 import { OriginGuard } from './origin-guard.js';
-import { requireSession, type BetterAuthSessionRow, type BetterAuthUserRow } from './session.js';
+import {
+  hasSessionCredential,
+  requireSession,
+  type BetterAuthSessionRow,
+  type BetterAuthUserRow,
+} from './session.js';
 import { mapUser } from './user-mapper.js';
 
 function emailLocalPart(email: string): string {
@@ -289,7 +294,12 @@ export class AuthController {
   }
 
   @Get('session')
-  async session(@Req() request: FastifyRequest): Promise<{ user: ReturnType<typeof mapUser> }> {
+  async session(
+    @Req() request: FastifyRequest,
+  ): Promise<{ user: ReturnType<typeof mapUser> | null }> {
+    if (!hasSessionCredential(this.auth, request)) {
+      return { user: null };
+    }
     const { user } = await requireSession(this.auth, request);
     return { user: mapUser(user) };
   }

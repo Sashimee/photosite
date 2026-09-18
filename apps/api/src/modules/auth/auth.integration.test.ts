@@ -183,6 +183,44 @@ describe('auth integration', () => {
     expect(afterSignOut.statusCode).toBe(401);
   }, 20_000);
 
+  it('GET /auth/session distinguishes anonymous, authenticated and rejected callers', async () => {
+    const anonymous = await fastify().inject({ method: 'GET', url: '/v1/auth/session' });
+    expect(anonymous.statusCode).toBe(200);
+    expect(anonymous.json<{ user: null }>()).toEqual({ user: null });
+
+    const email = uniqueEmail('session-shape');
+    await signUp(email);
+    await verifyByEmail(email);
+    const signInResponse = await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/sign-in',
+      payload: { email, password: PASSWORD },
+    });
+    const { session } = signInResponse.json<{ session: { token: string } }>();
+
+    const authenticated = await fastify().inject({
+      method: 'GET',
+      url: '/v1/auth/session',
+      headers: { authorization: `Bearer ${session.token}` },
+    });
+    expect(authenticated.statusCode).toBe(200);
+    expect(authenticated.json<{ user: { email: string } }>().user.email).toBe(email);
+
+    const invalidBearer = await fastify().inject({
+      method: 'GET',
+      url: '/v1/auth/session',
+      headers: { authorization: 'Bearer not-a-real-token' },
+    });
+    expect(invalidBearer.statusCode).toBe(401);
+
+    const invalidCookie = await fastify().inject({
+      method: 'GET',
+      url: '/v1/auth/session',
+      headers: { cookie: 'photoo_session=not-a-real-token' },
+    });
+    expect(invalidCookie.statusCode).toBe(401);
+  }, 20_000);
+
   it('rejects sign-in with the wrong password', async () => {
     const email = uniqueEmail('wrong-password');
     await signUp(email);
@@ -424,10 +462,10 @@ describe('auth integration', () => {
     expect(response.json<ApiErrorBody>().code).toBe('VALIDATION_ERROR');
   });
 
-  it('returns UNAUTHORIZED for /session without a session', async () => {
+  it('returns a null user for /session without a session, not an error', async () => {
     const response = await fastify().inject({ method: 'GET', url: '/v1/auth/session' });
-    expect(response.statusCode).toBe(401);
-    expect(response.json<ApiErrorBody>().code).toBe('UNAUTHORIZED');
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ user: null }>()).toEqual({ user: null });
   });
 
   it('returns PROVIDER_NOT_CONFIGURED for an unconfigured OAuth provider', async () => {
