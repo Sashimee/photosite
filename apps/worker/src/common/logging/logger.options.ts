@@ -31,6 +31,14 @@ export const REDACT_PATHS = [
   '*.userAgent',
   'ip',
   'userAgent',
+  // `anonymousId` links a pre-signup consent choice to a device; `exportKey`
+  // is the private S3 object key for a GDPR export archive (never a
+  // presigned URL, but still an internal storage path with no reason to sit
+  // in a log line either).
+  '*.anonymousId',
+  '*.exportKey',
+  'anonymousId',
+  'exportKey',
 ];
 
 export const REDACT_CENSOR = '[Redacted]';

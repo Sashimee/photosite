@@ -44,11 +44,19 @@ export interface PutObjectArgs {
   contentType: string;
 }
 
+export interface PutObjectStreamArgs {
+  bucket: string;
+  key: string;
+  body: Readable;
+  contentType: string;
+}
+
 export interface ObjectStorage {
   config: { privateBucket: string; publicBucket: string };
   getObjectStream(bucket: string, key: string): Promise<Readable>;
   getObjectBuffer(bucket: string, key: string): Promise<Buffer>;
   putObject(input: PutObjectArgs): Promise<void>;
+  putObjectStream(input: PutObjectStreamArgs): Promise<void>;
   deleteObject(bucket: string, key: string): Promise<void>;
 }
 

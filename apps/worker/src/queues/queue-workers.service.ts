@@ -3,6 +3,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   EMAIL_QUEUE_NAME,
   FILE_SCAN_QUEUE_NAME,
+  GDPR_EXPORT_QUEUE_NAME,
+  GDPR_SWEEP_QUEUE_NAME,
   IMAGE_PROCESS_QUEUE_NAME,
   NOTIFICATIONS_CLEANUP_QUEUE_NAME,
   NOTIFY_QUEUE_NAME,
@@ -18,6 +20,8 @@ import { AuditLogService } from '../common/audit-log.service.js';
 import { reportJobFailure } from '../common/monitoring/report-job-failure.js';
 import { APP_CONFIG, type Env } from '../config/env.js';
 import { createMailTransport } from '../email/mail-transport.js';
+import { createGdprExportProcessor } from '../gdpr/gdpr-export.processor.js';
+import { createGdprSweepProcessor } from '../gdpr/gdpr-sweep.processor.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { createExpoPushSender } from '../push/push-sender.js';
 import { createRedisPushTicketStore } from '../push/push-ticket-store.js';
@@ -39,6 +43,7 @@ const QUOTE_EXPIRY_SCHEDULER_ID = 'quote-expiry';
 const NOTIFY_SWEEP_SCHEDULER_ID = 'notify-sweep';
 const PUSH_RECEIPTS_SCHEDULER_ID = 'push-receipts';
 const NOTIFICATIONS_CLEANUP_SCHEDULER_ID = 'notifications-cleanup';
+const GDPR_SWEEP_SCHEDULER_ID = 'gdpr-sweep';
 
 @Injectable()
 export class QueueWorkersService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -98,6 +103,12 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
     const notificationsCleanupQueue = new Queue(NOTIFICATIONS_CLEANUP_QUEUE_NAME, {
       connection: this.newConnection(),
     });
+    const gdprExportQueue = new Queue(GDPR_EXPORT_QUEUE_NAME, {
+      connection: this.newConnection(),
+    });
+    const gdprSweepQueue = new Queue(GDPR_SWEEP_QUEUE_NAME, {
+      connection: this.newConnection(),
+    });
     this.queues.push(
       imageProcessQueue,
       uploadsCleanupQueue,
@@ -106,6 +117,8 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       notifySweepQueue,
       pushReceiptsQueue,
       notificationsCleanupQueue,
+      gdprExportQueue,
+      gdprSweepQueue,
     );
 
     // Redis being unreachable at boot must not crash the whole process (the
@@ -159,6 +172,16 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       );
     } catch (error) {
       this.logger.warn({ err: error }, 'queue-workers: failed to schedule notifications-cleanup');
+    }
+
+    try {
+      await gdprSweepQueue.upsertJobScheduler(
+        GDPR_SWEEP_SCHEDULER_ID,
+        { every: this.config.GDPR_SWEEP_INTERVAL_MS },
+        { name: 'sweep', data: {} },
+      );
+    } catch (error) {
+      this.logger.warn({ err: error }, 'queue-workers: failed to schedule gdpr-sweep');
     }
 
     if (this.config.NODE_ENV === 'production' && !this.config.EXPO_ACCESS_TOKEN) {
@@ -285,6 +308,34 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       },
     );
 
+    const gdprExportWorker = new Worker(
+      GDPR_EXPORT_QUEUE_NAME,
+      createGdprExportProcessor({
+        prisma: this.prisma,
+        storage: this.storage,
+        auditLog: this.auditLog,
+        logger: this.logger,
+      }),
+      {
+        connection: this.newConnection(),
+        concurrency: this.config.WORKER_CONCURRENCY_GDPR_EXPORT,
+      },
+    );
+
+    const gdprSweepWorker = new Worker(
+      GDPR_SWEEP_QUEUE_NAME,
+      createGdprSweepProcessor({
+        prisma: this.prisma,
+        storage: this.storage,
+        auditLog: this.auditLog,
+        logger: this.logger,
+      }),
+      {
+        connection: this.newConnection(),
+        concurrency: this.config.WORKER_CONCURRENCY_GDPR_SWEEP,
+      },
+    );
+
     for (const [name, worker] of [
       [FILE_SCAN_QUEUE_NAME, fileScanWorker],
       [IMAGE_PROCESS_QUEUE_NAME, imageProcessWorker],
@@ -295,6 +346,8 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       [NOTIFY_SWEEP_QUEUE_NAME, notifySweepWorker],
       [PUSH_RECEIPTS_QUEUE_NAME, pushReceiptsWorker],
       [NOTIFICATIONS_CLEANUP_QUEUE_NAME, notificationsCleanupWorker],
+      [GDPR_EXPORT_QUEUE_NAME, gdprExportWorker],
+      [GDPR_SWEEP_QUEUE_NAME, gdprSweepWorker],
     ] as const) {
       worker.on('failed', (job, err) => {
         this.logger.error({ err, jobId: job?.id, queue: name }, 'worker: job failed');
