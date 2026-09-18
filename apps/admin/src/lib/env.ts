@@ -15,7 +15,16 @@ const EnvSchema = z.object({
 });
 
 function loadEnv() {
-  const parsed = EnvSchema.safeParse(process.env);
+  // Next only substitutes *literal* `process.env.NEXT_PUBLIC_X` references
+  // into the client bundle, so passing the whole `process.env` object leaves
+  // public values `undefined` in the browser and makes this module throw at
+  // evaluation. Keep each key spelled out. (The same bug took every
+  // data-driven page of apps/web down on the preview.)
+  const parsed = EnvSchema.safeParse({
+    NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    ADMIN_BASE_PATH: process.env.ADMIN_BASE_PATH,
+  });
   if (!parsed.success) {
     const details = parsed.error.issues
       .map((issue) => `${issue.path.join('.') || '(unknown variable)'}: ${issue.message}`)
