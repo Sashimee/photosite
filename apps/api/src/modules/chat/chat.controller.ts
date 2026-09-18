@@ -45,6 +45,12 @@ export class ChatController {
     return this.chat.list(user, query);
   }
 
+  @Get('unread-count')
+  async unreadCount(@Req() request: FastifyRequest) {
+    const { user } = await requireSession(this.auth, request);
+    return this.chat.unreadCount(user);
+  }
+
   @Get(':id')
   async get(
     @Param('id', new ZodValidationPipe(IdSchema)) id: string,
