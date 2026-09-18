@@ -28,7 +28,7 @@ export interface ResolvedNavSection {
 const ADMIN_NAV_SECTIONS: readonly AdminNavSection[] = [
   { id: 'dashboard', href: '/', labelKey: 'dashboard' },
   { id: 'health', href: '/health', labelKey: 'health' },
-  { id: 'users', href: '/users', labelKey: 'users', blockedBy: { kind: 'ui', step: '1D.2' } },
+  { id: 'users', href: '/users', labelKey: 'users' },
   {
     id: 'verification',
     href: '/verification',
