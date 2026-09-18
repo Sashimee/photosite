@@ -9,6 +9,8 @@ import { waitForLinkInEmail } from '../../testing/mailpit.js';
 import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
 import { TEST_ENV } from '../../testing/test-env.js';
 import { generateTotpCode } from '../../testing/totp.js';
+import type { Auth } from './auth-instance.js';
+import { AUTH_INSTANCE } from './auth-instance.provider.js';
 
 function extractFragmentToken(link: string): string | null {
   const hashIndex = link.indexOf('#token=');
@@ -54,6 +56,7 @@ describe('auth integration', () => {
   let app: NestFastifyApplication;
   let prisma: PrismaClient;
   let redis: Redis;
+  let auth: Auth;
   const createdEmails: string[] = [];
 
   beforeAll(async () => {
@@ -64,6 +67,7 @@ describe('auth integration', () => {
     });
     prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
     redis = new Redis(testEnv.REDIS_URL);
+    auth = app.get<Auth>(AUTH_INSTANCE);
     await clearRateLimitKeys(redis);
   });
 
@@ -209,6 +213,15 @@ describe('auth integration', () => {
     await signUp(email);
     await verifyByEmail(email);
 
+    const signInBeforeReset = await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/sign-in',
+      payload: { email, password: PASSWORD },
+    });
+    const { session: sessionBeforeReset } = signInBeforeReset.json<{
+      session: { token: string };
+    }>();
+
     const requestResponse = await fastify().inject({
       method: 'POST',
       url: '/v1/auth/password-reset/request',
@@ -227,6 +240,13 @@ describe('auth integration', () => {
       payload: { token, password: newPassword },
     });
     expect(confirmResponse.statusCode).toBe(200);
+
+    const sessionAfterReset = await fastify().inject({
+      method: 'GET',
+      url: '/v1/auth/session',
+      headers: { authorization: `Bearer ${sessionBeforeReset.token}` },
+    });
+    expect(sessionAfterReset.statusCode).toBe(401);
 
     const oldPasswordSignIn = await fastify().inject({
       method: 'POST',
@@ -832,6 +852,99 @@ describe('auth integration', () => {
         headers: { cookie: secondCookieHeader },
       });
       expect(afterEnable.statusCode).toBe(401);
+    }, 20_000);
+  });
+
+  // Issue #127: hardened-adapter.ts used to hash a `where: { token }` value
+  // only when it didn't already look like one of its own sha256 hashes, so a
+  // hash round-tripped out of a userId-keyed `listSessions` read could be fed
+  // straight back in without being mangled by a second hash. That also meant
+  // a *stolen* hash (e.g. from a read-only DB leak) could be presented as a
+  // bearer token and pass straight through unhashed, authenticating with it
+  // directly — trading "revokeOtherSessions silently does nothing" for
+  // "a leaked hash is a working session token", which is worse. The fix
+  // hashes every token value unconditionally (a stolen hash just gets hashed
+  // into something that matches nothing) and never hands back a hash
+  // pretending to be a raw token: a session row not looked up by `token`
+  // gets `token: null` instead of its stored hash.
+  describe('issue #127: hashed session tokens never work as raw ones', () => {
+    it("rejects a bearer token that is actually a session's stored hash, not its raw token", async () => {
+      const email = uniqueEmail('hash-as-bearer');
+      await signUp(email);
+      await verifyByEmail(email);
+
+      const signInResponse = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const { session } = signInResponse.json<{ session: { token: string } }>();
+      const stolenHash = sha256Hex(session.token);
+      expect(await prisma.session.findUnique({ where: { tokenHash: stolenHash } })).not.toBeNull();
+
+      const asRawBearer = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${stolenHash}` },
+      });
+      expect(asRawBearer.statusCode).toBe(401);
+
+      const asRealBearer = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${session.token}` },
+      });
+      expect(asRealBearer.statusCode).toBe(200);
+    }, 20_000);
+
+    it('redacts the token on a session row not looked up by token, and cannot be tricked into revoking it', async () => {
+      const email = uniqueEmail('redact-token');
+      await signUp(email);
+      await verifyByEmail(email);
+
+      const firstSignIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const secondSignIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const { session: currentSession } = firstSignIn.json<{ session: { token: string } }>();
+      const { session: otherSession } = secondSignIn.json<{ session: { token: string } }>();
+      const otherTokenHash = sha256Hex(otherSession.token);
+      const otherRow = await prisma.session.findUniqueOrThrow({
+        where: { tokenHash: otherTokenHash },
+      });
+
+      const headers = new Headers({ authorization: `Bearer ${currentSession.token}` });
+      const sessions = await auth.api.listSessions({ headers });
+      const listedOther = sessions.find((listed) => listed.id === otherRow.id);
+      if (!listedOther) {
+        throw new Error('expected listSessions to return the other session');
+      }
+      expect(listedOther.token).toBeNull();
+
+      // better-auth's revokeOtherSessions takes exactly this redacted `null`
+      // and hands it to deleteSession, whose own pre-delete lookup swallows
+      // whatever the adapter throws (see with-hooks.mjs deleteWithHooks) and
+      // treats "not found" as "nothing to delete". So neither session is
+      // touched: safely inert, rather than either exploitable (accepting the
+      // hash as a credential) or destructively wrong (deleting the wrong
+      // session). Application code should keep doing what totpVerify already
+      // does (auth.controller.ts) and revoke by userId/id directly instead
+      // of relying on this helper.
+      const result = await auth.api.revokeOtherSessions({ headers });
+      expect(result.status).toBe(true);
+      expect(
+        await prisma.session.findUnique({ where: { tokenHash: otherTokenHash } }),
+      ).not.toBeNull();
+      const currentTokenHash = sha256Hex(currentSession.token);
+      expect(
+        await prisma.session.findUnique({ where: { tokenHash: currentTokenHash } }),
+      ).not.toBeNull();
     }, 20_000);
   });
 });
