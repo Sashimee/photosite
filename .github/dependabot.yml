@@ -33,6 +33,10 @@ updates:
       # mobile suite. These move with the SDK too. Only apps/mobile uses the
       # scope, so the other 15 packages in that group still come through.
       - dependency-name: '@react-native/*'
+      # Expo SDK pins the router to the SDK version: 58 expects a Platform
+      # module shape that is not there on SDK 57, so every mobile suite fails
+      # with `Cannot read properties of undefined (reading 'OS')`.
+      - dependency-name: expo-router
   - package-ecosystem: github-actions
     directory: /
     target-branch: dev
