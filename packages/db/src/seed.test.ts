@@ -1,4 +1,5 @@
 import { verify } from '@node-rs/argon2';
+import { ADMIN_PERMISSIONS } from '@photoo/shared';
 import { decryptAesGcm } from '@photoo/shared/crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createPrismaClient } from './index.js';
@@ -6,6 +7,7 @@ import {
   CREDENTIAL_PROVIDER_ID,
   DEV_VERIFICATION_ENCRYPTION_KEY,
   LUXEMBOURG_REQUIRED_DOCUMENTS,
+  SEED_ADMIN_EMAIL,
   SEED_UNVERIFIED_PHOTOGRAPHER_EMAIL,
   SEED_USERS,
   SEED_VERIFICATION_BUSINESS_NAME,
@@ -165,6 +167,28 @@ describe('seedDatabase', () => {
       where: { email: { in: SEED_USERS.map((seedUser) => seedUser.email) } },
     });
     expect(seedUserCount).toBe(SEED_USERS.length);
+  });
+
+  it('grants the seeded admin every admin permission, self-granted', async () => {
+    await seedDatabase(prisma);
+
+    const admin = await prisma.user.findUniqueOrThrow({ where: { email: SEED_ADMIN_EMAIL } });
+    const grants = await prisma.adminPermissionGrant.findMany({ where: { userId: admin.id } });
+
+    expect(grants.map((grant) => grant.permission).sort()).toEqual([...ADMIN_PERMISSIONS].sort());
+    expect(grants.every((grant) => grant.grantedByAdminId === admin.id)).toBe(true);
+  });
+
+  it('is idempotent: running the seed again does not duplicate admin permission grants', async () => {
+    await seedDatabase(prisma);
+    const admin = await prisma.user.findUniqueOrThrow({ where: { email: SEED_ADMIN_EMAIL } });
+    const before = await prisma.adminPermissionGrant.findMany({ where: { userId: admin.id } });
+
+    await seedDatabase(prisma);
+    const after = await prisma.adminPermissionGrant.findMany({ where: { userId: admin.id } });
+
+    expect(after).toHaveLength(before.length);
+    expect(after.map((grant) => grant.grantedAt)).toEqual(before.map((grant) => grant.grantedAt));
   });
 
   it('seeds a submitted verification case with encrypted business fields, not plaintext', async () => {
