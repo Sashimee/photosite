@@ -9,6 +9,8 @@ import { waitForLinkInEmail } from '../../testing/mailpit.js';
 import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
 import { TEST_ENV } from '../../testing/test-env.js';
 import { generateTotpCode } from '../../testing/totp.js';
+import type { Auth } from './auth-instance.js';
+import { AUTH_INSTANCE } from './auth-instance.provider.js';
 
 function extractFragmentToken(link: string): string | null {
   const hashIndex = link.indexOf('#token=');
@@ -54,6 +56,7 @@ describe('auth integration', () => {
   let app: NestFastifyApplication;
   let prisma: PrismaClient;
   let redis: Redis;
+  let auth: Auth;
   const createdEmails: string[] = [];
 
   beforeAll(async () => {
@@ -64,6 +67,7 @@ describe('auth integration', () => {
     });
     prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
     redis = new Redis(testEnv.REDIS_URL);
+    auth = app.get<Auth>(AUTH_INSTANCE);
     await clearRateLimitKeys(redis);
   });
 
@@ -832,6 +836,96 @@ describe('auth integration', () => {
         headers: { cookie: secondCookieHeader },
       });
       expect(afterEnable.statusCode).toBe(401);
+    }, 20_000);
+  });
+
+  // Issue #127: revokeOtherSessions() lists sessions by userId, so
+  // hardened-adapter.ts never gets a raw token to restore on those rows; the
+  // hashed token it hands back must still work as a `where: { token }` value
+  // downstream instead of being hashed a second time into a dead end.
+  describe('issue #127: revoke-other-sessions and listSessions share the token path', () => {
+    it('revokeOtherSessions deletes the other session row for the user (no longer a silent no-op)', async () => {
+      const email = uniqueEmail('revoke-other');
+      await signUp(email);
+      await verifyByEmail(email);
+
+      const firstSignIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const secondSignIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const { session: currentSession } = firstSignIn.json<{ session: { token: string } }>();
+      const { session: otherSession } = secondSignIn.json<{ session: { token: string } }>();
+
+      const otherTokenHash = sha256Hex(otherSession.token);
+      expect(
+        await prisma.session.findUnique({ where: { tokenHash: otherTokenHash } }),
+      ).not.toBeNull();
+
+      const headers = new Headers({ authorization: `Bearer ${currentSession.token}` });
+      const result = await auth.api.revokeOtherSessions({ headers });
+      expect(result.status).toBe(true);
+
+      expect(await prisma.session.findUnique({ where: { tokenHash: otherTokenHash } })).toBeNull();
+
+      // Known residual limitation, separate from #127's "deletes nothing" bug:
+      // better-auth's own revokeOtherSessions excludes the caller's session by
+      // comparing the *raw* token on ctx.context.session (from an earlier
+      // token-keyed lookup) against the *hashed* token every userId-keyed
+      // `listSessions` row carries (see isHashedToken in hardened-adapter.ts).
+      // That comparison never matches, so the caller's own session is swept
+      // into "other sessions" and deleted too. Fixing that would need the
+      // adapter to reliably tell "the caller's current session" apart from
+      // any other row without ever caching a raw token across requests (a
+      // cross-user token leak risk we measured and rejected), which needs
+      // request-scoped plumbing beyond this file. Application code should
+      // keep doing what totpVerify already does (auth.controller.ts) and
+      // revoke by userId/id directly instead of calling this endpoint.
+      const currentTokenHash = sha256Hex(currentSession.token);
+      expect(
+        await prisma.session.findUnique({ where: { tokenHash: currentTokenHash } }),
+      ).toBeNull();
+    }, 20_000);
+
+    it('revokeSession deletes the row for a token round-tripped through listSessions', async () => {
+      const email = uniqueEmail('revoke-listed');
+      await signUp(email);
+      await verifyByEmail(email);
+
+      const firstSignIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const secondSignIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const { session: currentSession } = firstSignIn.json<{ session: { token: string } }>();
+      const { session: otherSession } = secondSignIn.json<{ session: { token: string } }>();
+      const headers = new Headers({ authorization: `Bearer ${currentSession.token}` });
+
+      const sessions = await auth.api.listSessions({ headers });
+      const otherTokenHash = sha256Hex(otherSession.token);
+      const listedOther = sessions.find((session) => session.token === otherTokenHash);
+      if (!listedOther) {
+        throw new Error('expected listSessions to return the other session');
+      }
+      expect(listedOther.token).not.toBe(otherSession.token);
+
+      const revokeResult = await auth.api.revokeSession({
+        headers,
+        body: { token: listedOther.token },
+      });
+      expect(revokeResult.status).toBe(true);
+
+      expect(await prisma.session.findUnique({ where: { tokenHash: otherTokenHash } })).toBeNull();
     }, 20_000);
   });
 });

@@ -10,6 +10,21 @@ function isPlainObject(value: unknown): value is Row {
   );
 }
 
+const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
+
+// better-auth's own token generator (`generateId(32)`) never produces a
+// 64-char lowercase hex string, so this shape is an unambiguous signal that
+// a `token` value already went through sha256Hex — e.g. it round-tripped via
+// `listSessions`/`findMany` (queried by `userId`, not `token`), which never
+// had a raw token to restore. Hashing it again here would silently stop it
+// from matching the row it came from (see #127). The hashed value is still a
+// perfectly usable lookup key against this same adapter (the DB only ever
+// stores the hash), so passing it straight through is enough to make
+// `listSessions` -> `revokeSession`/`delete` round-trip correctly.
+function isHashedToken(value: string): boolean {
+  return SHA256_HEX_PATTERN.test(value);
+}
+
 function hashTokenInData(data: Row): { data: Row; rawToken: string | undefined } {
   if (typeof data.token !== 'string') {
     return { data, rawToken: undefined };
@@ -33,7 +48,7 @@ function hashTokenInWhere(where: readonly Where[] | undefined): {
     if (Array.isArray(clause.value)) {
       const values = clause.value as unknown[];
       const hashed = values.map((value) => {
-        if (typeof value !== 'string') {
+        if (typeof value !== 'string' || isHashedToken(value)) {
           return value;
         }
         rawToken = value;
@@ -41,7 +56,7 @@ function hashTokenInWhere(where: readonly Where[] | undefined): {
       });
       return { ...clause, value: hashed } as Where;
     }
-    if (typeof clause.value === 'string') {
+    if (typeof clause.value === 'string' && !isHashedToken(clause.value)) {
       rawToken = clause.value;
       return { ...clause, value: sha256Hex(clause.value) };
     }
