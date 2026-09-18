@@ -56,6 +56,10 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?copy infra/docker/.env.example to infra/docker/.env}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?copy infra/docker/.env.example to infra/docker/.env}
+      MINIO_BACKUP_ACCESS_KEY: ${MINIO_BACKUP_ACCESS_KEY:-photoo-backup-dev}
+      MINIO_BACKUP_SECRET_KEY: ${MINIO_BACKUP_SECRET_KEY:-photoo-backup-dev-secret}
+      MINIO_PRUNE_ACCESS_KEY: ${MINIO_PRUNE_ACCESS_KEY:-photoo-prune-dev}
+      MINIO_PRUNE_SECRET_KEY: ${MINIO_PRUNE_SECRET_KEY:-photoo-prune-dev-secret}
     entrypoint:
       - sh
       - -c
@@ -79,6 +83,39 @@ services:
         }
         EOF
         mc anonymous set-json /tmp/photoo-public-anonymous-policy.json local/photoo-public
+
+        # Mirrors the preview's bucket and scoped users (infra/dokploy/preview/compose.yml)
+        # so `infra/dokploy/backup/backup.sh` and the restore drill in
+        # docs/runbooks/restore.md run against the local stack with no manual
+        # setup. The keys are fixed dev-only values, like every other
+        # credential in this file.
+        mc mb --ignore-existing local/photoo-backups
+        mc anonymous set none local/photoo-backups
+        cat > /tmp/photoo-backup-policy.json <<'EOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {"Effect": "Allow", "Action": ["s3:ListBucket"], "Resource": ["arn:aws:s3:::photoo-backups"]},
+            {"Effect": "Allow", "Action": ["s3:PutObject"], "Resource": ["arn:aws:s3:::photoo-backups/*"]}
+          ]
+        }
+        EOF
+        mc admin user add local "$$MINIO_BACKUP_ACCESS_KEY" "$$MINIO_BACKUP_SECRET_KEY"
+        mc admin policy create local photoo-backup /tmp/photoo-backup-policy.json
+        mc admin policy attach local photoo-backup --user "$$MINIO_BACKUP_ACCESS_KEY"
+
+        cat > /tmp/photoo-prune-policy.json <<'EOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {"Effect": "Allow", "Action": ["s3:ListBucket"], "Resource": ["arn:aws:s3:::photoo-backups"]},
+            {"Effect": "Allow", "Action": ["s3:GetObject", "s3:DeleteObject"], "Resource": ["arn:aws:s3:::photoo-backups/photoo/*"]}
+          ]
+        }
+        EOF
+        mc admin user add local "$$MINIO_PRUNE_ACCESS_KEY" "$$MINIO_PRUNE_SECRET_KEY"
+        mc admin policy create local photoo-prune /tmp/photoo-prune-policy.json
+        mc admin policy attach local photoo-prune --user "$$MINIO_PRUNE_ACCESS_KEY"
     restart: 'no'
 
   mailpit:
