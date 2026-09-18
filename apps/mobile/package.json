@@ -13,7 +13,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@expo/metro-runtime": "57.0.15",
+    "@expo/metro-runtime": "58.0.1",
     "@photoo/api-client": "workspace:*",
     "@photoo/i18n": "workspace:*",
     "@photoo/shared": "workspace:*",
