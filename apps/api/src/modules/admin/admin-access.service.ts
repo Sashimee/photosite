@@ -28,6 +28,13 @@ export class AdminAccessService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
   ) {}
 
+  // For routes that need an authenticated admin but no specific permission
+  // (docs/steps/1A.11-admin-api.md: "an admin must always be able to ask
+  // what they may do") - everything else goes through `requirePermission`.
+  async requireSession(request: FastifyRequest): Promise<SessionContext> {
+    return requireAdminSession(this.auth, request);
+  }
+
   async requirePermission(
     request: FastifyRequest,
     permission: AdminPermission,

@@ -8,6 +8,8 @@ import { AdminAuditLogController } from './admin-audit-log.controller.js';
 import { AdminAuditLogRepository } from './admin-audit-log.repository.js';
 import { AdminAuditLogService } from './admin-audit-log.service.js';
 import { AdminAuditService } from './admin-audit.service.js';
+import { AdminMeController } from './admin-me.controller.js';
+import { AdminMeService } from './admin-me.service.js';
 import { AdminMutationRateLimitService } from './admin-mutation-rate-limit.service.js';
 import { AdminPermissionsService } from './admin-permissions.service.js';
 import { AdminReportsController } from './admin-reports.controller.js';
@@ -22,6 +24,7 @@ import { AdminUsersService } from './admin-users.service.js';
 @Module({
   imports: [AuthModule, ChatSocketBridgeModule, PlatformSettingsModule],
   controllers: [
+    AdminMeController,
     AdminUsersController,
     AdminSettingsController,
     AdminAuditLogController,
@@ -32,6 +35,7 @@ import { AdminUsersService } from './admin-users.service.js';
     AdminAuditService,
     AdminPermissionsService,
     AdminMutationRateLimitService,
+    AdminMeService,
     AdminUsersService,
     AdminUsersRepository,
     AdminSettingsService,

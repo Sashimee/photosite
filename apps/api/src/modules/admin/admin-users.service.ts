@@ -1,15 +1,19 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
-import type { AdminUserSearchQuerySchema, UserRole, UserSchema } from '@photoo/shared';
+import type { AdminUserSchema, AdminUserSearchQuerySchema, UserRole } from '@photoo/shared';
 import type { z } from 'zod';
-import { mapUser } from '../auth/user-mapper.js';
 import { ChatSocketBridge } from '../chat/chat-socket-bridge.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AdminAuditService } from './admin-audit.service.js';
+import { mapAdminUser } from './admin-user-mapper.js';
 import { decodeAdminUserCursor, encodeAdminUserCursor } from './admin-user-cursor.js';
 import { AdminUsersRepository } from './admin-users.repository.js';
 
+const PHOTOGRAPHER_PROFILE_SUMMARY_INCLUDE = {
+  photographerProfile: { select: { slug: true, isPublished: true } },
+} as const;
+
 type SearchQuery = z.infer<typeof AdminUserSearchQuerySchema>;
-type UserDto = z.infer<typeof UserSchema>;
+type UserDto = z.infer<typeof AdminUserSchema>;
 
 interface AdminActor {
   id: string;
@@ -47,7 +51,7 @@ export class AdminUsersService {
     const last = page[page.length - 1];
     const nextCursor = hasMore && last ? encodeAdminUserCursor(last.createdAt, last.id) : null;
 
-    return { items: page.map(mapUser), nextCursor };
+    return { items: page.map(mapAdminUser), nextCursor };
   }
 
   async get(id: string): Promise<UserDto> {
@@ -55,7 +59,7 @@ export class AdminUsersService {
     if (!row) {
       throw notFound();
     }
-    return mapUser(row);
+    return mapAdminUser(row);
   }
 
   async suspend(
@@ -96,12 +100,15 @@ export class AdminUsersService {
         ip: ip ?? null,
       });
 
-      return tx.user.findUniqueOrThrow({ where: { id } });
+      return tx.user.findUniqueOrThrow({
+        where: { id },
+        include: PHOTOGRAPHER_PROFILE_SUMMARY_INCLUDE,
+      });
     });
 
     this.chatSocketBridge.disconnectUser(id);
 
-    return mapUser(updated);
+    return mapAdminUser(updated);
   }
 
   async reactivate(admin: AdminActor, id: string, ip: string | undefined): Promise<UserDto> {
@@ -132,10 +139,13 @@ export class AdminUsersService {
         ip: ip ?? null,
       });
 
-      return tx.user.findUniqueOrThrow({ where: { id } });
+      return tx.user.findUniqueOrThrow({
+        where: { id },
+        include: PHOTOGRAPHER_PROFILE_SUMMARY_INCLUDE,
+      });
     });
 
-    return mapUser(updated);
+    return mapAdminUser(updated);
   }
 
   async setRoles(
@@ -153,7 +163,7 @@ export class AdminUsersService {
       existing.roles.includes('photographer') && !roles.includes('photographer');
 
     const updated = await this.prisma.client.$transaction(async (tx) => {
-      const updatedUser = await tx.user.update({
+      await tx.user.update({
         where: { id },
         data: { roles: { set: roles } },
       });
@@ -178,9 +188,12 @@ export class AdminUsersService {
         ip: ip ?? null,
       });
 
-      return updatedUser;
+      return tx.user.findUniqueOrThrow({
+        where: { id },
+        include: PHOTOGRAPHER_PROFILE_SUMMARY_INCLUDE,
+      });
     });
 
-    return mapUser(updated);
+    return mapAdminUser(updated);
   }
 }

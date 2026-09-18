@@ -671,6 +671,38 @@ describe('profiles integration', () => {
       });
       expect(response.statusCode).toBe(404);
     });
+
+    it('never carries the account name behind the profile, only the chosen displayName', async () => {
+      const photographer = await signUpAndSignIn(['photographer']);
+      const accountNameFragment = photographer.email.split('@')[0] ?? '';
+
+      const createResponse = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/photographer-profile',
+        headers: authHeaders(photographer.token),
+        payload: {
+          displayName: `Fx Name Leak ${RUN_ID}`,
+          categories: ['wedding'],
+          languages: ['en'],
+          location: { lat: 49.6, lng: 6.1 },
+          city: 'Luxembourg',
+          countryCode: 'LU',
+        },
+      });
+      const created = createResponse.json<OwnProfileBody>();
+      await prisma.photographerProfile.update({
+        where: { id: created.id },
+        data: { isPublished: true },
+      });
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/photographers/${created.slug}`,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.body).not.toContain(accountNameFragment);
+      expect(response.json<Record<string, unknown>>()).not.toHaveProperty('name');
+    });
   });
 
   describe('POST /v1/me/photographer-profile', () => {
