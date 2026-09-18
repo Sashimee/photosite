@@ -47,7 +47,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@jest/globals": "29.7.0",
+    "@jest/globals": "30.5.1",
     "@photoo/config": "workspace:*",
     "@react-native/jest-preset": "0.86.3",
     "@testing-library/react-native": "13.3.3",
