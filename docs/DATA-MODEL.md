@@ -11,6 +11,7 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 - **TwoFactor** – Better Auth two-factor plugin: userId, secret and backupCodes encrypted at rest (AES-256-GCM, key from `AUTH_ENCRYPTION_KEY`), verified, failedVerificationCount, lockedUntil.
 - **Device** – userId, expoPushToken, platform, lastSeenAt.
 - **ConsentRecord** – userId or anonymousId, purpose (`analytics`, `ads`, `marketing`), granted, version of the policy, ip, userAgent, recordedAt. Append-only.
+- **AdminPermissionGrant** – userId, permission (`ADMIN_PERMISSIONS`: `support`, `moderation`, `verification`, `finance`, `superadmin`), grantedByAdminId, grantedAt. Unique on `(userId, permission)`. A join table rather than a `String[]` column on `User`, because every grant is an auditable event and a revoke must say who did it and when; the grant/revoke event itself is written to `AuditLog` by the API, this table only holds current state (revoke deletes the row). A `User` with `admin` in `roles` and no grants can sign in and see nothing — the correct default for a freshly created admin.
 
 ## Uploads
 
@@ -59,7 +60,7 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 
 - **Notification** – userId, type, payload (JSON), channels (email/push/in-app, chosen at creation after preferences), emailSentAt, pushSentAt (nullable, set by the worker's per-channel processor once delivered, so a retry never double-sends), readAt.
 - **NotificationPreference** – userId, type, channel, enabled. Unique on `(userId, type, channel)`; a missing row means the type/channel defaults to on. `in_app` can't be disabled (enforced by the API, not the schema).
-- **Report** – reporterId, targetType, targetId, reason, status, adminId, resolution.
+- **Report** – DSA notice-and-action. reporterId (nullable, so a signed-out visitor can report), targetType/targetId (polymorphic, no foreign key), reason (free text), status (`open`, `resolved`, `dismissed`), adminId (the resolving admin, nullable until resolved), resolution (the statement of reasons required by DSA, nullable until resolved). Indexes on `(status, createdAt)` for the admin queue and `(targetType, targetId)` for looking up reports against one target. Takedown is a status change on the target itself, never a delete, so it stays out of this table.
 - **AuditLog** – actorId (user or admin or system), action, targetType, targetId, before (JSON), after (JSON), ip, occurredAt. Append-only.
 - **PlatformSetting** – key, value (JSON), updatedByAdminId. Holds fee percentage (default 5), auto-release days, feature flags.
 - **DataRequest** – userId, type (`export`, `delete`), status, requestedAt, completedAt, exportKey.
@@ -82,3 +83,5 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 - Deleting a `Conversation` cascades to its `ConversationParticipant` and `Message` rows; deleting a `Message` cascades to its `MessageAttachment` rows. `MessageAttachment.uploadId` is `Restrict`: an `Upload` still attached to a message can't be deleted.
 - At most one active `VerificationCase` per `userId` (partial unique index on `status IN (draft, submitted, in_review)`); a rejected or expired case stays for history and a new case starts a fresh `draft`. `VerificationDocument.uploadId` is `Restrict`, like `MessageAttachment`: an `Upload` still attached to a verification document can't be deleted.
 - `Message.body IS NOT NULL OR EXISTS (attachments)` at creation time (application-enforced, not a CHECK constraint, since the attachment count is a join): a message needs a body or at least one attachment, capped at 10 attachments.
+- An admin (`User.roles` includes `admin`) has no `AdminPermissionGrant` rows by default; `requirePermission` denies everything until one is granted. Only `superadmin` can create or delete a grant, and never for their own `userId` (application-enforced).
+- A `Report` only gets `adminId`/`resolution` set when its `status` moves off `open`, and `resolution` is never blank at that point (application-enforced by `ResolveReportRequestSchema` requiring a non-empty statement of reasons).

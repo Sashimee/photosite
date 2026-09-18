@@ -144,6 +144,23 @@ enum ConversationType {
   direct
 }
 
+// Mirrors `ADMIN_PERMISSIONS` in packages/shared/src/enums.ts.
+enum AdminPermission {
+  support
+  moderation
+  verification
+  finance
+  superadmin
+}
+
+// Mirrors the inline `REPORT_STATUSES` in
+// packages/shared/src/contract/admin.ts.
+enum ReportStatus {
+  open
+  resolved
+  dismissed
+}
+
 model Country {
   code              String   @id @db.Char(2)
   name              String
@@ -208,6 +225,10 @@ model User {
   verificationCases         VerificationCase[]        @relation("VerificationCaseUser")
   assignedVerificationCases VerificationCase[]        @relation("VerificationCaseAssignedAdmin")
   decidedVerificationCases  VerificationCase[]        @relation("VerificationCaseDecidedByAdmin")
+  adminPermissionGrants     AdminPermissionGrant[]    @relation("AdminPermissionGrantUser")
+  grantedPermissionGrants   AdminPermissionGrant[]    @relation("AdminPermissionGrantGrantedBy")
+  reports                   Report[]                  @relation("ReportReporter")
+  resolvedReports           Report[]                  @relation("ReportResolvedByAdmin")
 
   @@index([countryCode])
   @@index([status])
@@ -304,6 +325,30 @@ model Device {
   @@index([userId])
 }
 
+// A join table rather than a `String[]` column on `User`, because every
+// grant is an auditable event and a revoke must say who did it and when
+// (docs/steps/1A.11-admin-api.md): `grantedByAdminId`/`grantedAt` record the
+// grant, and the grant/revoke event itself is written to `AuditLog` by the
+// API service. Revoking a permission deletes the row (no `revokedAt`); the
+// unique constraint means re-granting after a revoke is just a new row. A
+// `User` with `admin` in `roles` and no grants can sign in and see nothing —
+// the correct default for a freshly created admin. `superadmin` is the only
+// permission that can grant permissions, and never for the granter's own
+// account, both enforced by the API service, not this table.
+model AdminPermissionGrant {
+  id               String          @id @default(uuid(7))
+  userId           String
+  user             User            @relation("AdminPermissionGrantUser", fields: [userId], references: [id], onDelete: Cascade)
+  permission       AdminPermission
+  grantedByAdminId String
+  grantedByAdmin   User            @relation("AdminPermissionGrantGrantedBy", fields: [grantedByAdminId], references: [id], onDelete: Restrict)
+  grantedAt        DateTime        @default(now())
+
+  @@unique([userId, permission])
+  @@index([permission])
+  @@index([grantedByAdminId])
+}
+
 // Append-only: no updatedAt, no update paths in seed code. A hand-written
 // CHECK constraint enforces exactly one of userId/anonymousId being set.
 model ConsentRecord {
@@ -340,6 +385,30 @@ model AuditLog {
   @@index([targetType, targetId])
   @@index([actorId])
   @@index([occurredAt])
+}
+
+// DSA notice-and-action (docs/steps/1A.11-admin-api.md). `reporterId` is
+// nullable so a signed-out visitor can report; `targetType`/`targetId` are
+// polymorphic like `AuditLog.targetType`/`targetId`, no foreign key. Takedown
+// itself is a status change on the target (never a delete) recorded outside
+// this table; `status`/`adminId`/`resolution` here only track the report's
+// own lifecycle, never updated after creation except by the resolve action.
+model Report {
+  id         String       @id @default(uuid(7))
+  reporterId String?
+  reporter   User?        @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  targetType String
+  targetId   String
+  reason     String
+  status     ReportStatus @default(open)
+  adminId    String?
+  admin      User?        @relation("ReportResolvedByAdmin", fields: [adminId], references: [id], onDelete: SetNull)
+  resolution String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
 }
 
 // `emailSentAt`/`pushSentAt` are set by the worker's per-channel processor
