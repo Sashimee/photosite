@@ -151,6 +151,35 @@ describe('AuthProvider', () => {
     expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
   });
 
+  it('checkSession reports false for an anonymous 200 response', async () => {
+    mockedGet.mockResolvedValue({
+      data: { user: null },
+      error: undefined,
+      response: new Response(null, { status: 200 }),
+    });
+    let checkSession: (() => Promise<boolean>) | undefined;
+    function Capture() {
+      const auth = useAuth();
+      checkSession = auth.checkSession;
+      return <Text>{`status:${auth.status}`}</Text>;
+    }
+
+    render(
+      <AuthProvider>
+        <Capture />
+      </AuthProvider>,
+    );
+    await waitFor(() => screen.getByText('status:signed-out'));
+
+    let result: boolean | undefined;
+    await act(async () => {
+      result = await (checkSession as () => Promise<boolean>)();
+    });
+
+    expect(result).toBe(false);
+    await waitFor(() => screen.getByText('status:signed-out'));
+  });
+
   it('signIn persists the session to secure storage only', async () => {
     let signIn: ((...args: never[]) => unknown) | undefined;
     function Capture() {

@@ -88,6 +88,18 @@ describe('getSession', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('returns null when the API reports an anonymous session', async () => {
+    cookiesMock.mockResolvedValue({
+      getAll: () => [{ name: 'photoo_session', value: 'abc' }],
+    });
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ user: null }), { status: 200 }));
+
+    const { getSession } = await import('./session');
+    const user = await getSession();
+
+    expect(user).toBeNull();
+  });
+
   it('returns null when the API rejects the session', async () => {
     cookiesMock.mockResolvedValue({
       getAll: () => [{ name: 'photoo_session', value: 'expired' }],

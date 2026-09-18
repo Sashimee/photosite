@@ -41,18 +41,19 @@ export async function getSession(): Promise<SessionUser | null> {
     cache: 'no-store',
   });
 
-  if (response.status === 401) {
-    return null;
-  }
   if (!data) {
-    // Anything other than 200/401 - a 403 from the edge, a 502, a blip -
-    // used to throw here, which blanked the whole page behind the error
-    // boundary just because the session could not be read. Degrade to
-    // signed-out and log instead: a visitor who cannot be identified is a
-    // visitor, not an outage.
-    console.error(
-      `Session lookup failed with HTTP ${String(response.status)}; treating the visitor as signed out`,
-    );
+    // A 401 here means the cookie we forwarded is invalid or expired, not
+    // that the visitor is anonymous (an anonymous caller gets 200 with a
+    // null user - see auth.controller.ts). Anything else - a 403 from the
+    // edge, a 502, a blip - used to throw here, which blanked the whole page
+    // behind the error boundary just because the session could not be read.
+    // Degrade to signed-out and log instead: a visitor who cannot be
+    // identified is a visitor, not an outage.
+    if (response.status !== 401) {
+      console.error(
+        `Session lookup failed with HTTP ${String(response.status)}; treating the visitor as signed out`,
+      );
+    }
     return null;
   }
   return data.user;

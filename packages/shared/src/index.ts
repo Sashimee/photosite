@@ -159,6 +159,7 @@ export {
   RequestPasswordResetRequestSchema,
   RequestPasswordResetResponseSchema,
   SIGNUP_ROLES,
+  SessionQueryResponseSchema,
   SessionResponseSchema,
   SignInRequestSchema,
   SignInResponseSchema,
