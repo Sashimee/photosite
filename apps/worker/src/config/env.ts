@@ -103,6 +103,14 @@ const BaseEnvSchema = z.object({
     .positive()
     .default(24 * 60 * 60 * 1000),
 
+  WORKER_CONCURRENCY_GDPR_EXPORT: z.coerce.number().int().positive().default(1),
+  WORKER_CONCURRENCY_GDPR_SWEEP: z.coerce.number().int().positive().default(1),
+  GDPR_SWEEP_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60 * 60 * 1000),
+
   SENTRY_DSN: OptionalUrlSchema,
   SENTRY_ENVIRONMENT: optionalNonEmpty(),
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
