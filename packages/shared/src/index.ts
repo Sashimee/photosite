@@ -61,6 +61,8 @@ export {
   type NotificationType,
   type LedgerEntryType,
   type DisputeStatus,
+  FEATURE_FLAG_KEYS,
+  type FeatureFlagKey,
 } from './enums.js';
 
 export {
@@ -175,7 +177,7 @@ export {
 } from './contract/auth.js';
 
 export { CitiesQuerySchema, CitySummarySchema } from './contract/cities.js';
-export { CountrySummarySchema } from './contract/countries.js';
+export { CountrySummarySchema, PolicyVersionResponseSchema } from './contract/countries.js';
 
 export {
   AttachPortfolioImageRequestSchema,
@@ -306,6 +308,9 @@ export {
   AdminAuditLogEntrySchema,
   AdminAuditLogQuerySchema,
   AdminBookingSchema,
+  AdminCountryLegalTextsResponseSchema,
+  AdminCountrySchema,
+  AdminLegalTextVersionSchema,
   AdminMeSchema,
   AdminProvenanceCheckSchema,
   AdminReportSchema,
@@ -313,7 +318,10 @@ export {
   AdminUserSchema,
   AdminUserSearchQuerySchema,
   AdminVerificationCasesQuerySchema,
+  FEATURE_FLAG_DESCRIPTIONS,
+  FeatureFlagStateSchema,
   PlatformSettingsSchema,
+  PublishLegalTextRequestSchema,
   RefundBookingRequestSchema,
   RejectProvenanceCheckRequestSchema,
   RejectVerificationCaseRequestSchema,
@@ -322,6 +330,8 @@ export {
   SetUserRolesRequestSchema,
   SuspendUserRequestSchema,
   TakedownReportRequestSchema,
+  UpdateCountryRequestSchema,
+  UpdateFeatureFlagsRequestSchema,
   UpdatePlatformSettingsRequestSchema,
 } from './contract/admin.js';
 

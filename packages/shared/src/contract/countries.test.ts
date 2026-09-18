@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CountrySummarySchema } from './countries.js';
+import { CountrySummarySchema, PolicyVersionResponseSchema } from './countries.js';
 
 describe('CountrySummarySchema', () => {
   const valid = {
@@ -27,5 +27,19 @@ describe('CountrySummarySchema', () => {
 
   it('rejects unknown keys', () => {
     expect(CountrySummarySchema.safeParse({ ...valid, vatRate: 17 }).success).toBe(false);
+  });
+});
+
+describe('PolicyVersionResponseSchema', () => {
+  it('accepts a published version', () => {
+    expect(PolicyVersionResponseSchema.safeParse({ policyVersion: '3' }).success).toBe(true);
+  });
+
+  it('accepts null, meaning nothing has been published yet', () => {
+    expect(PolicyVersionResponseSchema.safeParse({ policyVersion: null }).success).toBe(true);
+  });
+
+  it('rejects an empty string', () => {
+    expect(PolicyVersionResponseSchema.safeParse({ policyVersion: '' }).success).toBe(false);
   });
 });

@@ -182,3 +182,10 @@ export const NOTIFICATION_TYPES = [
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+// Feature flags are booleans the admin can toggle at runtime, but the set of
+// known flags is fixed here rather than free text, so a flag nothing reads
+// or a typo'd key turning a live one off can't happen (docs/steps/1D.7-settings.md).
+export const FEATURE_FLAG_KEYS = ['maintenanceMode', 'newSignupsPaused'] as const;
+
+export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];

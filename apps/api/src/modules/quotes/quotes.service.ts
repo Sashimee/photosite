@@ -16,6 +16,7 @@ import {
   decodeCreatedAtCursor,
   encodeCreatedAtCursor,
 } from '../../common/pagination/created-at-cursor.js';
+import { PlatformSettingsService } from '../../common/platform-settings/platform-settings.service.js';
 import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { ChatService } from '../chat/chat.service.js';
@@ -72,6 +73,7 @@ export class QuotesService {
     @Inject(QuotesRateLimitService) private readonly rateLimit: QuotesRateLimitService,
     @Inject(QUOTE_EVENTS) private readonly events: QuoteEvents,
     @Inject(ChatService) private readonly chat: ChatService,
+    @Inject(PlatformSettingsService) private readonly platformSettings: PlatformSettingsService,
     @Inject(Logger) private readonly logger: Logger,
     @Inject(APP_CONFIG) config: Env,
   ) {
@@ -564,7 +566,7 @@ export class QuotesService {
     totalCents: number;
     feePercent: number;
   }> {
-    const feePercent = await this.getFeePercent();
+    const feePercent = await this.platformSettings.getFeePercent();
     const totals = quoteTotals(lineItems, feePercent);
     if (totals.totalCents === 0) {
       throw unprocessable('The quote total must be greater than zero');
@@ -621,16 +623,5 @@ export class QuotesService {
       throw new Error(`quotes: profile country "${countryCode}" is missing from Country`);
     }
     return country.currency;
-  }
-
-  private async getFeePercent(): Promise<number> {
-    const setting = await this.prisma.client.platformSetting.findUnique({
-      where: { key: 'feePercent' },
-    });
-    const value = setting?.value;
-    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
-      throw new Error('quotes: PlatformSetting "feePercent" is missing or invalid');
-    }
-    return value;
   }
 }

@@ -1146,4 +1146,28 @@ describe('quotes integration', () => {
       expect(bySlug.get(photographerB.slug)?.id).toBe(photographerB.profileId);
     });
   });
+
+  // #193: a missing feePercent must fail loudly here, the same way it fails
+  // loudly through GET /v1/admin/settings (admin.integration.test.ts), never
+  // silently defaulting to 5%.
+  describe('a missing feePercent (#193)', () => {
+    it('fails to create a quote instead of defaulting to 5%', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const request = await createRequestAs(client.token);
+      const photographer = await createPublishedPhotographer('missing-fee');
+
+      const before = await prisma.platformSetting.findUniqueOrThrow({
+        where: { key: 'feePercent' },
+      });
+      await prisma.platformSetting.delete({ where: { key: 'feePercent' } });
+      try {
+        const response = await sendQuote(photographer.token, request.id);
+        expect(response.statusCode).toBe(500);
+      } finally {
+        await prisma.platformSetting.create({
+          data: { key: before.key, value: before.value as number, updatedByAdminId: null },
+        });
+      }
+    });
+  });
 });
