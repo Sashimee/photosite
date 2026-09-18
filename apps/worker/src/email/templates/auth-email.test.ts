@@ -41,6 +41,22 @@ describe('renderAuthEmail', () => {
     expect(message.text).toMatch(/sign in instead/);
   });
 
+  it('renders an account-deletion-requested job with the cancel link', () => {
+    const message = renderAuthEmail(
+      {
+        type: 'account-deletion-requested',
+        to: 'jane@example.com',
+        url: 'https://photoo.lu/account/deletion/cancel/req-1#token=abc',
+      },
+      'jane@example.com',
+    );
+    expect(message.subject).toMatch(/account deletion request/);
+    expect(message.text).toContain('https://photoo.lu/account/deletion/cancel/req-1#token=abc');
+    expect(message.html).toContain(
+      '<a href="https://photoo.lu/account/deletion/cancel/req-1#token=abc">',
+    );
+  });
+
   it('HTML-escapes a url containing an ampersand', () => {
     const message = renderAuthEmail(
       {

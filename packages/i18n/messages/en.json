@@ -365,6 +365,10 @@
       "subject": "Someone tried to sign up with your {appName} email",
       "body": "Someone tried to create a {appName} account with this email address. If that was you, sign in instead; if not, you can ignore this message."
     },
+    "accountDeletionRequested": {
+      "subject": "Your {appName} account deletion request",
+      "body": "We've received your request to delete your account. Your account is deactivated immediately. If you change your mind, you have 30 days to cancel by opening this link: {url}"
+    },
     "footer": {
       "preferences": "Manage your notification preferences: {url}"
     },

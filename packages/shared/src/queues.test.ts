@@ -106,6 +106,15 @@ describe('EmailJobSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts an account-deletion-requested job', () => {
+    const result = EmailJobSchema.safeParse({
+      type: 'account-deletion-requested',
+      to: 'client@photoo.test',
+      url: 'https://photoo.lu/account/deletion/cancel/abc#token=xyz',
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('rejects an unknown type', () => {
     expect(EmailJobSchema.safeParse({ type: 'newsletter', to: 'a@b.com' }).success).toBe(false);
   });
