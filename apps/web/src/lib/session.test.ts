@@ -55,6 +55,29 @@ describe('getSession', () => {
     expect(request.headers.get('cookie')).toBe('photoo_session=abc');
   });
 
+  // Better Auth renames the cookie to `__Secure-photoo_session` whenever it
+  // sets it over https, so every deployed environment sends that name and
+  // only local http sends the bare one. Matching the bare name alone made
+  // every signed-in page on the preview redirect back to sign-in.
+  it('forwards the __Secure- prefixed cookie that https environments send', async () => {
+    cookiesMock.mockResolvedValue({
+      getAll: () => [
+        { name: '__Secure-photoo_session', value: 'abc' },
+        { name: 'other', value: 'def' },
+      ],
+    });
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ user: sampleUser }), { status: 200 }),
+    );
+
+    const { getSession } = await import('./session');
+    const user = await getSession();
+
+    expect(user).toEqual(sampleUser);
+    const [request] = fetchMock.mock.calls[0] as [Request];
+    expect(request.headers.get('cookie')).toBe('__Secure-photoo_session=abc');
+  });
+
   it('returns null without calling the API when there is no session cookie', async () => {
     cookiesMock.mockResolvedValue({ getAll: () => [{ name: 'other', value: 'def' }] });
 
@@ -79,17 +102,40 @@ describe('getSession', () => {
     expect(user).toBeNull();
   });
 
-  it('throws instead of treating an API failure as signed out', async () => {
+  // This deliberately reverses the earlier "fail loudly" choice. Throwing
+  // here put every server-rendered page behind the error boundary whenever
+  // the session could not be read - on the preview, a 403 from the edge
+  // blanked the entire site while the static home page kept working. The
+  // failure is still loud in the logs (and will reach Sentry with 1E.2a);
+  // it just no longer costs the visitor the page they asked for.
+  it('logs and treats an unexpected API status as signed out', async () => {
     cookiesMock.mockResolvedValue({
       getAll: () => [{ name: 'photoo_session', value: 'abc' }],
     });
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ code: 'INTERNAL' }), { status: 500 }),
     );
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const { getSession } = await import('./session');
+    const user = await getSession();
+
+    expect(user).toBeNull();
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('HTTP 500'));
+    consoleError.mockRestore();
+  });
+
+  it('forwards a 403 from the edge as signed out rather than an error page', async () => {
+    cookiesMock.mockResolvedValue({
+      getAll: () => [{ name: '__Secure-photoo_session', value: 'abc' }],
+    });
+    fetchMock.mockResolvedValue(new Response('', { status: 403 }));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     const { getSession } = await import('./session');
 
-    await expect(getSession()).rejects.toThrow('HTTP 500');
+    await expect(getSession()).resolves.toBeNull();
+    consoleError.mockRestore();
   });
 });
 
