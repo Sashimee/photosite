@@ -125,7 +125,14 @@ export const DATA_REQUEST_TYPES = ['export', 'delete'] as const;
 
 export type DataRequestType = (typeof DATA_REQUEST_TYPES)[number];
 
-export const DATA_REQUEST_STATUSES = ['pending', 'processing', 'completed', 'failed'] as const;
+export const DATA_REQUEST_STATUSES = [
+  'pending',
+  'processing',
+  'ready',
+  'completed',
+  'failed',
+  'cancelled',
+] as const;
 
 export type DataRequestStatus = (typeof DATA_REQUEST_STATUSES)[number];
 

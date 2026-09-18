@@ -104,6 +104,10 @@ export {
   EmailJobSchema,
   FILE_SCAN_QUEUE_NAME,
   FileScanJobSchema,
+  GDPR_EXPORT_QUEUE_NAME,
+  GDPR_SWEEP_QUEUE_NAME,
+  GdprExportJobSchema,
+  GdprSweepJobSchema,
   IMAGE_PROCESS_QUEUE_NAME,
   ImageProcessJobSchema,
   NOTIFICATIONS_CLEANUP_QUEUE_NAME,
@@ -128,6 +132,8 @@ export {
   UploadsCleanupJobSchema,
   type EmailJob,
   type FileScanJob,
+  type GdprExportJob,
+  type GdprSweepJob,
   type ImageProcessJob,
   type NotificationsCleanupJob,
   type NotifyJob,
@@ -328,9 +334,13 @@ export {
 export {
   ConsentPurposeSchema,
   ConsentRecordSchema,
+  ConsentsResponseSchema,
+  ConsentStateEntrySchema,
   CreateConsentRequestSchema,
   CreateDataRequestRequestSchema,
+  DataRequestDownloadResponseSchema,
   DataRequestSchema,
+  UpdateConsentsRequestSchema,
 } from './contract/gdpr.js';
 
 export {
