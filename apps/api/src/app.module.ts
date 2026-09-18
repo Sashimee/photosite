@@ -11,6 +11,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { ChatModule } from './modules/chat/chat.module.js';
 import { CitiesModule } from './modules/cities/cities.module.js';
 import { CountriesModule } from './modules/countries/countries.module.js';
+import { GdprModule } from './modules/gdpr/gdpr.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { ProductsModule } from './modules/products/products.module.js';
 import { ProfilesModule } from './modules/profiles/profiles.module.js';
@@ -46,6 +47,7 @@ import { StorageModule } from './storage/storage.module.js';
     VerificationModule,
     AdminModule,
     ReportsModule,
+    GdprModule,
     OpenapiModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],

@@ -123,7 +123,13 @@ export class AuthController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: false }) reply: FastifyReply,
   ): Promise<void> {
-    const input = body as { email: string; password: string; roles: UserRole[]; locale: string };
+    const input = body as {
+      email: string;
+      password: string;
+      roles: UserRole[];
+      locale: string;
+      anonymousId?: string;
+    };
     await this.rateLimit.enforce('sign-up', request.ip);
 
     const compromised = await checkPasswordCompromised(input.password, this.logger);
@@ -152,11 +158,30 @@ export class AuthController {
         asResponse: true,
       });
       const parsed = await applyFetchResponse<{ user: BetterAuthUserRow }>(response, reply);
+      if (input.anonymousId) {
+        await this.linkAnonymousConsents(input.anonymousId, parsed.user.id);
+      }
       reply.status(201);
       reply.send({ user: mapUser(parsed.user) });
     } catch (error) {
       rethrowAsHttpException(error);
     }
+  }
+
+  // Consent records made before sign-in are keyed by a client-generated
+  // `anonymousId` (contract/gdpr.ts `CreateConsentRequestSchema`); this is
+  // the one point where they get attached to the account that made them
+  // (docs/steps/1A.12-gdpr.md "Consent records"). `anonymousId` is cleared
+  // as `userId` is set: `ConsentRecord`'s CHECK constraint requires exactly
+  // one of the two to be non-null, and a linked record is a user record
+  // from here on. `userId: null` in the `where` keeps a second sign-up
+  // reusing the same id from stealing rows already linked to an earlier
+  // account.
+  private async linkAnonymousConsents(anonymousId: string, userId: string): Promise<void> {
+    await this.prisma.client.consentRecord.updateMany({
+      where: { anonymousId, userId: null },
+      data: { userId, anonymousId: null },
+    });
   }
 
   @Post('sign-in')

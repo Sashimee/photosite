@@ -43,7 +43,18 @@ export default function SignUpScreen() {
     setFieldErrors({});
     setSubmitError(null);
     setIsSubmitting(true);
-    const { error } = await api.POST('/v1/auth/sign-up', { body: parsed.data });
+    // Built key-by-key rather than spread from `parsed.data`: there is no
+    // consent banner in the app yet (1C.8), so `anonymousId` is never set,
+    // and `exactOptionalPropertyTypes` rejects the schema's `T | undefined`
+    // for it against the client's `T | omitted` optional field.
+    const { error } = await api.POST('/v1/auth/sign-up', {
+      body: {
+        email: parsed.data.email,
+        password: parsed.data.password,
+        roles: parsed.data.roles,
+        locale: parsed.data.locale,
+      },
+    });
     setIsSubmitting(false);
 
     if (error) {

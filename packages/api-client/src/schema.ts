@@ -124,6 +124,7 @@ export interface paths {
                          * @enum {string}
                          */
                         locale: "en" | "fr" | "de" | "pt" | "es";
+                        anonymousId?: string;
                     };
                 };
             };

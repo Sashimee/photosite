@@ -66,4 +66,23 @@ describe('buildPinoOptions redaction', () => {
     expect(line.secret).toBe('[Redacted]');
     expect(line.name).toBe('ok');
   });
+
+  it('redacts a consent record ip/userAgent, at top level and one level deep', () => {
+    const { stream, lines } = collectLogs();
+    const logger = pino({ redact: getRedact() }, stream);
+
+    logger.info({
+      ip: '203.0.113.1',
+      userAgent: 'Mozilla/5.0',
+      consent: { ip: '203.0.113.1', userAgent: 'Mozilla/5.0' },
+    });
+
+    const [line] = lines() as [
+      { ip: string; userAgent: string; consent: { ip: string; userAgent: string } },
+    ];
+    expect(line.ip).toBe('[Redacted]');
+    expect(line.userAgent).toBe('[Redacted]');
+    expect(line.consent.ip).toBe('[Redacted]');
+    expect(line.consent.userAgent).toBe('[Redacted]');
+  });
 });

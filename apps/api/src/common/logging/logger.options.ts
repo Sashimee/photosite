@@ -29,6 +29,13 @@ export const REDACT_PATHS = [
   'businessRegistrationNumber',
   'rejectionReason',
   'downloadUrl',
+  // ConsentRecord's `ip`/`userAgent` are stored as evidence of consent
+  // (docs/steps/1A.12-gdpr.md "Consent records"), which makes them PII even
+  // though neither is a secret like the entries above.
+  '*.ip',
+  '*.userAgent',
+  'ip',
+  'userAgent',
   // Not a bare `*.url`/`*.otpauthUrl`: pino's `*` wildcard matches one level
   // under any object, which would also swallow `req.url` (the serializer
   // below already strips its query string and masks reset tokens, and it
