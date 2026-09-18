@@ -2072,6 +2072,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/policy-version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the currently published consent policy version */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The current policy version, or null if none has been published yet */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PolicyVersion"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/photographers/{slug}/products": {
         parameters: {
             query?: never;
@@ -7609,6 +7645,11 @@ export interface paths {
                     "application/json": {
                         feePercent?: number;
                         autoReleaseDays?: number;
+                        featureFlags?: {
+                            /** @enum {string} */
+                            key: "maintenanceMode" | "newSignupsPaused";
+                            enabled: boolean;
+                        }[];
                     };
                 };
             };
@@ -7660,6 +7701,305 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/v1/admin/countries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all countries, enabled or not, with their account counts */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Every country */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminCountry"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/countries/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update a country: enabled, VAT rate or default locale */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description ISO 3166-1 alpha-2 country code */
+                    code: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        enabled?: boolean;
+                        vatRate?: number;
+                        /**
+                         * @description BCP 47 locale
+                         * @example en
+                         * @enum {string}
+                         */
+                        defaultLocale?: "en" | "fr" | "de" | "pt" | "es";
+                    };
+                };
+            };
+            responses: {
+                /** @description Country updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminCountry"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/admin/countries/{code}/legal-texts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the published legal text versions for a country */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description ISO 3166-1 alpha-2 country code */
+                    code: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The published versions, oldest first */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminCountryLegalTexts"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Publish a new legal text version for a country */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description ISO 3166-1 alpha-2 country code */
+                    code: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @example terms */
+                        kind: string;
+                        /**
+                         * @description BCP 47 locale
+                         * @example en
+                         * @enum {string}
+                         */
+                        locale: "en" | "fr" | "de" | "pt" | "es";
+                        content: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The new version, appended to the country’s history */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminCountryLegalTexts"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/admin/audit-log": {
@@ -9098,6 +9438,9 @@ export interface components {
              */
             defaultLocale: "en" | "fr" | "de" | "pt" | "es";
         };
+        PolicyVersion: {
+            policyVersion: string | null;
+        };
         Product: {
             /**
              * Format: uuid
@@ -10099,8 +10442,69 @@ export interface components {
             resolution: string | null;
         };
         PlatformSettings: {
-            feePercent: number;
+            feePercent: number | null;
             autoReleaseDays: number;
+            featureFlags: components["schemas"]["FeatureFlagState"][];
+        };
+        FeatureFlagState: {
+            /** @enum {string} */
+            key: "maintenanceMode" | "newSignupsPaused";
+            description: string;
+            enabled: boolean;
+        };
+        AdminCountry: {
+            /**
+             * @description ISO 3166-1 alpha-2 country code
+             * @example LU
+             */
+            code: string;
+            name: string;
+            enabled: boolean;
+            /**
+             * @description ISO 4217 currency code
+             * @example EUR
+             */
+            currency: string;
+            vatRate: number;
+            /**
+             * @description BCP 47 locale
+             * @example en
+             * @enum {string}
+             */
+            defaultLocale: "en" | "fr" | "de" | "pt" | "es";
+            accountCount: number;
+        };
+        AdminCountryLegalTexts: {
+            /**
+             * @description ISO 3166-1 alpha-2 country code
+             * @example LU
+             */
+            countryCode: string;
+            versions: components["schemas"]["AdminLegalTextVersion"][];
+        };
+        AdminLegalTextVersion: {
+            version: string;
+            /** @example terms */
+            kind: string;
+            /**
+             * @description BCP 47 locale
+             * @example en
+             * @enum {string}
+             */
+            locale: "en" | "fr" | "de" | "pt" | "es";
+            content: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            publishedAt: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            publishedByAdminId: string;
         };
         AdminAuditLogEntry: {
             /**

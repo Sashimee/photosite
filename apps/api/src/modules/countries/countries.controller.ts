@@ -21,3 +21,13 @@ export class CountriesController {
     return this.countries.getVerificationRequirements(code);
   }
 }
+
+@Controller('policy-version')
+export class PolicyVersionController {
+  constructor(@Inject(CountriesService) private readonly countries: CountriesService) {}
+
+  @Get()
+  async get() {
+    return this.countries.getPolicyVersion();
+  }
+}

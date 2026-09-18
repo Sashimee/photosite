@@ -45,6 +45,11 @@ import { AdminUsersService } from './admin-users.service.js';
     AdminReportsRepository,
     OriginGuard,
   ],
-  exports: [AdminAccessService, AdminAuditService, AdminPermissionsService],
+  exports: [
+    AdminAccessService,
+    AdminAuditService,
+    AdminPermissionsService,
+    AdminMutationRateLimitService,
+  ],
 })
 export class AdminModule {}

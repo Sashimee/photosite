@@ -939,6 +939,23 @@
         ],
         "additionalProperties": false
       },
+      "PolicyVersion": {
+        "type": "object",
+        "properties": {
+          "policyVersion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 20
+          }
+        },
+        "required": [
+          "policyVersion"
+        ],
+        "additionalProperties": false
+      },
       "Product": {
         "type": "object",
         "properties": {
@@ -3367,7 +3384,10 @@
         "type": "object",
         "properties": {
           "feePercent": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 100
           },
@@ -3375,11 +3395,176 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 60
+          },
+          "featureFlags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeatureFlagState"
+            }
           }
         },
         "required": [
           "feePercent",
-          "autoReleaseDays"
+          "autoReleaseDays",
+          "featureFlags"
+        ],
+        "additionalProperties": false
+      },
+      "FeatureFlagState": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "maintenanceMode",
+              "newSignupsPaused"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "description",
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "AdminCountry": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code",
+            "example": "LU"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "ISO 4217 currency code",
+            "example": "EUR"
+          },
+          "vatRate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "defaultLocale": {
+            "type": "string",
+            "enum": [
+              "en",
+              "fr",
+              "de",
+              "pt",
+              "es"
+            ],
+            "description": "BCP 47 locale",
+            "example": "en"
+          },
+          "accountCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "enabled",
+          "currency",
+          "vatRate",
+          "defaultLocale",
+          "accountCount"
+        ],
+        "additionalProperties": false
+      },
+      "AdminCountryLegalTexts": {
+        "type": "object",
+        "properties": {
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code",
+            "example": "LU"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminLegalTextVersion"
+            }
+          }
+        },
+        "required": [
+          "countryCode",
+          "versions"
+        ],
+        "additionalProperties": false
+      },
+      "AdminLegalTextVersion": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "example": "terms"
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en",
+              "fr",
+              "de",
+              "pt",
+              "es"
+            ],
+            "description": "BCP 47 locale",
+            "example": "en"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200000
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "publishedByAdminId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          }
+        },
+        "required": [
+          "version",
+          "kind",
+          "locale",
+          "content",
+          "publishedAt",
+          "publishedByAdminId"
         ],
         "additionalProperties": false
       },
@@ -6391,6 +6576,26 @@
                   "items": {
                     "$ref": "#/components/schemas/CountrySummary"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/policy-version": {
+      "get": {
+        "summary": "Get the currently published consent policy version",
+        "tags": [
+          "countries"
+        ],
+        "responses": {
+          "200": {
+            "description": "The current policy version, or null if none has been published yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyVersion"
                 }
               }
             }
@@ -13377,6 +13582,31 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 60
+                  },
+                  "featureFlags": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "enum": [
+                            "maintenanceMode",
+                            "newSignupsPaused"
+                          ]
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "enabled"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 2
                   }
                 },
                 "additionalProperties": false
@@ -13417,6 +13647,375 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/countries": {
+      "get": {
+        "summary": "List all countries, enabled or not, with their account counts",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "superadmin",
+        "responses": {
+          "200": {
+            "description": "Every country",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminCountry"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/countries/{code}": {
+      "patch": {
+        "summary": "Update a country: enabled, VAT rate or default locale",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "superadmin",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$",
+              "description": "ISO 3166-1 alpha-2 country code",
+              "example": "LU"
+            },
+            "required": true,
+            "description": "ISO 3166-1 alpha-2 country code",
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "vatRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "defaultLocale": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "fr",
+                      "de",
+                      "pt",
+                      "es"
+                    ],
+                    "description": "BCP 47 locale",
+                    "example": "en"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Country updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCountry"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/countries/{code}/legal-texts": {
+      "get": {
+        "summary": "List the published legal text versions for a country",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "superadmin",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$",
+              "description": "ISO 3166-1 alpha-2 country code",
+              "example": "LU"
+            },
+            "required": true,
+            "description": "ISO 3166-1 alpha-2 country code",
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The published versions, oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCountryLegalTexts"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Publish a new legal text version for a country",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "superadmin",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$",
+              "description": "ISO 3166-1 alpha-2 country code",
+              "example": "LU"
+            },
+            "required": true,
+            "description": "ISO 3166-1 alpha-2 country code",
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60,
+                    "example": "terms"
+                  },
+                  "locale": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "fr",
+                      "de",
+                      "pt",
+                      "es"
+                    ],
+                    "description": "BCP 47 locale",
+                    "example": "en"
+                  },
+                  "content": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200000
+                  }
+                },
+                "required": [
+                  "kind",
+                  "locale",
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new version, appended to the country’s history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCountryLegalTexts"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {

@@ -1,5 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { UpdatePlatformSettingsRequestSchema } from '@photoo/shared';
+import {
+  FEATURE_FLAG_DESCRIPTIONS,
+  FEATURE_FLAG_KEYS,
+  type FeatureFlagKey,
+  type UpdatePlatformSettingsRequestSchema,
+} from '@photoo/shared';
 import type { z } from 'zod';
 import {
   PlatformSettingsService,
@@ -14,6 +19,20 @@ interface AdminActor {
   id: string;
 }
 
+export interface FeatureFlagState {
+  key: FeatureFlagKey;
+  description: string;
+  enabled: boolean;
+}
+
+export interface AdminPlatformSettings extends PlatformSettings {
+  featureFlags: FeatureFlagState[];
+}
+
+function featureFlagSettingKey(key: FeatureFlagKey): string {
+  return `featureFlag.${key}`;
+}
+
 @Injectable()
 export class AdminSettingsService {
   constructor(
@@ -22,30 +41,68 @@ export class AdminSettingsService {
     @Inject(AdminAuditService) private readonly auditService: AdminAuditService,
   ) {}
 
-  get(): Promise<PlatformSettings> {
-    return this.platformSettings.get();
+  async get(): Promise<AdminPlatformSettings> {
+    const settings = await this.platformSettings.get();
+    const featureFlags = await this.getFeatureFlags();
+    return { ...settings, featureFlags };
+  }
+
+  private async getFeatureFlags(): Promise<FeatureFlagState[]> {
+    const rows = await this.prisma.client.platformSetting.findMany({
+      where: { key: { in: FEATURE_FLAG_KEYS.map(featureFlagSettingKey) } },
+    });
+    const byKey = new Map(rows.map((row) => [row.key, row.value]));
+    return FEATURE_FLAG_KEYS.map((key) => ({
+      key,
+      description: FEATURE_FLAG_DESCRIPTIONS[key],
+      enabled: byKey.get(featureFlagSettingKey(key)) === true,
+    }));
   }
 
   async patch(
     admin: AdminActor,
     changes: UpdateInput,
     ip: string | undefined,
-  ): Promise<PlatformSettings> {
-    const before = await this.platformSettings.get();
-    const after: PlatformSettings = {
+  ): Promise<AdminPlatformSettings> {
+    const before = await this.get();
+    const flagChanges = new Map(
+      (changes.featureFlags ?? []).map((entry) => [entry.key, entry.enabled]),
+    );
+
+    const after: AdminPlatformSettings = {
       feePercent: changes.feePercent ?? before.feePercent,
       autoReleaseDays: changes.autoReleaseDays ?? before.autoReleaseDays,
+      featureFlags: before.featureFlags.map((flag) => {
+        const enabled = flagChanges.get(flag.key);
+        return enabled === undefined ? flag : { ...flag, enabled };
+      }),
     };
 
     await this.prisma.client.$transaction(async (tx) => {
-      for (const [key, value] of Object.entries(changes)) {
-        if (value === undefined) {
-          continue;
-        }
+      if (changes.feePercent !== undefined) {
         await tx.platformSetting.upsert({
-          where: { key },
-          create: { key, value, updatedByAdminId: admin.id },
-          update: { value, updatedByAdminId: admin.id },
+          where: { key: 'feePercent' },
+          create: { key: 'feePercent', value: changes.feePercent, updatedByAdminId: admin.id },
+          update: { value: changes.feePercent, updatedByAdminId: admin.id },
+        });
+      }
+      if (changes.autoReleaseDays !== undefined) {
+        await tx.platformSetting.upsert({
+          where: { key: 'autoReleaseDays' },
+          create: {
+            key: 'autoReleaseDays',
+            value: changes.autoReleaseDays,
+            updatedByAdminId: admin.id,
+          },
+          update: { value: changes.autoReleaseDays, updatedByAdminId: admin.id },
+        });
+      }
+      for (const [key, enabled] of flagChanges) {
+        const settingKey = featureFlagSettingKey(key);
+        await tx.platformSetting.upsert({
+          where: { key: settingKey },
+          create: { key: settingKey, value: enabled, updatedByAdminId: admin.id },
+          update: { value: enabled, updatedByAdminId: admin.id },
         });
       }
 
@@ -59,8 +116,6 @@ export class AdminSettingsService {
         ip: ip ?? null,
       });
     });
-
-    this.platformSettings.invalidate();
 
     return after;
   }
