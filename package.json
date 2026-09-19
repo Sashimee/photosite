@@ -36,7 +36,7 @@
     "@photoo/config": "workspace:*",
     "@photoo/shared": "workspace:*",
     "@playwright/test": "1.63.0",
-    "@types/node": "26.5.1",
+    "@types/node": "26.6.1",
     "eslint": "9.39.5",
     "husky": "9.1.7",
     "lint-staged": "17.5.1",
