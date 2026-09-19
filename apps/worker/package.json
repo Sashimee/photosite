@@ -18,8 +18,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1132.0",
-    "@aws-sdk/lib-storage": "3.1132.0",
+    "@aws-sdk/client-s3": "3.1133.0",
+    "@aws-sdk/lib-storage": "3.1133.0",
     "@nestjs/common": "12.0.3",
     "@nestjs/core": "12.0.3",
     "@photoo/db": "workspace:*",
@@ -46,7 +46,7 @@
     "@nestjs/testing": "12.0.3",
     "@photoo/config": "workspace:*",
     "@types/archiver": "7.0.0",
-    "@types/node": "26.5.1",
+    "@types/node": "26.6.1",
     "@types/nodemailer": "8.0.2",
     "@types/yauzl-promise": "4.0.1",
     "@vitest/coverage-v8": "5.0.1",

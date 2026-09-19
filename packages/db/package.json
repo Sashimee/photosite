@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@photoo/config": "workspace:*",
-    "@types/node": "26.5.1",
+    "@types/node": "26.6.1",
     "@vitest/coverage-v8": "5.0.1",
     "eslint": "9.39.5",
     "prisma": "7.10.0",
