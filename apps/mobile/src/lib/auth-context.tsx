@@ -56,7 +56,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const checkSession = useCallback(async () => {
     const { data } = await api.GET('/v1/auth/session');
-    if (!data) {
+    if (!data?.user) {
       return false;
     }
     setUser(data.user);
@@ -92,7 +92,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (cancelled) {
         return;
       }
-      if (data) {
+      if (data?.user) {
         setUser(data.user);
         setStatus('signed-in');
         return;

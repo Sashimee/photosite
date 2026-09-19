@@ -72,7 +72,7 @@ describe('useSession', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('reports unauthenticated when the session lookup fails', async () => {
+  it('reports unauthenticated when the session lookup is rejected', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ code: 'UNAUTHORIZED' }), { status: 401 }));
@@ -83,6 +83,22 @@ describe('useSession', () => {
 
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'));
     expect(screen.getByTestId('email')).toHaveTextContent('none');
+  });
+
+  it('reports unauthenticated for an anonymous 200 response without treating it as an error', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ user: null }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const Probe = await loadProbe();
+
+    render(<Probe initialUser={null} />);
+
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'));
+    expect(screen.getByTestId('email')).toHaveTextContent('none');
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 
   it('refreshes on demand', async () => {

@@ -21,8 +21,19 @@ export default defineConfig({
     // Chromium only - WebKit will not install on this stack's host (missing
     // system libraries). #180 (sign-in page downloading a file on a real
     // browser) never reproduced under Chromium; this suite cannot see it.
+    //
+    // `smoke-public` carries no storageState or `setup` dependency because
+    // the preview's seed password (deploy-preview.yml) is a pending human
+    // follow-up, not always available - the signed-out pages must stay
+    // checkable without it.
     {
-      name: 'smoke',
+      name: 'smoke-public',
+      testMatch: /signed-out\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'smoke-authenticated',
+      testMatch: /signed-in\.spec\.ts/,
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], storageState: AUTH_STATE_PATH },
     },
