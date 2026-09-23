@@ -84,6 +84,18 @@ describe('renderNotifyEmail', () => {
     expect(message.html).toContain('<a href="https://photoo.lu/en/account/notifications">');
   });
 
+  it('HTML-escapes a url containing an ampersand instead of rendering it as markup', () => {
+    const message = renderNotifyEmail(
+      'quote_received',
+      PAYLOAD,
+      'en',
+      'jane@example.com',
+      'https://photoo.lu?ref=a&b=2',
+    );
+    expect(message.html).toContain('ref=a&amp;b=2');
+    expect(message.html).not.toContain('ref=a&b=2');
+  });
+
   it('renders every quote notification type without throwing', () => {
     const types = [
       'quote_received',
