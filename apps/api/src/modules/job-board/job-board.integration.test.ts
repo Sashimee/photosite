@@ -1047,6 +1047,215 @@ describe('job board integration', () => {
     });
   });
 
+  describe('moderation takedown (deletedAt)', () => {
+    it("hides a taken-down offer from the public list, 404s it by slug, and drops it from the owner's own list and detail", async () => {
+      const professional = await createProfessional('moderated-offer');
+      const offer = await createPublishedOffer(professional.token);
+
+      const listBefore = await fastify().inject({ method: 'GET', url: '/v1/job-offers?limit=100' });
+      expect(
+        listBefore.json<PaginatedBody<PublicJobOfferSummaryBody>>().items.map((i) => i.id),
+      ).toContain(offer.id);
+      const ownListBefore = await fastify().inject({
+        method: 'GET',
+        url: '/v1/me/job-offers?limit=100',
+        headers: authHeaders(professional.token),
+      });
+      expect(ownListBefore.json<PaginatedBody<JobOfferBody>>().items.map((i) => i.id)).toContain(
+        offer.id,
+      );
+
+      await prisma.jobOffer.update({ where: { id: offer.id }, data: { deletedAt: new Date() } });
+
+      const list = await fastify().inject({ method: 'GET', url: '/v1/job-offers?limit=100' });
+      expect(
+        list.json<PaginatedBody<PublicJobOfferSummaryBody>>().items.map((i) => i.id),
+      ).not.toContain(offer.id);
+
+      const bySlug = await fastify().inject({ method: 'GET', url: `/v1/job-offers/${offer.slug}` });
+      expect(bySlug.statusCode).toBe(404);
+
+      const ownList = await fastify().inject({
+        method: 'GET',
+        url: '/v1/me/job-offers?limit=100',
+        headers: authHeaders(professional.token),
+      });
+      expect(ownList.json<PaginatedBody<JobOfferBody>>().items.map((i) => i.id)).not.toContain(
+        offer.id,
+      );
+
+      const ownDetail = await fastify().inject({
+        method: 'GET',
+        url: `/v1/me/job-offers/${offer.id}`,
+        headers: authHeaders(professional.token),
+      });
+      expect(ownDetail.statusCode).toBe(404);
+    });
+
+    it('refuses an application to a taken-down offer with 409', async () => {
+      const professional = await createProfessional('moderated-offer-apply');
+      const offer = await createPublishedOffer(professional.token);
+      const photographer = await createPhotographer('moderated-offer-apply');
+
+      await prisma.jobOffer.update({ where: { id: offer.id }, data: { deletedAt: new Date() } });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/job-offers/${offer.id}/applications`,
+        headers: authHeaders(photographer.token),
+        payload: { message: 'Should be refused.' },
+      });
+      expect(response.statusCode).toBe(409);
+    });
+
+    it("clearing an offer's deletedAt restores its visibility everywhere, proving restore will work", async () => {
+      const professional = await createProfessional('moderated-offer-restore');
+      const offer = await createPublishedOffer(professional.token);
+
+      await prisma.jobOffer.update({ where: { id: offer.id }, data: { deletedAt: new Date() } });
+      const hiddenBySlug = await fastify().inject({
+        method: 'GET',
+        url: `/v1/job-offers/${offer.slug}`,
+      });
+      expect(hiddenBySlug.statusCode).toBe(404);
+
+      await prisma.jobOffer.update({ where: { id: offer.id }, data: { deletedAt: null } });
+
+      const restoredBySlug = await fastify().inject({
+        method: 'GET',
+        url: `/v1/job-offers/${offer.slug}`,
+      });
+      expect(restoredBySlug.statusCode).toBe(200);
+
+      const restoredOwnDetail = await fastify().inject({
+        method: 'GET',
+        url: `/v1/me/job-offers/${offer.id}`,
+        headers: authHeaders(professional.token),
+      });
+      expect(restoredOwnDetail.statusCode).toBe(200);
+
+      const list = await fastify().inject({ method: 'GET', url: '/v1/job-offers?limit=100' });
+      expect(
+        list.json<PaginatedBody<PublicJobOfferSummaryBody>>().items.map((i) => i.id),
+      ).toContain(offer.id);
+    });
+
+    it('hides a taken-down application from both listReceived and listMine, and restores it once deletedAt is cleared', async () => {
+      const professional = await createProfessional('moderated-application');
+      const offer = await createPublishedOffer(professional.token);
+      const photographer = await createPhotographer('moderated-application');
+      const applyResponse = await fastify().inject({
+        method: 'POST',
+        url: `/v1/job-offers/${offer.id}/applications`,
+        headers: authHeaders(photographer.token),
+        payload: { message: 'Fixture application to be moderated.' },
+      });
+      const application = applyResponse.json<ApplicationBody>();
+
+      await prisma.jobApplication.update({
+        where: { id: application.id },
+        data: { deletedAt: new Date() },
+      });
+
+      const receivedHidden = await fastify().inject({
+        method: 'GET',
+        url: `/v1/job-offers/${offer.id}/applications`,
+        headers: authHeaders(professional.token),
+      });
+      expect(
+        receivedHidden.json<PaginatedBody<ApplicationBody>>().items.map((i) => i.id),
+      ).not.toContain(application.id);
+
+      const mineHidden = await fastify().inject({
+        method: 'GET',
+        url: '/v1/me/job-applications',
+        headers: authHeaders(photographer.token),
+      });
+      expect(mineHidden.json<PaginatedBody<{ id: string }>>().items.map((i) => i.id)).not.toContain(
+        application.id,
+      );
+
+      await prisma.jobApplication.update({
+        where: { id: application.id },
+        data: { deletedAt: null },
+      });
+
+      const receivedRestored = await fastify().inject({
+        method: 'GET',
+        url: `/v1/job-offers/${offer.id}/applications`,
+        headers: authHeaders(professional.token),
+      });
+      expect(
+        receivedRestored.json<PaginatedBody<ApplicationBody>>().items.map((i) => i.id),
+      ).toContain(application.id);
+
+      const mineRestored = await fastify().inject({
+        method: 'GET',
+        url: '/v1/me/job-applications',
+        headers: authHeaders(photographer.token),
+      });
+      expect(mineRestored.json<PaginatedBody<{ id: string }>>().items.map((i) => i.id)).toContain(
+        application.id,
+      );
+    });
+
+    it('treats a taken-down application as not-found for a status change', async () => {
+      const professional = await createProfessional('moderated-application-status');
+      const offer = await createPublishedOffer(professional.token);
+      const photographer = await createPhotographer('moderated-application-status');
+      const applyResponse = await fastify().inject({
+        method: 'POST',
+        url: `/v1/job-offers/${offer.id}/applications`,
+        headers: authHeaders(photographer.token),
+        payload: { message: 'Fixture application.' },
+      });
+      const application = applyResponse.json<ApplicationBody>();
+
+      await prisma.jobApplication.update({
+        where: { id: application.id },
+        data: { deletedAt: new Date() },
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/job-applications/${application.id}/status`,
+        headers: authHeaders(professional.token),
+        payload: { status: 'shortlisted' },
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('does not interfere with GDPR erasure: a takedown survives closure, and a hypothetical restore never reopens it', async () => {
+      const professional = await createProfessional('moderation-gdpr-orthogonal');
+      const offer = await createPublishedOffer(professional.token);
+
+      await prisma.jobOffer.update({ where: { id: offer.id }, data: { deletedAt: new Date() } });
+
+      const deletion = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/data-requests',
+        headers: { ...authHeaders(professional.token), origin: 'http://localhost:3000' },
+        payload: { type: 'delete' },
+      });
+      expect(deletion.statusCode).toBe(201);
+
+      const afterErasure = await prisma.jobOffer.findUniqueOrThrow({ where: { id: offer.id } });
+      expect(afterErasure.status).toBe('closed');
+      expect(afterErasure.deletedAt).not.toBeNull();
+
+      await prisma.jobOffer.update({ where: { id: offer.id }, data: { deletedAt: null } });
+      const afterHypotheticalRestore = await prisma.jobOffer.findUniqueOrThrow({
+        where: { id: offer.id },
+      });
+      expect(afterHypotheticalRestore.status).toBe('closed');
+
+      const publicList = await fastify().inject({ method: 'GET', url: '/v1/job-offers?limit=100' });
+      expect(
+        publicList.json<PaginatedBody<PublicJobOfferSummaryBody>>().items.map((i) => i.id),
+      ).not.toContain(offer.id);
+    });
+  });
+
   describe('GDPR account deletion', () => {
     it("closes the professional's published offers and withdraws the photographer's submitted applications, removing the offer from the public endpoints", async () => {
       const professional = await createProfessional('gdpr-professional');

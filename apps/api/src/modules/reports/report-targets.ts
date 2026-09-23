@@ -38,6 +38,13 @@ export async function reportTargetExists(
           select: { id: true },
         })) !== null
       );
+    case 'job_application':
+      return (
+        (await client.jobApplication.findUnique({
+          where: { id: targetId },
+          select: { id: true },
+        })) !== null
+      );
   }
 }
 
@@ -79,6 +86,20 @@ export async function takeDownReportTarget(
     }
     case 'request': {
       const result = await tx.request.updateMany({
+        where: { id: targetId, deletedAt: null },
+        data: { deletedAt },
+      });
+      return result.count > 0;
+    }
+    case 'job_offer': {
+      const result = await tx.jobOffer.updateMany({
+        where: { id: targetId, deletedAt: null },
+        data: { deletedAt },
+      });
+      return result.count > 0;
+    }
+    case 'job_application': {
+      const result = await tx.jobApplication.updateMany({
         where: { id: targetId, deletedAt: null },
         data: { deletedAt },
       });

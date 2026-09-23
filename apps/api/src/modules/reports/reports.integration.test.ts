@@ -64,6 +64,9 @@ describe('reports integration', () => {
   const createdUserIds: string[] = [];
   const createdProfileIds: string[] = [];
   const createdRequestIds: string[] = [];
+  const createdProfessionalProfileIds: string[] = [];
+  const createdJobOfferIds: string[] = [];
+  const createdJobApplicationIds: string[] = [];
 
   function fastify() {
     return app.getHttpAdapter().getInstance();
@@ -259,6 +262,58 @@ describe('reports integration', () => {
     return fastify().inject({ method: 'GET', url: `/v1/photographers/${slug}` });
   }
 
+  async function createPublishedJobOffer(suffix: string) {
+    const owner = await signUpVerifyAndSignIn(['client'], `offer-owner-${suffix}`);
+    const professional = await prisma.professionalProfile.create({
+      data: { userId: owner.id, companyName: `Fx Reports Professional ${suffix}` },
+    });
+    createdProfessionalProfileIds.push(professional.id);
+    const offer = await prisma.jobOffer.create({
+      data: {
+        professionalId: professional.id,
+        slug: `fx-reports-offer-${suffix}-${RUN_ID}`,
+        title: `Fx Reports Job Offer ${suffix}`,
+        description: 'Fixture job offer for report/takedown tests',
+        category: 'wedding',
+        city: `Fx Reports City ${suffix}`,
+        countryCode: 'LU',
+        remote: true,
+        status: 'published',
+        publishedAt: new Date(),
+        expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+      },
+    });
+    createdJobOfferIds.push(offer.id);
+    return offer;
+  }
+
+  async function createJobApplication(jobOfferId: string, suffix: string) {
+    const applicant = await signUpVerifyAndSignIn(['photographer'], `applicant-${suffix}`);
+    const profile = await prisma.photographerProfile.create({
+      data: {
+        userId: applicant.id,
+        slug: `fx-reports-applicant-${suffix}-${RUN_ID}`,
+        displayName: `Fx Reports Applicant ${suffix}`,
+        bio: {},
+        links: { other: [] },
+        categories: ['wedding'],
+        languages: ['en'],
+        city: `Fx Reports City ${suffix}`,
+        countryCode: 'LU',
+      },
+    });
+    createdProfileIds.push(profile.id);
+    const application = await prisma.jobApplication.create({
+      data: {
+        jobOfferId,
+        photographerId: profile.id,
+        message: `Fixture application message for ${suffix}`,
+      },
+    });
+    createdJobApplicationIds.push(application.id);
+    return application;
+  }
+
   async function clearRateLimitKeys(): Promise<void> {
     const patterns = [
       `rate-limit:auth:*:${FAKE_IP}`,
@@ -308,7 +363,13 @@ describe('reports integration', () => {
             })
           ).map((image) => image.id)
         : [];
-    const reportTargetIds = [...createdProfileIds, ...imageIds, ...createdRequestIds];
+    const reportTargetIds = [
+      ...createdProfileIds,
+      ...imageIds,
+      ...createdRequestIds,
+      ...createdJobOfferIds,
+      ...createdJobApplicationIds,
+    ];
     if (reportTargetIds.length > 0 || createdUserIds.length > 0) {
       await prisma.report.deleteMany({
         where: {
@@ -324,6 +385,19 @@ describe('reports integration', () => {
     }
     if (createdRequestIds.length > 0) {
       await prisma.request.deleteMany({ where: { id: { in: createdRequestIds } } });
+    }
+    // `JobApplication.photographerId` is `Restrict`, so applications must go
+    // before the photographer profiles they reference.
+    if (createdJobApplicationIds.length > 0) {
+      await prisma.jobApplication.deleteMany({ where: { id: { in: createdJobApplicationIds } } });
+    }
+    if (createdJobOfferIds.length > 0) {
+      await prisma.jobOffer.deleteMany({ where: { id: { in: createdJobOfferIds } } });
+    }
+    if (createdProfessionalProfileIds.length > 0) {
+      await prisma.professionalProfile.deleteMany({
+        where: { id: { in: createdProfessionalProfileIds } },
+      });
     }
     if (createdUserIds.length > 0) {
       await prisma.upload.deleteMany({ where: { ownerId: { in: createdUserIds } } });
@@ -890,6 +964,99 @@ describe('reports integration', () => {
 
       const dbRow = await prisma.request.findUniqueOrThrow({ where: { id: request.id } });
       expect(dbRow.deletedAt).not.toBeNull();
+    });
+
+    it('takes down a job offer: public reads 404, the row stays in the database', async () => {
+      const admin = await makeAdmin(`takedown-offer-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const offer = await createPublishedJobOffer(`takedown-offer-${randomUUID().slice(0, 6)}`);
+
+      await fastify().inject({
+        method: 'POST',
+        url: '/v1/reports',
+        remoteAddress: FAKE_IP,
+        payload: { targetType: 'job_offer', targetId: offer.id, reason: 'Fraudulent listing' },
+      });
+      const report = await prisma.report.findFirstOrThrow({ where: { targetId: offer.id } });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${report.id}/takedown`,
+        headers: admin.headers,
+        payload: { resolution: 'Confirmed fraud, offer removed' },
+      });
+      expect(response.statusCode).toBe(200);
+
+      const publicRead = await fastify().inject({
+        method: 'GET',
+        url: `/v1/job-offers/${offer.slug}`,
+      });
+      expect(publicRead.statusCode).toBe(404);
+
+      const dbRow = await prisma.jobOffer.findUniqueOrThrow({ where: { id: offer.id } });
+      expect(dbRow.deletedAt).not.toBeNull();
+
+      await prisma.jobOffer.update({ where: { id: offer.id }, data: { deletedAt: null } });
+      const restored = await fastify().inject({
+        method: 'GET',
+        url: `/v1/job-offers/${offer.slug}`,
+      });
+      expect(restored.statusCode).toBe(200);
+    });
+
+    it('reports and takes down a job application, leaving the report queryable to review or restore it', async () => {
+      const admin = await makeAdmin(`takedown-application-${randomUUID().slice(0, 6)}`, [
+        'moderation',
+      ]);
+      const offer = await createPublishedJobOffer(
+        `takedown-application-${randomUUID().slice(0, 6)}`,
+      );
+      const application = await createJobApplication(
+        offer.id,
+        `takedown-application-${randomUUID().slice(0, 6)}`,
+      );
+
+      const receivingProfessional = await signUpVerifyAndSignIn(
+        ['client'],
+        `receiving-professional-${randomUUID().slice(0, 6)}`,
+      );
+      const reportResponse = await fastify().inject({
+        method: 'POST',
+        url: '/v1/reports',
+        remoteAddress: FAKE_IP,
+        headers: authHeaders(receivingProfessional.token),
+        payload: {
+          targetType: 'job_application',
+          targetId: application.id,
+          reason: 'Abusive application message',
+        },
+      });
+      expect(reportResponse.statusCode).toBe(201);
+      const report = await prisma.report.findFirstOrThrow({ where: { targetId: application.id } });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${report.id}/takedown`,
+        headers: admin.headers,
+        payload: { resolution: 'Confirmed abusive, application removed' },
+      });
+      expect(response.statusCode).toBe(200);
+
+      const dbRow = await prisma.jobApplication.findUniqueOrThrow({
+        where: { id: application.id },
+      });
+      expect(dbRow.deletedAt).not.toBeNull();
+
+      // `reportTargetExists`/`takeDownReportTarget` never filter on
+      // `deletedAt`, so a moderator can still find and act on an
+      // already-suppressed row - this is what lets a future restore look it
+      // up again.
+      const detailAfterTakedown = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/reports?targetId=${application.id}`,
+        headers: admin.headers,
+      });
+      expect(detailAfterTakedown.statusCode).toBe(200);
+      expect(detailAfterTakedown.json<ReportsPage>().items).toHaveLength(1);
     });
 
     it('returns 409 when the report is already resolved', async () => {

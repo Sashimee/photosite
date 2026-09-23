@@ -12102,7 +12102,7 @@ export interface components {
              * @example portfolio_image
              * @enum {string}
              */
-            targetType: "photographer_profile" | "portfolio_image" | "request" | "job_offer";
+            targetType: "photographer_profile" | "portfolio_image" | "request" | "job_offer" | "job_application";
             /**
              * Format: uuid
              * @description UUID identifier
