@@ -7282,6 +7282,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "requestBody": {
           "content": {
             "application/json": {
@@ -7392,6 +7393,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "responses": {
           "200": {
             "description": "The current user's professional profile",
@@ -7448,6 +7450,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "requestBody": {
           "content": {
             "application/json": {
@@ -7762,6 +7765,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "requestBody": {
           "content": {
             "application/json": {
@@ -7918,6 +7922,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8008,6 +8013,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8078,6 +8084,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8250,6 +8257,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8315,6 +8323,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "parameters": [
           {
             "schema": {
@@ -8417,6 +8426,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8499,6 +8509,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "parameters": [
           {
             "schema": {
@@ -8639,6 +8650,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8751,6 +8763,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8841,6 +8854,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -9832,6 +9846,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "requestBody": {
           "content": {
             "application/json": {
@@ -9975,6 +9990,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10086,6 +10102,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10166,6 +10183,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10238,6 +10256,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10320,6 +10339,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "requestBody": {
           "content": {
             "application/json": {
@@ -10459,6 +10479,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "parameters": [
           {
             "schema": {
@@ -10610,6 +10631,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10712,6 +10734,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10774,6 +10797,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10876,6 +10900,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10968,6 +10993,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -11050,6 +11076,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {

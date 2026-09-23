@@ -111,6 +111,15 @@ describe('professionals integration', () => {
     });
   }
 
+  // No sign-up flow leaves a session unverified today (Better Auth blocks
+  // password sign-in until verified); this is the equivalent of the one
+  // that does, an OAuth account whose provider never confirmed the email,
+  // done directly against the row so the gate is tested independently of
+  // how a session ever ends up attached to one.
+  async function unverifyEmail(userId: string): Promise<void> {
+    await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: null } });
+  }
+
   beforeAll(async () => {
     app = await createTestApp({
       ...TEST_ENV,
@@ -148,6 +157,30 @@ describe('professionals integration', () => {
         payload: { companyName: 'Fixture Co' },
       });
       expect(response.statusCode).toBe(401);
+    });
+
+    it('rejects an unverified account with EMAIL_NOT_VERIFIED, then succeeds once verified', async () => {
+      const client = await signUpAndSignIn(['client']);
+      await unverifyEmail(client.id);
+
+      const blocked = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/professional-profile',
+        headers: authHeaders(client.token),
+        payload: { companyName: 'Unverified Co' },
+      });
+      expect(blocked.statusCode).toBe(403);
+      expect(blocked.json<{ code: string }>().code).toBe('EMAIL_NOT_VERIFIED');
+
+      await prisma.user.update({ where: { id: client.id }, data: { emailVerifiedAt: new Date() } });
+
+      const allowed = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/professional-profile',
+        headers: authHeaders(client.token),
+        payload: { companyName: 'Now Verified Co' },
+      });
+      expect(allowed.statusCode).toBe(201);
     });
 
     it('creates the profile and adds the professional role in the same account, with an audit log row', async () => {
@@ -304,6 +337,24 @@ describe('professionals integration', () => {
       });
       expect(response.statusCode).toBe(200);
       expect(response.json<ProfileBody>().vatNumber).toBe('LU99999999');
+    });
+
+    it('works for an unverified account: reading is not gated', async () => {
+      const professional = await signUpAndSignIn(['professional']);
+      await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/professional-profile',
+        headers: authHeaders(professional.token),
+        payload: { companyName: 'Read Unverified Co' },
+      });
+      await unverifyEmail(professional.id);
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/me/professional-profile',
+        headers: authHeaders(professional.token),
+      });
+      expect(response.statusCode).toBe(200);
     });
   });
 

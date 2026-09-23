@@ -14,6 +14,7 @@ import {
   SlugSchema,
   errorResponses,
   paginatedResponseSchema,
+  requiresVerifiedEmail,
 } from './common.js';
 import { PublicProfessionalCompanySchema } from './professionals.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
@@ -275,6 +276,7 @@ registry.registerPath({
   summary: 'Create a draft job offer',
   tags: ['job-board'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     body: { content: { 'application/json': { schema: CreateJobOfferRequestSchema } } },
   },
@@ -293,6 +295,7 @@ registry.registerPath({
   summary: "List the current professional's job offers",
   tags: ['job-board'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     query: CursorPaginationQuerySchema,
   },
@@ -311,6 +314,7 @@ registry.registerPath({
   summary: "Get one of the current professional's job offers",
   tags: ['job-board'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     params: z.object({ id: IdSchema }).strict(),
   },
@@ -329,6 +333,7 @@ registry.registerPath({
   summary: "Update one of the current professional's job offers",
   tags: ['job-board'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     params: z.object({ id: IdSchema }).strict(),
     body: { content: { 'application/json': { schema: UpdateJobOfferRequestSchema } } },
@@ -348,6 +353,7 @@ registry.registerPath({
   summary: "Delete one of the current professional's job offers",
   tags: ['job-board'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     params: z.object({ id: IdSchema }).strict(),
   },
@@ -363,6 +369,7 @@ registry.registerPath({
   summary: 'Publish a job offer, creating a free listing',
   tags: ['job-board'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(true),
   request: {
     params: z.object({ id: IdSchema }).strict(),
   },
@@ -381,6 +388,7 @@ registry.registerPath({
   summary: 'Close a published job offer',
   tags: ['job-board'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     params: z.object({ id: IdSchema }).strict(),
   },
@@ -399,6 +407,7 @@ registry.registerPath({
   summary: 'Apply to a published job offer',
   tags: ['job-board'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(true),
   request: {
     params: z.object({ id: IdSchema }).strict(),
     body: { content: { 'application/json': { schema: CreateJobApplicationRequestSchema } } },
@@ -418,6 +427,7 @@ registry.registerPath({
   summary: 'List the applications received for one of the current professional job offers',
   tags: ['job-board'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     params: z.object({ id: IdSchema }).strict(),
     query: CursorPaginationQuerySchema,
@@ -441,6 +451,7 @@ registry.registerPath({
   summary: "List the current photographer's job applications",
   tags: ['job-board'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     query: CursorPaginationQuerySchema,
   },
@@ -461,6 +472,7 @@ registry.registerPath({
   summary: 'Move a job application forward or withdraw it',
   tags: ['job-board'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     params: z.object({ id: IdSchema }).strict(),
     body: { content: { 'application/json': { schema: UpdateJobApplicationStatusRequestSchema } } },

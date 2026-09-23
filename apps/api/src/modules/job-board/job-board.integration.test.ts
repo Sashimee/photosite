@@ -279,6 +279,22 @@ describe('job board integration', () => {
       expect(body.publishedAt).toBeNull();
     });
 
+    it('works for an unverified account: drafting is not gated, only publishing is', async () => {
+      const professional = await createProfessional('create-unverified');
+      await prisma.user.update({
+        where: { id: professional.userId },
+        data: { emailVerifiedAt: null },
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/job-offers',
+        headers: authHeaders(professional.token),
+        payload: offerPayload(),
+      });
+      expect(response.statusCode).toBe(201);
+    });
+
     it('rejects a non-remote offer with no location with 400', async () => {
       const professional = await createProfessional('create-no-location');
       const response = await fastify().inject({
@@ -434,6 +450,27 @@ describe('job board integration', () => {
   });
 
   describe('POST /v1/me/job-offers/:id/publish', () => {
+    it('rejects an unverified account with EMAIL_NOT_VERIFIED, then succeeds once verified', async () => {
+      const professional = await createProfessional('publish-unverified');
+      const draft = await createDraftOffer(professional.token);
+      await prisma.user.update({
+        where: { id: professional.userId },
+        data: { emailVerifiedAt: null },
+      });
+
+      const blocked = await publishOffer(professional.token, draft.id);
+      expect(blocked.statusCode).toBe(403);
+      expect(blocked.json<{ code: string }>().code).toBe('EMAIL_NOT_VERIFIED');
+
+      await prisma.user.update({
+        where: { id: professional.userId },
+        data: { emailVerifiedAt: new Date() },
+      });
+
+      const allowed = await publishOffer(professional.token, draft.id);
+      expect(allowed.statusCode).toBe(200);
+    });
+
     it('never burns the daily publish budget on ids that do not exist', async () => {
       const professional = await createProfessional('publish-probe');
       for (let i = 0; i < 15; i += 1) {
@@ -716,6 +753,38 @@ describe('job board integration', () => {
   });
 
   describe('POST /v1/job-offers/:id/applications', () => {
+    it('rejects an unverified account with EMAIL_NOT_VERIFIED, then succeeds once verified', async () => {
+      const professional = await createProfessional('apply-unverified-offer');
+      const offer = await createPublishedOffer(professional.token);
+      const photographer = await createPhotographer('apply-unverified');
+      await prisma.user.update({
+        where: { id: photographer.userId },
+        data: { emailVerifiedAt: null },
+      });
+
+      const blocked = await fastify().inject({
+        method: 'POST',
+        url: `/v1/job-offers/${offer.id}/applications`,
+        headers: authHeaders(photographer.token),
+        payload: { message: 'Fixture application.' },
+      });
+      expect(blocked.statusCode).toBe(403);
+      expect(blocked.json<{ code: string }>().code).toBe('EMAIL_NOT_VERIFIED');
+
+      await prisma.user.update({
+        where: { id: photographer.userId },
+        data: { emailVerifiedAt: new Date() },
+      });
+
+      const allowed = await fastify().inject({
+        method: 'POST',
+        url: `/v1/job-offers/${offer.id}/applications`,
+        headers: authHeaders(photographer.token),
+        payload: { message: 'Fixture application.' },
+      });
+      expect(allowed.statusCode).toBe(201);
+    });
+
     it('rejects a caller without the photographer role with 403', async () => {
       const professional = await createProfessional('apply-role');
       const offer = await createPublishedOffer(professional.token);
@@ -937,6 +1006,22 @@ describe('job board integration', () => {
       const application = applyResponse.json<ApplicationBody>();
       return { professional, offer, photographer, application };
     }
+
+    it('lets an unverified professional shortlist an application: managing existing applications is not gated', async () => {
+      const { professional, application } = await applyFixture('shortlist-unverified');
+      await prisma.user.update({
+        where: { id: professional.userId },
+        data: { emailVerifiedAt: null },
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/job-applications/${application.id}/status`,
+        headers: authHeaders(professional.token),
+        payload: { status: 'shortlisted' },
+      });
+      expect(response.statusCode).toBe(200);
+    });
 
     it('lets the professional shortlist an application', async () => {
       const { professional, application } = await applyFixture('shortlist');

@@ -7,6 +7,7 @@ import type {
 } from '@photoo/shared';
 import type { z } from 'zod';
 import { requireRole } from '../../common/auth/require-role.js';
+import { requireVerifiedEmail } from '../../common/auth/require-verified-email.js';
 import { isAttachableUploadStatus } from '../../common/enums/upload-status.js';
 import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -15,6 +16,7 @@ import { mapOwnProfile, type ProfessionalProfileWithLogo } from './professional-
 interface SessionUser {
   id: string;
   roles: string[];
+  emailVerifiedAt?: string | Date | null;
 }
 type CreateInput = z.infer<typeof CreateProfessionalProfileRequestSchema>;
 type UpdateInput = z.infer<typeof UpdateProfessionalProfileRequestSchema>;
@@ -55,6 +57,7 @@ export class ProfessionalsService {
   // adds the `professional` role in the same transaction (D13: one account,
   // more roles, never a second account).
   async create(user: SessionUser, input: CreateInput, ip: string | undefined): Promise<ProfileDto> {
+    requireVerifiedEmail(user);
     const existing = await this.prisma.client.professionalProfile.findUnique({
       where: { userId: user.id },
     });

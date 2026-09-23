@@ -1,4 +1,4 @@
-import { HttpUrlSchema, IdSchema, errorResponses } from './common.js';
+import { HttpUrlSchema, IdSchema, errorResponses, requiresVerifiedEmail } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
 
@@ -40,6 +40,7 @@ registry.registerPath({
   summary: 'Create the professional profile for the current user, adding the professional role',
   tags: ['professionals'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(true),
   request: {
     body: {
       content: { 'application/json': { schema: CreateProfessionalProfileRequestSchema } },
@@ -60,6 +61,7 @@ registry.registerPath({
   summary: "Get the current user's professional profile",
   tags: ['professionals'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   responses: {
     '200': {
       description: "The current user's professional profile",
@@ -75,6 +77,7 @@ registry.registerPath({
   summary: "Update the current user's professional profile",
   tags: ['professionals'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     body: {
       content: { 'application/json': { schema: UpdateProfessionalProfileRequestSchema } },
