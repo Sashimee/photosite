@@ -145,7 +145,7 @@ export class JobBoardRepository {
     const rows = await this.prisma.client.$queryRaw<JobOfferFullRow[]>`
       SELECT ${FULL_ROW_SELECT}
       FROM "JobOffer" jo
-      WHERE jo.id = ${id} AND jo."professionalId" = ${professionalId}
+      WHERE jo.id = ${id} AND jo."professionalId" = ${professionalId} AND jo."deletedAt" IS NULL
     `;
     return rows[0] ?? null;
   }
@@ -155,7 +155,10 @@ export class JobBoardRepository {
     limit: number,
     cursor?: CreatedAtCursor,
   ): Promise<JobOfferFullRow[]> {
-    const conditions: Prisma.Sql[] = [Prisma.sql`jo."professionalId" = ${professionalId}`];
+    const conditions: Prisma.Sql[] = [
+      Prisma.sql`jo."professionalId" = ${professionalId}`,
+      Prisma.sql`jo."deletedAt" IS NULL`,
+    ];
     if (cursor) {
       conditions.push(
         Prisma.sql`(jo."createdAt" < ${cursor.createdAt} OR (jo."createdAt" = ${cursor.createdAt} AND jo.id > ${cursor.id}))`,
@@ -178,6 +181,7 @@ export class JobBoardRepository {
       WHERE jo.slug = ${slug}
         AND jo.status = 'published'
         AND jo."expiresAt" > now()
+        AND jo."deletedAt" IS NULL
         AND (jo.location IS NOT NULL OR jo.remote = true)
     `;
     return rows[0] ?? null;
@@ -201,6 +205,7 @@ export class JobBoardRepository {
     const conditions: Prisma.Sql[] = [
       Prisma.sql`jo.status = 'published'`,
       Prisma.sql`jo."expiresAt" > now()`,
+      Prisma.sql`jo."deletedAt" IS NULL`,
       Prisma.sql`(jo.location IS NOT NULL OR jo.remote = true)`,
     ];
 

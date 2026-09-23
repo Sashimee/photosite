@@ -189,6 +189,7 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
         photographerId: profileId,
         message: 'A message that must be blanked.',
         portfolioLink: 'https://example.com/portfolio',
+        deletedAt: new Date(),
       },
     });
     jobApplicationId = jobApplication.id;
@@ -347,6 +348,7 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
     expect(jobApplication.status).toBe('submitted');
     expect(jobApplication.createdAt).not.toBeNull();
     expect(jobApplication.updatedAt).not.toBeNull();
+    expect(jobApplication.deletedAt).not.toBeNull();
 
     const portfolioImages = await prisma.portfolioImage.findMany({ where: { profileId } });
     const products = await prisma.product.findMany({ where: { profileId } });

@@ -80,7 +80,8 @@ export class JobApplicationsService {
     if (
       offer.status !== 'published' ||
       !offer.expiresAt ||
-      offer.expiresAt.getTime() <= Date.now()
+      offer.expiresAt.getTime() <= Date.now() ||
+      offer.deletedAt
     ) {
       throw conflict('Job offer is not open for applications');
     }
@@ -146,6 +147,7 @@ export class JobApplicationsService {
     const rows = await this.prisma.client.jobApplication.findMany({
       where: {
         jobOfferId: offer.id,
+        deletedAt: null,
         ...(cursor
           ? {
               OR: [
@@ -189,6 +191,7 @@ export class JobApplicationsService {
     const rows = await this.prisma.client.jobApplication.findMany({
       where: {
         photographerId: profile.id,
+        deletedAt: null,
         ...(cursor
           ? {
               OR: [
@@ -220,7 +223,7 @@ export class JobApplicationsService {
   // (docs/steps/1A.13-professionals.md).
   async updateStatus(user: SessionUser, id: string, input: StatusInput): Promise<ApplicationDto> {
     const application = await this.prisma.client.jobApplication.findUnique({ where: { id } });
-    if (!application) {
+    if (!application || application.deletedAt) {
       throw notFound();
     }
 

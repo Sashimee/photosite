@@ -4423,7 +4423,8 @@
               "photographer_profile",
               "portfolio_image",
               "request",
-              "job_offer"
+              "job_offer",
+              "job_application"
             ],
             "example": "portfolio_image"
           },

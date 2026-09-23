@@ -155,6 +155,7 @@ export const REPORT_TARGET_TYPES = [
   'portfolio_image',
   'request',
   'job_offer',
+  'job_application',
 ] as const;
 
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
