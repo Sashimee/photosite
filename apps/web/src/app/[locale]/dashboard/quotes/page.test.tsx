@@ -43,16 +43,25 @@ const QUOTE = {
   status: 'sent' as const,
 };
 
+const PUBLISHED_PROFILE = { id: 'profile-1', isPublished: true };
+
 function mockApi({
+  profile = PUBLISHED_PROFILE,
+  profileStatus = 200,
   status = 200,
   items = [],
   nextCursor = null,
 }: {
+  profile?: unknown;
+  profileStatus?: number;
   status?: number;
   items?: unknown[];
   nextCursor?: string | null;
 }) {
   apiGetMock.mockImplementation((url: string) => {
+    if (url === '/v1/me/photographer-profile') {
+      return Promise.resolve({ data: profile, response: { status: profileStatus } });
+    }
     if (url === '/v1/quotes/mine') {
       return Promise.resolve({
         data: status === 200 ? { items, nextCursor } : undefined,
@@ -92,7 +101,43 @@ describe('DashboardQuotesPage', () => {
     expect(digest).toContain(encodeURIComponent('/en/dashboard/quotes'));
   });
 
-  it('throws loudly on an unexpected failure', async () => {
+  it('throws loudly on an unexpected profile lookup failure', async () => {
+    getSessionMock.mockResolvedValue({ id: 'photographer-user-1' });
+    apiGetMock.mockResolvedValue({ data: undefined, response: { status: 500 } });
+    const Page = await loadPage();
+
+    await expect(
+      Page({ params: Promise.resolve({ locale: 'en' }), searchParams: Promise.resolve({}) }),
+    ).rejects.toThrow(/HTTP 500/);
+  });
+
+  it('shows a notice to create a profile first when there is none', async () => {
+    getSessionMock.mockResolvedValue({ id: 'photographer-user-1' });
+    mockApi({ profile: null, profileStatus: 404 });
+    const Page = await loadPage();
+
+    render(
+      await Page({ params: Promise.resolve({ locale: 'en' }), searchParams: Promise.resolve({}) }),
+    );
+
+    expect(screen.getByText('Create your profile first')).toBeInTheDocument();
+    expect(apiGetMock).not.toHaveBeenCalledWith('/v1/quotes/mine', expect.anything());
+  });
+
+  it('shows a notice that the profile must be published, without fetching quotes', async () => {
+    getSessionMock.mockResolvedValue({ id: 'photographer-user-1' });
+    mockApi({ profile: { id: 'profile-1', isPublished: false } });
+    const Page = await loadPage();
+
+    render(
+      await Page({ params: Promise.resolve({ locale: 'en' }), searchParams: Promise.resolve({}) }),
+    );
+
+    expect(screen.getByText("Your profile isn't published yet")).toBeInTheDocument();
+    expect(apiGetMock).not.toHaveBeenCalledWith('/v1/quotes/mine', expect.anything());
+  });
+
+  it('throws loudly on an unexpected feed failure', async () => {
     getSessionMock.mockResolvedValue({ id: 'photographer-user-1' });
     mockApi({ status: 500 });
     const Page = await loadPage();
@@ -137,11 +182,23 @@ describe('DashboardQuotesPage', () => {
     );
 
     expect(screen.getByText('€1,500.00')).toBeInTheDocument();
-    expect(screen.getByText(/€1,425\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/Your payout €1,425\.00/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /€1,500\.00/ })).toHaveAttribute(
       'href',
       `/en/quotes/${QUOTE.id}`,
     );
+  });
+
+  it('shows no payout for a declined, expired or withdrawn quote', async () => {
+    getSessionMock.mockResolvedValue({ id: 'photographer-user-1' });
+    mockApi({ items: [{ ...QUOTE, status: 'declined' }] });
+    const Page = await loadPage();
+
+    render(
+      await Page({ params: Promise.resolve({ locale: 'en' }), searchParams: Promise.resolve({}) }),
+    );
+
+    expect(screen.queryByText(/Your payout/)).not.toBeInTheDocument();
   });
 
   it('links to the next page using the returned cursor', async () => {

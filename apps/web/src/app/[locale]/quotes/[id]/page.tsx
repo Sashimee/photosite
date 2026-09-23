@@ -68,14 +68,22 @@ export default async function QuoteDetailPage({
   const total = requireMoney(quote.total, `quote "${quote.id}" total`);
   // `quotes.service.get()` only ever returns a quote to its client or to the
   // matching photographer (anyone else gets a 404 before this point), so a
-  // caller who isn't the client must be the photographer who sent it.
-  const isOwnPhotographerQuote = quote.clientId !== user.id;
-  const payout = isOwnPhotographerQuote
-    ? payoutAmount(
-        requireMoney(quote.subtotal, `quote "${quote.id}" subtotal`),
-        requireMoney(quote.platformFee, `quote "${quote.id}" platform fee`),
-      )
-    : null;
+  // caller who isn't the client is the photographer who sent it - but the
+  // role check still fails closed if `get()` ever widens to admins.
+  const isOwnPhotographerQuote = quote.clientId !== user.id && user.roles.includes('photographer');
+  // Withheld once a quote is declined, expired or withdrawn: no booking will
+  // ever be released against it, so a payout figure there would describe a
+  // transfer that is never going to happen.
+  const payout =
+    isOwnPhotographerQuote && !isTerminalQuoteStatus(quote.status)
+      ? {
+          platformFee: requireMoney(quote.platformFee, `quote "${quote.id}" platform fee`),
+          amount: payoutAmount(
+            requireMoney(quote.subtotal, `quote "${quote.id}" subtotal`),
+            requireMoney(quote.platformFee, `quote "${quote.id}" platform fee`),
+          ),
+        }
+      : null;
 
   // A photographer's own quote always links back to their dashboard quotes
   // list: /requests/{id} only resolves for the client side (DATA-MODEL.md -
@@ -127,12 +135,20 @@ export default async function QuoteDetailPage({
           <span>{formatMoney(total, locale)}</span>
         </div>
         {payout ? (
-          <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-            <span>{t('payoutLabel')}</span>
-            <span>{formatMoney(payout, locale)}</span>
-          </div>
+          <>
+            <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+              <span>{t('feeLabel')}</span>
+              <span>−{formatMoney(payout.platformFee, locale)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+              <span>{t('payoutLabel')}</span>
+              <span>{formatMoney(payout.amount, locale)}</span>
+            </div>
+          </>
         ) : null}
       </div>
+
+      {payout ? <p className="text-xs text-muted-foreground">{t('payoutNotice')}</p> : null}
 
       {quote.message ? (
         <div className="flex flex-col gap-1">

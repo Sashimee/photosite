@@ -7,6 +7,7 @@ import { isLocale, type Locale } from '@photoo/shared';
 
 import { FormattedDateTime } from '@/components/requests/formatted-date-time';
 import { isTerminalQuoteStatus, StatusBadge } from '@/components/requests/status-badge';
+import { FormNotice } from '@/components/ui/form-message';
 import { formatMoney, payoutAmount, requireMoney } from '@/lib/money';
 import { buildRobotsMetadata } from '@/lib/robots';
 import { getSession, serverApi } from '@/lib/session';
@@ -47,8 +48,72 @@ export default async function DashboardQuotesPage({
   }
   const api = await serverApi();
 
-  const [t, tStatus, result] = await Promise.all([
-    getTranslations({ locale, namespace: 'web.dashboard.quotes' }),
+  const t = await getTranslations({ locale, namespace: 'web.dashboard.quotes' });
+
+  const profileResult = await api.GET('/v1/me/photographer-profile', { cache: 'no-store' });
+  if (profileResult.response.status === 401) {
+    redirect(signInHref);
+  }
+  if (profileResult.response.status !== 200 && profileResult.response.status !== 404) {
+    throw new Error(
+      `Failed to load the photographer profile: HTTP ${String(profileResult.response.status)}`,
+    );
+  }
+
+  const backLink = (
+    <Link
+      href={`/${locale}/dashboard`}
+      className="self-start text-sm font-medium text-primary underline-offset-4 hover:underline"
+    >
+      {t('backToOverview')}
+    </Link>
+  );
+
+  if (!profileResult.data) {
+    return (
+      <div className="flex flex-col gap-8">
+        {backLink}
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold text-foreground">{t('needsProfileTitle')}</h1>
+        </div>
+        <FormNotice tone="info">
+          <p>{t('needsProfileDescription')}</p>
+          <p>
+            <Link
+              href={`/${locale}/dashboard/profile`}
+              className="font-medium underline underline-offset-4"
+            >
+              {t('needsProfileCta')}
+            </Link>
+          </p>
+        </FormNotice>
+      </div>
+    );
+  }
+
+  if (!profileResult.data.isPublished) {
+    return (
+      <div className="flex flex-col gap-8">
+        {backLink}
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold text-foreground">{t('needsPublishedTitle')}</h1>
+        </div>
+        <FormNotice tone="info">
+          <p>{t('needsPublishedDescription')}</p>
+          <p>
+            <Link
+              href={`/${locale}/dashboard`}
+              className="font-medium underline underline-offset-4"
+            >
+              {t('needsPublishedCta')}
+            </Link>
+          </p>
+        </FormNotice>
+      </div>
+    );
+  }
+
+  const [tStatus, result] = await Promise.all([
     getTranslations({ locale, namespace: 'web.quotes.status' }),
     api.GET('/v1/quotes/mine', {
       params: {
@@ -71,12 +136,7 @@ export default async function DashboardQuotesPage({
 
   return (
     <div className="flex flex-col gap-8">
-      <Link
-        href={`/${locale}/dashboard`}
-        className="self-start text-sm font-medium text-primary underline-offset-4 hover:underline"
-      >
-        {t('backToOverview')}
-      </Link>
+      {backLink}
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold text-foreground">{t('title')}</h1>
         <p className="text-muted-foreground">{t('intro')}</p>
@@ -88,10 +148,12 @@ export default async function DashboardQuotesPage({
         <ul className="flex flex-col gap-4">
           {result.data.items.map((quote) => {
             const total = requireMoney(quote.total, `quote "${quote.id}" total`);
-            const payout = payoutAmount(
-              requireMoney(quote.subtotal, `quote "${quote.id}" subtotal`),
-              requireMoney(quote.platformFee, `quote "${quote.id}" platform fee`),
-            );
+            const payout = isTerminalQuoteStatus(quote.status)
+              ? null
+              : payoutAmount(
+                  requireMoney(quote.subtotal, `quote "${quote.id}" subtotal`),
+                  requireMoney(quote.platformFee, `quote "${quote.id}" platform fee`),
+                );
             return (
               <li key={quote.id} className="rounded-lg border border-border p-4">
                 <Link href={`/${locale}/quotes/${quote.id}`} className="flex flex-col gap-2">
@@ -104,9 +166,11 @@ export default async function DashboardQuotesPage({
                       {formatMoney(total, locale)}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {t('payoutLabel')} {formatMoney(payout, locale)}
-                  </p>
+                  {payout ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t('payoutLabel')} {formatMoney(payout, locale)}
+                    </p>
+                  ) : null}
                   <p className="text-sm text-muted-foreground">
                     {t('validUntilLabel')}{' '}
                     <FormattedDateTime value={quote.validUntil} locale={locale} timeStyle="short" />

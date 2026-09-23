@@ -1018,7 +1018,9 @@
         "validUntilLabel": "Valid until",
         "lineItemsHeading": "What's included",
         "totalLabel": "Total",
-        "payoutLabel": "You'll receive",
+        "feeLabel": "Platform fee",
+        "payoutLabel": "Your payout",
+        "payoutNotice": "Paid to your Stripe account after the booking is released. Currency conversion by Stripe or your bank isn't included.",
         "messageHeading": "Message from the photographer",
         "acceptCta": "Accept quote",
         "declineCta": "Decline quote",
@@ -1394,7 +1396,14 @@
           "feeNotice": "A platform fee is deducted from your payout at release; it isn't added on top of this total.",
           "backCta": "Back",
           "confirmSendCta": "Send quote",
-          "sending": "Sending…"
+          "sending": "Sending…",
+          "errors": {
+            "generic": "Something went wrong sending your quote. Try again.",
+            "conflict": "This request is no longer accepting quotes.",
+            "invalid": "This quote can't be sent as entered. Reload the request and try again.",
+            "tooManyRequests": "You're sending quotes too fast. Slow down and try again.",
+            "tooManyRequestsWithRetry": "You're sending quotes too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+          }
         }
       },
       "quotes": {
@@ -1402,8 +1411,14 @@
         "title": "Your quotes",
         "backToOverview": "Back to overview",
         "intro": "Quotes you've sent to clients.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Quotes are sent from your photographer profile, so set that up first.",
+        "needsProfileCta": "Create your profile",
+        "needsPublishedTitle": "Your profile isn't published yet",
+        "needsPublishedDescription": "Sending quotes needs a published profile. Check the overview for what's still missing.",
+        "needsPublishedCta": "Back to overview",
         "empty": "You haven't sent any quotes yet.",
-        "payoutLabel": "You'll receive",
+        "payoutLabel": "Your payout",
         "validUntilLabel": "Valid until",
         "loadMore": "Next page"
       }

@@ -51,8 +51,11 @@ export function payoutAmount(subtotal: Money, platformFee: Money): Money {
       `payoutAmount: currency mismatch (${subtotal.currency} vs ${platformFee.currency})`,
     );
   }
-  return {
-    amountCents: subtotal.amountCents - platformFee.amountCents,
-    currency: subtotal.currency,
-  };
+  const amountCents = subtotal.amountCents - platformFee.amountCents;
+  if (amountCents < 0) {
+    throw new Error(
+      `payoutAmount: fee ${String(platformFee.amountCents)} exceeds subtotal ${String(subtotal.amountCents)}`,
+    );
+  }
+  return { amountCents, currency: subtotal.currency };
 }

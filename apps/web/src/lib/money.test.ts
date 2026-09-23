@@ -77,4 +77,10 @@ describe('payoutAmount', () => {
       ),
     ).toThrow(/currency mismatch/);
   });
+
+  it('throws instead of returning a negative payout when the fee exceeds the subtotal', () => {
+    expect(() =>
+      payoutAmount({ amountCents: 5000, currency: 'EUR' }, { amountCents: 7500, currency: 'EUR' }),
+    ).toThrow(/fee 7500 exceeds subtotal 5000/);
+  });
 });

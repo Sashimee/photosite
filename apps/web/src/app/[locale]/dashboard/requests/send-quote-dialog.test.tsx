@@ -133,7 +133,7 @@ describe('SendQuoteDialog', () => {
     expect(pushMock).toHaveBeenCalledWith('/en/quotes/quote-1');
   });
 
-  it('shows a mapped error on the review step and lets the photographer retry', async () => {
+  it('shows a photographer-facing mapped error on the review step and lets them retry', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ code: 'CONFLICT' }), { status: 409 }));
@@ -151,7 +151,110 @@ describe('SendQuoteDialog', () => {
     await user.click(screen.getByRole('button', { name: translate(NS, 'reviewCta') }));
     await user.click(await screen.findByRole('button', { name: translate(NS, 'confirmSendCta') }));
 
-    expect(await screen.findByText(translate('web.quotes', 'errors.conflict'))).toBeInTheDocument();
+    expect(await screen.findByText(translate(NS, 'errors.conflict'))).toBeInTheDocument();
     expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('maps a validUntil-after-expiry 422 onto the field and returns to the form step', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: 'UNPROCESSABLE_ENTITY',
+          message: 'validUntil must not be after the request expires',
+        }),
+        { status: 422 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const SendQuoteDialog = await loadSendQuoteDialog();
+    const user = userEvent.setup();
+
+    render(<SendQuoteDialog request={REQUEST} locale="en" />);
+    await openDialog(user);
+    await user.type(
+      screen.getByLabelText(translate(NS, 'lineItemLabelLabel')),
+      'Full day coverage',
+    );
+    await user.type(screen.getByLabelText(priceLabel()), '1500');
+    await user.click(screen.getByRole('button', { name: translate(NS, 'reviewCta') }));
+    await user.click(await screen.findByRole('button', { name: translate(NS, 'confirmSendCta') }));
+
+    expect(
+      await screen.findByRole('heading', { name: translate(NS, 'formTitle') }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(translate(NS, 'validUntilLabel'))).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    expect(screen.queryByText(translate(NS, 'errors.invalid'))).not.toBeInTheDocument();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('shows a different 422 as a photographer-facing notice instead of the field error', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: 'UNPROCESSABLE_ENTITY',
+          message: 'Cannot send a quote on your own request',
+        }),
+        { status: 422 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const SendQuoteDialog = await loadSendQuoteDialog();
+    const user = userEvent.setup();
+
+    render(<SendQuoteDialog request={REQUEST} locale="en" />);
+    await openDialog(user);
+    await user.type(
+      screen.getByLabelText(translate(NS, 'lineItemLabelLabel')),
+      'Full day coverage',
+    );
+    await user.type(screen.getByLabelText(priceLabel()), '1500');
+    await user.click(screen.getByRole('button', { name: translate(NS, 'reviewCta') }));
+    await user.click(await screen.findByRole('button', { name: translate(NS, 'confirmSendCta') }));
+
+    expect(await screen.findByText(translate(NS, 'errors.invalid'))).toBeInTheDocument();
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('recomputes the default valid-until each time the dialog opens, not just at mount', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    const SendQuoteDialog = await loadSendQuoteDialog();
+    const user = userEvent.setup();
+    const nowSpy = vi.spyOn(Date, 'now');
+    const mountTime = Date.now();
+    nowSpy.mockReturnValue(mountTime);
+
+    render(<SendQuoteDialog request={REQUEST} locale="en" />);
+    await openDialog(user);
+    const firstValue = screen.getByLabelText<HTMLInputElement>(
+      translate(NS, 'validUntilLabel'),
+    ).value;
+    expect(firstValue).not.toBe('');
+
+    await user.click(screen.getByRole('button', { name: translate(NS, 'cancelCta') }));
+    nowSpy.mockReturnValue(mountTime + 60 * 60 * 1000);
+    await openDialog(user);
+
+    expect(
+      screen.getByLabelText<HTMLInputElement>(translate(NS, 'validUntilLabel')).value,
+    ).not.toBe(firstValue);
+
+    nowSpy.mockRestore();
+  });
+
+  it('bounds valid-until to the request expiry in the browser', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    const SendQuoteDialog = await loadSendQuoteDialog();
+    const user = userEvent.setup();
+
+    render(<SendQuoteDialog request={REQUEST} locale="en" />);
+    await openDialog(user);
+
+    expect(screen.getByLabelText(translate(NS, 'validUntilLabel'))).toHaveAttribute(
+      'max',
+      expect.stringContaining(REQUEST.expiresAt.slice(0, 10)),
+    );
   });
 });

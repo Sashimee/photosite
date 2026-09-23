@@ -33,8 +33,14 @@ import {
   lineItemsSubtotalCents,
   mapSendQuoteIssuePath,
   mapValidationErrorDetailPath,
+  toDateTimeLocal,
   type SendQuoteFormValues,
 } from './send-quote-form-helpers';
+
+// The one 422 message `quotes.service.ts#createForRequest` throws that names
+// a specific field; every other CONFLICT/UNPROCESSABLE_ENTITY case is a
+// business-rule failure with nothing on the form to highlight.
+const VALID_UNTIL_AFTER_REQUEST_EXPIRY_MESSAGE = 'validUntil must not be after the request expires';
 
 type RequestSummary = components['schemas']['RequestSummary'];
 // Deliberately typed from `buildSendQuotePayload`, not from
@@ -56,7 +62,6 @@ function lineItemFieldName(
 export function SendQuoteDialog({ request, locale }: { request: RequestSummary; locale: Locale }) {
   const t = useTranslations('web.dashboard.requests.sendQuote');
   const tValidation = useTranslations('common.validation');
-  const tErrors = useTranslations('web.quotes');
 
   const router = useRouter();
   const currency = request.budgetMin.currency;
@@ -86,14 +91,16 @@ export function SendQuoteDialog({ request, locale }: { request: RequestSummary; 
       return;
     }
     setOpen(next);
-    if (!next) {
-      setStep('form');
-      setReviewPayload(null);
-      setFormError(null);
-      setSubmitError(null);
-      clearErrors();
-      reset(defaultSendQuoteFormValues(request.expiresAt));
-    }
+    setStep('form');
+    setReviewPayload(null);
+    setFormError(null);
+    setSubmitError(null);
+    clearErrors();
+    // Recomputed on every open, not just on close: a photographer who opens
+    // the dialog well after page load would otherwise see a default
+    // computed at mount time, which can already be past the request's
+    // expiry for a request closing within minutes.
+    reset(defaultSendQuoteFormValues(request.expiresAt));
   }
 
   function onReview(values: SendQuoteFormValues) {
@@ -142,17 +149,25 @@ export function SendQuoteDialog({ request, locale }: { request: RequestSummary; 
           }
           setStep('form');
           if (!hasFieldError) {
-            setSubmitError(requestErrorMessage(tErrors, error));
+            setSubmitError(requestErrorMessage(t, error));
           }
           return;
         }
-        setSubmitError(requestErrorMessage(tErrors, error));
+        if (
+          error.code === 'UNPROCESSABLE_ENTITY' &&
+          error.message === VALID_UNTIL_AFTER_REQUEST_EXPIRY_MESSAGE
+        ) {
+          setError('validUntil', { type: 'custom' });
+          setStep('form');
+          return;
+        }
+        setSubmitError(requestErrorMessage(t, error));
         return;
       }
       setOpen(false);
       router.push(`/${locale}/quotes/${data.id}`);
     } catch {
-      setSubmitError(requestErrorMessage(tErrors, undefined));
+      setSubmitError(requestErrorMessage(t, undefined));
     } finally {
       setPending(false);
     }
@@ -275,6 +290,7 @@ export function SendQuoteDialog({ request, locale }: { request: RequestSummary; 
                 <Input
                   id="send-quote-valid-until"
                   type="datetime-local"
+                  max={request.expiresAt ? toDateTimeLocal(new Date(request.expiresAt)) : undefined}
                   aria-invalid={Boolean(errors.validUntil)}
                   {...register('validUntil')}
                 />
