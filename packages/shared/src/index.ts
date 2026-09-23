@@ -171,6 +171,8 @@ export {
   OAUTH_PROVIDERS,
   RequestPasswordResetRequestSchema,
   RequestPasswordResetResponseSchema,
+  ResendVerificationEmailRequestSchema,
+  ResendVerificationEmailResponseSchema,
   SIGNUP_ROLES,
   SessionQueryResponseSchema,
   SessionResponseSchema,

@@ -11,6 +11,7 @@ export type AuthRouteScope =
   | 'password-reset-request'
   | 'password-reset-confirm'
   | 'verify-email'
+  | 'verify-email-resend'
   | 'totp-enroll'
   | 'totp-verify'
   | 'totp-disable';
@@ -44,6 +45,10 @@ export const AUTH_ROUTE_RULES: Record<AuthRouteScope, ScopeRules> = {
   },
   'password-reset-confirm': { ip: { windowSeconds: ONE_HOUR, max: 10 } },
   'verify-email': { ip: { windowSeconds: ONE_HOUR, max: 10 } },
+  'verify-email-resend': {
+    ip: { windowSeconds: ONE_HOUR, max: 10 },
+    account: { windowSeconds: ONE_HOUR, max: 3 },
+  },
   'totp-enroll': { account: { windowSeconds: ONE_MINUTE, max: 5 } },
   'totp-verify': { account: { windowSeconds: ONE_MINUTE, max: 5 } },
   'totp-disable': { account: { windowSeconds: ONE_MINUTE, max: 5 } },

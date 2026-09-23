@@ -138,6 +138,20 @@ export const VerifyEmailRequestSchema = z
   })
   .strict();
 
+export const ResendVerificationEmailRequestSchema = z
+  .object({
+    email: z.email().openapi({ example: 'client@example.com' }),
+  })
+  .strict();
+
+export const ResendVerificationEmailResponseSchema = z
+  .object({
+    message: z.string().openapi({
+      example: 'If the account exists and is not yet verified, a verification email has been sent.',
+    }),
+  })
+  .strict();
+
 export const RequestPasswordResetRequestSchema = z
   .object({
     email: z.email().openapi({ example: 'client@example.com' }),
@@ -315,6 +329,24 @@ registry.registerPath({
       content: { 'application/json': { schema: SessionResponseSchema } },
     },
     ...errorResponses([400, 404, 409, 422, 429]),
+  },
+});
+
+// #290 tracks the web/mobile prompt that calls this on an EMAIL_NOT_VERIFIED error.
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/auth/verify-email/resend'),
+  summary: 'Resend the email verification link',
+  tags: ['auth'],
+  request: {
+    body: { content: { 'application/json': { schema: ResendVerificationEmailRequestSchema } } },
+  },
+  responses: {
+    '202': {
+      description: 'Verification email sent if the account exists and is not yet verified',
+      content: { 'application/json': { schema: ResendVerificationEmailResponseSchema } },
+    },
+    ...errorResponses([400, 422, 429]),
   },
 });
 
