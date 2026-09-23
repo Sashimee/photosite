@@ -23,10 +23,13 @@ import '@/styles/globals.css';
 // fetching it here (rather than from the client) lets a policy bump
 // re-prompt without an extra client round-trip. A network failure must not
 // take the whole site down: `null` degrades to "nothing published yet",
-// which already shows the banner (docs/steps/1B.10-consent.md).
+// which already shows the banner (docs/steps/1B.10-consent.md). The signal
+// bounds a stalled connection (accepted but never answered) the same way -
+// without it, this `await` blocks the entire page render indefinitely,
+// since fetch has no default timeout of its own.
 async function currentPolicyVersion(): Promise<string | null> {
   try {
-    const { data } = await api.GET('/v1/policy-version');
+    const { data } = await api.GET('/v1/policy-version', { signal: AbortSignal.timeout(8000) });
     return data?.policyVersion ?? null;
   } catch (error) {
     console.error('Failed to load the published policy version', error);
