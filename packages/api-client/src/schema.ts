@@ -2390,7 +2390,7 @@ export interface paths {
                          * @example LU
                          */
                         countryCode: string;
-                        location: components["schemas"]["LatLng"];
+                        location?: components["schemas"]["LatLng"];
                         remote: boolean;
                         /**
                          * Format: date-time
@@ -10681,7 +10681,7 @@ export interface components {
              * @example LU
              */
             countryCode: string;
-            location: components["schemas"]["LatLng"];
+            location: components["schemas"]["LatLng"] & (Record<string, never> | null);
             remote: boolean;
             compensation: components["schemas"]["Compensation"];
             /**
@@ -10734,7 +10734,7 @@ export interface components {
              * @example LU
              */
             countryCode: string;
-            location: components["schemas"]["LatLng"];
+            location: components["schemas"]["LatLng"] & (Record<string, never> | null);
             remote: boolean;
             compensation: components["schemas"]["Compensation"];
             /**
@@ -10789,7 +10789,7 @@ export interface components {
              * @example LU
              */
             countryCode: string;
-            location: components["schemas"]["LatLng"];
+            location: components["schemas"]["LatLng"] & (Record<string, never> | null);
             remote: boolean;
             /**
              * Format: date-time

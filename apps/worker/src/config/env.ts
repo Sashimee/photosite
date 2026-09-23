@@ -53,6 +53,12 @@ const BaseEnvSchema = z.object({
     .int()
     .positive()
     .default(15 * 60 * 1000),
+  WORKER_CONCURRENCY_LISTING_EXPIRY: z.coerce.number().int().positive().default(1),
+  LISTING_EXPIRY_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60 * 60 * 1000),
   IMAGE_PROCESS_MAX_PIXELS: z.coerce.number().int().positive().default(100_000_000),
 
   S3_ENDPOINT: z.url(),

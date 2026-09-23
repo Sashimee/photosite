@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@photoo/db';
 import type { PhotographerCategory } from '@photoo/shared';
+import { LOCATION_GRID_DEGREES } from '../../common/geo/location-grid.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { SearchCursor } from './search-cursor.js';
 
@@ -56,13 +57,6 @@ interface LocationRow {
   lat: number;
   lng: number;
 }
-
-// The grid a profile's location is snapped to before any distance is
-// computed or compared, in degrees (~1km at the equator, less at higher
-// latitudes): coarse enough that repeated searches from different points
-// can't triangulate a profile's exact coordinates, matching the ~1km
-// rounding applied to the distance itself below.
-const LOCATION_GRID_DEGREES = 0.01;
 
 @Injectable()
 export class ProfilesRepository {

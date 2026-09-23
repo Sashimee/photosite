@@ -980,7 +980,17 @@
             "example": "LU"
           },
           "location": {
-            "$ref": "#/components/schemas/LatLng"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LatLng"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
           },
           "remote": {
             "type": "boolean"
@@ -1119,7 +1129,17 @@
             "example": "LU"
           },
           "location": {
-            "$ref": "#/components/schemas/LatLng"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LatLng"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
           },
           "remote": {
             "type": "boolean"
@@ -1236,7 +1256,17 @@
             "example": "LU"
           },
           "location": {
-            "$ref": "#/components/schemas/LatLng"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LatLng"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
           },
           "remote": {
             "type": "boolean"
@@ -7804,7 +7834,6 @@
                   "category",
                   "city",
                   "countryCode",
-                  "location",
                   "remote"
                 ],
                 "additionalProperties": false

@@ -45,6 +45,15 @@ function jobOfferDateRangeRefinement(data: {
   return new Date(data.startDate).getTime() <= new Date(data.endDate).getTime();
 }
 
+// A remote offer has no site to attach a point to; every other offer needs
+// one for distance search and the map pin (docs/steps/1A.13-professionals.md).
+function jobOfferLocationRefinement(data: {
+  remote: boolean;
+  location?: { lat: number; lng: number } | undefined;
+}) {
+  return data.remote || data.location !== undefined;
+}
+
 export const CompensationSchema = z
   .object({
     min: MoneySchema,
@@ -67,7 +76,7 @@ export const JobOfferSchema = z
     category: JobOfferCategorySchema,
     city: z.string().min(1).max(120),
     countryCode: CountryCodeSchema,
-    location: LatLngSchema,
+    location: LatLngSchema.nullable(),
     remote: z.boolean(),
     startDate: IsoDateTimeSchema.nullable(),
     endDate: IsoDateTimeSchema.nullable(),
@@ -86,8 +95,8 @@ export const JobOfferSchema = z
 // zod refuses .partial() on a schema carrying an object-level refinement, so
 // the mutable fields live here unrefined and CreateJobOfferRequestSchema and
 // UpdateJobOfferRequestSchema each build on top of it. UpdateJobOfferRequestSchema
-// has no startDate <= endDate check as a result; the service must check it
-// itself on PATCH (docs/steps/1A.13-professionals.md).
+// has no startDate <= endDate or location/remote check as a result; the
+// service must check both itself on PATCH (docs/steps/1A.13-professionals.md).
 const JobOfferMutableFieldsSchema = z
   .object({
     title: z.string().min(1).max(150),
@@ -95,7 +104,7 @@ const JobOfferMutableFieldsSchema = z
     category: JobOfferCategorySchema,
     city: z.string().min(1).max(120),
     countryCode: CountryCodeSchema,
-    location: LatLngSchema,
+    location: LatLngSchema.optional(),
     remote: z.boolean(),
     startDate: IsoDateTimeSchema.nullable().optional(),
     endDate: IsoDateTimeSchema.nullable().optional(),
@@ -106,7 +115,10 @@ const JobOfferMutableFieldsSchema = z
 export const CreateJobOfferRequestSchema = JobOfferMutableFieldsSchema.refine(
   jobOfferDateRangeRefinement,
   { message: 'startDate must be less than or equal to endDate', path: ['endDate'] },
-);
+).refine(jobOfferLocationRefinement, {
+  message: 'location is required unless remote is true',
+  path: ['location'],
+});
 
 export const UpdateJobOfferRequestSchema = JobOfferMutableFieldsSchema.partial();
 
@@ -121,7 +133,7 @@ export const PublicJobOfferSummarySchema = z
     category: JobOfferCategorySchema,
     city: z.string().min(1).max(120),
     countryCode: CountryCodeSchema,
-    location: LatLngSchema,
+    location: LatLngSchema.nullable(),
     remote: z.boolean(),
     compensation: CompensationSchema.nullable(),
     publishedAt: IsoDateTimeSchema,
