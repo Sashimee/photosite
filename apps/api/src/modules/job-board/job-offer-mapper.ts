@@ -3,6 +3,10 @@ import type { z } from 'zod';
 import { mapPublicCompany } from '../professionals/professional-mapper.js';
 import type { JobOfferFullRow, PublicJobOfferRow } from './job-board.repository.js';
 
+function mapLocation(lat: number | null, lng: number | null): { lat: number; lng: number } | null {
+  return lat !== null && lng !== null ? { lat, lng } : null;
+}
+
 export function mapFullJobOffer(row: JobOfferFullRow): z.infer<typeof JobOfferSchema> {
   return JobOfferSchema.parse({
     id: row.id,
@@ -12,7 +16,7 @@ export function mapFullJobOffer(row: JobOfferFullRow): z.infer<typeof JobOfferSc
     category: row.category,
     city: row.city,
     countryCode: row.countryCode,
-    location: { lat: row.lat, lng: row.lng },
+    location: mapLocation(row.lat, row.lng),
     remote: row.remote,
     startDate: row.startDate ? row.startDate.toISOString() : null,
     endDate: row.endDate ? row.endDate.toISOString() : null,
@@ -34,7 +38,7 @@ export function mapPublicJobOfferSummary(
     category: row.category,
     city: row.city,
     countryCode: row.countryCode,
-    location: { lat: row.lat, lng: row.lng },
+    location: mapLocation(row.lat, row.lng),
     remote: row.remote,
     compensation: row.compensation,
     publishedAt: row.publishedAt.toISOString(),

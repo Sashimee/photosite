@@ -31,6 +31,13 @@ function uploadConflict(): HttpException {
   );
 }
 
+function profileConflict(): HttpException {
+  return new HttpException(
+    { code: 'CONFLICT', message: 'Professional profile already exists' },
+    409,
+  );
+}
+
 const PROFILE_WITH_LOGO_INCLUDE = { logoUpload: true } as const;
 
 @Injectable()
@@ -52,48 +59,53 @@ export class ProfessionalsService {
       where: { userId: user.id },
     });
     if (existing) {
-      throw new HttpException(
-        { code: 'CONFLICT', message: 'Professional profile already exists' },
-        409,
-      );
+      throw profileConflict();
     }
 
     const logoUploadId = await this.resolveUploadChange(user.id, input.logoUploadId);
 
-    const created = await this.prisma.client.$transaction(async (tx) => {
-      const profile = await tx.professionalProfile.create({
-        data: {
-          userId: user.id,
-          companyName: input.companyName,
-          website: input.website ?? null,
-          vatNumber: input.vatNumber ?? null,
-          logoUploadId: logoUploadId ?? null,
-        },
-        include: PROFILE_WITH_LOGO_INCLUDE,
-      });
-
-      if (!user.roles.includes('professional')) {
-        const nextRoles = [...user.roles, 'professional'];
-        await tx.user.update({
-          where: { id: user.id },
-          data: { roles: { set: nextRoles as never } },
-        });
-        await tx.auditLog.create({
+    let created;
+    try {
+      created = await this.prisma.client.$transaction(async (tx) => {
+        const profile = await tx.professionalProfile.create({
           data: {
-            actorType: 'user',
-            actorId: user.id,
-            action: 'user.role_added',
-            targetType: 'User',
-            targetId: user.id,
-            before: { roles: user.roles },
-            after: { roles: nextRoles },
-            ip: ip ?? null,
+            userId: user.id,
+            companyName: input.companyName,
+            website: input.website ?? null,
+            vatNumber: input.vatNumber ?? null,
+            logoUploadId: logoUploadId ?? null,
           },
+          include: PROFILE_WITH_LOGO_INCLUDE,
         });
-      }
 
-      return profile;
-    });
+        if (!user.roles.includes('professional')) {
+          const nextRoles = [...user.roles, 'professional'];
+          await tx.user.update({
+            where: { id: user.id },
+            data: { roles: { set: nextRoles as never } },
+          });
+          await tx.auditLog.create({
+            data: {
+              actorType: 'user',
+              actorId: user.id,
+              action: 'user.role_added',
+              targetType: 'User',
+              targetId: user.id,
+              before: { roles: user.roles },
+              after: { roles: nextRoles },
+              ip: ip ?? null,
+            },
+          });
+        }
+
+        return profile;
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw profileConflict();
+      }
+      throw error;
+    }
 
     return mapOwnProfile(created, this.baseUrl);
   }

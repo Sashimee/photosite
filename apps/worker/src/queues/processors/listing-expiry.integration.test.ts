@@ -126,17 +126,21 @@ describe('createListingExpiryProcessor against a real database', () => {
     await prisma.$disconnect();
   });
 
+  // `listing_expiry.swept` audit rows are global (`targetType: 'System'`,
+  // one row per sweep, no per-offer targetId to filter by), so counting the
+  // whole table before/after would also catch a real scheduled sweep
+  // running concurrently against `photoo_test` while this test runs.
+  // Narrowing to `occurredAt` between two watermarks taken immediately
+  // around each `processor()` call keeps the assertion scoped to this run.
   it('expires only the lapsed published offer and is idempotent on a second run', async () => {
     const processor = createListingExpiryProcessor({
       prisma: { client: prisma },
       logger: fakeLogger() as never,
     });
 
-    const auditLogCountBefore = await prisma.auditLog.count({
-      where: { action: 'listing_expiry.swept' },
-    });
-
+    const beforeFirstRun = new Date();
     await processor(undefined as never);
+    const afterFirstRun = new Date();
 
     const lapsed = await prisma.jobOffer.findUniqueOrThrow({ where: { id: lapsedOfferId } });
     const live = await prisma.jobOffer.findUniqueOrThrow({ where: { id: liveOfferId } });
@@ -145,21 +149,29 @@ describe('createListingExpiryProcessor against a real database', () => {
     expect(live.status).toBe('published');
     expect(closed.status).toBe('closed');
 
-    const auditLogCountAfterFirstRun = await prisma.auditLog.count({
-      where: { action: 'listing_expiry.swept' },
+    const auditLogsFromFirstRun = await prisma.auditLog.count({
+      where: {
+        action: 'listing_expiry.swept',
+        occurredAt: { gte: beforeFirstRun, lte: afterFirstRun },
+      },
     });
-    expect(auditLogCountAfterFirstRun).toBe(auditLogCountBefore + 1);
+    expect(auditLogsFromFirstRun).toBe(1);
 
+    const beforeSecondRun = new Date();
     await processor(undefined as never);
+    const afterSecondRun = new Date();
 
     const lapsedAfterSecondRun = await prisma.jobOffer.findUniqueOrThrow({
       where: { id: lapsedOfferId },
     });
     expect(lapsedAfterSecondRun.status).toBe('expired');
 
-    const auditLogCountAfterSecondRun = await prisma.auditLog.count({
-      where: { action: 'listing_expiry.swept' },
+    const auditLogsFromSecondRun = await prisma.auditLog.count({
+      where: {
+        action: 'listing_expiry.swept',
+        occurredAt: { gte: beforeSecondRun, lte: afterSecondRun },
+      },
     });
-    expect(auditLogCountAfterSecondRun).toBe(auditLogCountAfterFirstRun);
+    expect(auditLogsFromSecondRun).toBe(0);
   });
 });

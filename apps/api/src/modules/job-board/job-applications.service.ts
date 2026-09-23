@@ -72,7 +72,6 @@ export class JobApplicationsService {
   async apply(user: SessionUser, jobOfferId: string, input: ApplyInput): Promise<ApplicationDto> {
     requireRole(user, 'photographer');
     const profile = await this.requirePhotographerProfile(user.id);
-    await this.rateLimit.enforceApply(profile.id);
 
     const offer = await this.prisma.client.jobOffer.findUnique({ where: { id: jobOfferId } });
     if (!offer) {
@@ -92,6 +91,11 @@ export class JobApplicationsService {
     if (professional?.userId === user.id) {
       throw unprocessable('Cannot apply to your own job offer');
     }
+
+    // Consumed only once the offer is known to exist, be open and not be
+    // the caller's own (docs/steps/1A.13-professionals.md): probing dead or
+    // closed ids must never burn the daily apply budget.
+    await this.rateLimit.enforceApply(profile.id);
 
     let created: JobApplication;
     try {

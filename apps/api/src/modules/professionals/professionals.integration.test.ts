@@ -213,6 +213,32 @@ describe('professionals integration', () => {
       expect(second.statusCode).toBe(409);
     });
 
+    it('rejects a second, concurrent create for the same account with 409 instead of 500', async () => {
+      const client = await signUpAndSignIn(['client']);
+
+      const [first, second] = await Promise.all([
+        fastify().inject({
+          method: 'POST',
+          url: '/v1/me/professional-profile',
+          headers: authHeaders(client.token),
+          payload: { companyName: 'Concurrent Co A' },
+        }),
+        fastify().inject({
+          method: 'POST',
+          url: '/v1/me/professional-profile',
+          headers: authHeaders(client.token),
+          payload: { companyName: 'Concurrent Co B' },
+        }),
+      ]);
+      const statuses = [first.statusCode, second.statusCode].sort();
+      expect(statuses).toEqual([201, 409]);
+
+      const profiles = await prisma.professionalProfile.findMany({
+        where: { userId: client.id },
+      });
+      expect(profiles).toHaveLength(1);
+    });
+
     it('rejects a logoUploadId not owned by the caller with 404', async () => {
       const client = await signUpAndSignIn(['client']);
       const otherUser = await signUpAndSignIn(['client']);

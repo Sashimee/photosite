@@ -1,16 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma, type PrismaClient } from '@photoo/db';
 import type { CreatedAtCursor } from '../../common/pagination/created-at-cursor.js';
+import { LOCATION_GRID_DEGREES } from '../../common/geo/location-grid.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 
 interface ExecuteRawClient {
   $executeRaw: PrismaClient['$executeRaw'];
 }
-
-// Matches the ~1km coarsening grid used by profile search
-// (profiles.repository.ts), so a request's exact location can never be
-// triangulated by a photographer browsing the feed or reading a summary.
-const LOCATION_GRID_DEGREES = 0.01;
 
 export interface RequestFullRow {
   id: string;

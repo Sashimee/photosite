@@ -27,6 +27,10 @@ function uniqueEmail(label: string): string {
   return `job-board-${label}-${randomUUID()}@photoo.test`;
 }
 
+function isSnappedToGrid(value: number): boolean {
+  return Math.abs(value * 100 - Math.round(value * 100)) < 1e-6;
+}
+
 interface JobOfferBody {
   id: string;
   slug: string;
@@ -34,13 +38,14 @@ interface JobOfferBody {
   status: string;
   publishedAt: string | null;
   expiresAt: string | null;
-  location: { lat: number; lng: number };
+  location: { lat: number; lng: number } | null;
 }
 
 interface PublicJobOfferSummaryBody {
   id: string;
   slug: string;
   title: string;
+  location: { lat: number; lng: number } | null;
   company: { id: string; companyName: string; verified: boolean; [key: string]: unknown };
 }
 
@@ -203,12 +208,14 @@ describe('job board integration', () => {
     return published.json<JobOfferBody>();
   }
 
-  // Publishing more than 30 fixture offers from one account would trip the
-  // publish rate limit (10/day) as a side effect of setting up the apply
-  // rate limit fixtures, so tests that need many published offers from the
-  // same professional reset it between publishes.
-  async function resetPublishRateLimit(userId: string): Promise<void> {
+  // Publishing more than 20-30 fixture offers from one account would trip
+  // the create (20/day) or publish (10/day) rate limit as a side effect of
+  // setting up the apply rate limit fixtures, so tests that need many
+  // published offers from the same professional reset both between calls.
+  async function resetJobBoardWriteRateLimits(userId: string): Promise<void> {
     await redis.del(
+      `rate-limit:job-board:create:account:${userId}`,
+      `lockout:job-board:create:account:${userId}`,
       `rate-limit:job-board:publish:account:${userId}`,
       `lockout:job-board:publish:account:${userId}`,
     );
@@ -267,6 +274,52 @@ describe('job board integration', () => {
       expect(body.slug).toMatch(/^[a-z0-9-]+$/);
       expect(body.publishedAt).toBeNull();
     });
+
+    it('rejects a non-remote offer with no location with 400', async () => {
+      const professional = await createProfessional('create-no-location');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/job-offers',
+        headers: authHeaders(professional.token),
+        payload: offerPayload({ remote: false, location: undefined }),
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('creates a remote offer with no location, returning a null location', async () => {
+      const professional = await createProfessional('create-remote');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/job-offers',
+        headers: authHeaders(professional.token),
+        payload: offerPayload({ remote: true, location: undefined }),
+      });
+      expect(response.statusCode).toBe(201);
+      expect(response.json<JobOfferBody>().location).toBeNull();
+    });
+
+    it('rate limits draft creation to 20 a day per account, returning 429 with a retry-after detail', async () => {
+      const professional = await createProfessional('create-rate-limit');
+      let last;
+      for (let i = 0; i < 20; i += 1) {
+        last = await fastify().inject({
+          method: 'POST',
+          url: '/v1/me/job-offers',
+          headers: authHeaders(professional.token),
+          payload: offerPayload(),
+        });
+        expect(last.statusCode).toBe(201);
+      }
+      const twentyFirst = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/job-offers',
+        headers: authHeaders(professional.token),
+        payload: offerPayload(),
+      });
+      expect(twentyFirst.statusCode).toBe(429);
+      const body = twentyFirst.json<{ details: { retryAfterSeconds: number } }>();
+      expect(body.details.retryAfterSeconds).toBeGreaterThan(0);
+    });
   });
 
   describe('GET/PATCH/DELETE /v1/me/job-offers/:id', () => {
@@ -315,6 +368,40 @@ describe('job board integration', () => {
       expect(response.statusCode).toBe(422);
     });
 
+    it('rejects a PATCH that turns off remote and leaves no location, merged against the existing row', async () => {
+      const professional = await createProfessional('patch-location-merge');
+      const offer = await createDraftOffer(professional.token, {
+        remote: true,
+        location: undefined,
+      });
+      expect(offer.location).toBeNull();
+
+      const response = await fastify().inject({
+        method: 'PATCH',
+        url: `/v1/me/job-offers/${offer.id}`,
+        headers: authHeaders(professional.token),
+        payload: { remote: false },
+      });
+      expect(response.statusCode).toBe(422);
+    });
+
+    it('accepts a PATCH that sets remote and a location together', async () => {
+      const professional = await createProfessional('patch-location-set');
+      const offer = await createDraftOffer(professional.token, {
+        remote: true,
+        location: undefined,
+      });
+
+      const response = await fastify().inject({
+        method: 'PATCH',
+        url: `/v1/me/job-offers/${offer.id}`,
+        headers: authHeaders(professional.token),
+        payload: { remote: false, location: { lat: RUN_LAT, lng: RUN_LNG } },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json<JobOfferBody>().location).toEqual({ lat: RUN_LAT, lng: RUN_LNG });
+    });
+
     it('deletes an own offer, cascading its applications', async () => {
       const professional = await createProfessional('delete');
       const offer = await createPublishedOffer(professional.token);
@@ -343,6 +430,18 @@ describe('job board integration', () => {
   });
 
   describe('POST /v1/me/job-offers/:id/publish', () => {
+    it('never burns the daily publish budget on ids that do not exist', async () => {
+      const professional = await createProfessional('publish-probe');
+      for (let i = 0; i < 15; i += 1) {
+        const response = await publishOffer(professional.token, randomUUID());
+        expect(response.statusCode).toBe(404);
+      }
+
+      const draft = await createDraftOffer(professional.token);
+      const response = await publishOffer(professional.token, draft.id);
+      expect(response.statusCode).toBe(200);
+    });
+
     it('sets publishedAt, expiresAt about 60 days out, and creates a free listing', async () => {
       const professional = await createProfessional('publish');
       const draft = await createDraftOffer(professional.token);
@@ -371,6 +470,27 @@ describe('job board integration', () => {
 
       const response = await publishOffer(professional.token, offer.id);
       expect(response.statusCode).toBe(409);
+    });
+
+    it('leaves exactly one listing when the same offer is published twice concurrently', async () => {
+      const professional = await createProfessional('publish-concurrent');
+      const draft = await createDraftOffer(professional.token);
+
+      const [first, second] = await Promise.all([
+        publishOffer(professional.token, draft.id),
+        publishOffer(professional.token, draft.id),
+      ]);
+      const statuses = [first.statusCode, second.statusCode].sort();
+      expect(statuses).toEqual([200, 409]);
+
+      const listingCount = await prisma.listing.count({ where: { ownerId: draft.id } });
+      expect(listingCount).toBe(1);
+
+      const offerRow = await prisma.jobOffer.findUniqueOrThrow({ where: { id: draft.id } });
+      const listing = await prisma.listing.findUniqueOrThrow({
+        where: { id: offerRow.listingId ?? '' },
+      });
+      expect(listing.ownerId).toBe(draft.id);
     });
 
     it('creates a new listing rather than extending the old one when re-publishing a closed offer', async () => {
@@ -501,6 +621,56 @@ describe('job board integration', () => {
       expect(ids).toContain(offer.id);
     });
 
+    it('snaps the location to the coarsening grid for public reads but keeps the owner view exact', async () => {
+      const professional = await createProfessional('location-privacy');
+      const preciseLocation = { lat: RUN_LAT + 0.00345, lng: RUN_LNG + 0.00678 };
+      const offer = await createPublishedOffer(professional.token, { location: preciseLocation });
+
+      const ownView = await fastify().inject({
+        method: 'GET',
+        url: `/v1/me/job-offers/${offer.id}`,
+        headers: authHeaders(professional.token),
+      });
+      const ownLocation = ownView.json<JobOfferBody>().location;
+      expect(ownLocation?.lat).toBeCloseTo(preciseLocation.lat, 5);
+      expect(ownLocation?.lng).toBeCloseTo(preciseLocation.lng, 5);
+
+      const summary = await fastify().inject({ method: 'GET', url: '/v1/job-offers?limit=100' });
+      const summaryOffer = summary
+        .json<PaginatedBody<PublicJobOfferSummaryBody>>()
+        .items.find((item) => item.id === offer.id);
+      expect(summaryOffer?.location?.lat).not.toBeCloseTo(preciseLocation.lat, 3);
+      expect(isSnappedToGrid(summaryOffer?.location?.lat ?? NaN)).toBe(true);
+      expect(isSnappedToGrid(summaryOffer?.location?.lng ?? NaN)).toBe(true);
+
+      const detail = await fastify().inject({
+        method: 'GET',
+        url: `/v1/job-offers/${offer.slug}`,
+      });
+      const detailLocation = detail.json<PublicJobOfferSummaryBody>().location;
+      expect(detailLocation?.lat).not.toBeCloseTo(preciseLocation.lat, 3);
+      expect(isSnappedToGrid(detailLocation?.lat ?? NaN)).toBe(true);
+      expect(isSnappedToGrid(detailLocation?.lng ?? NaN)).toBe(true);
+    });
+
+    it('matches a % or _ in the title literally instead of as a wildcard', async () => {
+      const professional = await createProfessional('q-wildcard');
+      const offer = await createPublishedOffer(professional.token, {
+        title: `Fx Wildcard 100% Q_${RUN_ID}`,
+      });
+      await createPublishedOffer(professional.token, {
+        title: `Fx Wildcard 100X QY${RUN_ID}`,
+      });
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/job-offers?q=${encodeURIComponent(`100% Q_${RUN_ID}`)}&limit=100`,
+      });
+      const ids = response.json<PaginatedBody<PublicJobOfferSummaryBody>>().items.map((i) => i.id);
+      expect(ids).toContain(offer.id);
+      expect(ids).toHaveLength(1);
+    });
+
     it('treats a malformed cursor as 400, not 500', async () => {
       const response = await fastify().inject({
         method: 'GET',
@@ -565,6 +735,29 @@ describe('job board integration', () => {
         payload: { message: 'Fixture application.' },
       });
       expect(response.statusCode).toBe(404);
+    });
+
+    it('never burns the daily apply budget on offers that do not exist', async () => {
+      const photographer = await createPhotographer('apply-probe');
+      for (let i = 0; i < 35; i += 1) {
+        const response = await fastify().inject({
+          method: 'POST',
+          url: `/v1/job-offers/${randomUUID()}/applications`,
+          headers: authHeaders(photographer.token),
+          payload: { message: 'Fixture application.' },
+        });
+        expect(response.statusCode).toBe(404);
+      }
+
+      const professional = await createProfessional('apply-probe-owner');
+      const offer = await createPublishedOffer(professional.token);
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/job-offers/${offer.id}/applications`,
+        headers: authHeaders(photographer.token),
+        payload: { message: 'A genuine application after probing dead ids.' },
+      });
+      expect(response.statusCode).toBe(201);
     });
 
     it('rejects applying to a draft offer with 409', async () => {
@@ -634,7 +827,7 @@ describe('job board integration', () => {
       const professional = await createProfessional('apply-rate-limit-owner');
       let last;
       for (let i = 0; i < 30; i += 1) {
-        await resetPublishRateLimit(professional.userId);
+        await resetJobBoardWriteRateLimits(professional.userId);
         const offer = await createPublishedOffer(professional.token);
         last = await fastify().inject({
           method: 'POST',
@@ -725,7 +918,7 @@ describe('job board integration', () => {
       expect(response.statusCode).toBe(403);
     });
 
-    it('lets the photographer withdraw their own application, notifying the professional', async () => {
+    it('lets the photographer withdraw their own application without notifying the professional', async () => {
       const { professional, photographer, application } = await applyFixture('withdraw');
       const response = await fastify().inject({
         method: 'POST',

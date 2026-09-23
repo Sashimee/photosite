@@ -75,27 +75,36 @@ export class JobOffersService {
     requireRole(user, 'professional');
     const professional = await this.professionals.getOwnProfileRecord(user.id);
     await this.assertCountryEnabled(input.countryCode);
+    await this.rateLimit.enforceCreate(user.id);
 
     const slug = await generateUniqueJobOfferSlug(this.prisma, input.title);
 
-    const created = await this.prisma.client.jobOffer.create({
-      data: {
-        professionalId: professional.id,
-        slug,
-        title: input.title,
-        description: input.description,
-        category: toPrismaCategory(input.category),
-        city: input.city,
-        countryCode: input.countryCode,
-        remote: input.remote,
-        startDate: input.startDate ? new Date(input.startDate) : null,
-        endDate: input.endDate ? new Date(input.endDate) : null,
-        compensation: input.compensation ?? Prisma.JsonNull,
-        status: 'draft',
-      },
-    });
+    // One `$transaction`, not two statements: a row with a location write
+    // that failed separately would 500 every reader instead of rolling back.
+    const created = await this.prisma.client.$transaction(async (tx) => {
+      const row = await tx.jobOffer.create({
+        data: {
+          professionalId: professional.id,
+          slug,
+          title: input.title,
+          description: input.description,
+          category: toPrismaCategory(input.category),
+          city: input.city,
+          countryCode: input.countryCode,
+          remote: input.remote,
+          startDate: input.startDate ? new Date(input.startDate) : null,
+          endDate: input.endDate ? new Date(input.endDate) : null,
+          compensation: input.compensation ?? Prisma.JsonNull,
+          status: 'draft',
+        },
+      });
 
-    await this.repository.setLocation(created.id, input.location.lat, input.location.lng);
+      if (input.location) {
+        await this.repository.setLocation(row.id, input.location.lat, input.location.lng, tx);
+      }
+
+      return row;
+    });
 
     return mapFullJobOffer(await this.requireOwnRow(created.id, professional.id));
   }
@@ -159,6 +168,16 @@ export class JobOffersService {
       throw unprocessable('startDate must be less than or equal to endDate');
     }
 
+    // Same reasoning as the date check above: CreateJobOfferRequestSchema's
+    // remote/location refinement doesn't survive .partial(), so PATCH checks
+    // the merged result itself.
+    const nextRemote = input.remote ?? existing.remote;
+    const nextHasLocation =
+      input.location !== undefined ? true : existing.lat !== null && existing.lng !== null;
+    if (!nextRemote && !nextHasLocation) {
+      throw unprocessable('location is required unless remote is true');
+    }
+
     const data: Prisma.JobOfferUncheckedUpdateInput = {};
     if (input.title !== undefined) data.title = input.title;
     if (input.description !== undefined) data.description = input.description;
@@ -170,10 +189,12 @@ export class JobOffersService {
     if (input.endDate !== undefined) data.endDate = nextEndDate;
     if (input.compensation !== undefined) data.compensation = input.compensation ?? Prisma.JsonNull;
 
-    await this.prisma.client.jobOffer.update({ where: { id: existing.id }, data });
-    if (input.location !== undefined) {
-      await this.repository.setLocation(existing.id, input.location.lat, input.location.lng);
-    }
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.jobOffer.update({ where: { id: existing.id }, data });
+      if (input.location !== undefined) {
+        await this.repository.setLocation(existing.id, input.location.lat, input.location.lng, tx);
+      }
+    });
 
     return mapFullJobOffer(await this.requireOwnRow(existing.id, professional.id));
   }
@@ -195,7 +216,6 @@ export class JobOffersService {
   async publish(user: SessionUser, id: string): Promise<JobOfferDto> {
     requireRole(user, 'professional');
     const professional = await this.professionals.getOwnProfileRecord(user.id);
-    await this.rateLimit.enforcePublish(user.id);
 
     const existing = await this.repository.getOwnById(id, professional.id);
     if (!existing) {
@@ -204,6 +224,11 @@ export class JobOffersService {
     if (existing.status === 'published') {
       throw conflict('Job offer is already published');
     }
+
+    // Consumed only once the offer is known to exist, be owned by the
+    // caller and not already published: probing dead ids must never burn
+    // the daily publish budget.
+    await this.rateLimit.enforcePublish(user.id);
 
     const country = await this.prisma.client.country.findUnique({
       where: { code: existing.countryCode },
@@ -216,17 +241,22 @@ export class JobOffersService {
 
     // Runtime guard, not just the `z.literal('free')` type (D8): a future
     // edit that widens this call site fails loudly instead of billing Phase 1.
-    CreateListingRequestSchema.parse({ kind: 'job_offer', plan: 'free' });
+    const listingRequest = CreateListingRequestSchema.parse({ kind: 'job_offer', plan: 'free' });
 
     const publishedAt = new Date();
     const expiresAt = new Date(publishedAt.getTime() + LISTING_EXPIRY_DAYS * MS_PER_DAY);
 
+    // The `status` above is a fast pre-check, not the guard: two concurrent
+    // publishes both pass it, so the update that actually flips the status
+    // is a conditional `updateMany` inside the same transaction as the
+    // listing insert. Whichever call loses the race rolls back its listing
+    // instead of leaving an orphan with a live `expiresAt` (D8).
     await this.prisma.client.$transaction(async (tx) => {
       const listing = await tx.listing.create({
         data: {
           ownerId: existing.id,
-          kind: 'job_offer',
-          plan: 'free',
+          kind: listingRequest.kind,
+          plan: listingRequest.plan,
           priceCents: 0,
           currency: country.currency,
           paidAt: publishedAt,
@@ -234,10 +264,13 @@ export class JobOffersService {
         },
       });
 
-      await tx.jobOffer.update({
-        where: { id: existing.id },
+      const result = await tx.jobOffer.updateMany({
+        where: { id: existing.id, status: { in: ['draft', 'closed', 'expired'] } },
         data: { status: 'published', publishedAt, expiresAt, listingId: listing.id },
       });
+      if (result.count === 0) {
+        throw conflict('Job offer is already published');
+      }
     });
 
     return mapFullJobOffer(await this.requireOwnRow(existing.id, professional.id));
