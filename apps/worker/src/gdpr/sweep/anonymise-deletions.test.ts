@@ -144,7 +144,7 @@ describe('anonymiseDeletions', () => {
     );
   });
 
-  it('replaces displayName and anonymises job applications when a photographer profile exists', async () => {
+  it('replaces displayName and slug, and anonymises job applications when a photographer profile exists', async () => {
     const { client, photographerProfileUpdate, jobApplicationUpdateMany } = fakePrisma({
       due: [{ id: 'req-ok', userId: 'user-ok' }],
       photographerProfile: { id: 'profile-1' },
@@ -162,12 +162,55 @@ describe('anonymiseDeletions', () => {
 
     expect(photographerProfileUpdate).toHaveBeenCalledWith({
       where: { id: 'profile-1' },
-      data: { displayName: 'Deleted user', headline: null, bio: {}, links: [], languages: [] },
+      data: {
+        slug: 'deleted-profile-1',
+        displayName: 'Deleted user',
+        headline: null,
+        bio: {},
+        links: [],
+        languages: [],
+      },
     });
     expect(jobApplicationUpdateMany).toHaveBeenCalledWith({
       where: { photographerId: 'profile-1' },
       data: { message: '', portfolioLink: null },
     });
+  });
+
+  it('derives the anonymised slug from the profile id, so two erased photographers never collide', async () => {
+    const first = fakePrisma({
+      due: [{ id: 'req-a', userId: 'user-a' }],
+      photographerProfile: { id: 'profile-a' },
+    });
+    const second = fakePrisma({
+      due: [{ id: 'req-b', userId: 'user-b' }],
+      photographerProfile: { id: 'profile-b' },
+    });
+
+    for (const fixture of [first, second]) {
+      await anonymiseDeletions({
+        prisma: { client: fixture.client } as never,
+        storage: {
+          config: { privateBucket: 'private', publicBucket: 'public' },
+          deleteObject: vi.fn(() => Promise.resolve()),
+        },
+        auditLog: { record: vi.fn(() => Promise.resolve()) },
+        logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+      });
+    }
+
+    expect(first.photographerProfileUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'profile-a' },
+        data: expect.objectContaining({ slug: 'deleted-profile-a' }) as object,
+      }),
+    );
+    expect(second.photographerProfileUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'profile-b' },
+        data: expect.objectContaining({ slug: 'deleted-profile-b' }) as object,
+      }),
+    );
   });
 
   it('replaces companyName and nulls website/vatNumber when a professional profile exists', async () => {
