@@ -9,8 +9,9 @@ import { FormattedDateTime } from '@/components/requests/formatted-date-time';
 import { QuoteActions } from '@/components/requests/quote-actions';
 import { QuoteLineItems } from '@/components/requests/quote-line-items';
 import { isTerminalQuoteStatus, StatusBadge } from '@/components/requests/status-badge';
+import { WithdrawQuoteAction } from '@/components/requests/withdraw-quote-action';
 import { FormNotice } from '@/components/ui/form-message';
-import { formatMoney, requireMoney } from '@/lib/money';
+import { formatMoney, payoutAmount, requireMoney } from '@/lib/money';
 import { buildRobotsMetadata } from '@/lib/robots';
 import { getSession, serverApi } from '@/lib/session';
 
@@ -65,15 +66,38 @@ export default async function QuoteDetailPage({
   }
   const quote = result.data;
   const total = requireMoney(quote.total, `quote "${quote.id}" total`);
+  // `quotes.service.get()` only ever returns a quote to its client or to the
+  // matching photographer (anyone else gets a 404 before this point), so a
+  // caller who isn't the client must be the photographer who sent it.
+  const isOwnPhotographerQuote = quote.clientId !== user.id;
+  const payout = isOwnPhotographerQuote
+    ? payoutAmount(
+        requireMoney(quote.subtotal, `quote "${quote.id}" subtotal`),
+        requireMoney(quote.platformFee, `quote "${quote.id}" platform fee`),
+      )
+    : null;
+
+  // A photographer's own quote always links back to their dashboard quotes
+  // list: /requests/{id} only resolves for the client side (DATA-MODEL.md -
+  // a photographer without an accepted or sent quote gets a 404 there, and
+  // even with one the endpoint returns the client's request shape, not the
+  // photographer's summary one).
+  const backHref = isOwnPhotographerQuote
+    ? `/${locale}/dashboard/quotes`
+    : quote.requestId
+      ? `/${locale}/requests/${quote.requestId}`
+      : `/${locale}/quotes`;
+  const backLabel =
+    !isOwnPhotographerQuote && quote.requestId ? t('backToRequest') : t('backToList');
 
   return (
     <section className="mx-auto flex max-w-2xl flex-col gap-8 px-4 py-12">
       <div className="flex flex-col gap-2">
         <Link
-          href={quote.requestId ? `/${locale}/requests/${quote.requestId}` : `/${locale}/quotes`}
+          href={backHref}
           className="self-start text-sm font-medium text-primary underline-offset-4 hover:underline"
         >
-          {quote.requestId ? t('backToRequest') : t('backToList')}
+          {backLabel}
         </Link>
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-2xl font-semibold text-foreground">{formatMoney(total, locale)}</h1>
@@ -91,6 +115,9 @@ export default async function QuoteDetailPage({
       {quote.status === 'declined' ? (
         <FormNotice tone="info">{t('declinedNotice')}</FormNotice>
       ) : null}
+      {quote.status === 'withdrawn' ? (
+        <FormNotice tone="info">{t('withdrawnNotice')}</FormNotice>
+      ) : null}
 
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold text-foreground">{t('lineItemsHeading')}</h2>
@@ -99,6 +126,12 @@ export default async function QuoteDetailPage({
           <span>{t('totalLabel')}</span>
           <span>{formatMoney(total, locale)}</span>
         </div>
+        {payout ? (
+          <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+            <span>{t('payoutLabel')}</span>
+            <span>{formatMoney(payout, locale)}</span>
+          </div>
+        ) : null}
       </div>
 
       {quote.message ? (
@@ -109,6 +142,7 @@ export default async function QuoteDetailPage({
       ) : null}
 
       <QuoteActions quote={quote} currentUserId={user.id} />
+      {isOwnPhotographerQuote ? <WithdrawQuoteAction quote={quote} /> : null}
     </section>
   );
 }

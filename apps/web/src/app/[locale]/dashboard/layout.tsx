@@ -52,6 +52,8 @@ export default async function DashboardLayout({
     { href: `/${locale}/dashboard/profile`, label: t('nav.profile') },
     { href: `/${locale}/dashboard/portfolio`, label: t('nav.portfolio') },
     { href: `/${locale}/dashboard/products`, label: t('nav.products') },
+    { href: `/${locale}/dashboard/requests`, label: t('nav.requests') },
+    { href: `/${locale}/dashboard/quotes`, label: t('nav.quotes') },
   ];
 
   return (

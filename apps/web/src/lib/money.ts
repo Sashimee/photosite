@@ -40,3 +40,19 @@ export function requireMoney(money: Money | null | undefined, context: string): 
   }
   return money;
 }
+
+// Per docs/PAYMENTS.md the photographer's payout is subtotal minus the
+// platform fee (Transfer amount = subtotalCents - platformFeeCents); the API
+// only ever returns the two parts, never the net, so this subtracts two
+// numbers the server already computed instead of recomputing the fee itself.
+export function payoutAmount(subtotal: Money, platformFee: Money): Money {
+  if (subtotal.currency !== platformFee.currency) {
+    throw new Error(
+      `payoutAmount: currency mismatch (${subtotal.currency} vs ${platformFee.currency})`,
+    );
+  }
+  return {
+    amountCents: subtotal.amountCents - platformFee.amountCents,
+    currency: subtotal.currency,
+  };
+}

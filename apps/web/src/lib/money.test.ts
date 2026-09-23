@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatMoney, lowestPrice, requireMoney } from './money';
+import { formatMoney, lowestPrice, payoutAmount, requireMoney } from './money';
 
 describe('formatMoney', () => {
   it('formats integer cents as currency in the given locale', () => {
@@ -56,5 +56,25 @@ describe('requireMoney', () => {
   it('throws with the given context when null or undefined', () => {
     expect(() => requireMoney(null, 'a product tier')).toThrow(/a product tier/);
     expect(() => requireMoney(undefined, 'a product tier')).toThrow(/a product tier/);
+  });
+});
+
+describe('payoutAmount', () => {
+  it('subtracts the platform fee from the subtotal', () => {
+    expect(
+      payoutAmount(
+        { amountCents: 150000, currency: 'EUR' },
+        { amountCents: 7500, currency: 'EUR' },
+      ),
+    ).toEqual({ amountCents: 142500, currency: 'EUR' });
+  });
+
+  it('throws on a currency mismatch instead of returning a wrong amount', () => {
+    expect(() =>
+      payoutAmount(
+        { amountCents: 150000, currency: 'EUR' },
+        { amountCents: 7500, currency: 'USD' },
+      ),
+    ).toThrow(/currency mismatch/);
   });
 });
