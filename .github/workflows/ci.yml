@@ -304,17 +304,41 @@ jobs:
         run: pnpm exec turbo run build --filter=@photoo/api... --filter=@photoo/web...
       - name: Start api and web, wait until both answer
         run: |
-          # `next start` doesn't support `output: standalone` (apps/web/next.config.ts,
-          # and next itself warns about it at boot) and in this job intermittently
-          # serves /en responses that never finish, so the curl loop below retries
-          # until the timeout kills it - not a slow boot, the requests just hang.
-          # infra/docker/web.Dockerfile already runs the standalone server this same
-          # build produces; do the same here instead of raising the timeout.
+          # infra/docker/web.Dockerfile runs the standalone server `next
+          # build` produces (`next start` doesn't support `output:
+          # standalone` and next itself warns about it at boot), so this
+          # does the same rather than the dev-only `next start`.
           cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/
           pnpm --filter @photoo/api start &
           PORT=3000 HOSTNAME=0.0.0.0 node apps/web/.next/standalone/apps/web/server.js &
-          timeout 60 bash -c 'until curl -sf http://127.0.0.1:4000/health; do sleep 1; done'
-          timeout 60 bash -c 'until curl -sf http://127.0.0.1:3000/en; do sleep 1; done'
+
+          # A bare `curl -s` swallows curl's own error (a reset, a stalled
+          # connection, a short read) along with its progress meter, leaving
+          # only this loop's own generic timeout to diagnose a failure from.
+          # -S restores it, and the body/status get printed on the final
+          # attempt so a stuck or truncated response explains itself.
+          wait_for() {
+            local url="$1" deadline=$((SECONDS + 60)) body status
+            body="$(mktemp)"
+            while true; do
+              # --max-time bounds each attempt: without it, one connection
+              # that's accepted but never answered hangs this curl call
+              # forever, and the deadline below never gets checked.
+              status="$(curl -sS --max-time 5 -o "$body" -w '%{http_code}' "$url" 2>"$body.err")" \
+                && [ "$status" = 200 ] && { rm -f "$body" "$body.err"; return 0; }
+              if [ "$SECONDS" -ge "$deadline" ]; then
+                echo "::error::$url did not answer with HTTP 200 within 60s (last status: ${status:-none, see curl error below})"
+                echo '--- curl stderr ---'; cat "$body.err"
+                echo '--- response body ---'; cat "$body"
+                rm -f "$body" "$body.err"
+                return 1
+              fi
+              sleep 1
+            done
+          }
+
+          wait_for http://127.0.0.1:4000/health
+          wait_for http://127.0.0.1:3000/en
       - name: Install the smoke project's browser
         run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:smoke
