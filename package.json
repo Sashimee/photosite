@@ -36,12 +36,12 @@
     "@photoo/config": "workspace:*",
     "@photoo/shared": "workspace:*",
     "@playwright/test": "1.63.0",
-    "@types/node": "26.5.1",
+    "@types/node": "26.6.2",
     "eslint": "9.39.5",
     "husky": "9.1.7",
     "lint-staged": "17.5.1",
-    "prettier": "3.9.7",
-    "turbo": "2.10.13",
+    "prettier": "3.9.8",
+    "turbo": "2.11.2",
     "typescript": "6.0.3"
   }
 }
