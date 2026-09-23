@@ -12,6 +12,8 @@ import {
   GdprSweepJobSchema,
   IMAGE_PROCESS_QUEUE_NAME,
   ImageProcessJobSchema,
+  LISTING_EXPIRY_QUEUE_NAME,
+  ListingExpiryJobSchema,
   NOTIFICATIONS_CLEANUP_QUEUE_NAME,
   NotificationsCleanupJobSchema,
   NOTIFY_JOB_ATTEMPTS,
@@ -55,6 +57,7 @@ describe('QUEUE_NAMES', () => {
       'receipt-pdf',
       'gdpr-export',
       'gdpr-sweep',
+      'listing-expiry',
     ]);
     expect(new Set(QUEUE_NAMES).size).toBe(QUEUE_NAMES.length);
   });
@@ -75,6 +78,7 @@ describe('QUEUE_NAMES', () => {
       RECEIPT_PDF_QUEUE_NAME,
       GDPR_EXPORT_QUEUE_NAME,
       GDPR_SWEEP_QUEUE_NAME,
+      LISTING_EXPIRY_QUEUE_NAME,
     ]).toEqual(QUEUE_NAMES);
   });
 });
@@ -324,6 +328,16 @@ describe('gdpr-sweep job schema', () => {
 
   it('rejects unknown extra keys', () => {
     expect(GdprSweepJobSchema.safeParse({ uploadId: VALID_UPLOAD_ID }).success).toBe(false);
+  });
+});
+
+describe('listing-expiry job schema', () => {
+  it('accepts an empty payload', () => {
+    expect(ListingExpiryJobSchema.safeParse({}).success).toBe(true);
+  });
+
+  it('rejects unknown extra keys', () => {
+    expect(ListingExpiryJobSchema.safeParse({ uploadId: VALID_UPLOAD_ID }).success).toBe(false);
   });
 });
 

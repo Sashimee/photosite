@@ -101,6 +101,21 @@ describe('renderNotifyEmail', () => {
     }
   });
 
+  it('renders every job application notification type without throwing', () => {
+    const types = ['job_application_received', 'job_application_status_changed'] as const;
+    for (const type of types) {
+      expect(() =>
+        renderNotifyEmail(
+          type,
+          { jobOfferId: 'job-offer-1' },
+          'en',
+          'jane@example.com',
+          'https://photoo.lu',
+        ),
+      ).not.toThrow();
+    }
+  });
+
   it('renders message_received with a conversation deep link', () => {
     const message = renderNotifyEmail(
       'message_received',
@@ -176,5 +191,46 @@ describe('renderNotifyEmail', () => {
     expect(message.subject).toContain('rejected');
     expect(message.text).not.toContain('illegible');
     expect(message.text).toContain('https://photoo.lu/en/account/verification');
+  });
+
+  it('renders job_application_received with the job offer title and applications deep link', () => {
+    const message = renderNotifyEmail(
+      'job_application_received',
+      {
+        jobOfferId: 'job-offer-1',
+        jobOfferTitle: 'Wedding photographer needed',
+        counterpartName: 'Jane Doe',
+      },
+      'en',
+      'company@example.com',
+      'https://photoo.lu',
+    );
+    expect(message.subject).toContain('Jane Doe');
+    expect(message.text).toContain('Wedding photographer needed');
+    expect(message.text).toContain('https://photoo.lu/en/job-offers/job-offer-1/applications');
+  });
+
+  it('renders job_application_status_changed with a fallback job offer title when absent', () => {
+    const message = renderNotifyEmail(
+      'job_application_status_changed',
+      { jobOfferId: 'job-offer-1' },
+      'en',
+      'photographer@example.com',
+      'https://photoo.lu',
+    );
+    expect(message.text).toContain('the job offer');
+    expect(message.text).toContain('https://photoo.lu/en/job-offers/job-offer-1/applications');
+  });
+
+  it('throws when a job application notification has no jobOfferId', () => {
+    expect(() =>
+      renderNotifyEmail(
+        'job_application_received',
+        {},
+        'en',
+        'company@example.com',
+        'https://photoo.lu',
+      ),
+    ).toThrow(/jobOfferId/);
   });
 });

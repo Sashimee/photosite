@@ -376,6 +376,7 @@
       "unknownCounterpart": "Someone",
       "unknownClient": "A client",
       "directQuoteLabel": "your booking",
+      "unknownJobOffer": "the job offer",
       "quoteReceived": {
         "subject": "New quote from {counterpartName}",
         "body": "{counterpartName} sent you a quote for {requestTitle}, totalling {total}. View it here: {url}"
@@ -407,6 +408,14 @@
       "verificationRejected": {
         "subject": "Your verification was rejected",
         "body": "Your photographer verification was rejected. Sign in to see the reason and next steps: {url}"
+      },
+      "jobApplicationReceived": {
+        "subject": "New application from {counterpartName}",
+        "body": "{counterpartName} applied to {jobOfferTitle}. View it here: {url}"
+      },
+      "jobApplicationStatusChanged": {
+        "subject": "Your application status has changed",
+        "body": "{counterpartName} updated your application for {jobOfferTitle}. View it here: {url}"
       }
     }
   },
@@ -583,6 +592,14 @@
       "verificationRejected": {
         "title": "Verification rejected",
         "body": "Your photographer verification was rejected"
+      },
+      "jobApplicationReceived": {
+        "title": "New application",
+        "body": "{counterpartName} applied to {jobOfferTitle}"
+      },
+      "jobApplicationStatusChanged": {
+        "title": "Application status changed",
+        "body": "Your application for {jobOfferTitle} was updated"
       }
     }
   },

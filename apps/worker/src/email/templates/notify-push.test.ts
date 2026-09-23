@@ -44,6 +44,13 @@ describe('renderNotifyPush', () => {
     }
   });
 
+  it('renders every job application notification type without throwing', () => {
+    const types = ['job_application_received', 'job_application_status_changed'] as const;
+    for (const type of types) {
+      expect(() => renderNotifyPush(type, { jobOfferId: 'job-offer-1' }, 'en')).not.toThrow();
+    }
+  });
+
   it('renders verification_rejected without leaking the reason into the push body', () => {
     const push = renderNotifyPush(
       'verification_rejected',
@@ -79,5 +86,29 @@ describe('renderNotifyPush', () => {
 
   it('throws when a message_received payload has no conversationId', () => {
     expect(() => renderNotifyPush('message_received', {}, 'en')).toThrow(/conversationId/);
+  });
+
+  it('renders job_application_received with the job offer title', () => {
+    const push = renderNotifyPush(
+      'job_application_received',
+      { jobOfferId: 'job-offer-1', jobOfferTitle: 'Wedding photographer needed' },
+      'en',
+    );
+    expect(push.title).toBe('New application');
+    expect(push.body).toContain('Wedding photographer needed');
+    expect(push.url).toBe('/en/job-offers/job-offer-1/applications');
+  });
+
+  it('falls back to a generic job offer label for job_application_status_changed when absent', () => {
+    const push = renderNotifyPush(
+      'job_application_status_changed',
+      { jobOfferId: 'job-offer-1' },
+      'en',
+    );
+    expect(push.body).toContain('the job offer');
+  });
+
+  it('throws when a job application notification has no jobOfferId', () => {
+    expect(() => renderNotifyPush('job_application_received', {}, 'en')).toThrow(/jobOfferId/);
   });
 });
