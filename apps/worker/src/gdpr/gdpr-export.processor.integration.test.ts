@@ -52,6 +52,12 @@ describe('createGdprExportProcessor against a real database and MinIO', () => {
   let profileId: string;
   let dataRequestId: string;
   let jobOfferId: string;
+  let subjectProfessionalId: string;
+  let ownJobOfferIds: string[];
+  let applicantId: string;
+  let applicantProfileId: string;
+  const applicantSecretMessage = `SECRET-APPLICANT-MESSAGE-${runId}`;
+  const applicantSecretPortfolioLink = `https://example.com/secret-portfolio-${runId}`;
   let portfolioObjectKey: string;
   let verificationObjectKey: string;
   const createdObjectKeys: string[] = [];
@@ -202,12 +208,113 @@ describe('createGdprExportProcessor against a real database and MinIO', () => {
       },
     });
 
-    await prisma.professionalProfile.create({
+    const subjectProfessional = await prisma.professionalProfile.create({
       data: {
         userId: subjectId,
         companyName: `Fx Export Co ${runId}`,
         website: 'https://example.com',
         vatNumber: `LU${runId}`,
+      },
+    });
+    subjectProfessionalId = subjectProfessional.id;
+
+    const ownDraftOffer = await prisma.jobOffer.create({
+      data: {
+        professionalId: subjectProfessionalId,
+        slug: `fx-export-own-draft-${runId}`,
+        title: `Fx Export Own Draft Offer ${runId}`,
+        description: 'A draft offer authored by the export subject.',
+        category: 'wedding',
+        city: 'Luxembourg',
+        countryCode: 'LU',
+        status: 'draft',
+      },
+    });
+    const ownPublishedOffer = await prisma.jobOffer.create({
+      data: {
+        professionalId: subjectProfessionalId,
+        slug: `fx-export-own-published-${runId}`,
+        title: `Fx Export Own Published Offer ${runId}`,
+        description: 'A published offer authored by the export subject.',
+        category: 'wedding',
+        city: 'Luxembourg',
+        countryCode: 'LU',
+        status: 'published',
+        publishedAt: new Date(),
+        expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+      },
+    });
+    await prisma.$executeRaw`
+      UPDATE "JobOffer"
+      SET location = ST_SetSRID(ST_MakePoint(6.131935, 49.611622), 4326)::geography
+      WHERE id = ${ownPublishedOffer.id}
+    `;
+    const ownClosedOffer = await prisma.jobOffer.create({
+      data: {
+        professionalId: subjectProfessionalId,
+        slug: `fx-export-own-closed-${runId}`,
+        title: `Fx Export Own Closed Offer ${runId}`,
+        description: 'A closed offer authored by the export subject.',
+        category: 'wedding',
+        city: 'Luxembourg',
+        countryCode: 'LU',
+        status: 'closed',
+        publishedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+    const ownExpiredOffer = await prisma.jobOffer.create({
+      data: {
+        professionalId: subjectProfessionalId,
+        slug: `fx-export-own-expired-${runId}`,
+        title: `Fx Export Own Expired Offer ${runId}`,
+        description: 'An expired offer authored by the export subject.',
+        category: 'wedding',
+        city: 'Luxembourg',
+        countryCode: 'LU',
+        status: 'expired',
+        publishedAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+    ownJobOfferIds = [
+      ownDraftOffer.id,
+      ownPublishedOffer.id,
+      ownClosedOffer.id,
+      ownExpiredOffer.id,
+    ];
+
+    const applicant = await prisma.user.create({
+      data: {
+        email: `gdpr-export-applicant-${runId}@photoo.test`,
+        emailVerifiedAt: new Date(),
+        name: 'Fx Export Applicant',
+        locale: 'en',
+        countryCode: 'LU',
+        roles: ['photographer'],
+        status: 'active',
+      },
+    });
+    applicantId = applicant.id;
+    const applicantProfile = await prisma.photographerProfile.create({
+      data: {
+        userId: applicantId,
+        slug: `fx-gdpr-export-applicant-${runId}`,
+        displayName: 'Fx Export Applicant Photographer',
+        bio: {},
+        links: {},
+        categories: ['wedding'],
+        languages: ['en'],
+        city: 'Luxembourg',
+        countryCode: 'LU',
+      },
+    });
+    applicantProfileId = applicantProfile.id;
+    await prisma.jobApplication.create({
+      data: {
+        jobOfferId: ownPublishedOffer.id,
+        photographerId: applicantProfileId,
+        message: applicantSecretMessage,
+        portfolioLink: applicantSecretPortfolioLink,
       },
     });
 
@@ -340,6 +447,10 @@ describe('createGdprExportProcessor against a real database and MinIO', () => {
     await prisma.quote.deleteMany({ where: { photographerId: profileId } });
     await prisma.jobApplication.deleteMany({ where: { jobOfferId } });
     await prisma.jobOffer.deleteMany({ where: { id: jobOfferId } });
+    await prisma.jobApplication.deleteMany({ where: { jobOfferId: { in: ownJobOfferIds } } });
+    await prisma.jobOffer.deleteMany({ where: { id: { in: ownJobOfferIds } } });
+    await prisma.photographerProfile.deleteMany({ where: { id: applicantProfileId } });
+    await prisma.user.deleteMany({ where: { id: applicantId } });
     await prisma.professionalProfile.deleteMany({
       where: { userId: { in: [subjectId, counterpartId] } },
     });
@@ -386,6 +497,9 @@ describe('createGdprExportProcessor against a real database and MinIO', () => {
     const wholeZipText = entries.map((entry) => entry.content.toString('utf8')).join('\n');
     expect(wholeZipText).not.toContain(counterpartEmail);
     expect(wholeZipText).not.toContain(verificationSecret);
+    expect(wholeZipText).not.toContain(applicantSecretMessage);
+    expect(wholeZipText).not.toContain(applicantSecretPortfolioLink);
+    expect(wholeZipText).not.toContain(`gdpr-export-applicant-${runId}@photoo.test`);
 
     const manifest = jsonOf(entries, 'manifest.json') as { files: Record<string, number> };
     expect(manifest.files['messages.json']).toBe(2);
@@ -394,7 +508,31 @@ describe('createGdprExportProcessor against a real database and MinIO', () => {
     expect(manifest.files['consents.json']).toBe(1);
     expect(manifest.files['notifications.json']).toBe(1);
     expect(manifest.files['professional-profile.json']).toBe(1);
+    expect(manifest.files['job-offers.json']).toBe(4);
     expect(manifest.files['job-applications.json']).toBe(1);
+
+    const jobOffers = jsonOf(entries, 'job-offers.json') as {
+      id: string;
+      slug: string;
+      status: string;
+      publishedAt: string | null;
+      expiresAt: string | null;
+      lat: number | null;
+      lng: number | null;
+    }[];
+    expect(jobOffers).toHaveLength(4);
+    expect(jobOffers.map((offer) => offer.id).sort()).toEqual([...ownJobOfferIds].sort());
+    expect(new Set(jobOffers.map((offer) => offer.status))).toEqual(
+      new Set(['draft', 'published', 'closed', 'expired']),
+    );
+    const publishedOffer = jobOffers.find((offer) => offer.status === 'published');
+    expect(publishedOffer?.publishedAt).not.toBeNull();
+    expect(publishedOffer?.expiresAt).not.toBeNull();
+    expect(publishedOffer?.lat).toBeCloseTo(49.611622, 5);
+    expect(publishedOffer?.lng).toBeCloseTo(6.131935, 5);
+    const draftOffer = jobOffers.find((offer) => offer.status === 'draft');
+    expect(draftOffer?.publishedAt).toBeNull();
+    expect(draftOffer?.lat).toBeNull();
 
     const professionalProfile = jsonOf(entries, 'professional-profile.json') as {
       companyName: string;
@@ -489,6 +627,10 @@ describe('createGdprExportProcessor against a real database and MinIO', () => {
       },
     });
 
+    await prisma.professionalProfile.create({
+      data: { userId: clientSubject.id, companyName: `Fx Export Client Co ${clientRunId}` },
+    });
+
     const clientDataRequest = await prisma.dataRequest.create({
       data: { userId: clientSubject.id, type: 'export', status: 'pending' },
     });
@@ -517,11 +659,15 @@ describe('createGdprExportProcessor against a real database and MinIO', () => {
       const manifest = jsonOf(entries, 'manifest.json') as { files: Record<string, number> };
       expect(manifest.files['messages.json']).toBe(0);
       expect(manifest.files['photographer-profile.json']).toBe(0);
-      expect(manifest.files['professional-profile.json']).toBe(0);
+      expect(manifest.files['professional-profile.json']).toBe(1);
+      expect(manifest.files['job-offers.json']).toBe(0);
       expect(manifest.files['job-applications.json']).toBe(0);
       expect(manifest.files['products.json']).toBe(0);
       expect(manifest.files['portfolio-images.json']).toBe(0);
       expect(manifest.files['requests.json']).toBe(1);
+
+      const jobOffers = jsonOf(entries, 'job-offers.json');
+      expect(jobOffers).toEqual([]);
 
       const requests = jsonOf(entries, 'requests.json') as { deletedAt: string | null }[];
       expect(requests[0]?.deletedAt).not.toBeNull();
@@ -543,6 +689,7 @@ describe('createGdprExportProcessor against a real database and MinIO', () => {
       });
       await prisma.dataRequest.deleteMany({ where: { id: clientDataRequest.id } });
       await prisma.request.deleteMany({ where: { id: ownRequest.id } });
+      await prisma.professionalProfile.deleteMany({ where: { userId: clientSubject.id } });
       await prisma.user.deleteMany({ where: { id: clientSubject.id } });
     }
   });

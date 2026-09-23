@@ -136,6 +136,27 @@ export interface JobApplicationExportRow {
   updatedAt: string;
 }
 
+export interface JobOfferExportRow {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  category: string;
+  city: string;
+  countryCode: string;
+  remote: boolean;
+  lat: number | null;
+  lng: number | null;
+  startDate: string | null;
+  endDate: string | null;
+  compensation: unknown;
+  status: string;
+  publishedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProductTierExportRow {
   id: string;
   usage: string;
@@ -249,6 +270,7 @@ export interface CollectedExport {
   quotes: QuoteExportRow[];
   photographerProfile: PhotographerProfileExportRow | null;
   professionalProfile: ProfessionalProfileExportRow | null;
+  jobOffers: JobOfferExportRow[];
   jobApplications: JobApplicationExportRow[];
   products: ProductExportRow[];
   portfolioImages: PortfolioImageExportRow[];
@@ -274,6 +296,27 @@ function resolveCounterpartName(
     name: profile?.displayName ?? user.name ?? 'Photoo user',
     profileSlug: profile?.slug ?? null,
   };
+}
+
+interface JobOfferRawRow {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  category: string;
+  city: string;
+  countryCode: string;
+  remote: boolean;
+  startDate: Date | null;
+  endDate: Date | null;
+  compensation: unknown;
+  status: string;
+  publishedAt: Date | null;
+  expiresAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  lat: number | null;
+  lng: number | null;
 }
 
 // One collector for the whole export rather than one file per entity
@@ -404,6 +447,56 @@ export async function collectExportData(
       updatedAt: true,
     },
   });
+
+  // Exact `location`, unlike the public board's grid-snapped
+  // `PUBLIC_JOB_OFFER_LOCATION` (`job-board.repository.ts`): it is the
+  // subject's own data here, not a third party's.
+  const jobOfferRows = professionalProfile
+    ? await prisma.$queryRaw<JobOfferRawRow[]>`
+        SELECT
+          jo.id AS "id",
+          jo.slug AS "slug",
+          jo.title AS "title",
+          jo.description AS "description",
+          jo.category::text AS "category",
+          jo.city AS "city",
+          jo."countryCode" AS "countryCode",
+          jo.remote AS "remote",
+          jo."startDate" AS "startDate",
+          jo."endDate" AS "endDate",
+          jo.compensation AS "compensation",
+          jo.status::text AS "status",
+          jo."publishedAt" AS "publishedAt",
+          jo."expiresAt" AS "expiresAt",
+          jo."createdAt" AS "createdAt",
+          jo."updatedAt" AS "updatedAt",
+          ST_Y(jo.location::geometry) AS "lat",
+          ST_X(jo.location::geometry) AS "lng"
+        FROM "JobOffer" jo
+        WHERE jo."professionalId" = ${professionalProfile.id}
+        ORDER BY jo."createdAt" ASC
+      `
+    : [];
+  const jobOffers: JobOfferExportRow[] = jobOfferRows.map((offer) => ({
+    id: offer.id,
+    slug: offer.slug,
+    title: offer.title,
+    description: offer.description,
+    category: offer.category,
+    city: offer.city,
+    countryCode: offer.countryCode,
+    remote: offer.remote,
+    lat: offer.lat,
+    lng: offer.lng,
+    startDate: offer.startDate?.toISOString() ?? null,
+    endDate: offer.endDate?.toISOString() ?? null,
+    compensation: offer.compensation,
+    status: offer.status,
+    publishedAt: offer.publishedAt?.toISOString() ?? null,
+    expiresAt: offer.expiresAt?.toISOString() ?? null,
+    createdAt: offer.createdAt.toISOString(),
+    updatedAt: offer.updatedAt.toISOString(),
+  }));
 
   const jobApplicationRows = profile
     ? await prisma.jobApplication.findMany({
@@ -791,6 +884,7 @@ export async function collectExportData(
           updatedAt: professionalProfile.updatedAt.toISOString(),
         }
       : null,
+    jobOffers,
     jobApplications,
     products,
     portfolioImages,
