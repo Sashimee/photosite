@@ -16,6 +16,7 @@ export const QUEUE_NAMES = [
   'receipt-pdf',
   'gdpr-export',
   'gdpr-sweep',
+  'listing-expiry',
 ] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];
@@ -36,6 +37,7 @@ export const BOOKING_RELEASE_QUEUE_NAME = 'booking-release' as const satisfies Q
 export const RECEIPT_PDF_QUEUE_NAME = 'receipt-pdf' as const satisfies QueueName;
 export const GDPR_EXPORT_QUEUE_NAME = 'gdpr-export' as const satisfies QueueName;
 export const GDPR_SWEEP_QUEUE_NAME = 'gdpr-sweep' as const satisfies QueueName;
+export const LISTING_EXPIRY_QUEUE_NAME = 'listing-expiry' as const satisfies QueueName;
 
 export const EmailJobSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('verify-email'), to: z.email(), url: z.url() }).strict(),
@@ -127,6 +129,13 @@ export const GdprSweepJobSchema = z.object({}).strict();
 
 export type GdprSweepJob = z.infer<typeof GdprSweepJobSchema>;
 
+// A repeatable hourly sweep of every listing whose expiresAt has lapsed, not
+// a lookup of one row, so (like quote-expiry/booking-release) it carries no
+// listingId (docs/steps/1A.13-professionals.md "Expiry is a repeatable job").
+export const ListingExpiryJobSchema = z.object({}).strict();
+
+export type ListingExpiryJob = z.infer<typeof ListingExpiryJobSchema>;
+
 export const NOTIFY_JOB_ATTEMPTS = 5;
 export const NOTIFY_JOB_BACKOFF_DELAY_MS = 5000;
 export const NOTIFY_JOB_FAILED_RETENTION_SECONDS = 24 * 60 * 60;
@@ -172,6 +181,7 @@ export const QUEUE_JOB_SCHEMAS = {
   [RECEIPT_PDF_QUEUE_NAME]: ReceiptPdfJobSchema,
   [GDPR_EXPORT_QUEUE_NAME]: GdprExportJobSchema,
   [GDPR_SWEEP_QUEUE_NAME]: GdprSweepJobSchema,
+  [LISTING_EXPIRY_QUEUE_NAME]: ListingExpiryJobSchema,
 } as const satisfies Record<QueueName, z.ZodType>;
 
 export type QueueJobPayload<Name extends QueueName> = z.infer<(typeof QUEUE_JOB_SCHEMAS)[Name]>;

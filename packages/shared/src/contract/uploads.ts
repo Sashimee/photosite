@@ -7,6 +7,7 @@ export const UPLOAD_PURPOSES = [
   'portfolio',
   'avatar',
   'cover',
+  'logo',
   'chat_attachment',
   'verification_document',
   'delivery_file',
@@ -18,6 +19,7 @@ export const PUBLIC_UPLOAD_PURPOSES = [
   'portfolio',
   'avatar',
   'cover',
+  'logo',
 ] as const satisfies readonly UploadPurpose[];
 
 const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -33,6 +35,7 @@ export const UPLOAD_PURPOSE_LIMITS: Record<
   portfolio: { mimeTypes: IMAGE_MIME_TYPES, maxSizeBytes: IMAGE_MAX_SIZE_BYTES },
   avatar: { mimeTypes: IMAGE_MIME_TYPES, maxSizeBytes: IMAGE_MAX_SIZE_BYTES },
   cover: { mimeTypes: IMAGE_MIME_TYPES, maxSizeBytes: IMAGE_MAX_SIZE_BYTES },
+  logo: { mimeTypes: IMAGE_MIME_TYPES, maxSizeBytes: IMAGE_MAX_SIZE_BYTES },
   chat_attachment: {
     mimeTypes: [...IMAGE_MIME_TYPES, ...DOCUMENT_MIME_TYPES],
     maxSizeBytes: IMAGE_MAX_SIZE_BYTES,

@@ -884,6 +884,719 @@
         ],
         "additionalProperties": false
       },
+      "OwnProfessionalProfile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "companyName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "website": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "logoUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "vatNumber": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 50
+          }
+        },
+        "required": [
+          "id",
+          "companyName",
+          "website",
+          "logoUrl",
+          "verified",
+          "vatNumber"
+        ],
+        "additionalProperties": false
+      },
+      "PublicJobOfferSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 60,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "URL-safe profile slug",
+            "example": "jane-doe-photography"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 150
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "wedding",
+              "portrait",
+              "event",
+              "product",
+              "real-estate",
+              "corporate"
+            ],
+            "example": "wedding"
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code",
+            "example": "LU"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LatLng"
+          },
+          "remote": {
+            "type": "boolean"
+          },
+          "compensation": {
+            "$ref": "#/components/schemas/Compensation"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "company": {
+            "$ref": "#/components/schemas/PublicProfessionalCompany"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "category",
+          "city",
+          "countryCode",
+          "location",
+          "remote",
+          "compensation",
+          "publishedAt",
+          "company"
+        ],
+        "additionalProperties": false
+      },
+      "Compensation": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "min": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "max": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "min",
+          "max"
+        ],
+        "additionalProperties": false
+      },
+      "PublicProfessionalCompany": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "companyName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "website": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "logoUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "companyName",
+          "website",
+          "logoUrl",
+          "verified"
+        ],
+        "additionalProperties": false
+      },
+      "PublicJobOffer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 60,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "URL-safe profile slug",
+            "example": "jane-doe-photography"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 150
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "wedding",
+              "portrait",
+              "event",
+              "product",
+              "real-estate",
+              "corporate"
+            ],
+            "example": "wedding"
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code",
+            "example": "LU"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LatLng"
+          },
+          "remote": {
+            "type": "boolean"
+          },
+          "compensation": {
+            "$ref": "#/components/schemas/Compensation"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "company": {
+            "$ref": "#/components/schemas/PublicProfessionalCompany"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "startDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "endDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "category",
+          "city",
+          "countryCode",
+          "location",
+          "remote",
+          "compensation",
+          "publishedAt",
+          "company",
+          "description",
+          "startDate",
+          "endDate",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "JobOffer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 60,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "URL-safe profile slug",
+            "example": "jane-doe-photography"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 150
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "wedding",
+              "portrait",
+              "event",
+              "product",
+              "real-estate",
+              "corporate"
+            ],
+            "example": "wedding"
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code",
+            "example": "LU"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LatLng"
+          },
+          "remote": {
+            "type": "boolean"
+          },
+          "startDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "endDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "compensation": {
+            "$ref": "#/components/schemas/Compensation"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "closed",
+              "expired"
+            ]
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "description",
+          "category",
+          "city",
+          "countryCode",
+          "location",
+          "remote",
+          "startDate",
+          "endDate",
+          "compensation",
+          "status",
+          "publishedAt",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "JobApplication": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "jobOfferId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "photographerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "portfolioLink": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "format": "uri",
+            "description": "https-only URL, normalised",
+            "example": "https://example.com/portfolio"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "shortlisted",
+              "rejected",
+              "withdrawn"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "jobOfferId",
+          "photographerId",
+          "message",
+          "portfolioLink",
+          "status",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "JobApplicationWithPhotographer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "jobOfferId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "photographerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "portfolioLink": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "format": "uri",
+            "description": "https-only URL, normalised",
+            "example": "https://example.com/portfolio"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "shortlisted",
+              "rejected",
+              "withdrawn"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "photographer": {
+            "$ref": "#/components/schemas/JobApplicationPhotographer"
+          }
+        },
+        "required": [
+          "id",
+          "jobOfferId",
+          "photographerId",
+          "message",
+          "portfolioLink",
+          "status",
+          "createdAt",
+          "photographer"
+        ],
+        "additionalProperties": false
+      },
+      "JobApplicationPhotographer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 60,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "URL-safe profile slug",
+            "example": "jane-doe-photography"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "countryCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code",
+            "example": "LU"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "displayName",
+          "avatarUrl",
+          "city",
+          "countryCode"
+        ],
+        "additionalProperties": false
+      },
+      "JobApplicationWithOffer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "jobOfferId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "photographerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "portfolioLink": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "format": "uri",
+            "description": "https-only URL, normalised",
+            "example": "https://example.com/portfolio"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "shortlisted",
+              "rejected",
+              "withdrawn"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "jobOffer": {
+            "$ref": "#/components/schemas/JobApplicationOfferSummary"
+          }
+        },
+        "required": [
+          "id",
+          "jobOfferId",
+          "photographerId",
+          "message",
+          "portfolioLink",
+          "status",
+          "createdAt",
+          "jobOffer"
+        ],
+        "additionalProperties": false
+      },
+      "JobApplicationOfferSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 60,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "URL-safe profile slug",
+            "example": "jane-doe-photography"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 150
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "closed",
+              "expired"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "status"
+        ],
+        "additionalProperties": false
+      },
       "CitySummary": {
         "type": "object",
         "properties": {
@@ -2002,6 +2715,7 @@
               "portfolio",
               "avatar",
               "cover",
+              "logo",
               "chat_attachment",
               "verification_document",
               "delivery_file"
@@ -3678,7 +4392,8 @@
             "enum": [
               "photographer_profile",
               "portfolio_image",
-              "request"
+              "request",
+              "job_offer"
             ],
             "example": "portfolio_image"
           },
@@ -3920,7 +4635,9 @@
               "quote_expired",
               "message_received",
               "verification_approved",
-              "verification_rejected"
+              "verification_rejected",
+              "job_application_received",
+              "job_application_status_changed"
             ],
             "example": "quote_received"
           },
@@ -4004,6 +4721,23 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 1000
+          },
+          "jobOfferId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "jobOfferTitle": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 150
+          },
+          "jobApplicationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
           }
         },
         "additionalProperties": false
@@ -4062,7 +4796,9 @@
               "quote_expired",
               "message_received",
               "verification_approved",
-              "verification_rejected"
+              "verification_rejected",
+              "job_application_received",
+              "job_application_status_changed"
             ],
             "example": "quote_received"
           },
@@ -6490,6 +7226,1691 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/professional-profile": {
+      "post": {
+        "summary": "Create the professional profile for the current user, adding the professional role",
+        "tags": [
+          "professionals"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "companyName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "website": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uri"
+                  },
+                  "vatNumber": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 50
+                  },
+                  "logoUploadId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "description": "UUID identifier",
+                    "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                  }
+                },
+                "required": [
+                  "companyName"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Professional profile created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnProfessionalProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Get the current user's professional profile",
+        "tags": [
+          "professionals"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The current user's professional profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnProfessionalProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update the current user's professional profile",
+        "tags": [
+          "professionals"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "companyName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "website": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uri"
+                  },
+                  "vatNumber": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 50
+                  },
+                  "logoUploadId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "description": "UUID identifier",
+                    "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Professional profile updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnProfessionalProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/job-offers": {
+      "get": {
+        "summary": "List published, unexpired job offers",
+        "tags": [
+          "job-board"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "wedding",
+                "portrait",
+                "event",
+                "product",
+                "real-estate",
+                "corporate"
+              ],
+              "example": "wedding"
+            },
+            "required": false,
+            "name": "category",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$",
+              "description": "ISO 3166-1 alpha-2 country code",
+              "example": "LU"
+            },
+            "required": false,
+            "description": "ISO 3166-1 alpha-2 country code",
+            "name": "countryCode",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": false,
+            "name": "city",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "remote",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 150
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of matching job offers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PublicJobOfferSummary"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/job-offers/{slug}": {
+      "get": {
+        "summary": "Get a published job offer by slug",
+        "tags": [
+          "job-board"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 60,
+              "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+              "description": "URL-safe profile slug",
+              "example": "jane-doe-photography"
+            },
+            "required": true,
+            "description": "URL-safe profile slug",
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The job offer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJobOffer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/job-offers": {
+      "post": {
+        "summary": "Create a draft job offer",
+        "tags": [
+          "job-board"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "wedding",
+                      "portrait",
+                      "event",
+                      "product",
+                      "real-estate",
+                      "corporate"
+                    ],
+                    "example": "wedding"
+                  },
+                  "city": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "countryCode": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{2}$",
+                    "description": "ISO 3166-1 alpha-2 country code",
+                    "example": "LU"
+                  },
+                  "location": {
+                    "$ref": "#/components/schemas/LatLng"
+                  },
+                  "remote": {
+                    "type": "boolean"
+                  },
+                  "startDate": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time",
+                    "description": "ISO 8601 date-time",
+                    "example": "2026-09-16T12:00:00.000Z"
+                  },
+                  "endDate": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time",
+                    "description": "ISO 8601 date-time",
+                    "example": "2026-09-16T12:00:00.000Z"
+                  },
+                  "compensation": {
+                    "$ref": "#/components/schemas/Compensation"
+                  }
+                },
+                "required": [
+                  "title",
+                  "description",
+                  "category",
+                  "city",
+                  "countryCode",
+                  "location",
+                  "remote"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Job offer created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOffer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List the current professional's job offers",
+        "tags": [
+          "job-board"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of job offers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/JobOffer"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/job-offers/{id}": {
+      "get": {
+        "summary": "Get one of the current professional's job offers",
+        "tags": [
+          "job-board"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The job offer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOffer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update one of the current professional's job offers",
+        "tags": [
+          "job-board"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "wedding",
+                      "portrait",
+                      "event",
+                      "product",
+                      "real-estate",
+                      "corporate"
+                    ],
+                    "example": "wedding"
+                  },
+                  "city": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "countryCode": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{2}$",
+                    "description": "ISO 3166-1 alpha-2 country code",
+                    "example": "LU"
+                  },
+                  "location": {
+                    "$ref": "#/components/schemas/LatLng"
+                  },
+                  "remote": {
+                    "type": "boolean"
+                  },
+                  "startDate": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time",
+                    "description": "ISO 8601 date-time",
+                    "example": "2026-09-16T12:00:00.000Z"
+                  },
+                  "endDate": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time",
+                    "description": "ISO 8601 date-time",
+                    "example": "2026-09-16T12:00:00.000Z"
+                  },
+                  "compensation": {
+                    "$ref": "#/components/schemas/Compensation"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job offer updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOffer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete one of the current professional's job offers",
+        "tags": [
+          "job-board"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Job offer deleted"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/job-offers/{id}/publish": {
+      "post": {
+        "summary": "Publish a job offer, creating a free listing",
+        "tags": [
+          "job-board"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job offer published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOffer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/job-offers/{id}/close": {
+      "post": {
+        "summary": "Close a published job offer",
+        "tags": [
+          "job-board"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job offer closed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOffer"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/job-offers/{id}/applications": {
+      "post": {
+        "summary": "Apply to a published job offer",
+        "tags": [
+          "job-board"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "portfolioLink": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 2000,
+                    "format": "uri",
+                    "description": "https-only URL, normalised",
+                    "example": "https://example.com/portfolio"
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Application submitted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobApplication"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List the applications received for one of the current professional job offers",
+        "tags": [
+          "job-board"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of applications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/JobApplicationWithPhotographer"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/job-applications": {
+      "get": {
+        "summary": "List the current photographer's job applications",
+        "tags": [
+          "job-board"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of applications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/JobApplicationWithOffer"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/job-applications/{id}/status": {
+      "post": {
+        "summary": "Move a job application forward or withdraw it",
+        "tags": [
+          "job-board"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "shortlisted",
+                      "rejected",
+                      "withdrawn"
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Application status updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobApplication"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -9504,6 +11925,7 @@
                       "portfolio",
                       "avatar",
                       "cover",
+                      "logo",
                       "chat_attachment",
                       "verification_document",
                       "delivery_file"

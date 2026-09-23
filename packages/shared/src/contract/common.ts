@@ -31,6 +31,10 @@ export const SlugSchema = z
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'must be lowercase alphanumeric words separated by hyphens')
   .openapi({ description: 'URL-safe profile slug', example: 'jane-doe-photography' });
 
+const HTTP_URL_PROTOCOL = /^https?$/;
+
+export const HttpUrlSchema = z.url({ protocol: HTTP_URL_PROTOCOL });
+
 export const LatLngSchema = z
   .object({
     lat: z.number().min(-90).max(90).openapi({ example: 49.6116 }),

@@ -29,6 +29,9 @@ export const NotificationPayloadSchema = z
     counterpartName: z.string().min(1).max(NOTIFICATION_TEXT_MAX_LENGTH).optional(),
     conversationId: IdSchema.optional(),
     reason: z.string().min(1).max(1000).optional(),
+    jobOfferId: IdSchema.optional(),
+    jobOfferTitle: z.string().min(1).max(NOTIFICATION_TEXT_MAX_LENGTH).optional(),
+    jobApplicationId: IdSchema.optional(),
   })
   .strict()
   .openapi('NotificationPayload');

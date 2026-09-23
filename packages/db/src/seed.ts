@@ -1079,6 +1079,123 @@ export async function seedPaidBooking(
   }
 }
 
+export const SEED_PROFESSIONAL_EMAIL = 'professional@photoo.test';
+export const SEED_PROFESSIONAL_COMPANY_NAME = 'Fondation Kler Sàrl';
+export const SEED_JOB_OFFER_SLUG = 'event-photographer-luxembourg-city';
+export const SEED_JOB_OFFER_TITLE = 'Event photographer for a corporate gala evening';
+
+const SEED_JOB_OFFER_LOCATION = { lat: 49.6116, lng: 6.1319 };
+
+// One professional profile with a published job offer and its free listing,
+// on the seed user already documented as the professional login
+// (docs/steps/1A.1-identity-schema.md), so the preview and 1B.9
+// (professional area, public job board) have something real to render
+// without creating their own fixtures. The offer starts as a draft because
+// `Listing.ownerId` needs the offer's id (docs/steps/1A.13-professionals.md:
+// "publishing ... creates the listing"), so the listing can't exist first.
+// Idempotent: skips entirely once the profile exists, like
+// `seedPhotographerProfile`.
+export async function seedProfessionalJobOffer(
+  prisma: ReturnType<typeof createPrismaClient>,
+): Promise<void> {
+  const passwordHash = await hash(getSeedUserPassword());
+  const user = await seedUser(prisma, SEED_PROFESSIONAL_EMAIL, ['professional']);
+  await seedCredentialAccount(prisma, user.id, passwordHash);
+
+  const existingProfile = await prisma.professionalProfile.findUnique({
+    where: { userId: user.id },
+  });
+  if (existingProfile) {
+    return;
+  }
+
+  const storage = seedStorageFromEnv();
+  const logoObjectKey = 'seed/professional/logo/original.jpg';
+  const logoVariants = placeholderVariants('seed/professional/logo');
+  const logoUpload = await prisma.upload.upsert({
+    where: { objectKey: logoObjectKey },
+    create: {
+      ownerId: user.id,
+      purpose: 'logo',
+      status: 'processed',
+      mimeType: 'image/jpeg',
+      declaredSizeBytes: 2048,
+      actualSizeBytes: 2048,
+      width: 512,
+      height: 512,
+      objectKey: logoObjectKey,
+      variants: logoVariants,
+      virusScanStatus: 'clean',
+    },
+    update: {},
+  });
+  await uploadPlaceholderVariants(storage, logoVariants);
+
+  await prisma.professionalProfile.create({
+    data: {
+      userId: user.id,
+      companyName: SEED_PROFESSIONAL_COMPANY_NAME,
+      website: 'https://example.com',
+      vatNumber: 'LU12345678',
+      logoUploadId: logoUpload.id,
+      verified: true,
+    },
+  });
+
+  const jobOffer = await prisma.jobOffer.create({
+    data: {
+      professionalId: (
+        await prisma.professionalProfile.findUniqueOrThrow({ where: { userId: user.id } })
+      ).id,
+      slug: SEED_JOB_OFFER_SLUG,
+      title: SEED_JOB_OFFER_TITLE,
+      description:
+        'Looking for an experienced event photographer to cover a corporate gala evening in Luxembourg City, including candid shots and formal group photos.',
+      category: 'event',
+      city: 'Luxembourg City',
+      countryCode: 'LU',
+      remote: false,
+      compensation: {
+        min: { amountCents: 60000, currency: 'EUR' },
+        max: { amountCents: 90000, currency: 'EUR' },
+      },
+      status: 'draft',
+    },
+  });
+
+  await prisma.$executeRaw`
+    UPDATE "JobOffer"
+    SET location = ST_SetSRID(ST_MakePoint(${SEED_JOB_OFFER_LOCATION.lng}, ${SEED_JOB_OFFER_LOCATION.lat}), 4326)::geography
+    WHERE id = ${jobOffer.id}
+  `;
+
+  const publishedAt = new Date();
+  const expiresAt = new Date();
+  expiresAt.setUTCDate(expiresAt.getUTCDate() + 60);
+
+  const listing = await prisma.listing.create({
+    data: {
+      ownerId: jobOffer.id,
+      kind: 'job_offer',
+      plan: 'free',
+      priceCents: 0,
+      currency: 'EUR',
+      paidAt: publishedAt,
+      expiresAt,
+    },
+  });
+
+  await prisma.jobOffer.update({
+    where: { id: jobOffer.id },
+    data: {
+      status: 'published',
+      publishedAt,
+      expiresAt,
+      listingId: listing.id,
+    },
+  });
+}
+
 export async function seedDatabase(prisma: ReturnType<typeof createPrismaClient>): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('db seed: refusing to run with NODE_ENV=production');
@@ -1093,6 +1210,7 @@ export async function seedDatabase(prisma: ReturnType<typeof createPrismaClient>
   await seedQuoteConversation(prisma);
   await seedVerificationCase(prisma);
   await seedPaidBooking(prisma);
+  await seedProfessionalJobOffer(prisma);
 }
 
 async function main(): Promise<void> {

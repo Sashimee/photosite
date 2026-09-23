@@ -150,7 +150,12 @@ export const REPORT_STATUSES = ['open', 'resolved', 'dismissed'] as const;
 
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
-export const REPORT_TARGET_TYPES = ['photographer_profile', 'portfolio_image', 'request'] as const;
+export const REPORT_TARGET_TYPES = [
+  'photographer_profile',
+  'portfolio_image',
+  'request',
+  'job_offer',
+] as const;
 
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
 
@@ -179,9 +184,34 @@ export const NOTIFICATION_TYPES = [
   'message_received',
   'verification_approved',
   'verification_rejected',
+  'job_application_received',
+  'job_application_status_changed',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+export const JOB_OFFER_STATUSES = ['draft', 'published', 'closed', 'expired'] as const;
+
+export type JobOfferStatus = (typeof JOB_OFFER_STATUSES)[number];
+
+export const JOB_APPLICATION_STATUSES = [
+  'submitted',
+  'shortlisted',
+  'rejected',
+  'withdrawn',
+] as const;
+
+export type JobApplicationStatus = (typeof JOB_APPLICATION_STATUSES)[number];
+
+export const LISTING_KINDS = ['job_offer', 'featured_profile'] as const;
+
+export type ListingKind = (typeof LISTING_KINDS)[number];
+
+// Free forever at launch (D8); 'paid' and 'featured' are switched on in
+// Phase 3 without a schema change.
+export const LISTING_PLANS = ['free', 'paid', 'featured'] as const;
+
+export type ListingPlan = (typeof LISTING_PLANS)[number];
 
 // Feature flags are booleans the admin can toggle at runtime, but the set of
 // known flags is fixed here rather than free text, so a flag nothing reads
