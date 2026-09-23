@@ -1103,7 +1103,10 @@ model ProfessionalProfile {
 // (docs/steps/1A.13-professionals.md): publishing sets `publishedAt`,
 // creates a `Listing` and sets `expiresAt` to the listing's; republishing an
 // expired offer creates a *new* `Listing` rather than extending the old
-// one, so `listingId` always points at the current listing.
+// one, so `listingId` always points at the current listing. `deletedAt` is a
+// moderator takedown (report-targets.ts), same soft-delete pattern as
+// `PhotographerProfile`/`PortfolioImage`/`Request`; it is orthogonal to
+// `status` — `closed` means the professional closed it themselves.
 model JobOffer {
   id             String                                 @id @default(uuid(7))
   professionalId String
@@ -1125,6 +1128,7 @@ model JobOffer {
   listing        Listing?                               @relation(fields: [listingId], references: [id], onDelete: Restrict)
   publishedAt    DateTime?
   expiresAt      DateTime?
+  deletedAt      DateTime?
   createdAt      DateTime                               @default(now())
   updatedAt      DateTime                               @updatedAt
 
@@ -1139,7 +1143,9 @@ model JobOffer {
 // database-level conflict (409), not a duplicate row
 // (docs/steps/1A.13-professionals.md). Deleting the offer cascades to its
 // applications; closing it (a status change) never touches them.
-// `photographerId` is `Restrict`, like `Quote.photographerId`.
+// `photographerId` is `Restrict`, like `Quote.photographerId`. `deletedAt` is
+// a moderator takedown of the application itself (report-targets.ts), same
+// soft-delete pattern as `PhotographerProfile`/`PortfolioImage`/`Request`.
 model JobApplication {
   id             String               @id @default(uuid(7))
   jobOfferId     String
@@ -1149,6 +1155,7 @@ model JobApplication {
   message        String
   portfolioLink  String?
   status         JobApplicationStatus @default(submitted)
+  deletedAt      DateTime?
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 
