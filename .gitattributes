@@ -2,3 +2,9 @@
 # the last line without ever disagreeing about content. Union keeps both sides'
 # rows; the file is append-only by construction, so there is nothing to lose.
 docs/steps/human-followups.md merge=union
+
+# The historical blob still contains the NUL sentinel this fix replaced (#262):
+# without this, git's binary heuristic looks at the pre-image too, so the diff
+# that removes the NUL would itself still render as "Bin ... bytes".
+apps/worker/src/email/templates/notify-email.ts diff
+apps/worker/src/email/templates/auth-email.ts diff
