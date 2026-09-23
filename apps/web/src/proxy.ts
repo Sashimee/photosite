@@ -14,6 +14,10 @@ const imgOrigins = [originOf(env.NEXT_PUBLIC_MEDIA_BASE_URL)].filter(
   (origin): origin is string => origin !== null,
 );
 
+// apps/api/src/common/constants.ts's REVISION_HEADER sets the same name.
+const REVISION_HEADER = 'x-photoo-revision';
+const revision = process.env.PHOTOO_REVISION ?? 'unknown';
+
 export function proxy(request: NextRequest): NextResponse {
   const { pathname, search } = request.nextUrl;
   const isDev = process.env.NODE_ENV === 'development';
@@ -29,6 +33,7 @@ export function proxy(request: NextRequest): NextResponse {
   if (redirectPath) {
     const response = NextResponse.redirect(new URL(redirectPath, request.url));
     response.headers.set('Content-Security-Policy', cspHeader);
+    response.headers.set(REVISION_HEADER, revision);
     return response;
   }
 
@@ -38,6 +43,7 @@ export function proxy(request: NextRequest): NextResponse {
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set('Content-Security-Policy', cspHeader);
+  response.headers.set(REVISION_HEADER, revision);
   return response;
 }
 

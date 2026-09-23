@@ -2,7 +2,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { API_PREFIX } from '@photoo/shared';
-import { REQUEST_ID_HEADER } from '../common/constants.js';
+import { REQUEST_ID_HEADER, REVISION_HEADER } from '../common/constants.js';
 import type { Env } from '../config/env.js';
 
 const EXCLUDED_FROM_PREFIX = ['health', 'ready', 'openapi.json'];
@@ -12,6 +12,7 @@ export async function configureApp(app: NestFastifyApplication, config: Env): Pr
 
   fastify.addHook('onRequest', (request, reply, done) => {
     reply.header(REQUEST_ID_HEADER, request.id);
+    reply.header(REVISION_HEADER, process.env.PHOTOO_REVISION ?? 'unknown');
     done();
   });
 

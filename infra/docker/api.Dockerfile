@@ -58,7 +58,12 @@ RUN rm -rf \
 
 # Runtime image: no devDependencies, no source maps, non-root user.
 FROM base AS runtime
+# The commit this image was built from, baked in rather than passed at
+# compose runtime, so it matches the image regardless of which IMAGE_TAG
+# Dokploy is pointed at (infra/dokploy/preview/README.md "Rollback").
+ARG REVISION
 ENV NODE_ENV=production
+ENV PHOTOO_REVISION=$REVISION
 RUN addgroup -S app -g 1001 && adduser -S app -G app -u 1001 -h /app
 COPY --from=trimmed --chown=app:app /app/package.json /app/pnpm-workspace.yaml ./
 COPY --from=trimmed --chown=app:app /app/node_modules ./node_modules

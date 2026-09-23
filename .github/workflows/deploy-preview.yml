@@ -59,6 +59,8 @@ jobs:
           tags: |
             ghcr.io/sashimee/photosite-api:main
             ghcr.io/sashimee/photosite-api:${{ steps.sha.outputs.short }}
+          build-args: |
+            REVISION=${{ github.event.workflow_run.head_sha }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
 
@@ -125,6 +127,7 @@ jobs:
             NEXT_PUBLIC_ALLOW_INDEXING=${{ vars.NEXT_PUBLIC_ALLOW_INDEXING || 'false' }}
             NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
             SENTRY_REQUIRED=${{ vars.SENTRY_REQUIRED }}
+            REVISION=${{ github.event.workflow_run.head_sha }}
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
@@ -202,8 +205,18 @@ jobs:
       # silently red from the day it was added instead of ever running.
       - name: Build the workspace packages the smoke suite imports
         run: pnpm turbo run build --filter='@photoo/shared'
-      - name: Wait for the Dokploy webhook to finish rolling the deploy out
-        run: timeout 180 bash -c 'until curl -sf https://footoo.bas.lu/health; do sleep 5; done'
+      # Dokploy accepts the webhook and returns immediately while the old
+      # container keeps serving until the swap completes, so a bare "does
+      # /health respond" check (the previous version of this step) passed on
+      # its first try against the OLD deploy - see #257. This polls both
+      # origins the smoke suite actually drives for the new build's own
+      # x-photoo-revision header instead.
+      - name: Wait for web and api to report the new revision
+        run: |
+          .github/workflows/wait-for-revision.sh \
+            "${{ github.event.workflow_run.head_sha }}" 180 \
+            https://footoo.bas.lu/en \
+            https://footoo.bas.lu/v1/photographers
       - run: pnpm exec playwright install --with-deps chromium
       - name: Run the signed-out smoke suite against the live preview
         run: pnpm exec playwright test --project=smoke-public --workers=1
