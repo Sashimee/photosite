@@ -1018,6 +1018,9 @@
         "validUntilLabel": "Valid until",
         "lineItemsHeading": "What's included",
         "totalLabel": "Total",
+        "feeLabel": "Platform fee",
+        "payoutLabel": "Your payout",
+        "payoutNotice": "Paid to your Stripe account after the booking is released. Currency conversion by Stripe or your bank isn't included.",
         "messageHeading": "Message from the photographer",
         "acceptCta": "Accept quote",
         "declineCta": "Decline quote",
@@ -1031,8 +1034,15 @@
         "declineConfirmCta": "Yes, decline quote",
         "declinePending": "Declining…",
         "declineDismissCta": "Keep quote",
+        "withdrawCta": "Withdraw quote",
+        "withdrawConfirmTitle": "Withdraw this quote?",
+        "withdrawConfirmDescription": "The client will no longer be able to accept it, even if they're already looking at it. This can't be undone.",
+        "withdrawConfirmCta": "Yes, withdraw quote",
+        "withdrawPending": "Withdrawing…",
+        "withdrawDismissCta": "Keep quote",
         "acceptedNotice": "Quote accepted. Booking and payment are coming soon — we'll be in touch with next steps.",
         "declinedNotice": "Quote declined.",
+        "withdrawnNotice": "This quote was withdrawn by the photographer.",
         "notFound": {
           "title": "Quote not found",
           "description": "This quote doesn't exist, or it isn't yours.",
@@ -1122,7 +1132,9 @@
         "overview": "Overview",
         "profile": "Profile",
         "portfolio": "Portfolio",
-        "products": "Packages"
+        "products": "Packages",
+        "requests": "Requests",
+        "quotes": "Quotes"
       },
       "needsRole": {
         "title": "Photographer dashboard",
@@ -1346,6 +1358,69 @@
           "tooManyRequests": "You're doing that too fast. Slow down and try again.",
           "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
         }
+      },
+      "requests": {
+        "metaTitle": "Incoming requests",
+        "title": "Incoming requests",
+        "backToOverview": "Back to overview",
+        "intro": "Requests from clients matching your categories and location.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Incoming requests are matched to your photographer profile, so set that up first.",
+        "needsProfileCta": "Create your profile",
+        "needsPublishedTitle": "Your profile isn't published yet",
+        "needsPublishedDescription": "Incoming requests only show once your profile is published. Check the overview for what's still missing.",
+        "needsPublishedCta": "Back to overview",
+        "empty": "No requests are matching your categories and location right now.",
+        "alreadyQuotedLabel": "Quote sent",
+        "alreadyQuotedNotice": "You've already sent a quote for this request.",
+        "expiredNotice": "This request is no longer accepting quotes.",
+        "loadMore": "Next page",
+        "sendQuote": {
+          "triggerCta": "Send a quote",
+          "formTitle": "Send a quote",
+          "formDescription": "Add each item you're offering and its price. You'll review the total before it sends.",
+          "lineItemsHeading": "What's included",
+          "lineItemLabelLabel": "Item",
+          "lineItemQtyLabel": "Quantity",
+          "lineItemPriceLabel": "Unit price ({currency})",
+          "removeLineItemCta": "Remove item",
+          "addLineItemCta": "Add item",
+          "validUntilLabel": "Valid until",
+          "messageLabel": "Message (optional)",
+          "cancelCta": "Cancel",
+          "reviewCta": "Review quote",
+          "invalidForm": "Check the highlighted fields and try again.",
+          "reviewTitle": "Review before you send",
+          "reviewDescription": "This is what the client will pay. The platform fee is calculated when the quote is sent, and you'll see what you'll receive on the quote's page.",
+          "totalLabel": "Total",
+          "feeNotice": "A platform fee is deducted from your payout at release; it isn't added on top of this total.",
+          "backCta": "Back",
+          "confirmSendCta": "Send quote",
+          "sending": "Sending…",
+          "errors": {
+            "generic": "Something went wrong sending your quote. Try again.",
+            "conflict": "This request is no longer accepting quotes.",
+            "invalid": "This quote can't be sent as entered. Reload the request and try again.",
+            "tooManyRequests": "You're sending quotes too fast. Slow down and try again.",
+            "tooManyRequestsWithRetry": "You're sending quotes too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+          }
+        }
+      },
+      "quotes": {
+        "metaTitle": "Your quotes",
+        "title": "Your quotes",
+        "backToOverview": "Back to overview",
+        "intro": "Quotes you've sent to clients.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Quotes are sent from your photographer profile, so set that up first.",
+        "needsProfileCta": "Create your profile",
+        "needsPublishedTitle": "Your profile isn't published yet",
+        "needsPublishedDescription": "Sending quotes needs a published profile. Check the overview for what's still missing.",
+        "needsPublishedCta": "Back to overview",
+        "empty": "You haven't sent any quotes yet.",
+        "payoutLabel": "Your payout",
+        "validUntilLabel": "Valid until",
+        "loadMore": "Next page"
       }
     }
   }
