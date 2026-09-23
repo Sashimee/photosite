@@ -192,6 +192,15 @@ jobs:
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
       NEXT_PUBLIC_MEDIA_BASE_URL: http://127.0.0.1:9000/photoo-public
       NEXT_PUBLIC_ALLOW_INDEXING: 'false'
+      # Local-MinIO workaround only, not a general "run in dev mode" pattern:
+      # without it, apps/web/next.config.ts bakes `dangerouslyAllowLocalIP:
+      # false` into the build, and the image optimizer rejects every
+      # avatar/portfolio thumbnail from 127.0.0.1:9000 as a private-IP SSRF
+      # target ("url parameter is not allowed"), which real production never
+      # hits because its media host is a public domain. Whoever next touches
+      # this job: do not "clean this up" by removing it, and do not copy it
+      # anywhere that isn't pointed at a local MinIO.
+      ALLOW_LOCAL_IMAGE_HOSTS: 'true'
       DATABASE_URL: postgresql://photoo:photoo_dev_password@127.0.0.1:5432/photoo_test
       # `prisma migrate deploy` never touches a shadow database, but this
       # repo's prisma.config.ts validates the variable at load time, so the
@@ -212,16 +221,8 @@ jobs:
       PUBLIC_API_URL: http://127.0.0.1:4000
       WEB_ORIGINS: http://127.0.0.1:3000
       WEB_APP_URL: http://127.0.0.1:3000
-      # Local-MinIO workaround only, not a general "run in dev mode" pattern:
-      # `next build` always forces NODE_ENV=production regardless of this
-      # (verified - the CSP nonce logic below, baked into the edge-bundled
-      # proxy at build time, is unaffected), but `next start`'s image
-      # optimizer reads a live NODE_ENV, and without this it rejects every
-      # avatar/portfolio thumbnail from 127.0.0.1:9000 as a private-IP SSRF
-      # target ("url parameter is not allowed"), which real production never
-      # hits because its media host is a public domain. Whoever next touches
-      # this job: do not "clean this up" by removing it, and do not copy it
-      # anywhere that isn't pointed at a local MinIO.
+      # apps/api's env validation (apps/api/src/config/env.ts) refuses these
+      # dev-only placeholder secrets once NODE_ENV=production.
       NODE_ENV: development
       TRUSTED_PROXIES: ''
       AUTH_SECRET: dev-only-auth-secret-change-me-please-32-chars-min
@@ -303,8 +304,15 @@ jobs:
         run: pnpm exec turbo run build --filter=@photoo/api... --filter=@photoo/web...
       - name: Start api and web, wait until both answer
         run: |
+          # `next start` doesn't support `output: standalone` (apps/web/next.config.ts,
+          # and next itself warns about it at boot) and in this job intermittently
+          # serves /en responses that never finish, so the curl loop below retries
+          # until the timeout kills it - not a slow boot, the requests just hang.
+          # infra/docker/web.Dockerfile already runs the standalone server this same
+          # build produces; do the same here instead of raising the timeout.
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/
           pnpm --filter @photoo/api start &
-          pnpm --filter @photoo/web start &
+          PORT=3000 HOSTNAME=0.0.0.0 node apps/web/.next/standalone/apps/web/server.js &
           timeout 60 bash -c 'until curl -sf http://127.0.0.1:4000/health; do sleep 1; done'
           timeout 60 bash -c 'until curl -sf http://127.0.0.1:3000/en; do sleep 1; done'
       - name: Install the smoke project's browser
