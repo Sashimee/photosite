@@ -59,6 +59,13 @@ Last updated: 2026-09-17.
 | Job board terms: what a professional warrants when posting, and the takedown process | Folded into the Phase 2 ToS work already listed | Public launch of the board | Offers are reportable by id; moderation queue is 1A.11 |
 | The `listing-expiry` sweep (1A.13b) flips a lapsed offer to `expired` but sends no notification: `NOTIFICATION_TYPES` only has `job_application_received`/`job_application_status_changed` from 1A.13a, and the worker's `notify-email.ts`/`notify-push.ts` templates are a `Record<NotificationType, ...>` keyed exhaustively over that enum, so nothing safe to add without a `packages/shared` contract change (issue #264) | A schema-migrator/api-developer pass adding a `job_offer_expired` notification type (enum, payload fields, email/push copy) | The professional getting told their listing lapsed | The sweep still flips the status and is fully idempotent; 1B.9's dashboard reads the true `status` from the database either way |
 
+## Professional area (1B.9)
+
+| Issue | Needed from Alex | Blocks | Workaround meanwhile |
+|-------|------------------|--------|----------------------|
+| `seedProfessionalJobOffer` (`packages/db/src/seed.ts`) creates exactly one professional profile with exactly one *published* offer and zero `JobApplication` rows — every other state 1B.9 has to render (draft, closed, expired, an inbox with at least one application) has nothing to click through locally without creating it by hand first | A schema-migrator follow-up to extend the seed with a draft offer, a closed offer, an offer near `expiresAt`, and at least one seeded application (ideally one `submitted`, one `shortlisted`/`rejected`) from an already-seeded photographer | Manual verification of 1B.9's non-happy-path states on the local stack and preview | 1B.9 ships its own component/page tests for these states regardless; only the "does it look right against real data" manual check is affected |
+| `1B.5` (request form) and `1B.8d` (send-quote) were built before the `EMAIL_NOT_VERIFIED` guard (#273) shipped and don't special-case that error code — a real (if narrow, OAuth-sign-up-only) user hits a generic error toast there today, the same dead end #290 was filed to fix elsewhere | A follow-up ticket to reuse 1B.9's `EmailVerificationRequired` component in those two already-merged flows | Nothing new — this is an existing, live gap, not something 1B.9 introduces | Users with a verified email (the large majority — see #290's own analysis of how an unverified session even happens) never see it |
+
 ## Payments (1A.8) — the biggest schedule risk
 
 | Issue | Needed from Alex | Blocks | Workaround meanwhile |
