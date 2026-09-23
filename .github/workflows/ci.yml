@@ -153,8 +153,24 @@ jobs:
       # Bounding concurrency to the actual core count removes the starvation
       # without changing total throughput (verified locally: same wall time,
       # no more oversubscribed tail latency).
-      - name: Run tests (concurrency bounded to the runner's core count, see comment above)
-        run: pnpm exec turbo run test --concurrency="$(nproc)"
+      #
+      # That bound alone was not enough (#201 recurred after it shipped):
+      # turbo's --concurrency only bounds how many *tasks* run at once, not
+      # how many processes each task then spawns. Every vitest workspace and
+      # apps/mobile's jest each size their own worker pool from the runner's
+      # total core count by default, so up to $(nproc) tasks can still each
+      # fork up to $(nproc) workers - the same oversubscription, one level
+      # down. `--maxWorkers=2` after `--` is forwarded by turbo to every
+      # task's own "test" script (confirmed locally: an unrecognised flag
+      # there fails the task, so this is a real pass-through, not a no-op),
+      # capping every workspace's pool to the same small, fixed number
+      # regardless of how many tasks and cores the runner has. A workflow-level
+      # flag over per-package config so the bound is uniform across jest and
+      # every vitest workspace in one place, and so `pnpm --filter @photoo/mobile
+      # test` (and every other workspace's local `test` run) is completely
+      # unaffected - this only ever runs in CI.
+      - name: Run tests (turbo concurrency and each task's own worker pool both bounded, see comment above)
+        run: pnpm exec turbo run test --concurrency="$(nproc)" -- --maxWorkers=2
       - run: pnpm build
       - run: pnpm --filter @photoo/api-client generate:check
       - run: pnpm audit --audit-level high
