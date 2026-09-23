@@ -1003,4 +1003,64 @@ describe('job board integration', () => {
       expect(items.some((item) => item.jobOffer.id === offer.id)).toBe(true);
     });
   });
+
+  describe('GDPR account deletion', () => {
+    it("closes the professional's published offers and withdraws the photographer's submitted applications, removing the offer from the public endpoints", async () => {
+      const professional = await createProfessional('gdpr-professional');
+      const offer = await createPublishedOffer(professional.token);
+
+      const photographer = await createPhotographer('gdpr-photographer');
+      const applyResponse = await fastify().inject({
+        method: 'POST',
+        url: `/v1/job-offers/${offer.id}/applications`,
+        headers: authHeaders(photographer.token),
+        payload: { message: 'Fixture application.' },
+      });
+      const application = applyResponse.json<ApplicationBody>();
+
+      const beforePublicGet = await fastify().inject({
+        method: 'GET',
+        url: `/v1/job-offers/${offer.slug}`,
+      });
+      expect(beforePublicGet.statusCode).toBe(200);
+
+      const professionalDeletion = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/data-requests',
+        headers: { ...authHeaders(professional.token), origin: 'http://localhost:3000' },
+        payload: { type: 'delete' },
+      });
+      expect(professionalDeletion.statusCode).toBe(201);
+
+      const offerAfter = await prisma.jobOffer.findUniqueOrThrow({ where: { id: offer.id } });
+      expect(offerAfter.status).toBe('closed');
+
+      const publicGetAfter = await fastify().inject({
+        method: 'GET',
+        url: `/v1/job-offers/${offer.slug}`,
+      });
+      expect(publicGetAfter.statusCode).toBe(404);
+
+      const publicListAfter = await fastify().inject({
+        method: 'GET',
+        url: `/v1/job-offers?countryCode=LU&city=${encodeURIComponent(`Fx JobBoard City ${RUN_ID}`)}`,
+      });
+      expect(publicListAfter.statusCode).toBe(200);
+      const listItems = publicListAfter.json<PaginatedBody<{ id: string }>>().items;
+      expect(listItems.some((item) => item.id === offer.id)).toBe(false);
+
+      const photographerDeletion = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/data-requests',
+        headers: { ...authHeaders(photographer.token), origin: 'http://localhost:3000' },
+        payload: { type: 'delete' },
+      });
+      expect(photographerDeletion.statusCode).toBe(201);
+
+      const applicationAfter = await prisma.jobApplication.findUniqueOrThrow({
+        where: { id: application.id },
+      });
+      expect(applicationAfter.status).toBe('withdrawn');
+    });
+  });
 });

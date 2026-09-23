@@ -116,6 +116,26 @@ export interface PhotographerProfileExportRow {
   updatedAt: string;
 }
 
+export interface ProfessionalProfileExportRow {
+  id: string;
+  companyName: string;
+  website: string | null;
+  vatNumber: string | null;
+  verified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JobApplicationExportRow {
+  id: string;
+  jobOfferId: string;
+  message: string;
+  portfolioLink: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProductTierExportRow {
   id: string;
   usage: string;
@@ -228,6 +248,8 @@ export interface CollectedExport {
   requests: RequestExportRow[];
   quotes: QuoteExportRow[];
   photographerProfile: PhotographerProfileExportRow | null;
+  professionalProfile: ProfessionalProfileExportRow | null;
+  jobApplications: JobApplicationExportRow[];
   products: ProductExportRow[];
   portfolioImages: PortfolioImageExportRow[];
   uploads: UploadExportRow[];
@@ -369,6 +391,40 @@ export async function collectExportData(
       updatedAt: true,
     },
   });
+
+  const professionalProfile = await prisma.professionalProfile.findUnique({
+    where: { userId },
+    select: {
+      id: true,
+      companyName: true,
+      website: true,
+      vatNumber: true,
+      verified: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  const jobApplicationRows = profile
+    ? await prisma.jobApplication.findMany({
+        where: { photographerId: profile.id },
+        select: {
+          id: true,
+          jobOfferId: true,
+          message: true,
+          portfolioLink: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      })
+    : [];
+  const jobApplications: JobApplicationExportRow[] = jobApplicationRows.map((application) => ({
+    ...application,
+    createdAt: application.createdAt.toISOString(),
+    updatedAt: application.updatedAt.toISOString(),
+  }));
 
   const quoteRows = await prisma.quote.findMany({
     where: profile
@@ -724,6 +780,18 @@ export async function collectExportData(
           updatedAt: profile.updatedAt.toISOString(),
         }
       : null,
+    professionalProfile: professionalProfile
+      ? {
+          id: professionalProfile.id,
+          companyName: professionalProfile.companyName,
+          website: professionalProfile.website,
+          vatNumber: professionalProfile.vatNumber,
+          verified: professionalProfile.verified,
+          createdAt: professionalProfile.createdAt.toISOString(),
+          updatedAt: professionalProfile.updatedAt.toISOString(),
+        }
+      : null,
+    jobApplications,
     products,
     portfolioImages,
     uploads,

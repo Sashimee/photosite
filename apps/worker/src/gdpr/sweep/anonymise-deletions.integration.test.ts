@@ -35,6 +35,9 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
   let portfolioObjectKey: string;
   let portfolioVariantKey: string;
   let dueRequest: { id: string };
+  let employerId: string;
+  let jobOfferId: string;
+  let jobApplicationId: string;
 
   beforeAll(async () => {
     prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
@@ -139,6 +142,54 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
     });
     dueRequestId = dueRequest.id;
 
+    await prisma.professionalProfile.create({
+      data: {
+        userId: dueUserId,
+        companyName: `Fx Anon Co ${runId}`,
+        website: 'https://example.com',
+        vatNumber: `LU${runId}`,
+      },
+    });
+
+    const employer = await prisma.user.create({
+      data: {
+        email: `gdpr-anon-employer-${runId}@photoo.test`,
+        name: 'Fx Anon Employer',
+        locale: 'en',
+        countryCode: 'LU',
+        roles: ['client'],
+        status: 'active',
+      },
+    });
+    employerId = employer.id;
+    const employerProfile = await prisma.professionalProfile.create({
+      data: { userId: employerId, companyName: `Fx Anon Employer Co ${runId}` },
+    });
+    const jobOffer = await prisma.jobOffer.create({
+      data: {
+        professionalId: employerProfile.id,
+        slug: `fx-anon-offer-${runId}`,
+        title: `Fx Anon Job Offer ${runId}`,
+        description: 'A fixture job offer for the gdpr-sweep test.',
+        category: 'wedding',
+        city: 'Luxembourg',
+        countryCode: 'LU',
+        status: 'published',
+        publishedAt: new Date(),
+        expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+      },
+    });
+    jobOfferId = jobOffer.id;
+    const jobApplication = await prisma.jobApplication.create({
+      data: {
+        jobOfferId: jobOffer.id,
+        photographerId: profileId,
+        message: 'A message that must be blanked.',
+        portfolioLink: 'https://example.com/portfolio',
+      },
+    });
+    jobApplicationId = jobApplication.id;
+
     const notDueUser = await prisma.user.create({
       data: {
         email: `gdpr-anon-notdue-${runId}@photoo.test`,
@@ -172,13 +223,18 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
       .catch(() => undefined);
     await prisma.portfolioImage.deleteMany({ where: { profileId } });
     await prisma.product.deleteMany({ where: { profileId } });
+    await prisma.jobApplication.deleteMany({ where: { id: jobApplicationId } });
+    await prisma.jobOffer.deleteMany({ where: { id: jobOfferId } });
+    await prisma.professionalProfile.deleteMany({
+      where: { userId: { in: [dueUserId, employerId] } },
+    });
     await prisma.photographerProfile.deleteMany({ where: { id: profileId } });
     await prisma.upload.deleteMany({ where: { ownerId: dueUserId } });
     await prisma.session.deleteMany({ where: { userId: { in: [dueUserId, notDueUserId] } } });
     await prisma.device.deleteMany({ where: { userId: { in: [dueUserId, notDueUserId] } } });
     await prisma.auditLog.deleteMany({ where: { targetType: 'User', targetId: dueUserId } });
     await prisma.dataRequest.deleteMany({ where: { id: { in: [dueRequestId, notDueRequestId] } } });
-    await prisma.user.deleteMany({ where: { id: { in: [dueUserId, notDueUserId] } } });
+    await prisma.user.deleteMany({ where: { id: { in: [dueUserId, notDueUserId, employerId] } } });
     await prisma.$disconnect();
   });
 
@@ -211,6 +267,24 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
     });
     expect(profile.headline).toBeNull();
     expect(profile.languages).toEqual([]);
+    expect(profile.displayName).toBe('Deleted user');
+
+    const professionalProfile = await prisma.professionalProfile.findUniqueOrThrow({
+      where: { userId: dueUserId },
+    });
+    expect(professionalProfile.companyName).toBe('Deleted company');
+    expect(professionalProfile.website).toBeNull();
+    expect(professionalProfile.vatNumber).toBeNull();
+
+    const jobApplication = await prisma.jobApplication.findUniqueOrThrow({
+      where: { id: jobApplicationId },
+    });
+    expect(jobApplication.message).toBe('');
+    expect(jobApplication.portfolioLink).toBeNull();
+    expect(jobApplication.jobOfferId).toBe(jobOfferId);
+    expect(jobApplication.status).toBe('submitted');
+    expect(jobApplication.createdAt).not.toBeNull();
+    expect(jobApplication.updatedAt).not.toBeNull();
 
     const portfolioImages = await prisma.portfolioImage.findMany({ where: { profileId } });
     const products = await prisma.product.findMany({ where: { profileId } });
@@ -238,5 +312,28 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
       where: { id: notDueRequestId },
     });
     expect(notDueRow.status).toBe('pending');
+
+    // The due request is now `completed`, so a second sweep run finds
+    // nothing left to anonymise and every already-anonymised row is
+    // unchanged.
+    const second = await anonymiseDeletions({
+      prisma: { client: prisma },
+      storage,
+      auditLog,
+      logger: fakeLogger() as never,
+    });
+    expect(second.usersAnonymised).toBe(0);
+    expect(second.usersFailed).toBe(0);
+
+    const jobApplicationAfterSecondRun = await prisma.jobApplication.findUniqueOrThrow({
+      where: { id: jobApplicationId },
+    });
+    expect(jobApplicationAfterSecondRun.message).toBe('');
+    expect(jobApplicationAfterSecondRun.portfolioLink).toBeNull();
+
+    const professionalProfileAfterSecondRun = await prisma.professionalProfile.findUniqueOrThrow({
+      where: { userId: dueUserId },
+    });
+    expect(professionalProfileAfterSecondRun.companyName).toBe('Deleted company');
   });
 });

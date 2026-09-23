@@ -20,6 +20,8 @@ export function buildManifest(data: CollectedExport, policyVersion: string | nul
       'requests.json': data.requests.length,
       'quotes.json': data.quotes.length,
       'photographer-profile.json': data.photographerProfile ? 1 : 0,
+      'professional-profile.json': data.professionalProfile ? 1 : 0,
+      'job-applications.json': data.jobApplications.length,
       'products.json': data.products.length,
       'portfolio-images.json': data.portfolioImages.length,
       'uploads.json': data.uploads.length,
