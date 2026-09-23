@@ -12,8 +12,10 @@ import { ChatModule } from './modules/chat/chat.module.js';
 import { CitiesModule } from './modules/cities/cities.module.js';
 import { CountriesModule } from './modules/countries/countries.module.js';
 import { GdprModule } from './modules/gdpr/gdpr.module.js';
+import { JobBoardModule } from './modules/job-board/job-board.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { ProductsModule } from './modules/products/products.module.js';
+import { ProfessionalsModule } from './modules/professionals/professionals.module.js';
 import { ProfilesModule } from './modules/profiles/profiles.module.js';
 import { QuotesModule } from './modules/quotes/quotes.module.js';
 import { ReportsModule } from './modules/reports/reports.module.js';
@@ -48,6 +50,8 @@ import { StorageModule } from './storage/storage.module.js';
     AdminModule,
     ReportsModule,
     GdprModule,
+    ProfessionalsModule,
+    JobBoardModule,
     OpenapiModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
