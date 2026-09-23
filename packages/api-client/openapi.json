@@ -5492,6 +5492,86 @@
         }
       }
     },
+    "/v1/auth/verify-email/resend": {
+      "post": {
+        "summary": "Resend the email verification link",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "client@example.com"
+                  }
+                },
+                "required": [
+                  "email"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Verification email sent if the account exists and is not yet verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "If the account exists and is not yet verified, a verification email has been sent."
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/auth/password-reset/request": {
       "post": {
         "summary": "Request a password reset email",
@@ -7282,6 +7362,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "requestBody": {
           "content": {
             "application/json": {
@@ -7392,6 +7473,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "responses": {
           "200": {
             "description": "The current user's professional profile",
@@ -7448,6 +7530,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "requestBody": {
           "content": {
             "application/json": {
@@ -7762,6 +7845,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "requestBody": {
           "content": {
             "application/json": {
@@ -7918,6 +8002,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8008,6 +8093,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8078,6 +8164,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8250,6 +8337,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8315,6 +8403,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "parameters": [
           {
             "schema": {
@@ -8417,6 +8506,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8499,6 +8589,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "parameters": [
           {
             "schema": {
@@ -8639,6 +8730,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8751,6 +8843,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -8841,6 +8934,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -9832,6 +9926,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "requestBody": {
           "content": {
             "application/json": {
@@ -9975,6 +10070,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10086,6 +10182,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10166,6 +10263,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10238,6 +10336,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10320,6 +10419,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "requestBody": {
           "content": {
             "application/json": {
@@ -10459,6 +10559,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "parameters": [
           {
             "schema": {
@@ -10610,6 +10711,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10712,6 +10814,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10774,6 +10877,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10876,6 +10980,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -10968,6 +11073,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {
@@ -11050,6 +11156,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": false,
         "parameters": [
           {
             "schema": {

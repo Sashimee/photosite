@@ -12,6 +12,7 @@ import {
 import { Logger } from 'nestjs-pino';
 import type { z } from 'zod';
 import { requireRole } from '../../common/auth/require-role.js';
+import { requireVerifiedEmail } from '../../common/auth/require-verified-email.js';
 import {
   decodeCreatedAtCursor,
   encodeCreatedAtCursor,
@@ -29,6 +30,7 @@ interface SessionUser {
   id: string;
   roles: string[];
   locale: string;
+  emailVerifiedAt?: string | Date | null;
 }
 type CreateForRequestInput = z.infer<typeof CreateQuoteRequestSchema>;
 type DirectQuoteInput = z.infer<typeof DirectQuoteRequestSchema>;
@@ -85,6 +87,7 @@ export class QuotesService {
     input: CreateForRequestInput,
     ip: string | undefined,
   ): Promise<QuoteDto> {
+    requireVerifiedEmail(user);
     requireRole(user, 'photographer');
     await this.rateLimit.enforceCreate(ip, user.id);
 
@@ -192,6 +195,7 @@ export class QuotesService {
     input: DirectQuoteInput,
     ip: string | undefined,
   ): Promise<QuoteDto> {
+    requireVerifiedEmail(user);
     await this.rateLimit.enforceDirectCreate(ip, user.id);
 
     const profile = await this.prisma.client.photographerProfile.findUnique({ where: { slug } });

@@ -90,6 +90,7 @@ export {
   CountryCodeSchema,
   CurrencyCodeSchema,
   CursorPaginationQuerySchema,
+  EMAIL_NOT_VERIFIED_ERROR_CODE,
   IdSchema,
   IsoDateTimeSchema,
   LanguageCodeSchema,
@@ -100,6 +101,7 @@ export {
   STANDARD_ERROR_STATUS_CODES,
   errorResponses,
   paginatedResponseSchema,
+  requiresVerifiedEmail,
   type StandardErrorStatusCode,
 } from './contract/common.js';
 
@@ -169,6 +171,8 @@ export {
   OAUTH_PROVIDERS,
   RequestPasswordResetRequestSchema,
   RequestPasswordResetResponseSchema,
+  ResendVerificationEmailRequestSchema,
+  ResendVerificationEmailResponseSchema,
   SIGNUP_ROLES,
   SessionQueryResponseSchema,
   SessionResponseSchema,

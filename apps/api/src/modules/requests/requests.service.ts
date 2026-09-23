@@ -9,6 +9,7 @@ import type {
 } from '@photoo/shared';
 import type { z } from 'zod';
 import { requireRole } from '../../common/auth/require-role.js';
+import { requireVerifiedEmail } from '../../common/auth/require-verified-email.js';
 import { toPrismaCategory, toWireCategory } from '../../common/enums/photographer-category.js';
 import {
   decodeCreatedAtCursor,
@@ -23,6 +24,7 @@ import { RequestsRepository } from './requests.repository.js';
 interface SessionUser {
   id: string;
   roles: string[];
+  emailVerifiedAt?: string | Date | null;
 }
 type CreateInput = z.infer<typeof CreateRequestRequestSchema>;
 type FeedQuery = z.infer<typeof RequestFeedQuerySchema>;
@@ -62,6 +64,7 @@ export class RequestsService {
   ) {}
 
   async create(user: SessionUser, input: CreateInput, ip: string | undefined): Promise<RequestDto> {
+    requireVerifiedEmail(user);
     await this.rateLimit.enforceCreate(ip, user.id);
 
     const country = await this.prisma.client.country.findUnique({

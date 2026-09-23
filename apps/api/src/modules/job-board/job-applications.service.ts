@@ -11,6 +11,7 @@ import {
 } from '@photoo/shared';
 import type { z } from 'zod';
 import { requireRole } from '../../common/auth/require-role.js';
+import { requireVerifiedEmail } from '../../common/auth/require-verified-email.js';
 import {
   decodeCreatedAtCursor,
   encodeCreatedAtCursor,
@@ -28,6 +29,7 @@ import {
 interface SessionUser {
   id: string;
   roles: string[];
+  emailVerifiedAt?: string | Date | null;
 }
 type ApplyInput = z.infer<typeof CreateJobApplicationRequestSchema>;
 type StatusInput = z.infer<typeof UpdateJobApplicationStatusRequestSchema>;
@@ -70,6 +72,7 @@ export class JobApplicationsService {
   }
 
   async apply(user: SessionUser, jobOfferId: string, input: ApplyInput): Promise<ApplicationDto> {
+    requireVerifiedEmail(user);
     requireRole(user, 'photographer');
     const profile = await this.requirePhotographerProfile(user.id);
 

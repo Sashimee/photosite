@@ -12,6 +12,7 @@ import {
 } from '@photoo/shared';
 import type { z } from 'zod';
 import { requireRole } from '../../common/auth/require-role.js';
+import { requireVerifiedEmail } from '../../common/auth/require-verified-email.js';
 import { toPrismaCategory } from '../../common/enums/photographer-category.js';
 import {
   decodeCreatedAtCursor,
@@ -33,6 +34,7 @@ import { generateUniqueJobOfferSlug } from './job-offer-slug.js';
 interface SessionUser {
   id: string;
   roles: string[];
+  emailVerifiedAt?: string | Date | null;
 }
 type CreateInput = z.infer<typeof CreateJobOfferRequestSchema>;
 type UpdateInput = z.infer<typeof UpdateJobOfferRequestSchema>;
@@ -214,6 +216,7 @@ export class JobOffersService {
   // that is the moment Phase 3 would charge for it
   // (docs/steps/1A.13-professionals.md).
   async publish(user: SessionUser, id: string): Promise<JobOfferDto> {
+    requireVerifiedEmail(user);
     requireRole(user, 'professional');
     const professional = await this.professionals.getOwnProfileRecord(user.id);
 

@@ -129,6 +129,15 @@ describe('quotes integration', () => {
     return { authorization: `Bearer ${token}` };
   }
 
+  // No sign-up flow leaves a session unverified today (Better Auth blocks
+  // password sign-in until verified); this is the equivalent of the one
+  // that does, an OAuth account whose provider never confirmed the email,
+  // done directly against the row so the gate is tested independently of
+  // how a session ever ends up attached to one.
+  async function unverifyEmail(userId: string): Promise<void> {
+    await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: null } });
+  }
+
   function requestPayload(overrides: Record<string, unknown> = {}) {
     const eventDate = new Date();
     eventDate.setUTCDate(eventDate.getUTCDate() + 30);
@@ -362,6 +371,25 @@ describe('quotes integration', () => {
   });
 
   describe('POST /v1/quotes (request quote)', () => {
+    it('rejects an unverified account with EMAIL_NOT_VERIFIED, then succeeds once verified', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const request = await createRequestAs(client.token);
+      const photographer = await createPublishedPhotographer('unverified-request-quote');
+      await unverifyEmail(photographer.userId);
+
+      const blocked = await sendQuote(photographer.token, request.id);
+      expect(blocked.statusCode).toBe(403);
+      expect(blocked.json<{ code: string }>().code).toBe('EMAIL_NOT_VERIFIED');
+
+      await prisma.user.update({
+        where: { id: photographer.userId },
+        data: { emailVerifiedAt: new Date() },
+      });
+
+      const allowed = await sendQuote(photographer.token, request.id);
+      expect(allowed.statusCode).toBe(201);
+    });
+
     it('rejects a caller without the photographer role with 403', async () => {
       const client = await signUpAndSignIn(['client']);
       const request = await createRequestAs(client.token);
@@ -605,6 +633,30 @@ describe('quotes integration', () => {
   });
 
   describe('POST /v1/photographers/:slug/products/:productId/quotes (direct quote)', () => {
+    it('rejects an unverified account with EMAIL_NOT_VERIFIED, then succeeds once verified', async () => {
+      const photographer = await createPublishedPhotographer('unverified-direct-quote');
+      const product = await createProduct(photographer.token);
+      const tier = product.tiers[0];
+      if (!tier) {
+        throw new Error('expected a tier');
+      }
+      const client = await signUpAndSignIn(['client']);
+      await unverifyEmail(client.id);
+
+      const blocked = await requestDirectQuote(client.token, photographer.slug, product.id, {
+        productTierId: tier.id,
+      });
+      expect(blocked.statusCode).toBe(403);
+      expect(blocked.json<{ code: string }>().code).toBe('EMAIL_NOT_VERIFIED');
+
+      await prisma.user.update({ where: { id: client.id }, data: { emailVerifiedAt: new Date() } });
+
+      const allowed = await requestDirectQuote(client.token, photographer.slug, product.id, {
+        productTierId: tier.id,
+      });
+      expect(allowed.statusCode).toBe(201);
+    });
+
     it('builds the line item from the tier server-side and rejects client-supplied price fields with 400', async () => {
       const photographer = await createPublishedPhotographer('direct');
       const product = await createProduct(photographer.token);
@@ -725,6 +777,21 @@ describe('quotes integration', () => {
   });
 
   describe('quote lifecycle', () => {
+    it('accepts a quote for an unverified client: acting on an existing quote is not gated', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const request = await createRequestAs(client.token);
+      const photographer = await createPublishedPhotographer('unverified-accept');
+      const quote = (await sendQuote(photographer.token, request.id)).json<QuoteBody>();
+      await unverifyEmail(client.id);
+
+      const accept = await fastify().inject({
+        method: 'POST',
+        url: `/v1/quotes/${quote.id}/accept`,
+        headers: authHeaders(client.token),
+      });
+      expect(accept.statusCode).toBe(200);
+    });
+
     it('accepts a quote, declines siblings, books the request, and writes audit logs', async () => {
       const client = await signUpAndSignIn(['client']);
       const request = await createRequestAs(client.token);

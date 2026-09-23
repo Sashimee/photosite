@@ -8,6 +8,7 @@ import {
   MoneySchema,
   errorResponses,
   paginatedResponseSchema,
+  requiresVerifiedEmail,
 } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
@@ -123,6 +124,7 @@ registry.registerPath({
   summary: 'Create a request',
   tags: ['requests'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(true),
   request: {
     body: { content: { 'application/json': { schema: CreateRequestRequestSchema } } },
   },
@@ -141,6 +143,7 @@ registry.registerPath({
   summary: 'List open requests matching the current photographer profile',
   tags: ['requests'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     query: RequestFeedQuerySchema,
   },
@@ -159,6 +162,7 @@ registry.registerPath({
   summary: "List the current client's requests",
   tags: ['requests'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     query: CursorPaginationQuerySchema,
   },
@@ -177,6 +181,7 @@ registry.registerPath({
   summary: 'Get a request',
   tags: ['requests'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     params: z.object({ id: IdSchema }).strict(),
   },
@@ -195,6 +200,7 @@ registry.registerPath({
   summary: 'Cancel a request',
   tags: ['requests'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     params: z.object({ id: IdSchema }).strict(),
   },

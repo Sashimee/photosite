@@ -305,6 +305,20 @@ describe('data requests integration', () => {
     });
 
     describe('export', () => {
+      it('works for an unverified account: GDPR export is not gated by email verification', async () => {
+        const user = await signUpAndSignIn('export-unverified', ['client']);
+        await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: null } });
+        const headers = { ...authHeaders(user.token), origin: 'http://localhost:3000' };
+
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/me/data-requests',
+          headers,
+          payload: { type: 'export' },
+        });
+        expect(response.statusCode).toBe(201);
+      });
+
       it('creates a pending export, and a second call returns the same row', async () => {
         const user = await signUpAndSignIn('export-idempotent', ['client']);
         const headers = { ...authHeaders(user.token), origin: 'http://localhost:3000' };
@@ -462,6 +476,19 @@ describe('data requests integration', () => {
           headers: authHeaders(secondSession.token),
         });
         expect(authedAfterDeletion.statusCode).toBe(401);
+      });
+
+      it('works for an unverified account: GDPR deletion is not gated by email verification', async () => {
+        const user = await signUpAndSignIn('delete-unverified', ['client']);
+        await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: null } });
+
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/me/data-requests',
+          headers: { ...authHeaders(user.token), origin: 'http://localhost:3000' },
+          payload: { type: 'delete' },
+        });
+        expect(response.statusCode).toBe(201);
       });
 
       it('returns the existing row on a second call', async () => {

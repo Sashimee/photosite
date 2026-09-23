@@ -108,6 +108,15 @@ describe('requests integration', () => {
     return { authorization: `Bearer ${token}` };
   }
 
+  // No sign-up flow leaves a session unverified today (Better Auth blocks
+  // password sign-in until verified); this is the equivalent of the one
+  // that does, an OAuth account whose provider never confirmed the email,
+  // done directly against the row so the gate is tested independently of
+  // how a session ever ends up attached to one.
+  async function unverifyEmail(userId: string): Promise<void> {
+    await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: null } });
+  }
+
   function requestPayload(overrides: Record<string, unknown> = {}) {
     const eventDate = new Date();
     eventDate.setUTCDate(eventDate.getUTCDate() + 30);
@@ -264,6 +273,20 @@ describe('requests integration', () => {
       expect(response.statusCode).toBe(401);
     });
 
+    it('rejects an unverified account with EMAIL_NOT_VERIFIED, then succeeds once verified', async () => {
+      const client = await signUpAndSignIn(['client']);
+      await unverifyEmail(client.id);
+
+      const blocked = await createRequestAs(client.token);
+      expect(blocked.statusCode).toBe(403);
+      expect(blocked.json<{ code: string }>().code).toBe('EMAIL_NOT_VERIFIED');
+
+      await prisma.user.update({ where: { id: client.id }, data: { emailVerifiedAt: new Date() } });
+
+      const allowed = await createRequestAs(client.token);
+      expect(allowed.statusCode).toBe(201);
+    });
+
     it('rejects a disabled or unknown countryCode with 422', async () => {
       const client = await signUpAndSignIn(['client']);
       const response = await createRequestAs(client.token, {
@@ -318,6 +341,19 @@ describe('requests integration', () => {
   });
 
   describe('GET /v1/requests/mine', () => {
+    it('works for an unverified account: reading is not gated', async () => {
+      const client = await signUpAndSignIn(['client']);
+      await createRequestAs(client.token, { title: 'Unverified reader' });
+      await unverifyEmail(client.id);
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/requests/mine',
+        headers: authHeaders(client.token),
+      });
+      expect(response.statusCode).toBe(200);
+    });
+
     it('paginates the owner requests stably', async () => {
       const client = await signUpAndSignIn(['client']);
       await createRequestAs(client.token, { title: 'Mine A' });

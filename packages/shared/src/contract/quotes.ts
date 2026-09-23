@@ -7,6 +7,7 @@ import {
   SlugSchema,
   errorResponses,
   paginatedResponseSchema,
+  requiresVerifiedEmail,
 } from './common.js';
 import { PhotographerSummarySchema } from './profiles.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
@@ -89,6 +90,7 @@ registry.registerPath({
   summary: 'Create a quote for a request',
   tags: ['quotes'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(true),
   request: {
     body: { content: { 'application/json': { schema: CreateQuoteRequestSchema } } },
   },
@@ -107,6 +109,7 @@ registry.registerPath({
   summary: 'Request a direct quote from a product tier',
   tags: ['quotes'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(true),
   request: {
     params: z.object({ slug: SlugSchema, productId: IdSchema }).strict(),
     body: { content: { 'application/json': { schema: DirectQuoteRequestSchema } } },
@@ -126,6 +129,7 @@ registry.registerPath({
   summary: "List the current user's quotes",
   tags: ['quotes'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     query: QuotesMineQuerySchema,
   },
@@ -144,6 +148,7 @@ registry.registerPath({
   summary: 'Get a quote',
   tags: ['quotes'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     params: z.object({ id: IdSchema }).strict(),
   },
@@ -162,6 +167,7 @@ registry.registerPath({
   summary: 'List the quotes for a request',
   tags: ['quotes'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     params: z.object({ requestId: IdSchema }).strict(),
     query: CursorPaginationQuerySchema,
@@ -181,6 +187,7 @@ registry.registerPath({
   summary: 'Accept a quote',
   tags: ['quotes'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     params: z.object({ id: IdSchema }).strict(),
   },
@@ -199,6 +206,7 @@ registry.registerPath({
   summary: 'Decline a quote',
   tags: ['quotes'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     params: z.object({ id: IdSchema }).strict(),
   },
@@ -217,6 +225,7 @@ registry.registerPath({
   summary: 'Withdraw a quote',
   tags: ['quotes'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(false),
   request: {
     params: z.object({ id: IdSchema }).strict(),
   },
