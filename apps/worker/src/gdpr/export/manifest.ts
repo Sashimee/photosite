@@ -21,6 +21,7 @@ export function buildManifest(data: CollectedExport, policyVersion: string | nul
       'quotes.json': data.quotes.length,
       'photographer-profile.json': data.photographerProfile ? 1 : 0,
       'professional-profile.json': data.professionalProfile ? 1 : 0,
+      'job-offers.json': data.jobOffers.length,
       'job-applications.json': data.jobApplications.length,
       'products.json': data.products.length,
       'portfolio-images.json': data.portfolioImages.length,

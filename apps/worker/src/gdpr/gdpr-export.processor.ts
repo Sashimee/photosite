@@ -80,6 +80,7 @@ export function createGdprExportProcessor(deps: GdprExportDeps): Processor<GdprE
           'quotes.json': data.quotes,
           'photographer-profile.json': data.photographerProfile,
           'professional-profile.json': data.professionalProfile,
+          'job-offers.json': data.jobOffers,
           'job-applications.json': data.jobApplications,
           'products.json': data.products,
           'portfolio-images.json': data.portfolioImages,
