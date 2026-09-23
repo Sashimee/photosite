@@ -17,12 +17,12 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@formatjs/icu-messageformat-parser": "3.5.19",
+    "@formatjs/icu-messageformat-parser": "3.5.20",
     "@photoo/shared": "workspace:*"
   },
   "devDependencies": {
     "@photoo/config": "workspace:*",
-    "@types/node": "26.5.1",
+    "@types/node": "26.6.2",
     "@vitest/coverage-v8": "5.0.1",
     "eslint": "9.39.5",
     "typescript": "6.0.3",
