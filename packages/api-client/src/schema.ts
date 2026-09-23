@@ -3117,7 +3117,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        status: "submitted" | "shortlisted" | "rejected" | "withdrawn";
+                        status: "shortlisted" | "rejected" | "withdrawn";
                     };
                 };
             };
@@ -12102,7 +12102,7 @@ export interface components {
              * @example portfolio_image
              * @enum {string}
              */
-            targetType: "photographer_profile" | "portfolio_image" | "request";
+            targetType: "photographer_profile" | "portfolio_image" | "request" | "job_offer";
             /**
              * Format: uuid
              * @description UUID identifier

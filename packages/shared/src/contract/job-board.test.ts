@@ -10,6 +10,7 @@ import {
   PublicJobOfferSchema,
   PublicJobOfferSummarySchema,
   UpdateJobApplicationStatusRequestSchema,
+  UpdateJobOfferRequestSchema,
 } from './job-board.js';
 
 const id = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
@@ -113,6 +114,26 @@ describe('CreateJobOfferRequestSchema', () => {
       CreateJobOfferRequestSchema.safeParse({ ...validCreateOffer, category: 'landscape' }).success,
     ).toBe(false);
   });
+
+  it('accepts startDate equal to endDate', () => {
+    expect(
+      CreateJobOfferRequestSchema.safeParse({
+        ...validCreateOffer,
+        startDate: '2026-12-01T00:00:00.000Z',
+        endDate: '2026-12-01T00:00:00.000Z',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects startDate after endDate', () => {
+    expect(
+      CreateJobOfferRequestSchema.safeParse({
+        ...validCreateOffer,
+        startDate: '2026-12-01T00:00:00.000Z',
+        endDate: '2026-11-01T00:00:00.000Z',
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe('JobOfferSchema', () => {
@@ -144,6 +165,27 @@ describe('JobOfferSchema', () => {
 
   it('rejects a slug shorter than 3 characters', () => {
     expect(JobOfferSchema.safeParse({ ...validOffer, slug: 'ab' }).success).toBe(false);
+  });
+
+  it('rejects startDate after endDate', () => {
+    expect(
+      JobOfferSchema.safeParse({
+        ...validOffer,
+        startDate: '2026-12-01T00:00:00.000Z',
+        endDate: '2026-11-01T00:00:00.000Z',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('UpdateJobOfferRequestSchema', () => {
+  it('does not re-validate startDate <= endDate (.partial() drops the refinement); the service must check it on PATCH', () => {
+    expect(
+      UpdateJobOfferRequestSchema.safeParse({
+        startDate: '2026-12-01T00:00:00.000Z',
+        endDate: '2026-11-01T00:00:00.000Z',
+      }).success,
+    ).toBe(true);
   });
 });
 
@@ -255,10 +297,16 @@ describe('CreateJobApplicationRequestSchema', () => {
 });
 
 describe('UpdateJobApplicationStatusRequestSchema', () => {
-  it('accepts each known status', () => {
-    for (const status of ['submitted', 'shortlisted', 'rejected', 'withdrawn']) {
+  it('accepts each transition target', () => {
+    for (const status of ['shortlisted', 'rejected', 'withdrawn']) {
       expect(UpdateJobApplicationStatusRequestSchema.safeParse({ status }).success).toBe(true);
     }
+  });
+
+  it('rejects submitted as a transition target', () => {
+    expect(UpdateJobApplicationStatusRequestSchema.safeParse({ status: 'submitted' }).success).toBe(
+      false,
+    );
   });
 
   it('rejects an unknown status', () => {

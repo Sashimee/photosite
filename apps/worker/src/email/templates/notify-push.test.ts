@@ -96,7 +96,7 @@ describe('renderNotifyPush', () => {
     );
     expect(push.title).toBe('New application');
     expect(push.body).toContain('Wedding photographer needed');
-    expect(push.url).toBe('/en/job-offers/job-offer-1/applications');
+    expect(push.url).toBe('/en/account/job-offers/job-offer-1/applications');
   });
 
   it('falls back to a generic job offer label for job_application_status_changed when absent', () => {
@@ -106,6 +106,7 @@ describe('renderNotifyPush', () => {
       'en',
     );
     expect(push.body).toContain('the job offer');
+    expect(push.url).toBe('/en/account/job-applications');
   });
 
   it('throws when a job application notification has no jobOfferId', () => {

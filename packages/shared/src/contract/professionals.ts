@@ -1,10 +1,6 @@
-import { IdSchema, errorResponses } from './common.js';
+import { HttpUrlSchema, IdSchema, errorResponses } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
-
-const HTTP_URL_PROTOCOL = /^https?$/;
-
-const WebsiteSchema = z.url({ protocol: HTTP_URL_PROTOCOL });
 
 // The public-safe shape of a professional's company: name, logo and the
 // manual verified badge, never the email/phone/VAT number the account and
@@ -13,7 +9,7 @@ export const PublicProfessionalCompanySchema = z
   .object({
     id: IdSchema,
     companyName: z.string().min(1).max(120),
-    website: WebsiteSchema.nullable(),
+    website: HttpUrlSchema.nullable(),
     logoUrl: z.url().nullable(),
     verified: z.boolean(),
   })
@@ -29,7 +25,7 @@ export const OwnProfessionalProfileSchema = PublicProfessionalCompanySchema.exte
 export const CreateProfessionalProfileRequestSchema = z
   .object({
     companyName: z.string().min(1).max(120),
-    website: WebsiteSchema.nullable().optional(),
+    website: HttpUrlSchema.nullable().optional(),
     vatNumber: z.string().min(1).max(50).nullable().optional(),
     logoUploadId: IdSchema.nullable().optional(),
   })

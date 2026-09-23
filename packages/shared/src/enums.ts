@@ -150,7 +150,12 @@ export const REPORT_STATUSES = ['open', 'resolved', 'dismissed'] as const;
 
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
-export const REPORT_TARGET_TYPES = ['photographer_profile', 'portfolio_image', 'request'] as const;
+export const REPORT_TARGET_TYPES = [
+  'photographer_profile',
+  'portfolio_image',
+  'request',
+  'job_offer',
+] as const;
 
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
 

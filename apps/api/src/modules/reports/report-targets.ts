@@ -31,6 +31,13 @@ export async function reportTargetExists(
           select: { id: true },
         })) !== null
       );
+    case 'job_offer':
+      return (
+        (await client.jobOffer.findUnique({
+          where: { id: targetId },
+          select: { id: true },
+        })) !== null
+      );
   }
 }
 

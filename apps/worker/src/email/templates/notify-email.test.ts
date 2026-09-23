@@ -207,7 +207,9 @@ describe('renderNotifyEmail', () => {
     );
     expect(message.subject).toContain('Jane Doe');
     expect(message.text).toContain('Wedding photographer needed');
-    expect(message.text).toContain('https://photoo.lu/en/job-offers/job-offer-1/applications');
+    expect(message.text).toContain(
+      'https://photoo.lu/en/account/job-offers/job-offer-1/applications',
+    );
   });
 
   it('renders job_application_status_changed with a fallback job offer title when absent', () => {
@@ -219,7 +221,7 @@ describe('renderNotifyEmail', () => {
       'https://photoo.lu',
     );
     expect(message.text).toContain('the job offer');
-    expect(message.text).toContain('https://photoo.lu/en/job-offers/job-offer-1/applications');
+    expect(message.text).toContain('https://photoo.lu/en/account/job-applications');
   });
 
   it('throws when a job application notification has no jobOfferId', () => {

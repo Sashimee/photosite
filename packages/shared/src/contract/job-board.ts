@@ -35,6 +35,16 @@ export const PortfolioLinkSchema = z
   .transform((value) => new URL(value).toString())
   .openapi({ description: 'https-only URL, normalised', example: 'https://example.com/portfolio' });
 
+function jobOfferDateRangeRefinement(data: {
+  startDate?: string | null | undefined;
+  endDate?: string | null | undefined;
+}) {
+  if (!data.startDate || !data.endDate) {
+    return true;
+  }
+  return new Date(data.startDate).getTime() <= new Date(data.endDate).getTime();
+}
+
 export const CompensationSchema = z
   .object({
     min: MoneySchema,
@@ -67,9 +77,18 @@ export const JobOfferSchema = z
     expiresAt: IsoDateTimeSchema.nullable(),
   })
   .strict()
+  .refine(jobOfferDateRangeRefinement, {
+    message: 'startDate must be less than or equal to endDate',
+    path: ['endDate'],
+  })
   .openapi('JobOffer');
 
-export const CreateJobOfferRequestSchema = z
+// zod refuses .partial() on a schema carrying an object-level refinement, so
+// the mutable fields live here unrefined and CreateJobOfferRequestSchema and
+// UpdateJobOfferRequestSchema each build on top of it. UpdateJobOfferRequestSchema
+// has no startDate <= endDate check as a result; the service must check it
+// itself on PATCH (docs/steps/1A.13-professionals.md).
+const JobOfferMutableFieldsSchema = z
   .object({
     title: z.string().min(1).max(150),
     description: z.string().min(1).max(4000),
@@ -84,7 +103,12 @@ export const CreateJobOfferRequestSchema = z
   })
   .strict();
 
-export const UpdateJobOfferRequestSchema = CreateJobOfferRequestSchema.partial();
+export const CreateJobOfferRequestSchema = JobOfferMutableFieldsSchema.refine(
+  jobOfferDateRangeRefinement,
+  { message: 'startDate must be less than or equal to endDate', path: ['endDate'] },
+);
+
+export const UpdateJobOfferRequestSchema = JobOfferMutableFieldsSchema.partial();
 
 // `company` is the public-safe PublicProfessionalCompanySchema, not the
 // owner-facing OwnProfessionalProfileSchema, so the professional's email,
@@ -177,22 +201,14 @@ export const CreateJobApplicationRequestSchema = z
   })
   .strict();
 
+// The initial status comes from POST /job-offers/{id}/applications, which
+// takes no status; submitted is a starting point, never a transition target
+// (docs/steps/1A.13-professionals.md "submitted -> shortlisted|rejected|withdrawn").
 export const UpdateJobApplicationStatusRequestSchema = z
   .object({
-    status: z.enum(JOB_APPLICATION_STATUSES),
+    status: z.enum(JOB_APPLICATION_STATUSES).exclude(['submitted']),
   })
   .strict();
-
-export const ListingSchema = z
-  .object({
-    id: IdSchema,
-    kind: z.enum(LISTING_KINDS),
-    price: MoneySchema,
-    paidAt: IsoDateTimeSchema.nullable(),
-    expiresAt: IsoDateTimeSchema,
-  })
-  .strict()
-  .openapi('Listing');
 
 // Every listing created in Phase 1 is free (D8); the service refuses
 // anything else, and this is what it validates against before that check

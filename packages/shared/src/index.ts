@@ -227,7 +227,6 @@ export {
   JobOfferCategorySchema,
   JobOfferSchema,
   JobOffersQuerySchema,
-  ListingSchema,
   PortfolioLinkSchema,
   PublicJobOfferSchema,
   PublicJobOfferSummarySchema,

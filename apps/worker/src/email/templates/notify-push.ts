@@ -3,6 +3,7 @@ import type { NotificationPayload, NotificationType } from '@photoo/shared';
 import { formatText } from '../format-message.js';
 import {
   buildConversationPath,
+  buildJobApplicationsPath,
   buildJobOfferApplicationsPath,
   buildNotificationPath,
   buildVerificationCasePath,
@@ -57,9 +58,11 @@ export function renderNotifyPush(
       ? buildConversationPath(locale, requireConversationId(type, payload))
       : type === 'verification_approved' || type === 'verification_rejected'
         ? buildVerificationCasePath(locale)
-        : type === 'job_application_received' || type === 'job_application_status_changed'
+        : type === 'job_application_received'
           ? buildJobOfferApplicationsPath(locale, requireJobOfferId(type, payload))
-          : buildNotificationPath(locale, requireQuoteId(type, payload));
+          : type === 'job_application_status_changed'
+            ? buildJobApplicationsPath(locale)
+            : buildNotificationPath(locale, requireQuoteId(type, payload));
 
   return {
     title: template.title,

@@ -7,6 +7,7 @@ import { SUPPORTED_LOCALES } from '../locale.js';
 import {
   CountryCodeSchema,
   CursorPaginationQuerySchema,
+  HttpUrlSchema,
   IdSchema,
   LanguageCodeSchema,
   LatLngSchema,
@@ -28,10 +29,6 @@ export const LocalizedTextSchema = z
     description: 'Text keyed by supported locale, only translated locales present',
     example: { en: 'Wedding and portrait photographer in Luxembourg' },
   });
-
-const HTTP_URL_PROTOCOL = /^https?$/;
-
-const HttpUrlSchema = z.url({ protocol: HTTP_URL_PROTOCOL });
 
 export const ProfileLinksSchema = z
   .object({
