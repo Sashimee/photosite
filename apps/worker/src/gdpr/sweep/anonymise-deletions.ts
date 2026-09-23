@@ -70,6 +70,7 @@ async function anonymiseOne(
       await tx.photographerProfile.update({
         where: { id: profile.id },
         data: {
+          slug: `deleted-${profile.id}`,
           displayName: ANONYMISED_DISPLAY_NAME,
           headline: null,
           bio: {},

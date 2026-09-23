@@ -56,6 +56,10 @@ interface ApplicationBody {
   status: string;
 }
 
+interface ApplicationWithPhotographerBody extends ApplicationBody {
+  photographer: { id: string; slug: string; displayName: string };
+}
+
 interface PaginatedBody<T> {
   items: T[];
   nextCursor: string | null;
@@ -877,6 +881,45 @@ describe('job board integration', () => {
         headers: authHeaders(stranger.token),
       });
       expect(forbidden.statusCode).toBe(404);
+    });
+
+    it('exposes neither the slug nor the display name of an anonymised applicant', async () => {
+      const professional = await createProfessional('received-anon');
+      const offer = await createPublishedOffer(professional.token);
+      const photographer = await createPhotographer('received-anon');
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/job-offers/${offer.id}/applications`,
+        headers: authHeaders(photographer.token),
+        payload: { message: 'Fixture application.' },
+      });
+
+      await prisma.photographerProfile.update({
+        where: { id: photographer.profileId },
+        data: {
+          slug: `deleted-${photographer.profileId}`,
+          displayName: 'Deleted user',
+          headline: null,
+          bio: {},
+          links: [],
+          languages: [],
+        },
+      });
+
+      const received = await fastify().inject({
+        method: 'GET',
+        url: `/v1/job-offers/${offer.id}/applications`,
+        headers: authHeaders(professional.token),
+      });
+      expect(received.statusCode).toBe(200);
+      const items = received.json<PaginatedBody<ApplicationWithPhotographerBody>>().items;
+      expect(items).toHaveLength(1);
+      const [item] = items;
+      expect(item?.photographer.displayName).toBe('Deleted user');
+      expect(item?.photographer.slug).toBe(`deleted-${photographer.profileId}`);
+      expect(item?.photographer.slug).not.toContain('received-anon');
+      expect(item?.photographer.displayName).not.toMatch(/Fx JobBoard Photog/i);
+      expect(item?.photographer.slug).not.toMatch(/Fx JobBoard Photog/i);
     });
   });
 
