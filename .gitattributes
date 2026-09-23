@@ -4,7 +4,10 @@
 docs/steps/human-followups.md merge=union
 
 # The historical blob still contains the NUL sentinel this fix replaced (#262):
-# without this, git's binary heuristic looks at the pre-image too, so the diff
-# that removes the NUL would itself still render as "Bin ... bytes".
+# git's binary heuristic looks at the pre-image too, so `git diff`/`git show`
+# on the commit that removes the NUL would otherwise still say "Bin ... bytes"
+# locally. GitHub's own diff view doesn't honor this attribute, so its PR/API
+# diff for that one introducing commit still shows binary; every diff after
+# it (base and head both NUL-free) renders normally there too.
 apps/worker/src/email/templates/notify-email.ts diff
 apps/worker/src/email/templates/auth-email.ts diff
