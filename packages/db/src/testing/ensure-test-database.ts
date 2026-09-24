@@ -111,14 +111,20 @@ async function createFromTemplate(
 }
 
 async function formatTemplateSessions(admin: Client, templateName: string): Promise<string> {
-  const result = await admin.query<{
-    pid: number;
-    application_name: string;
-    state: string | null;
-  }>(
-    `SELECT pid, application_name, state FROM pg_stat_activity WHERE datname = $1 AND pid != pg_backend_pid()`,
-    [templateName],
-  );
+  let result;
+  try {
+    result = await admin.query<{
+      pid: number;
+      application_name: string;
+      state: string | null;
+    }>(
+      `SELECT pid, application_name, state FROM pg_stat_activity WHERE datname = $1 AND pid != pg_backend_pid()`,
+      [templateName],
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `  (could not list sessions: ${message})`;
+  }
   if (result.rows.length === 0) {
     return '  (none found - it may have disconnected between the failed clone and this check)';
   }
