@@ -1422,6 +1422,55 @@
         "validUntilLabel": "Valid until",
         "loadMore": "Next page"
       }
+    },
+    "emailVerification": {
+      "message": "Please verify your email address to continue.",
+      "resendCta": "Resend verification email",
+      "sending": "Sending…",
+      "sent": "Verification email sent. Check your inbox."
+    },
+    "professional": {
+      "metaTitle": "Professional profile",
+      "backToAccount": "Back to account",
+      "createTitle": "Create your professional profile",
+      "editTitle": "Edit your professional profile",
+      "createIntro": "Set up your company profile before posting a job offer for photographers.",
+      "companyNameLabel": "Company name",
+      "websiteLabel": "Website",
+      "vatNumberLabel": "VAT number",
+      "logoHeading": "Logo",
+      "logoHint": "Shown on your job offers and public company profile.",
+      "logoEmpty": "No logo yet",
+      "logoWillBeRemoved": "Logo will be removed",
+      "logoAlt": "{companyName} logo",
+      "logoUploadCta": "Upload logo",
+      "logoReplaceCta": "Replace logo",
+      "logoRemoveCta": "Remove logo",
+      "logoReady": "New logo ready. Save to apply it.",
+      "uploading": "Uploading… {percent}%",
+      "scanning": "Scanning for viruses…",
+      "unsupportedType": "Only JPEG, PNG and WEBP images can be uploaded.",
+      "tooLarge": "This file is too large.",
+      "uploadErrors": {
+        "infected": "This file failed a virus scan and wasn't uploaded.",
+        "scanFailed": "The scan couldn't complete. Try again.",
+        "scanTimeout": "The scan is taking longer than expected. Try again shortly."
+      },
+      "createCta": "Create profile",
+      "saveCta": "Save changes",
+      "saving": "Saving…",
+      "created": "Profile created.",
+      "saved": "Saved.",
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "invalid": "Check the highlighted fields and try again.",
+        "notFound": "Your professional profile could not be found.",
+        "forbidden": "You don't have access to this profile.",
+        "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}.",
+        "alreadyExists": "You already have a professional profile. Reload the page to edit it.",
+        "logoConflict": "This logo is already used by another profile."
+      }
     }
   }
 }
