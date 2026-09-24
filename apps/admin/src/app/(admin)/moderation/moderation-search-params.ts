@@ -10,6 +10,7 @@ export type RawModerationSearchParams = Record<string, string | string[] | undef
 export interface ModerationFilters {
   status: ReportStatus;
   targetType?: ReportTargetType;
+  moderatorInitiated?: boolean;
 }
 
 const DEFAULT_STATUS: ReportStatus = 'open';
@@ -37,12 +38,15 @@ export function parseModerationSearchParams(raw: RawModerationSearchParams): Mod
   const rawTargetType = first(raw.targetType);
   const targetType = rawTargetType && isReportTargetType(rawTargetType) ? rawTargetType : undefined;
 
+  const moderatorInitiated = first(raw.moderatorInitiated) === 'true';
+
   return {
     status,
     ...(targetType ? { targetType } : {}),
+    ...(moderatorInitiated ? { moderatorInitiated } : {}),
   };
 }
 
 export function moderationFiltersKey(filters: ModerationFilters): string {
-  return `${filters.status}|${filters.targetType ?? ''}`;
+  return `${filters.status}|${filters.targetType ?? ''}|${filters.moderatorInitiated ? '1' : '0'}`;
 }

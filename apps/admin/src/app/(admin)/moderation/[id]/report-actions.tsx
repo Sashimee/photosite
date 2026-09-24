@@ -9,9 +9,9 @@ import { FormNotice } from '@/components/ui/form-message';
 import { api } from '@/lib/api';
 
 import { reportTargetLabel } from '../report-target-label';
+import { TakedownDialog } from '../takedown-dialog';
 import { ResolveDialog } from './resolve-dialog';
 import { RestoreDialog } from './restore-dialog';
-import { TakedownDialog } from './takedown-dialog';
 
 type AdminReport = components['schemas']['AdminReport'];
 
@@ -83,7 +83,7 @@ export function ReportActions({ report: initialReport }: { report: AdminReport }
         ) : null}
         {canTakedown ? (
           <TakedownDialog
-            reportId={report.id}
+            target={{ kind: 'report', reportId: report.id }}
             targetLabel={targetLabel}
             onDecided={() => void handleDecided()}
             onConflict={() => void handleResolveConflict()}

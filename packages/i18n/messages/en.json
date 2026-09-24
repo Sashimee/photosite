@@ -349,6 +349,8 @@
       "list": {
         "title": "Moderation queue",
         "caption": "Reports awaiting moderation, oldest first",
+        "directTakedownLink": "Take down without a report",
+        "moderatorInitiated": "Taken down directly by a moderator (no report filed)",
         "columns": {
           "reason": "Reason",
           "targetType": "Target type",
@@ -371,6 +373,7 @@
           "statusLabel": "Status",
           "targetTypeLabel": "Target type",
           "allTargetTypes": "All types",
+          "moderatorInitiatedLabel": "Only content a moderator took down directly, with no report",
           "submit": "Filter"
         }
       },
@@ -386,7 +389,11 @@
           "resolution": "Statement of reasons"
         },
         "reason": {
-          "title": "Reason given by the reporter"
+          "title": "Reason given by the reporter",
+          "moderatorInitiated": {
+            "title": "Found by a moderator",
+            "description": "No public report was filed. A moderator identified this content directly."
+          }
         },
         "target": {
           "title": "Reported content",
@@ -464,6 +471,22 @@
             "consequences": "This restores {targetLabel} and notifies its owner. It does not reopen the report.",
             "confirm": "Restore content"
           }
+        }
+      },
+      "directTakedown": {
+        "title": "Take down without a report",
+        "description": "Remove a photographer profile or job offer a moderator found directly, with no public report filed. Only a published profile or an open job offer can be looked up here; something already taken down is found from the moderation queue instead.",
+        "form": {
+          "formLabel": "Look up content to take down",
+          "targetTypeLabel": "Content type",
+          "slugLabel": "Slug",
+          "slugPlaceholder": "jane-doe-photography",
+          "slugHint": "The URL slug from the public page, for example photoo.lu/en/photographers/jane-doe-photography.",
+          "submit": "Look up"
+        },
+        "notFound": {
+          "title": "Nothing found",
+          "description": "No published content matches that slug. If it was already taken down, find it in the moderation queue with the resolved status and the moderator-initiated filter."
         }
       }
     }

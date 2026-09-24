@@ -14,6 +14,7 @@ import {
 import { api } from '@/lib/api';
 
 import type { ModerationFilters } from './moderation-search-params';
+import { isModeratorInitiatedReport } from './moderator-initiated';
 import { reportAgeDays } from './report-age';
 
 type AdminReport = components['schemas']['AdminReport'];
@@ -22,7 +23,7 @@ function isKnownTargetType(value: string): value is (typeof REPORT_TARGET_TYPES)
   return (REPORT_TARGET_TYPES as readonly string[]).includes(value);
 }
 
-export function ModerationTable({ status, targetType }: ModerationFilters) {
+export function ModerationTable({ status, targetType, moderatorInitiated }: ModerationFilters) {
   const t = useTranslations('admin.moderation.list');
   const tStatuses = useTranslations('admin.moderation.statuses');
   const tTargetTypes = useTranslations('admin.moderation.targetTypes');
@@ -37,7 +38,7 @@ export function ModerationTable({ status, targetType }: ModerationFilters) {
           href={`/moderation/${row.id}`}
           className="line-clamp-2 max-w-sm underline-offset-4 hover:underline"
         >
-          {row.reason}
+          {isModeratorInitiatedReport(row.reason) ? t('moderatorInitiated') : row.reason}
         </Link>
       ),
     },
@@ -67,8 +68,15 @@ export function ModerationTable({ status, targetType }: ModerationFilters) {
     },
   ];
 
+  // `moderatorInitiated` has no server-side query param - the queue's list
+  // endpoint filters on `status`/`targetType`/`targetId` only - so this
+  // narrows each already-fetched page instead. A page can render fewer rows
+  // than usual, or none, when few of its reports are moderator-initiated;
+  // that only trades a click on "Next" for a second server round trip, which
+  // is acceptable for a filter aimed at an occasional review, not a queue a
+  // moderator works through continuously.
   async function fetchPage(cursor: string | undefined): Promise<DataTableFetchResult<AdminReport>> {
-    return api.GET('/v1/admin/reports', {
+    const result = await api.GET('/v1/admin/reports', {
       params: {
         query: {
           status,
@@ -77,6 +85,16 @@ export function ModerationTable({ status, targetType }: ModerationFilters) {
         },
       },
     });
+    if (!moderatorInitiated || !result.data) {
+      return result;
+    }
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        items: result.data.items.filter((item) => isModeratorInitiatedReport(item.reason)),
+      },
+    };
   }
 
   return (

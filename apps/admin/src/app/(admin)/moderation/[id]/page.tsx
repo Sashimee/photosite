@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { serverApi } from '@/lib/server-api';
 
+import { isModeratorInitiatedReport } from '../moderator-initiated';
 import { DecisionHistory } from './decision-history';
 import { ReportActions } from './report-actions';
 import { ReportTargetSummary } from './report-target-summary';
@@ -81,8 +82,19 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
       </dl>
 
       <div className="flex flex-col gap-2">
-        <h2 className="text-lg font-medium text-foreground">{t('reason.title')}</h2>
-        <p className="text-sm whitespace-pre-wrap text-foreground">{report.reason}</p>
+        {isModeratorInitiatedReport(report.reason) ? (
+          <>
+            <h2 className="text-lg font-medium text-foreground">
+              {t('reason.moderatorInitiated.title')}
+            </h2>
+            <p className="text-sm text-foreground">{t('reason.moderatorInitiated.description')}</p>
+          </>
+        ) : (
+          <>
+            <h2 className="text-lg font-medium text-foreground">{t('reason.title')}</h2>
+            <p className="text-sm whitespace-pre-wrap text-foreground">{report.reason}</p>
+          </>
+        )}
       </div>
 
       <div className="flex flex-col gap-2">
