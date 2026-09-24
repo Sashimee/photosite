@@ -178,11 +178,22 @@ async function signedInPage(
   return page;
 }
 
+// `framenavigated` fires for same-document History API calls as well as
+// real reloads. It fires here intermittently with no code of ours anywhere
+// near it: Next's own App Router (client/components/app-router.js's
+// `HistoryUpdater`) calls `history.replaceState()` to the *unchanged*
+// canonical URL as routine bookkeeping whenever its internal router state
+// changes for any reason, including a background Link prefetch settling
+// (`pingVisibleLinks`, for the header's own "Messages" link and this page's
+// "back to messages" link) - confirmed with a raw CDP session, reporting
+// `navigationType: "historyApi"` and no accompanying navigation-type
+// request. A real reload always makes one (a fresh document GET); tracking
+// that instead is what actually proves "no reload happened".
 function trackNavigations(page: Page): string[] {
   const navigations: string[] = [];
-  page.on('framenavigated', (frame) => {
-    if (frame === page.mainFrame()) {
-      navigations.push(frame.url());
+  page.on('request', (request) => {
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) {
+      navigations.push(request.url());
     }
   });
   return navigations;
