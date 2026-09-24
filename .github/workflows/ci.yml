@@ -191,6 +191,10 @@ jobs:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
       NEXT_PUBLIC_MEDIA_BASE_URL: http://127.0.0.1:9000/photoo-public
+      # Matches S3_ENDPOINT below (#322): the presigned PUT/GET URL host, which
+      # differs from the public read path above once a real deployment fronts
+      # MinIO with a reverse proxy.
+      NEXT_PUBLIC_STORAGE_ORIGIN: http://127.0.0.1:9000
       NEXT_PUBLIC_ALLOW_INDEXING: 'false'
       # Local-MinIO workaround only, not a general "run in dev mode" pattern:
       # without it, apps/web/next.config.ts bakes `dangerouslyAllowLocalIP:
@@ -392,6 +396,10 @@ jobs:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
       NEXT_PUBLIC_MEDIA_BASE_URL: http://127.0.0.1:9000/photoo-public
+      # Matches S3_ENDPOINT below (#322): the presigned PUT/GET URL host, which
+      # differs from the public read path above once a real deployment fronts
+      # MinIO with a reverse proxy.
+      NEXT_PUBLIC_STORAGE_ORIGIN: http://127.0.0.1:9000
       NEXT_PUBLIC_ALLOW_INDEXING: 'false'
       ALLOW_LOCAL_IMAGE_HOSTS: 'true'
       DATABASE_URL: postgresql://photoo:photoo_dev_password@127.0.0.1:5432/photoo_test
@@ -573,6 +581,10 @@ jobs:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
       NEXT_PUBLIC_MEDIA_BASE_URL: http://127.0.0.1:9000/photoo-public
+      # Matches S3_ENDPOINT below (#322): the presigned PUT/GET URL host, which
+      # differs from the public read path above once a real deployment fronts
+      # MinIO with a reverse proxy.
+      NEXT_PUBLIC_STORAGE_ORIGIN: http://127.0.0.1:9000
       NEXT_PUBLIC_ALLOW_INDEXING: 'false'
       # Same local-MinIO workaround as browser-smoke - see the comment on
       # that job's copy of this variable before touching it.

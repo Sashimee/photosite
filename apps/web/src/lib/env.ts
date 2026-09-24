@@ -20,6 +20,17 @@ const EnvSchema = z.object({
   // of Next's http://localhost:3000 metadataBase default.
   NEXT_PUBLIC_SITE_URL: z.url(),
   NEXT_PUBLIC_MEDIA_BASE_URL: optional(z.url()),
+  // Origin of apps/api's S3_ENDPOINT - where a presigned PUT/GET URL from
+  // POST /v1/uploads actually points, which is not necessarily
+  // NEXT_PUBLIC_MEDIA_BASE_URL above (that's the public-read origin,
+  // routed through a reverse proxy; this is the presign target apps/api's
+  // StorageService signs against). Needed in the CSP's connect-src so the
+  // browser's direct-to-storage PUT isn't blocked, and in img-src too,
+  // since the chat attachment preview renders an <img> pointed straight at
+  // a presigned download URL rather than a blob copy (#322). Mirrors
+  // apps/admin's NEXT_PUBLIC_STORAGE_ORIGIN. Local stack default:
+  // http://localhost:9000
+  NEXT_PUBLIC_STORAGE_ORIGIN: optional(z.url()),
   NEXT_PUBLIC_SENTRY_DSN: optional(z.url()),
   SENTRY_REQUIRED: optional(z.enum(['true', 'false'])),
   NEXT_PUBLIC_ALLOW_INDEXING: z
@@ -48,6 +59,7 @@ function loadEnv() {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
     NEXT_PUBLIC_MEDIA_BASE_URL: process.env.NEXT_PUBLIC_MEDIA_BASE_URL,
+    NEXT_PUBLIC_STORAGE_ORIGIN: process.env.NEXT_PUBLIC_STORAGE_ORIGIN,
     NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
     NEXT_PUBLIC_ALLOW_INDEXING: process.env.NEXT_PUBLIC_ALLOW_INDEXING,
     SENTRY_REQUIRED: process.env.SENTRY_REQUIRED,

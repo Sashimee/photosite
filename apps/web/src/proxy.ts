@@ -8,11 +8,16 @@ const connectOrigins = [
   originOf(env.NEXT_PUBLIC_API_URL),
   websocketOrigin(originOf(env.NEXT_PUBLIC_API_URL)),
   originOf(env.NEXT_PUBLIC_SENTRY_DSN),
+  originOf(env.NEXT_PUBLIC_STORAGE_ORIGIN),
 ].filter((origin): origin is string => origin !== null);
 
-const imgOrigins = [originOf(env.NEXT_PUBLIC_MEDIA_BASE_URL)].filter(
-  (origin): origin is string => origin !== null,
-);
+// The chat attachment preview (AttachmentChip) renders an <img> pointed
+// straight at a presigned download URL rather than a blob copy, so the
+// presign origin needs img-src too, not just connect-src (#322).
+const imgOrigins = [
+  originOf(env.NEXT_PUBLIC_MEDIA_BASE_URL),
+  originOf(env.NEXT_PUBLIC_STORAGE_ORIGIN),
+].filter((origin): origin is string => origin !== null);
 
 // apps/api/src/common/constants.ts's REVISION_HEADER sets the same name.
 const REVISION_HEADER = 'x-photoo-revision';
