@@ -247,4 +247,63 @@ describe('renderNotifyEmail', () => {
       ),
     ).toThrow(/jobOfferId/);
   });
+
+  it('renders report_decision with the resolution text and an escaped reason in HTML', () => {
+    const message = renderNotifyEmail(
+      'report_decision',
+      {
+        reason: 'Confirmed <script>alert(1)</script>, image removed',
+        moderationOutcome: 'takedown',
+      },
+      'en',
+      'reporter@example.com',
+      'https://photoo.lu',
+    );
+    expect(message.subject).toContain('removed');
+    expect(message.text).toContain('Confirmed <script>alert(1)</script>, image removed');
+    expect(message.html).toContain('&lt;script&gt;');
+    expect(message.html).not.toContain('<script>');
+    expect(message.text).toContain('https://photoo.lu/en/account/notifications');
+  });
+
+  it('renders every moderation outcome for report_decision and moderation_action without throwing', () => {
+    const outcomes = ['resolved', 'dismissed', 'takedown', 'restored'] as const;
+    for (const type of ['report_decision', 'moderation_action'] as const) {
+      for (const moderationOutcome of outcomes) {
+        expect(() =>
+          renderNotifyEmail(
+            type,
+            { reason: 'Reviewed and decided', moderationOutcome },
+            'en',
+            'user@example.com',
+            'https://photoo.lu',
+          ),
+        ).not.toThrow();
+      }
+    }
+  });
+
+  it('throws when a moderation notice payload has no moderationOutcome', () => {
+    expect(() =>
+      renderNotifyEmail(
+        'report_decision',
+        { reason: 'Reviewed and decided' },
+        'en',
+        'user@example.com',
+        'https://photoo.lu',
+      ),
+    ).toThrow(/moderationOutcome/);
+  });
+
+  it('throws when a moderation notice payload has no reason', () => {
+    expect(() =>
+      renderNotifyEmail(
+        'moderation_action',
+        { moderationOutcome: 'restored' },
+        'en',
+        'user@example.com',
+        'https://photoo.lu',
+      ),
+    ).toThrow(/reason/);
+  });
 });

@@ -416,6 +416,42 @@
       "jobApplicationStatusChanged": {
         "subject": "Your application status has changed",
         "body": "{counterpartName} updated your application for {jobOfferTitle}. View it here: {url}"
+      },
+      "reportDecision": {
+        "resolved": {
+          "subject": "Your report was reviewed",
+          "body": "We reviewed the report you filed and took no further action. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        },
+        "dismissed": {
+          "subject": "Your report was reviewed",
+          "body": "We reviewed the report you filed and dismissed it. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        },
+        "takedown": {
+          "subject": "Content you reported was removed",
+          "body": "We reviewed the report you filed and removed the content. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        },
+        "restored": {
+          "subject": "A removal you reported on was reversed",
+          "body": "Content you reported, which had been removed, was restored after further review. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        }
+      },
+      "moderationAction": {
+        "resolved": {
+          "subject": "A report about your content was reviewed",
+          "body": "A report was filed about your content. We reviewed it and took no further action. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        },
+        "dismissed": {
+          "subject": "A report about your content was dismissed",
+          "body": "A report was filed about your content and dismissed. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        },
+        "takedown": {
+          "subject": "Your content was removed",
+          "body": "Your content was removed after a report. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        },
+        "restored": {
+          "subject": "Your content was restored",
+          "body": "Content of yours that had been removed was restored after further review. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        }
       }
     }
   },
@@ -600,6 +636,30 @@
       "jobApplicationStatusChanged": {
         "title": "Application status changed",
         "body": "Your application for {jobOfferTitle} was updated"
+      },
+      "reportDecision": {
+        "resolved": { "title": "Your report was reviewed", "body": "See the outcome by email" },
+        "dismissed": { "title": "Your report was reviewed", "body": "See the outcome by email" },
+        "takedown": {
+          "title": "Content you reported was removed",
+          "body": "See the details by email"
+        },
+        "restored": {
+          "title": "A removal you reported on was reversed",
+          "body": "See the details by email"
+        }
+      },
+      "moderationAction": {
+        "resolved": {
+          "title": "A report about your content was reviewed",
+          "body": "See the outcome by email"
+        },
+        "dismissed": {
+          "title": "A report about your content was dismissed",
+          "body": "See the outcome by email"
+        },
+        "takedown": { "title": "Your content was removed", "body": "See the details by email" },
+        "restored": { "title": "Your content was restored", "body": "See the details by email" }
       }
     }
   },

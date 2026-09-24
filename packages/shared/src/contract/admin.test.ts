@@ -14,6 +14,7 @@ import {
   RefundBookingRequestSchema,
   RejectVerificationCaseRequestSchema,
   ResolveReportRequestSchema,
+  RestoreReportRequestSchema,
   SetUserRolesRequestSchema,
   SuspendUserRequestSchema,
   TakedownReportRequestSchema,
@@ -72,6 +73,16 @@ describe('AdminReportSchema and ResolveReportRequestSchema', () => {
     status: 'open',
     adminId: null,
     resolution: null,
+    createdAt: '2026-08-01T10:00:00.000Z',
+    resolvedAt: null,
+    target: {
+      targetType: 'portfolio_image',
+      url: 'https://cdn.photoo.lu/portfolio/abc123.jpg',
+      width: 1600,
+      height: 900,
+      status: 'approved',
+      deletedAt: null,
+    },
   };
 
   it('accepts a well-formed report', () => {
@@ -82,10 +93,62 @@ describe('AdminReportSchema and ResolveReportRequestSchema', () => {
     expect(AdminReportSchema.safeParse({ ...validReport, reporterId: null }).success).toBe(true);
   });
 
+  it('accepts a null target when the reported row is gone', () => {
+    expect(AdminReportSchema.safeParse({ ...validReport, target: null }).success).toBe(true);
+  });
+
   it('rejects an unknown status', () => {
     expect(AdminReportSchema.safeParse({ ...validReport, status: 'escalated' }).success).toBe(
       false,
     );
+  });
+
+  it('accepts every target variant', () => {
+    const variants = [
+      {
+        targetType: 'photographer_profile',
+        displayName: 'Jane Doe',
+        slug: 'jane-doe',
+        isPublished: true,
+        deletedAt: null,
+      },
+      {
+        targetType: 'portfolio_image',
+        url: null,
+        width: null,
+        height: null,
+        status: 'processing',
+        deletedAt: null,
+      },
+      {
+        targetType: 'request',
+        title: 'Wedding photographer needed',
+        description: 'Looking for a photographer for our wedding',
+        deletedAt: null,
+      },
+      {
+        targetType: 'job_offer',
+        title: 'Studio assistant',
+        description: 'Part-time studio assistant',
+        companyName: 'Studio Doe',
+        deletedAt: '2026-08-02T10:00:00.000Z',
+      },
+      {
+        targetType: 'job_application',
+        message: '',
+        jobOfferTitle: 'Studio assistant',
+        deletedAt: null,
+      },
+    ];
+    for (const target of variants) {
+      expect(AdminReportSchema.safeParse({ ...validReport, target }).success).toBe(true);
+    }
+  });
+
+  it('rejects a target with an unknown targetType', () => {
+    expect(
+      AdminReportSchema.safeParse({ ...validReport, target: { targetType: 'user' } }).success,
+    ).toBe(false);
   });
 
   it('resolve request requires a resolution', () => {
@@ -103,6 +166,13 @@ describe('AdminReportSchema and ResolveReportRequestSchema', () => {
   it('takedown request requires a resolution', () => {
     expect(TakedownReportRequestSchema.safeParse({ resolution: '' }).success).toBe(false);
     expect(TakedownReportRequestSchema.safeParse({ resolution: 'Image removed' }).success).toBe(
+      true,
+    );
+  });
+
+  it('restore request requires a resolution', () => {
+    expect(RestoreReportRequestSchema.safeParse({ resolution: '' }).success).toBe(false);
+    expect(RestoreReportRequestSchema.safeParse({ resolution: 'Wrongly removed' }).success).toBe(
       true,
     );
   });
