@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 import { seedConsentCookie } from './fixtures/consent.js';
 import { waitForLinkInEmail } from './support/mailpit.js';
 import { signInAsUser } from './support/sign-in.js';
+import { expect, test } from './support/test.js';
 
 const LOCALE = 'en';
 
