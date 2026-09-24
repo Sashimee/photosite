@@ -63,12 +63,30 @@ describe('scopedRedisUrl integration', () => {
     const scope = randomScope();
 
     const urlA = await scopedRedisUrl(testEnv.REDIS_URL, scope, worktreeA);
-    const urlB = await scopedRedisUrl(testEnv.REDIS_URL, scope, worktreeB);
     const indexA = new URL(urlA).pathname.slice(1);
+    registryKeys.push(`photoo:test-slot:${indexA}`);
+
+    const urlB = await scopedRedisUrl(testEnv.REDIS_URL, scope, worktreeB);
     const indexB = new URL(urlB).pathname.slice(1);
-    registryKeys.push(`photoo:test-slot:${indexA}`, `photoo:test-slot:${indexB}`);
+    registryKeys.push(`photoo:test-slot:${indexB}`);
 
     expect(indexA).not.toBe(indexB);
+  });
+
+  it('gives concurrent claims from distinct owners distinct database indices', async () => {
+    const owners = Array.from({ length: 4 }, () => ({
+      worktree: tempWorktree(),
+      scope: randomScope(),
+    }));
+    worktrees.push(...owners.map((owner) => owner.worktree));
+
+    const urls = await Promise.all(
+      owners.map((owner) => scopedRedisUrl(testEnv.REDIS_URL, owner.scope, owner.worktree)),
+    );
+    const indices = urls.map((url) => new URL(url).pathname.slice(1));
+    registryKeys.push(...indices.map((index) => `photoo:test-slot:${index}`));
+
+    expect(new Set(indices).size).toBe(indices.length);
   });
 
   it('reuses the same database index on a repeat call for the same worktree/scope pair', async () => {
