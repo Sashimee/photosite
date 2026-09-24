@@ -7,6 +7,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
     }
   },
   "scripts": {
@@ -23,6 +27,7 @@
   "devDependencies": {
     "@photoo/config": "workspace:*",
     "@types/node": "26.6.2",
+    "@types/pg": "8.23.1",
     "@vitest/coverage-v8": "5.0.1",
     "eslint": "9.39.5",
     "prisma": "7.10.0",
