@@ -318,6 +318,154 @@
           }
         }
       }
+    },
+    "moderation": {
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "forbidden": "You don't have permission to do this.",
+        "notFound": "This couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "conflict": "That couldn't be completed because something changed. Please retry."
+      },
+      "statuses": {
+        "open": "Open",
+        "resolved": "Resolved",
+        "dismissed": "Dismissed"
+      },
+      "targetTypes": {
+        "photographer_profile": "Photographer profile",
+        "portfolio_image": "Portfolio image",
+        "request": "Request",
+        "job_offer": "Job offer",
+        "job_application": "Job application"
+      },
+      "portfolioImageStatuses": {
+        "processing": "Processing",
+        "pending_review": "Pending review",
+        "approved": "Approved",
+        "flagged": "Flagged",
+        "rejected": "Rejected"
+      },
+      "list": {
+        "title": "Moderation queue",
+        "caption": "Reports awaiting moderation, oldest first",
+        "columns": {
+          "reason": "Reason",
+          "targetType": "Target type",
+          "age": "Age",
+          "reporter": "Reporter",
+          "status": "Status"
+        },
+        "reporterPresent": "Reporter present",
+        "reporterAnonymous": "Anonymous",
+        "age": {
+          "today": "Today",
+          "days": "{days, plural, one {# day ago} other {# days ago}}"
+        },
+        "empty": {
+          "title": "No reports match this filter.",
+          "hint": "The queue defaults to open reports, oldest first."
+        },
+        "filters": {
+          "formLabel": "Moderation filters",
+          "statusLabel": "Status",
+          "targetTypeLabel": "Target type",
+          "allTargetTypes": "All types",
+          "submit": "Filter"
+        }
+      },
+      "detail": {
+        "title": "Report",
+        "fields": {
+          "status": "Status",
+          "createdAt": "Reported",
+          "resolvedAt": "Decided",
+          "reporter": "Reporter",
+          "reporterPresent": "Present",
+          "reporterAnonymous": "Anonymous",
+          "resolution": "Statement of reasons"
+        },
+        "reason": {
+          "title": "Reason given by the reporter"
+        },
+        "target": {
+          "title": "Reported content",
+          "removed": {
+            "title": "This content is gone",
+            "description": "It no longer exists. It may have been deleted or removed as part of an account closure."
+          },
+          "alreadyTakenDown": "Taken down on {date}.",
+          "photographerProfile": {
+            "displayName": "Display name",
+            "slug": "Profile slug",
+            "isPublished": "Published",
+            "published": "Yes",
+            "unpublished": "No"
+          },
+          "portfolioImage": {
+            "alt": "Reported portfolio image",
+            "noPreview": "This image has no preview available.",
+            "dimensions": "Dimensions",
+            "dimensionsValue": "{width} × {height}px",
+            "dimensionsUnknown": "Unknown",
+            "status": "Status",
+            "label": "this portfolio image"
+          },
+          "jobOffer": {
+            "companyName": "Posted by {companyName}"
+          },
+          "jobApplication": {
+            "jobOfferTitle": "Application to {jobOfferTitle}",
+            "emptyMessage": "This applicant's message was removed as part of account deletion.",
+            "label": "the application to “{jobOfferTitle}”"
+          }
+        },
+        "history": {
+          "title": "Decision history",
+          "caption": "Audit log entries for this report",
+          "empty": "No audit log entries for this report.",
+          "systemActor": "System",
+          "columns": {
+            "occurredAt": "When",
+            "action": "Action",
+            "actor": "Actor"
+          }
+        },
+        "actions": {
+          "noticeLabel": "Statement of reasons (sent to the reporter and the content owner)",
+          "noticeHint": "This explanation is sent to both the person who reported this and the content's owner. Write it for them, not for another moderator.",
+          "noActions": "This report is closed and its target isn't taken down. There is nothing left to do here.",
+          "conflict": {
+            "alreadyResolved": "This report was already resolved by {adminId}.",
+            "alreadyResolvedUnknown": "This report was already resolved by another admin.",
+            "notTakenDown": "This target is no longer taken down; there is nothing to restore."
+          },
+          "resolve": {
+            "trigger": "Resolve",
+            "title": "Resolve this report?",
+            "consequences": "This closes the report without removing anything. Your explanation is sent to the reporter and the content's owner.",
+            "confirm": "Resolve report"
+          },
+          "dismiss": {
+            "trigger": "Dismiss",
+            "title": "Dismiss this report?",
+            "consequences": "This closes the report as without merit. Your explanation is sent to the reporter and the content's owner.",
+            "confirm": "Dismiss report"
+          },
+          "takedown": {
+            "trigger": "Take down",
+            "title": "Take down this content?",
+            "consequences": "This removes {targetLabel} and notifies its owner that it was taken down. You can reverse this later from this page.",
+            "confirm": "Take down content"
+          },
+          "restore": {
+            "trigger": "Restore",
+            "title": "Restore this content?",
+            "consequences": "This restores {targetLabel} and notifies its owner. It does not reopen the report.",
+            "confirm": "Restore content"
+          }
+        }
+      }
     }
   },
   "common": {
