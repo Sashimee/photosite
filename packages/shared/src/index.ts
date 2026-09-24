@@ -34,6 +34,10 @@ export {
   NOTIFICATION_TYPES,
   LEDGER_ENTRY_TYPES,
   DISPUTE_STATUSES,
+  JOB_OFFER_STATUSES,
+  JOB_APPLICATION_STATUSES,
+  LISTING_KINDS,
+  LISTING_PLANS,
   type UserRole,
   type UserStatus,
   type PhotographerCategory,
@@ -61,6 +65,10 @@ export {
   type NotificationType,
   type LedgerEntryType,
   type DisputeStatus,
+  type JobOfferStatus,
+  type JobApplicationStatus,
+  type ListingKind,
+  type ListingPlan,
   FEATURE_FLAG_KEYS,
   type FeatureFlagKey,
 } from './enums.js';
@@ -82,6 +90,7 @@ export {
   CountryCodeSchema,
   CurrencyCodeSchema,
   CursorPaginationQuerySchema,
+  EMAIL_NOT_VERIFIED_ERROR_CODE,
   IdSchema,
   IsoDateTimeSchema,
   LanguageCodeSchema,
@@ -92,6 +101,7 @@ export {
   STANDARD_ERROR_STATUS_CODES,
   errorResponses,
   paginatedResponseSchema,
+  requiresVerifiedEmail,
   type StandardErrorStatusCode,
 } from './contract/common.js';
 
@@ -112,6 +122,8 @@ export {
   GdprSweepJobSchema,
   IMAGE_PROCESS_QUEUE_NAME,
   ImageProcessJobSchema,
+  LISTING_EXPIRY_QUEUE_NAME,
+  ListingExpiryJobSchema,
   NOTIFICATIONS_CLEANUP_QUEUE_NAME,
   NotificationsCleanupJobSchema,
   NOTIFY_JOB_ATTEMPTS,
@@ -137,6 +149,7 @@ export {
   type GdprExportJob,
   type GdprSweepJob,
   type ImageProcessJob,
+  type ListingExpiryJob,
   type NotificationsCleanupJob,
   type NotifyJob,
   type NotifyJobOptions,
@@ -158,6 +171,8 @@ export {
   OAUTH_PROVIDERS,
   RequestPasswordResetRequestSchema,
   RequestPasswordResetResponseSchema,
+  ResendVerificationEmailRequestSchema,
+  ResendVerificationEmailResponseSchema,
   SIGNUP_ROLES,
   SessionQueryResponseSchema,
   SessionResponseSchema,
@@ -195,6 +210,33 @@ export {
   ReorderPortfolioRequestSchema,
   UpdatePhotographerProfileRequestSchema,
 } from './contract/profiles.js';
+
+export {
+  CreateProfessionalProfileRequestSchema,
+  OwnProfessionalProfileSchema,
+  PublicProfessionalCompanySchema,
+  UpdateProfessionalProfileRequestSchema,
+} from './contract/professionals.js';
+
+export {
+  CompensationSchema,
+  CreateJobApplicationRequestSchema,
+  CreateJobOfferRequestSchema,
+  CreateListingRequestSchema,
+  JobApplicationOfferSummarySchema,
+  JobApplicationPhotographerSchema,
+  JobApplicationSchema,
+  JobApplicationWithOfferSchema,
+  JobApplicationWithPhotographerSchema,
+  JobOfferCategorySchema,
+  JobOfferSchema,
+  JobOffersQuerySchema,
+  PortfolioLinkSchema,
+  PublicJobOfferSchema,
+  PublicJobOfferSummarySchema,
+  UpdateJobApplicationStatusRequestSchema,
+  UpdateJobOfferRequestSchema,
+} from './contract/job-board.js';
 
 export {
   CreateProductRequestSchema,

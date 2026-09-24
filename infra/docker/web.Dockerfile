@@ -39,7 +39,11 @@ RUN pnpm exec turbo run build --filter=@photoo/web...
 # `output: 'standalone'` (apps/web/next.config.ts) traces the minimal
 # node_modules the server needs alongside server.js.
 FROM base AS runtime
+# Read by apps/web/src/proxy.ts at request time, same as api.Dockerfile -
+# see that file's REVISION ARG comment.
+ARG REVISION
 ENV NODE_ENV=production
+ENV PHOTOO_REVISION=$REVISION
 RUN addgroup -S app -g 1001 && adduser -S app -G app -u 1001 -h /app
 # No apps/web/public/ yet; add a COPY for it here once one exists.
 COPY --from=build --chown=app:app /app/apps/web/.next/standalone ./

@@ -376,6 +376,7 @@
       "unknownCounterpart": "Someone",
       "unknownClient": "A client",
       "directQuoteLabel": "your booking",
+      "unknownJobOffer": "the job offer",
       "quoteReceived": {
         "subject": "New quote from {counterpartName}",
         "body": "{counterpartName} sent you a quote for {requestTitle}, totalling {total}. View it here: {url}"
@@ -407,6 +408,14 @@
       "verificationRejected": {
         "subject": "Your verification was rejected",
         "body": "Your photographer verification was rejected. Sign in to see the reason and next steps: {url}"
+      },
+      "jobApplicationReceived": {
+        "subject": "New application from {counterpartName}",
+        "body": "{counterpartName} applied to {jobOfferTitle}. View it here: {url}"
+      },
+      "jobApplicationStatusChanged": {
+        "subject": "Your application status has changed",
+        "body": "{counterpartName} updated your application for {jobOfferTitle}. View it here: {url}"
       }
     }
   },
@@ -583,6 +592,14 @@
       "verificationRejected": {
         "title": "Verification rejected",
         "body": "Your photographer verification was rejected"
+      },
+      "jobApplicationReceived": {
+        "title": "New application",
+        "body": "{counterpartName} applied to {jobOfferTitle}"
+      },
+      "jobApplicationStatusChanged": {
+        "title": "Application status changed",
+        "body": "Your application for {jobOfferTitle} was updated"
       }
     }
   },
@@ -597,7 +614,9 @@
       "messages": "Messages",
       "openMenu": "Open menu",
       "closeMenu": "Close menu",
-      "menuTitle": "Navigation"
+      "menuTitle": "Navigation",
+      "postJob": "Post a job",
+      "jobBoard": "Job board"
     },
     "localeSwitcher": {
       "label": "Change language"
@@ -1001,6 +1020,9 @@
         "validUntilLabel": "Valid until",
         "lineItemsHeading": "What's included",
         "totalLabel": "Total",
+        "feeLabel": "Platform fee",
+        "payoutLabel": "Your payout",
+        "payoutNotice": "Paid to your Stripe account after the booking is released. Currency conversion by Stripe or your bank isn't included.",
         "messageHeading": "Message from the photographer",
         "acceptCta": "Accept quote",
         "declineCta": "Decline quote",
@@ -1014,8 +1036,15 @@
         "declineConfirmCta": "Yes, decline quote",
         "declinePending": "Declining…",
         "declineDismissCta": "Keep quote",
+        "withdrawCta": "Withdraw quote",
+        "withdrawConfirmTitle": "Withdraw this quote?",
+        "withdrawConfirmDescription": "The client will no longer be able to accept it, even if they're already looking at it. This can't be undone.",
+        "withdrawConfirmCta": "Yes, withdraw quote",
+        "withdrawPending": "Withdrawing…",
+        "withdrawDismissCta": "Keep quote",
         "acceptedNotice": "Quote accepted. Booking and payment are coming soon — we'll be in touch with next steps.",
         "declinedNotice": "Quote declined.",
+        "withdrawnNotice": "This quote was withdrawn by the photographer.",
         "notFound": {
           "title": "Quote not found",
           "description": "This quote doesn't exist, or it isn't yours.",
@@ -1105,7 +1134,9 @@
         "overview": "Overview",
         "profile": "Profile",
         "portfolio": "Portfolio",
-        "products": "Packages"
+        "products": "Packages",
+        "requests": "Requests",
+        "quotes": "Quotes"
       },
       "needsRole": {
         "title": "Photographer dashboard",
@@ -1328,6 +1359,323 @@
           "notFound": "This package could not be found.",
           "tooManyRequests": "You're doing that too fast. Slow down and try again.",
           "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "requests": {
+        "metaTitle": "Incoming requests",
+        "title": "Incoming requests",
+        "backToOverview": "Back to overview",
+        "intro": "Requests from clients matching your categories and location.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Incoming requests are matched to your photographer profile, so set that up first.",
+        "needsProfileCta": "Create your profile",
+        "needsPublishedTitle": "Your profile isn't published yet",
+        "needsPublishedDescription": "Incoming requests only show once your profile is published. Check the overview for what's still missing.",
+        "needsPublishedCta": "Back to overview",
+        "empty": "No requests are matching your categories and location right now.",
+        "alreadyQuotedLabel": "Quote sent",
+        "alreadyQuotedNotice": "You've already sent a quote for this request.",
+        "expiredNotice": "This request is no longer accepting quotes.",
+        "loadMore": "Next page",
+        "sendQuote": {
+          "triggerCta": "Send a quote",
+          "formTitle": "Send a quote",
+          "formDescription": "Add each item you're offering and its price. You'll review the total before it sends.",
+          "lineItemsHeading": "What's included",
+          "lineItemLabelLabel": "Item",
+          "lineItemQtyLabel": "Quantity",
+          "lineItemPriceLabel": "Unit price ({currency})",
+          "removeLineItemCta": "Remove item",
+          "addLineItemCta": "Add item",
+          "validUntilLabel": "Valid until",
+          "messageLabel": "Message (optional)",
+          "cancelCta": "Cancel",
+          "reviewCta": "Review quote",
+          "invalidForm": "Check the highlighted fields and try again.",
+          "reviewTitle": "Review before you send",
+          "reviewDescription": "This is what the client will pay. The platform fee is calculated when the quote is sent, and you'll see what you'll receive on the quote's page.",
+          "totalLabel": "Total",
+          "feeNotice": "A platform fee is deducted from your payout at release; it isn't added on top of this total.",
+          "backCta": "Back",
+          "confirmSendCta": "Send quote",
+          "sending": "Sending…",
+          "errors": {
+            "generic": "Something went wrong sending your quote. Try again.",
+            "conflict": "This request is no longer accepting quotes.",
+            "invalid": "This quote can't be sent as entered. Reload the request and try again.",
+            "tooManyRequests": "You're sending quotes too fast. Slow down and try again.",
+            "tooManyRequestsWithRetry": "You're sending quotes too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+          }
+        }
+      },
+      "quotes": {
+        "metaTitle": "Your quotes",
+        "title": "Your quotes",
+        "backToOverview": "Back to overview",
+        "intro": "Quotes you've sent to clients.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Quotes are sent from your photographer profile, so set that up first.",
+        "needsProfileCta": "Create your profile",
+        "needsPublishedTitle": "Your profile isn't published yet",
+        "needsPublishedDescription": "Sending quotes needs a published profile. Check the overview for what's still missing.",
+        "needsPublishedCta": "Back to overview",
+        "empty": "You haven't sent any quotes yet.",
+        "payoutLabel": "Your payout",
+        "validUntilLabel": "Valid until",
+        "loadMore": "Next page"
+      }
+    },
+    "emailVerification": {
+      "message": "Please verify your email address to continue.",
+      "resendCta": "Resend verification email",
+      "sending": "Sending…",
+      "sent": "Verification email sent. Check your inbox."
+    },
+    "professional": {
+      "metaTitle": "Professional profile",
+      "backToAccount": "Back to account",
+      "createTitle": "Create your professional profile",
+      "editTitle": "Edit your professional profile",
+      "createIntro": "Set up your company profile before posting a job offer for photographers.",
+      "companyNameLabel": "Company name",
+      "websiteLabel": "Website",
+      "vatNumberLabel": "VAT number",
+      "logoHeading": "Logo",
+      "logoHint": "Shown on your job offers and public company profile.",
+      "logoEmpty": "No logo yet",
+      "logoWillBeRemoved": "Logo will be removed",
+      "logoAlt": "{companyName} logo",
+      "logoUploadCta": "Upload logo",
+      "logoReplaceCta": "Replace logo",
+      "logoRemoveCta": "Remove logo",
+      "logoReady": "New logo ready. Save to apply it.",
+      "uploading": "Uploading… {percent}%",
+      "scanning": "Scanning for viruses…",
+      "unsupportedType": "Only JPEG, PNG and WEBP images can be uploaded.",
+      "tooLarge": "This file is too large.",
+      "uploadErrors": {
+        "infected": "This file failed a virus scan and wasn't uploaded.",
+        "scanFailed": "The scan couldn't complete. Try again.",
+        "scanTimeout": "The scan is taking longer than expected. Try again shortly."
+      },
+      "createCta": "Create profile",
+      "saveCta": "Save changes",
+      "saving": "Saving…",
+      "created": "Profile created.",
+      "saved": "Saved.",
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "invalid": "Check the highlighted fields and try again.",
+        "notFound": "Your professional profile could not be found.",
+        "forbidden": "You don't have access to this profile.",
+        "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}.",
+        "alreadyExists": "You already have a professional profile. Reload the page to edit it.",
+        "logoConflict": "This logo is already used by another profile."
+      }
+    },
+    "jobOffers": {
+      "metaTitle": "Your job offers",
+      "backToAccount": "Back to account",
+      "title": "Job offers",
+      "intro": "Manage the job offers you've posted for photographers.",
+      "newCta": "Post a job offer",
+      "needsProfileTitle": "Set up your professional profile first",
+      "needsProfileDescription": "You need a professional profile before you can post a job offer.",
+      "needsProfileCta": "Create your professional profile",
+      "empty": "No job offers yet. Post your first one to start receiving applications.",
+      "loadMore": "Load more",
+      "editCta": "Edit",
+      "applicationsCta": "Applications",
+      "remoteLabel": "Remote",
+      "compensationRange": "{min} – {max}",
+      "status": {
+        "draft": "Draft",
+        "published": "Published",
+        "closed": "Closed",
+        "expired": "Expired"
+      },
+      "publishCta": "Publish",
+      "publishConfirmTitle": "Publish this job offer?",
+      "publishConfirmDescription": "This makes the offer visible on the public job board for 60 days from today. Re-publishing a closed or expired offer starts a new 60-day listing rather than extending the old one.",
+      "publishConfirmCta": "Yes, publish",
+      "publishPending": "Publishing…",
+      "publishDismissCta": "Cancel",
+      "closeCta": "Close",
+      "closeConfirmTitle": "Close this job offer?",
+      "closeConfirmDescription": "It will no longer be visible on the public job board. Applications you've already received stay in your inbox.",
+      "closeConfirmCta": "Yes, close",
+      "closePending": "Closing…",
+      "closeDismissCta": "Cancel",
+      "deleteCta": "Delete",
+      "deleteConfirmTitle": "Delete this job offer?",
+      "deleteConfirmDescription": "This can't be undone. Any applications received for this offer are removed with it.",
+      "deleteConfirmCta": "Yes, delete",
+      "deletePending": "Deleting…",
+      "deleteDismissCta": "Cancel",
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "invalid": "Check the highlighted fields and try again.",
+        "notFound": "This job offer could not be found.",
+        "forbidden": "You don't have access to this job offer.",
+        "conflict": "This job offer changed elsewhere. Reload and try again.",
+        "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}.",
+        "alreadyPublished": "This offer is already published.",
+        "notOpenToClose": "This offer isn't open, so it can't be closed."
+      },
+      "form": {
+        "createTitle": "Post a job offer",
+        "editTitle": "Edit job offer",
+        "backToList": "Back to job offers",
+        "titleLabel": "Title",
+        "descriptionLabel": "Description",
+        "categoryLabel": "Category",
+        "categoryPlaceholder": "Select a category",
+        "citySearchLabel": "Find a city",
+        "citySearchHint": "Pick a matching suggestion below to set the offer's map location.",
+        "cityLabel": "City",
+        "countryLabel": "Country",
+        "countryPlaceholder": "Select a country",
+        "remoteLabel": "This job can be done remotely",
+        "remoteHint": "Remote offers still show a city, but don't need a precise map location.",
+        "locationRequired": "Pick a matching city suggestion, or mark this offer as remote.",
+        "locationSet": "Map location set.",
+        "startDateLabel": "Start date",
+        "endDateLabel": "End date",
+        "dateRangeInvalid": "The start date must be before the end date.",
+        "compensationHeading": "Compensation",
+        "compensationHint": "Optional. Shown to photographers in {currency}.",
+        "compensationMinLabel": "Minimum",
+        "compensationMaxLabel": "Maximum",
+        "createCta": "Create draft",
+        "saveCta": "Save changes",
+        "saving": "Saving…",
+        "created": "Draft created.",
+        "saved": "Saved."
+      }
+    },
+    "jobBoard": {
+      "metaTitle": "Job board",
+      "metaDescription": "Job offers posted by businesses and professionals looking for photographers.",
+      "title": "Job board",
+      "intro": "Job offers posted by businesses and professionals looking for photographers.",
+      "empty": "No offers posted yet.",
+      "emptyFiltered": "No offers match your filters.",
+      "clearFilters": "Clear filters",
+      "loadMore": "Load more",
+      "remoteLabel": "Remote",
+      "compensationRange": "{min} – {max}",
+      "postedAgo": "Posted {relative}",
+      "filters": {
+        "formLabel": "Job offer filters",
+        "categoryLabel": "Category",
+        "allCategories": "All categories",
+        "countryLabel": "Country",
+        "allCountries": "All countries",
+        "cityLabel": "City",
+        "remoteOnlyLabel": "Remote only",
+        "queryLabel": "Keyword",
+        "submit": "Search"
+      },
+      "detail": {
+        "metaTitle": "{title} at {companyName}",
+        "backToBoard": "Back to job board",
+        "companyWebsiteLabel": "Website",
+        "verifiedBadge": "Verified company",
+        "contactNotice": "Apply below to contact this company — no email or phone number is shown here.",
+        "descriptionHeading": "About this offer",
+        "compensationHeading": "Compensation",
+        "startDateLabel": "Start date",
+        "endDateLabel": "End date",
+        "expiresLabel": "Applications close"
+      },
+      "notFound": {
+        "title": "Job offer not found",
+        "description": "This job offer isn't available anymore, or never existed.",
+        "backCta": "Back to job board"
+      },
+      "apply": {
+        "heading": "Apply to this offer",
+        "messageLabel": "Message",
+        "portfolioLinkLabel": "Portfolio link (optional)",
+        "submitCta": "Send application",
+        "submitting": "Sending…",
+        "success": "Application sent. The company can now see your message.",
+        "signedOutNotice": "Sign in as a photographer to apply.",
+        "signInCta": "Sign in to apply",
+        "alreadyApplied": "You already applied to this offer.",
+        "viewApplicationsCta": "See my applications",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "invalid": "Check the highlighted fields and try again.",
+          "notFound": "This job offer could not be found.",
+          "forbidden": "You don't have access to this action.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      }
+    },
+    "jobApplications": {
+      "status": {
+        "submitted": "Submitted",
+        "shortlisted": "Shortlisted",
+        "rejected": "Rejected",
+        "withdrawn": "Withdrawn"
+      },
+      "inbox": {
+        "metaTitle": "Applications",
+        "backToList": "Back to job offers",
+        "title": "Applications for \"{title}\"",
+        "intro": "Review who applied and move them forward or reject them.",
+        "empty": "No applications yet.",
+        "loadMore": "Load more",
+        "portfolioLinkLabel": "Portfolio link",
+        "shortlistCta": "Shortlist",
+        "shortlistConfirmTitle": "Shortlist this application?",
+        "shortlistConfirmDescription": "The photographer will be notified that they've been shortlisted.",
+        "shortlistConfirmCta": "Yes, shortlist",
+        "shortlistPending": "Shortlisting…",
+        "shortlistDismissCta": "Cancel",
+        "rejectCta": "Reject",
+        "rejectConfirmTitle": "Reject this application?",
+        "rejectConfirmDescription": "This can't be undone. There is no way to move a rejected application back to shortlisted or submitted. The photographer will be notified.",
+        "rejectConfirmCta": "Yes, reject",
+        "rejectPending": "Rejecting…",
+        "rejectDismissCta": "Cancel",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "invalid": "Check the highlighted fields and try again.",
+          "notFound": "This application could not be found.",
+          "forbidden": "You don't have access to this application.",
+          "conflict": "This application changed elsewhere. Reload and try again.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}.",
+          "alreadyDecided": "This application has already been decided."
+        }
+      },
+      "mine": {
+        "metaTitle": "My applications",
+        "backToAccount": "Back to account",
+        "title": "My applications",
+        "intro": "Job offers you've applied to.",
+        "empty": "You haven't applied to anything yet.",
+        "loadMore": "Load more",
+        "withdrawCta": "Withdraw",
+        "withdrawConfirmTitle": "Withdraw this application?",
+        "withdrawConfirmDescription": "This can't be undone. The company will no longer see you as a candidate for this offer.",
+        "withdrawConfirmCta": "Yes, withdraw",
+        "withdrawPending": "Withdrawing…",
+        "withdrawDismissCta": "Cancel",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "invalid": "Check the highlighted fields and try again.",
+          "notFound": "This application could not be found.",
+          "forbidden": "You don't have access to this application.",
+          "conflict": "This application changed elsewhere. Reload and try again.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}.",
+          "alreadyDecided": "This application has already been decided."
         }
       }
     }

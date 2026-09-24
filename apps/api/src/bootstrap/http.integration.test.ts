@@ -155,4 +155,29 @@ describe('http bootstrap', () => {
     expect(response.headers['x-request-id']).not.toBe('not-a-uuid');
     expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/i);
   });
+
+  it('echoes PHOTOO_REVISION on x-photoo-revision, defaulting to "unknown"', async () => {
+    const originalRevision = process.env.PHOTOO_REVISION;
+    delete process.env.PHOTOO_REVISION;
+    try {
+      const response = await app
+        .getHttpAdapter()
+        .getInstance()
+        .inject({ method: 'GET', url: '/v1/does-not-exist' });
+      expect(response.headers['x-photoo-revision']).toBe('unknown');
+
+      process.env.PHOTOO_REVISION = 'deadbeef';
+      const responseWithRevision = await app
+        .getHttpAdapter()
+        .getInstance()
+        .inject({ method: 'GET', url: '/v1/does-not-exist' });
+      expect(responseWithRevision.headers['x-photoo-revision']).toBe('deadbeef');
+    } finally {
+      if (originalRevision === undefined) {
+        delete process.env.PHOTOO_REVISION;
+      } else {
+        process.env.PHOTOO_REVISION = originalRevision;
+      }
+    }
+  });
 });

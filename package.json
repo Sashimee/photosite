@@ -23,7 +23,9 @@
     "db:seed": "pnpm --filter @photoo/db run seed",
     "test:integration": "set -a && . packages/db/.env && . apps/api/.env && set +a && pnpm exec turbo run test --filter=@photoo/db && pnpm --filter @photoo/worker build && pnpm --filter @photoo/api test && pnpm --filter @photoo/worker test",
     "typecheck:smoke": "tsc --noEmit -p tsconfig.json",
-    "test:smoke": "playwright test --project=smoke-public --project=smoke-authenticated"
+    "test:smoke": "playwright test --project=smoke-public --project=smoke-authenticated",
+    "test:lighthouse": "rm -rf .lighthouseci && lhci collect --config=tests/lighthouse/lighthouserc.cjs && node tests/lighthouse/assert-budgets.cjs",
+    "test:lighthouse:consent-granted": "rm -rf .lighthouseci && lhci collect --config=tests/lighthouse/lighthouserc.consent-granted.cjs && node tests/lighthouse/report-consent-granted.cjs"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [
@@ -33,15 +35,19 @@
     "*.{json,yml,yaml}": "prettier --write"
   },
   "devDependencies": {
+    "@lhci/cli": "0.15.1",
+    "@lhci/utils": "0.15.1",
     "@photoo/config": "workspace:*",
     "@photoo/shared": "workspace:*",
     "@playwright/test": "1.63.0",
-    "@types/node": "26.5.1",
+    "@types/node": "26.6.2",
     "eslint": "9.39.5",
     "husky": "9.1.7",
     "lint-staged": "17.5.1",
-    "prettier": "3.9.7",
-    "turbo": "2.10.13",
-    "typescript": "6.0.3"
+    "prettier": "3.9.8",
+    "puppeteer-core": "24.43.1",
+    "turbo": "2.11.2",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0"
   }
 }

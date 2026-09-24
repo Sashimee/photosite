@@ -15,6 +15,7 @@ import {
   AddRoleRequestSchema,
   ConfirmPasswordResetRequestSchema,
   RequestPasswordResetRequestSchema,
+  ResendVerificationEmailRequestSchema,
   SIGNUP_ROLES,
   SignInRequestSchema,
   SignInTotpRequestSchema,
@@ -340,6 +341,32 @@ export class AuthController {
     } catch (error) {
       rethrowAsHttpException(error);
     }
+  }
+
+  // #290: recovery path for an account with no verified email and no
+  // session gate to catch it, e.g. an OAuth sign-up whose provider
+  // asserted an unverified email (`requireEmailVerification` is an
+  // `emailAndPassword`-only option, never set per social provider here).
+  @Post('verify-email/resend')
+  @HttpCode(202)
+  async resendVerificationEmail(
+    @Body(new ZodValidationPipe(ResendVerificationEmailRequestSchema)) body: unknown,
+    @Req() request: FastifyRequest,
+  ): Promise<{ message: string }> {
+    const input = body as { email: string };
+    const accountKey = input.email.trim().toLowerCase();
+    await this.rateLimit.enforce('verify-email-resend', request.ip, accountKey);
+    try {
+      await this.auth.api.sendVerificationEmail({
+        body: { email: input.email },
+        headers: toFetchHeaders(request),
+      });
+    } catch (error) {
+      rethrowAsHttpException(error);
+    }
+    return {
+      message: 'If the account exists and is not yet verified, a verification email has been sent.',
+    };
   }
 
   @Post('password-reset/request')

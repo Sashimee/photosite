@@ -193,7 +193,7 @@ describe('QuoteDetailPage', () => {
   });
 
   it('only shows quote actions to the quote’s own client', async () => {
-    getSessionMock.mockResolvedValue({ id: 'someone-else' });
+    getSessionMock.mockResolvedValue({ id: 'someone-else', roles: [] });
     mockApi({ data: QUOTE });
     const QuoteDetailPage = await loadPage();
 
@@ -205,5 +205,96 @@ describe('QuoteDetailPage', () => {
     expect(
       screen.queryByRole('button', { name: translate('web.quotes.detail', 'acceptCta') }),
     ).not.toBeInTheDocument();
+  });
+
+  it('does not treat a non-client viewer as the photographer without the photographer role', async () => {
+    getSessionMock.mockResolvedValue({ id: 'someone-else', roles: ['client'] });
+    mockApi({ data: QUOTE });
+    const QuoteDetailPage = await loadPage();
+
+    const element = await QuoteDetailPage({
+      params: Promise.resolve({ locale: 'en', id: QUOTE_ID }),
+    });
+    render(element);
+
+    expect(
+      screen.queryByText(translate('web.quotes.detail', 'payoutLabel')),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: translate('web.quotes.detail', 'withdrawCta') }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to request' })).toHaveAttribute(
+      'href',
+      `/en/requests/${REQUEST_ID}`,
+    );
+  });
+
+  it('shows the total, fee, payout and a withdraw action to the quote’s own photographer, and links back to the dashboard', async () => {
+    getSessionMock.mockResolvedValue({ id: 'photographer-user-1', roles: ['photographer'] });
+    mockApi({ data: QUOTE });
+    const QuoteDetailPage = await loadPage();
+
+    const element = await QuoteDetailPage({
+      params: Promise.resolve({ locale: 'en', id: QUOTE_ID }),
+    });
+    render(element);
+
+    expect(screen.getByText('−€75.00')).toBeInTheDocument();
+    expect(screen.getByText('€1,425.00')).toBeInTheDocument();
+    expect(screen.getByText(translate('web.quotes.detail', 'payoutNotice'))).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: translate('web.quotes.detail', 'withdrawCta') }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to quotes' })).toHaveAttribute(
+      'href',
+      '/en/dashboard/quotes',
+    );
+  });
+
+  it('hides the withdraw action once the quote is no longer sent', async () => {
+    getSessionMock.mockResolvedValue({ id: 'photographer-user-1', roles: ['photographer'] });
+    mockApi({ data: { ...QUOTE, status: 'accepted' } });
+    const QuoteDetailPage = await loadPage();
+
+    const element = await QuoteDetailPage({
+      params: Promise.resolve({ locale: 'en', id: QUOTE_ID }),
+    });
+    render(element);
+
+    expect(
+      screen.queryByRole('button', { name: translate('web.quotes.detail', 'withdrawCta') }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows no payout for the quote’s own photographer once the quote is declined, expired or withdrawn', async () => {
+    getSessionMock.mockResolvedValue({ id: 'photographer-user-1', roles: ['photographer'] });
+    mockApi({ data: { ...QUOTE, status: 'declined' } });
+    const QuoteDetailPage = await loadPage();
+
+    const element = await QuoteDetailPage({
+      params: Promise.resolve({ locale: 'en', id: QUOTE_ID }),
+    });
+    render(element);
+
+    expect(
+      screen.queryByText(translate('web.quotes.detail', 'payoutLabel')),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(translate('web.quotes.detail', 'feeLabel'))).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(translate('web.quotes.detail', 'payoutNotice')),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the withdrawn notice to any viewer once a quote is withdrawn', async () => {
+    getSessionMock.mockResolvedValue({ id: 'client-1' });
+    mockApi({ data: { ...QUOTE, status: 'withdrawn' } });
+    const QuoteDetailPage = await loadPage();
+
+    const element = await QuoteDetailPage({
+      params: Promise.resolve({ locale: 'en', id: QUOTE_ID }),
+    });
+    render(element);
+
+    expect(screen.getByText(translate('web.quotes.detail', 'withdrawnNotice'))).toBeInTheDocument();
   });
 });

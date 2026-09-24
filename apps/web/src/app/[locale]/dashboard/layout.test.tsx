@@ -83,6 +83,14 @@ describe('DashboardLayout', () => {
       'href',
       '/en/dashboard/profile',
     );
+    expect(screen.getByRole('link', { name: 'Requests' })).toHaveAttribute(
+      'href',
+      '/en/dashboard/requests',
+    );
+    expect(screen.getByRole('link', { name: 'Quotes' })).toHaveAttribute(
+      'href',
+      '/en/dashboard/quotes',
+    );
     expect(screen.getByText('checklist content')).toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import { PassThrough, type Readable } from 'node:stream';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import type { ExportBinaryFile } from './collect.js';
 
 export interface ArchiveStorage {
@@ -28,7 +28,7 @@ export interface WriteArchiveInput {
 // a time, so only one image is ever in flight, and the finished zip itself
 // is never buffered in memory or on local disk.
 export async function writeZipArchive(input: WriteArchiveInput): Promise<void> {
-  const archive = archiver('zip', { zlib: { level: 9 } });
+  const archive = new ZipArchive({ zlib: { level: 9 } });
   const passthrough = new PassThrough();
   archive.pipe(passthrough);
 

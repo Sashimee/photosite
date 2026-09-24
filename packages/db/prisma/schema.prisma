@@ -58,6 +58,7 @@ enum UploadPurpose {
   portfolio
   avatar
   cover
+  logo
   chat_attachment
   verification_document
   delivery_file
@@ -209,6 +210,42 @@ enum DisputeStatus {
   lost
 }
 
+// Mirrors `JOB_OFFER_STATUSES` in packages/shared/src/enums.ts. Driven by
+// the offer's listing lifecycle (docs/steps/1A.13-professionals.md):
+// `published` while its listing is unexpired, `expired` once it lapses,
+// `closed` when the professional closes it, `draft` before first publish.
+enum JobOfferStatus {
+  draft
+  published
+  closed
+  expired
+}
+
+// Mirrors `JOB_APPLICATION_STATUSES`. The professional moves an application
+// forward; the photographer may only withdraw.
+enum JobApplicationStatus {
+  submitted
+  shortlisted
+  rejected
+  withdrawn
+}
+
+// Mirrors `LISTING_KINDS`. Polymorphic owner (`Listing.ownerId`, no foreign
+// key): `job_offer` today, `featured_profile` from Phase 3.
+enum ListingKind {
+  job_offer
+  featured_profile
+}
+
+// Mirrors `LISTING_PLANS`. Free forever at launch (D8); `paid`/`featured`
+// switch on in Phase 3 without a schema change. The service refuses
+// anything but `free` in Phase 1.
+enum ListingPlan {
+  free
+  paid
+  featured
+}
+
 model Country {
   code              String   @id @db.Char(2)
   name              String
@@ -225,6 +262,7 @@ model Country {
   photographerProfiles PhotographerProfile[]
   requests             Request[]
   verificationCases    VerificationCase[]
+  jobOffers            JobOffer[]
 }
 
 model PlatformSetting {
@@ -266,6 +304,7 @@ model User {
   updatedPlatformSettings   PlatformSetting[]
   uploads                   Upload[]
   photographerProfile       PhotographerProfile?
+  professionalProfile       ProfessionalProfile?
   requests                  Request[]
   quotes                    Quote[]
   conversationParticipants  ConversationParticipant[]
@@ -561,6 +600,7 @@ model Upload {
   messageAttachment    MessageAttachment?
   verificationDocument VerificationDocument?
   deliveryFile         DeliveryFile?
+  logoForProfile       ProfessionalProfile?  @relation("ProfessionalProfileLogo")
 
   @@index([ownerId])
   @@index([status])
@@ -608,6 +648,7 @@ model PhotographerProfile {
   products        Product[]
   quotes          Quote[]
   bookings        Booking[]
+  jobApplications JobApplication[]
 
   @@index([countryCode])
   @@index([verificationStatus])
@@ -1032,4 +1073,117 @@ model Dispute {
 
   @@index([bookingId])
   @@index([status, createdAt])
+}
+
+// Company data only, not a `PhotographerProfile` (docs/steps/1A.13-professionals.md):
+// a professional role is added to the existing account (D13), never a
+// second account. `verified` is a manual admin flag with no self-service
+// path in this step. `vatNumber` is stored as given and never used for tax
+// logic in Phase 1.
+model ProfessionalProfile {
+  id           String   @id @default(uuid(7))
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName  String
+  website      String?
+  vatNumber    String?
+  logoUploadId String?  @unique
+  logoUpload   Upload?  @relation("ProfessionalProfileLogo", fields: [logoUploadId], references: [id], onDelete: SetNull)
+  verified     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  jobOffers JobOffer[]
+}
+
+// `location` is `geography(Point, 4326)`, an `Unsupported` type Prisma
+// cannot index or write directly: the GiST index lives in hand-written
+// migration SQL, same pattern as `PhotographerProfile`/`Request`
+// (DATA-MODEL.md). A job offer's lifecycle is its listing's lifecycle
+// (docs/steps/1A.13-professionals.md): publishing sets `publishedAt`,
+// creates a `Listing` and sets `expiresAt` to the listing's; republishing an
+// expired offer creates a *new* `Listing` rather than extending the old
+// one, so `listingId` always points at the current listing. `deletedAt` is a
+// moderator takedown (report-targets.ts), same soft-delete pattern as
+// `PhotographerProfile`/`PortfolioImage`/`Request`; it is orthogonal to
+// `status` — `closed` means the professional closed it themselves.
+model JobOffer {
+  id             String                                 @id @default(uuid(7))
+  professionalId String
+  professional   ProfessionalProfile                    @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  slug           String                                 @unique
+  title          String
+  description    String
+  category       PhotographerCategory
+  location       Unsupported("geography(Point, 4326)")?
+  city           String
+  countryCode    String                                 @db.Char(2)
+  country        Country                                @relation(fields: [countryCode], references: [code])
+  remote         Boolean                                @default(false)
+  startDate      DateTime?
+  endDate        DateTime?
+  compensation   Json?
+  status         JobOfferStatus                         @default(draft)
+  listingId      String?                                @unique
+  listing        Listing?                               @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  publishedAt    DateTime?
+  expiresAt      DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime                               @default(now())
+  updatedAt      DateTime                               @updatedAt
+
+  applications JobApplication[]
+
+  @@index([professionalId])
+  @@index([status, publishedAt])
+  @@index([countryCode, city])
+}
+
+// Unique on `(jobOfferId, photographerId)` so a double application is a
+// database-level conflict (409), not a duplicate row
+// (docs/steps/1A.13-professionals.md). Deleting the offer cascades to its
+// applications; closing it (a status change) never touches them.
+// `photographerId` is `Restrict`, like `Quote.photographerId`. `deletedAt` is
+// a moderator takedown of the application itself (report-targets.ts), same
+// soft-delete pattern as `PhotographerProfile`/`PortfolioImage`/`Request`.
+model JobApplication {
+  id             String               @id @default(uuid(7))
+  jobOfferId     String
+  jobOffer       JobOffer             @relation(fields: [jobOfferId], references: [id], onDelete: Cascade)
+  photographerId String
+  photographer   PhotographerProfile  @relation(fields: [photographerId], references: [id], onDelete: Restrict)
+  message        String
+  portfolioLink  String?
+  status         JobApplicationStatus @default(submitted)
+  deletedAt      DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([jobOfferId, photographerId])
+  @@index([jobOfferId, createdAt])
+  @@index([photographerId, createdAt])
+}
+
+// `ownerId` is polymorphic (the id of the `JobOffer` for `kind = job_offer`),
+// no foreign key, same pattern as `Report.targetType`/`targetId`
+// (DATA-MODEL.md). `expiresAt` is indexed for the hourly `listing-expiry`
+// sweep (docs/steps/1A.13-professionals.md). Free at launch (D8): the
+// service refuses any `plan` but `free` in Phase 1, not only the schema.
+model Listing {
+  id                      String      @id @default(uuid(7))
+  ownerId                 String
+  kind                    ListingKind
+  plan                    ListingPlan @default(free)
+  priceCents              Int         @default(0)
+  currency                String      @db.Char(3)
+  paidAt                  DateTime?
+  stripeCheckoutSessionId String?
+  expiresAt               DateTime
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  jobOffer JobOffer?
+
+  @@index([ownerId, kind])
+  @@index([expiresAt])
 }

@@ -246,6 +246,78 @@ describe('auth integration', () => {
     expect(response.statusCode).toBe(403);
   }, 20_000);
 
+  describe('POST /v1/auth/verify-email/resend (#290)', () => {
+    it('sends a second, independently valid verification link that also verifies the account', async () => {
+      const email = uniqueEmail('resend');
+      await signUp(email);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/verify-email/resend',
+        payload: { email },
+      });
+      expect(response.statusCode).toBe(202);
+
+      const link = await waitForLinkInEmail(email, /https?:\/\/\S*verify-email#token=\S+/);
+      const token = extractFragmentToken(link);
+      if (!token) {
+        throw new Error(`no token found in verification link: ${link}`);
+      }
+      const verifyResponse = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/verify-email',
+        payload: { token },
+      });
+      expect(verifyResponse.statusCode).toBe(200);
+
+      const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+      expect(user.emailVerifiedAt).not.toBeNull();
+    }, 20_000);
+
+    it('returns 202 for an email that has never signed up, same as a real one (no enumeration)', async () => {
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/verify-email/resend',
+        payload: { email: uniqueEmail('never-registered-resend') },
+      });
+      expect(response.statusCode).toBe(202);
+    });
+
+    it('returns 202 for an already-verified email without erroring', async () => {
+      const email = uniqueEmail('resend-already-verified');
+      await signUp(email);
+      await verifyByEmail(email);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/verify-email/resend',
+        payload: { email },
+      });
+      expect(response.statusCode).toBe(202);
+    }, 20_000);
+
+    it('rate limits repeated resend requests for the same account', async () => {
+      const email = uniqueEmail('resend-rate-limit');
+      await signUp(email);
+
+      let last;
+      for (let i = 0; i < 3; i += 1) {
+        last = await fastify().inject({
+          method: 'POST',
+          url: '/v1/auth/verify-email/resend',
+          payload: { email },
+        });
+        expect(last.statusCode).toBe(202);
+      }
+      const fourth = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/verify-email/resend',
+        payload: { email },
+      });
+      expect(fourth.statusCode).toBe(429);
+    }, 20_000);
+  });
+
   it('resets a forgotten password end to end', async () => {
     const email = uniqueEmail('reset');
     await signUp(email);

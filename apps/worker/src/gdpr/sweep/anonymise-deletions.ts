@@ -24,6 +24,8 @@ export interface AnonymiseDeletionsResult {
 const GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 // `en` is the source-of-truth locale (CLAUDE.md), not a nullable field.
 const ANONYMISED_LOCALE = 'en';
+const ANONYMISED_DISPLAY_NAME = 'Deleted user';
+const ANONYMISED_COMPANY_NAME = 'Deleted company';
 
 interface AnonymisationCounts {
   sessions: number;
@@ -35,6 +37,8 @@ interface AnonymisationCounts {
   products: number;
   portfolioImages: number;
   uploads: number;
+  jobApplicationsAnonymised: number;
+  professionalProfileAnonymised: number;
 }
 
 async function anonymiseOne(
@@ -65,7 +69,32 @@ async function anonymiseOne(
 
       await tx.photographerProfile.update({
         where: { id: profile.id },
-        data: { headline: null, bio: {}, links: [], languages: [] },
+        data: {
+          slug: `deleted-${profile.id}`,
+          displayName: ANONYMISED_DISPLAY_NAME,
+          headline: null,
+          bio: {},
+          links: [],
+          languages: [],
+        },
+      });
+    }
+
+    const jobApplications = profile
+      ? await tx.jobApplication.updateMany({
+          where: { photographerId: profile.id },
+          data: { message: '', portfolioLink: null },
+        })
+      : { count: 0 };
+
+    const professionalProfile = await tx.professionalProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (professionalProfile) {
+      await tx.professionalProfile.update({
+        where: { id: professionalProfile.id },
+        data: { companyName: ANONYMISED_COMPANY_NAME, website: null, vatNumber: null },
       });
     }
 
@@ -124,6 +153,8 @@ async function anonymiseOne(
       products: productsCount,
       portfolioImages: portfolioImagesCount,
       uploads: orphanableUploads.length,
+      jobApplicationsAnonymised: jobApplications.count,
+      professionalProfileAnonymised: professionalProfile ? 1 : 0,
     };
     return result;
   });

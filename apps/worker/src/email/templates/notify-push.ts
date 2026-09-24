@@ -3,9 +3,12 @@ import type { NotificationPayload, NotificationType } from '@photoo/shared';
 import { formatText } from '../format-message.js';
 import {
   buildConversationPath,
+  buildJobApplicationsPath,
+  buildJobOfferApplicationsPath,
   buildNotificationPath,
   buildVerificationCasePath,
   requireConversationId,
+  requireJobOfferId,
   requireQuoteId,
 } from './notify-email.js';
 
@@ -40,23 +43,30 @@ export function renderNotifyPush(
     message_received: t.messageReceived,
     verification_approved: t.verificationApproved,
     verification_rejected: t.verificationRejected,
+    job_application_received: t.jobApplicationReceived,
+    job_application_status_changed: t.jobApplicationStatusChanged,
   };
   const template = templates[type];
   const fallback = PHOTOGRAPHER_FACING_TYPES.has(type)
     ? messages.email.notifications.unknownClient
     : messages.email.notifications.unknownCounterpart;
   const counterpartName = payload.counterpartName ?? fallback;
+  const jobOfferTitle = payload.jobOfferTitle ?? messages.email.notifications.unknownJobOffer;
 
   const url =
     type === 'message_received'
       ? buildConversationPath(locale, requireConversationId(type, payload))
       : type === 'verification_approved' || type === 'verification_rejected'
         ? buildVerificationCasePath(locale)
-        : buildNotificationPath(locale, requireQuoteId(type, payload));
+        : type === 'job_application_received'
+          ? buildJobOfferApplicationsPath(locale, requireJobOfferId(type, payload))
+          : type === 'job_application_status_changed'
+            ? buildJobApplicationsPath(locale)
+            : buildNotificationPath(locale, requireQuoteId(type, payload));
 
   return {
     title: template.title,
-    body: formatText(template.body, { counterpartName }),
+    body: formatText(template.body, { counterpartName, jobOfferTitle }),
     url,
   };
 }

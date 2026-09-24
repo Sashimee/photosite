@@ -84,6 +84,18 @@ describe('renderNotifyEmail', () => {
     expect(message.html).toContain('<a href="https://photoo.lu/en/account/notifications">');
   });
 
+  it('HTML-escapes a url containing an ampersand instead of rendering it as markup', () => {
+    const message = renderNotifyEmail(
+      'quote_received',
+      PAYLOAD,
+      'en',
+      'jane@example.com',
+      'https://photoo.lu?ref=a&b=2',
+    );
+    expect(message.html).toContain('ref=a&amp;b=2');
+    expect(message.html).not.toContain('ref=a&b=2');
+  });
+
   it('renders every quote notification type without throwing', () => {
     const types = [
       'quote_received',
@@ -97,6 +109,21 @@ describe('renderNotifyEmail', () => {
     for (const type of types) {
       expect(() =>
         renderNotifyEmail(type, PAYLOAD, 'en', 'jane@example.com', 'https://photoo.lu'),
+      ).not.toThrow();
+    }
+  });
+
+  it('renders every job application notification type without throwing', () => {
+    const types = ['job_application_received', 'job_application_status_changed'] as const;
+    for (const type of types) {
+      expect(() =>
+        renderNotifyEmail(
+          type,
+          { jobOfferId: 'job-offer-1' },
+          'en',
+          'jane@example.com',
+          'https://photoo.lu',
+        ),
       ).not.toThrow();
     }
   });
@@ -176,5 +203,48 @@ describe('renderNotifyEmail', () => {
     expect(message.subject).toContain('rejected');
     expect(message.text).not.toContain('illegible');
     expect(message.text).toContain('https://photoo.lu/en/account/verification');
+  });
+
+  it('renders job_application_received with the job offer title and applications deep link', () => {
+    const message = renderNotifyEmail(
+      'job_application_received',
+      {
+        jobOfferId: 'job-offer-1',
+        jobOfferTitle: 'Wedding photographer needed',
+        counterpartName: 'Jane Doe',
+      },
+      'en',
+      'company@example.com',
+      'https://photoo.lu',
+    );
+    expect(message.subject).toContain('Jane Doe');
+    expect(message.text).toContain('Wedding photographer needed');
+    expect(message.text).toContain(
+      'https://photoo.lu/en/account/job-offers/job-offer-1/applications',
+    );
+  });
+
+  it('renders job_application_status_changed with a fallback job offer title when absent', () => {
+    const message = renderNotifyEmail(
+      'job_application_status_changed',
+      { jobOfferId: 'job-offer-1' },
+      'en',
+      'photographer@example.com',
+      'https://photoo.lu',
+    );
+    expect(message.text).toContain('the job offer');
+    expect(message.text).toContain('https://photoo.lu/en/account/job-applications');
+  });
+
+  it('throws when a job application notification has no jobOfferId', () => {
+    expect(() =>
+      renderNotifyEmail(
+        'job_application_received',
+        {},
+        'en',
+        'company@example.com',
+        'https://photoo.lu',
+      ),
+    ).toThrow(/jobOfferId/);
   });
 });

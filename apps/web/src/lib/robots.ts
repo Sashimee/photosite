@@ -1,11 +1,16 @@
 import type { Metadata, MetadataRoute } from 'next';
 
-export function buildRobotsRules(allowIndexing: boolean): MetadataRoute.Robots {
+// A sitemap that lists URLs while robots.txt disallows everything is a
+// contradiction search engines report as an error, so the sitemap directive
+// only ever appears alongside `allow: '/'` - never alongside `disallow: '/'`,
+// where `app/sitemap.ts` itself also returns an empty list.
+export function buildRobotsRules(allowIndexing: boolean, siteUrl: string): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: '*',
       ...(allowIndexing ? { allow: '/' } : { disallow: '/' }),
     },
+    ...(allowIndexing ? { sitemap: `${siteUrl}/sitemap.xml` } : {}),
   };
 }
 

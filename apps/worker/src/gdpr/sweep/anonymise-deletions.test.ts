@@ -12,6 +12,8 @@ function fakePrisma(options: {
   due: { id: string; userId: string }[];
   failUserId?: string;
   uploads?: FakeUpload[];
+  photographerProfile?: { id: string } | null;
+  professionalProfile?: { id: string } | null;
 }) {
   const dataRequestUpdate = vi.fn(() => Promise.resolve());
   const userUpdate = vi.fn((args: { where: { id: string } }) => {
@@ -21,10 +23,21 @@ function fakePrisma(options: {
     return Promise.resolve();
   });
   const zero = () => Promise.resolve({ count: 0 });
+  const photographerProfileUpdate = vi.fn(() => Promise.resolve());
+  const professionalProfileUpdate = vi.fn(() => Promise.resolve());
+  const jobApplicationUpdateMany = vi.fn(() => Promise.resolve({ count: 2 }));
 
   const client = {
     dataRequest: { findMany: vi.fn(() => Promise.resolve(options.due)), update: dataRequestUpdate },
-    photographerProfile: { findUnique: vi.fn(() => Promise.resolve(null)) },
+    photographerProfile: {
+      findUnique: vi.fn(() => Promise.resolve(options.photographerProfile ?? null)),
+      update: photographerProfileUpdate,
+    },
+    professionalProfile: {
+      findUnique: vi.fn(() => Promise.resolve(options.professionalProfile ?? null)),
+      update: professionalProfileUpdate,
+    },
+    jobApplication: { updateMany: jobApplicationUpdateMany },
     portfolioImage: { findMany: vi.fn(() => Promise.resolve([])), deleteMany: zero },
     product: { deleteMany: vi.fn(() => Promise.resolve({ count: 0 })) },
     session: { deleteMany: zero },
@@ -38,7 +51,14 @@ function fakePrisma(options: {
     $transaction: (fn: (tx: unknown) => Promise<unknown>) => fn(client),
   };
 
-  return { client, dataRequestUpdate, userUpdate };
+  return {
+    client,
+    dataRequestUpdate,
+    userUpdate,
+    photographerProfileUpdate,
+    professionalProfileUpdate,
+    jobApplicationUpdateMany,
+  };
 }
 
 describe('anonymiseDeletions', () => {
@@ -122,5 +142,96 @@ describe('anonymiseDeletions', () => {
       expect.objectContaining({ dataRequestId: 'req-fail' }),
       expect.any(String),
     );
+  });
+
+  it('replaces displayName and slug, and anonymises job applications when a photographer profile exists', async () => {
+    const { client, photographerProfileUpdate, jobApplicationUpdateMany } = fakePrisma({
+      due: [{ id: 'req-ok', userId: 'user-ok' }],
+      photographerProfile: { id: 'profile-1' },
+    });
+
+    await anonymiseDeletions({
+      prisma: { client } as never,
+      storage: {
+        config: { privateBucket: 'private', publicBucket: 'public' },
+        deleteObject: vi.fn(() => Promise.resolve()),
+      },
+      auditLog: { record: vi.fn(() => Promise.resolve()) },
+      logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+    });
+
+    expect(photographerProfileUpdate).toHaveBeenCalledWith({
+      where: { id: 'profile-1' },
+      data: {
+        slug: 'deleted-profile-1',
+        displayName: 'Deleted user',
+        headline: null,
+        bio: {},
+        links: [],
+        languages: [],
+      },
+    });
+    expect(jobApplicationUpdateMany).toHaveBeenCalledWith({
+      where: { photographerId: 'profile-1' },
+      data: { message: '', portfolioLink: null },
+    });
+  });
+
+  it('derives the anonymised slug from the profile id, so two erased photographers never collide', async () => {
+    const first = fakePrisma({
+      due: [{ id: 'req-a', userId: 'user-a' }],
+      photographerProfile: { id: 'profile-a' },
+    });
+    const second = fakePrisma({
+      due: [{ id: 'req-b', userId: 'user-b' }],
+      photographerProfile: { id: 'profile-b' },
+    });
+
+    for (const fixture of [first, second]) {
+      await anonymiseDeletions({
+        prisma: { client: fixture.client } as never,
+        storage: {
+          config: { privateBucket: 'private', publicBucket: 'public' },
+          deleteObject: vi.fn(() => Promise.resolve()),
+        },
+        auditLog: { record: vi.fn(() => Promise.resolve()) },
+        logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+      });
+    }
+
+    expect(first.photographerProfileUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'profile-a' },
+        data: expect.objectContaining({ slug: 'deleted-profile-a' }) as object,
+      }),
+    );
+    expect(second.photographerProfileUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'profile-b' },
+        data: expect.objectContaining({ slug: 'deleted-profile-b' }) as object,
+      }),
+    );
+  });
+
+  it('replaces companyName and nulls website/vatNumber when a professional profile exists', async () => {
+    const { client, professionalProfileUpdate } = fakePrisma({
+      due: [{ id: 'req-ok', userId: 'user-ok' }],
+      professionalProfile: { id: 'company-1' },
+    });
+
+    await anonymiseDeletions({
+      prisma: { client } as never,
+      storage: {
+        config: { privateBucket: 'private', publicBucket: 'public' },
+        deleteObject: vi.fn(() => Promise.resolve()),
+      },
+      auditLog: { record: vi.fn(() => Promise.resolve()) },
+      logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+    });
+
+    expect(professionalProfileUpdate).toHaveBeenCalledWith({
+      where: { id: 'company-1' },
+      data: { companyName: 'Deleted company', website: null, vatNumber: null },
+    });
   });
 });

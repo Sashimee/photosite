@@ -26,6 +26,9 @@ function fakeCollected(overrides: Partial<CollectedExport> = {}): CollectedExpor
     requests: [],
     quotes: [],
     photographerProfile: null,
+    professionalProfile: null,
+    jobOffers: [],
+    jobApplications: [],
     products: [],
     portfolioImages: [],
     uploads: [],
@@ -52,5 +55,24 @@ describe('buildManifest', () => {
 
     expect(manifest.files['photographer-profile.json']).toBe(1);
     expect(manifest.policyVersion).toBeNull();
+  });
+
+  it('records professional-profile.json and job-applications.json counts', () => {
+    const manifest = buildManifest(
+      fakeCollected({
+        professionalProfile: {} as never,
+        jobApplications: [{} as never, {} as never, {} as never],
+      }),
+      null,
+    );
+
+    expect(manifest.files['professional-profile.json']).toBe(1);
+    expect(manifest.files['job-applications.json']).toBe(3);
+  });
+
+  it('records job-offers.json count', () => {
+    const manifest = buildManifest(fakeCollected({ jobOffers: [{} as never, {} as never] }), null);
+
+    expect(manifest.files['job-offers.json']).toBe(2);
   });
 });

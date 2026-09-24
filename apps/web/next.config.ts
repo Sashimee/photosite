@@ -9,7 +9,10 @@ import { env } from './src/lib/env';
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const isProduction = process.env.NODE_ENV === 'production';
-const isDevelopment = process.env.NODE_ENV === 'development';
+// `next build` and the standalone server it produces (infra/docker/web.Dockerfile)
+// both hardcode NODE_ENV=production, so this can't key off NODE_ENV the way
+// `isProduction` above does - it would never see anything else.
+const allowLocalImageHosts = process.env.ALLOW_LOCAL_IMAGE_HOSTS === 'true';
 
 const mediaBaseUrl = env.NEXT_PUBLIC_MEDIA_BASE_URL
   ? new URL(env.NEXT_PUBLIC_MEDIA_BASE_URL)
@@ -30,8 +33,9 @@ const nextConfig: NextConfig = {
         ]
       : [],
     // The local stack's media origin (http://localhost:9000) is a local IP,
-    // which Next's image optimizer otherwise refuses to fetch from.
-    ...(isDevelopment ? { dangerouslyAllowLocalIP: true } : {}),
+    // which Next's image optimizer otherwise refuses to fetch from. Never set
+    // ALLOW_LOCAL_IMAGE_HOSTS anywhere pointed at anything but a local MinIO.
+    ...(allowLocalImageHosts ? { dangerouslyAllowLocalIP: true } : {}),
   },
   headers() {
     return [

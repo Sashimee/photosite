@@ -6,6 +6,7 @@ import {
   GDPR_EXPORT_QUEUE_NAME,
   GDPR_SWEEP_QUEUE_NAME,
   IMAGE_PROCESS_QUEUE_NAME,
+  LISTING_EXPIRY_QUEUE_NAME,
   NOTIFICATIONS_CLEANUP_QUEUE_NAME,
   NOTIFY_QUEUE_NAME,
   NOTIFY_SWEEP_QUEUE_NAME,
@@ -30,6 +31,7 @@ import { shutdownWorkers } from './graceful-shutdown.js';
 import { createEmailProcessor } from './processors/email.processor.js';
 import { createFileScanProcessor } from './processors/file-scan.processor.js';
 import { createImageProcessProcessor } from './processors/image-process.processor.js';
+import { createListingExpiryProcessor } from './processors/listing-expiry.processor.js';
 import { createNotificationsCleanupProcessor } from './processors/notifications-cleanup.processor.js';
 import { createNotifyProcessor } from './processors/notify.processor.js';
 import { createNotifySweepProcessor } from './processors/notify-sweep.processor.js';
@@ -40,6 +42,7 @@ import { createUploadsCleanupProcessor } from './processors/uploads-cleanup.proc
 const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 30_000;
 const UPLOADS_CLEANUP_SCHEDULER_ID = 'uploads-cleanup';
 const QUOTE_EXPIRY_SCHEDULER_ID = 'quote-expiry';
+const LISTING_EXPIRY_SCHEDULER_ID = 'listing-expiry';
 const NOTIFY_SWEEP_SCHEDULER_ID = 'notify-sweep';
 const PUSH_RECEIPTS_SCHEDULER_ID = 'push-receipts';
 const NOTIFICATIONS_CLEANUP_SCHEDULER_ID = 'notifications-cleanup';
@@ -91,6 +94,9 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
     const quoteExpiryQueue = new Queue(QUOTE_EXPIRY_QUEUE_NAME, {
       connection: this.newConnection(),
     });
+    const listingExpiryQueue = new Queue(LISTING_EXPIRY_QUEUE_NAME, {
+      connection: this.newConnection(),
+    });
     const notifyQueue = new Queue(NOTIFY_QUEUE_NAME, {
       connection: this.newRecoveringConnection(),
     });
@@ -113,6 +119,7 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       imageProcessQueue,
       uploadsCleanupQueue,
       quoteExpiryQueue,
+      listingExpiryQueue,
       notifyQueue,
       notifySweepQueue,
       pushReceiptsQueue,
@@ -142,6 +149,16 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       );
     } catch (error) {
       this.logger.warn({ err: error }, 'queue-workers: failed to schedule quote-expiry');
+    }
+
+    try {
+      await listingExpiryQueue.upsertJobScheduler(
+        LISTING_EXPIRY_SCHEDULER_ID,
+        { every: this.config.LISTING_EXPIRY_INTERVAL_MS },
+        { name: 'sweep', data: {} },
+      );
+    } catch (error) {
+      this.logger.warn({ err: error }, 'queue-workers: failed to schedule listing-expiry');
     }
 
     try {
@@ -257,6 +274,15 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       },
     );
 
+    const listingExpiryWorker = new Worker(
+      LISTING_EXPIRY_QUEUE_NAME,
+      createListingExpiryProcessor({ prisma: this.prisma, logger: this.logger }),
+      {
+        connection: this.newConnection(),
+        concurrency: this.config.WORKER_CONCURRENCY_LISTING_EXPIRY,
+      },
+    );
+
     const emailWorker = new Worker(
       EMAIL_QUEUE_NAME,
       createEmailProcessor({ mailTransport, logger: this.logger }),
@@ -341,6 +367,7 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       [IMAGE_PROCESS_QUEUE_NAME, imageProcessWorker],
       [UPLOADS_CLEANUP_QUEUE_NAME, uploadsCleanupWorker],
       [QUOTE_EXPIRY_QUEUE_NAME, quoteExpiryWorker],
+      [LISTING_EXPIRY_QUEUE_NAME, listingExpiryWorker],
       [EMAIL_QUEUE_NAME, emailWorker],
       [NOTIFY_QUEUE_NAME, notifyWorker],
       [NOTIFY_SWEEP_QUEUE_NAME, notifySweepWorker],

@@ -275,6 +275,10 @@ export class DataRequestsService {
           where: { userId: user.id },
           select: { id: true, isPublished: true },
         });
+        const professional = await tx.professionalProfile.findUnique({
+          where: { userId: user.id },
+          select: { id: true },
+        });
 
         const guarded = await tx.user.updateMany({
           where: { id: user.id, status: 'active' },
@@ -297,6 +301,8 @@ export class DataRequestsService {
         const cancelledRequestIds = await this.cancelOwnRequests(tx, user.id);
         const declinedQuoteIds = await this.cancelOwnQuotesAsClient(tx, user.id);
         const withdrawnQuoteIds = await this.cancelOwnQuotesAsPhotographer(tx, profile?.id);
+        const closedJobOfferIds = await this.closeOwnJobOffers(tx, professional?.id);
+        const withdrawnJobApplicationIds = await this.withdrawOwnJobApplications(tx, profile?.id);
 
         const row = await tx.dataRequest.create({
           data: { userId: user.id, type: 'delete', status: 'pending' },
@@ -315,6 +321,8 @@ export class DataRequestsService {
               cancelledRequestIds,
               declinedQuoteIds,
               withdrawnQuoteIds,
+              closedJobOfferIds,
+              withdrawnJobApplicationIds,
             },
             ip: ip ?? null,
           },
@@ -394,6 +402,48 @@ export class DataRequestsService {
     const ids = rows.map((row) => row.id);
     if (ids.length > 0) {
       await tx.quote.updateMany({ where: { id: { in: ids } }, data: { status: 'withdrawn' } });
+    }
+    return ids;
+  }
+
+  // Mirrors `cancelOwnQuotesAsPhotographer`: nothing stays reachable on the
+  // public job board during the grace period, the same way the
+  // photographer profile is unpublished above.
+  private async closeOwnJobOffers(
+    tx: Prisma.TransactionClient,
+    professionalId: string | undefined,
+  ): Promise<string[]> {
+    if (!professionalId) {
+      return [];
+    }
+    const rows = await tx.jobOffer.findMany({
+      where: { professionalId, status: 'published' },
+      select: { id: true },
+    });
+    const ids = rows.map((row) => row.id);
+    if (ids.length > 0) {
+      await tx.jobOffer.updateMany({ where: { id: { in: ids } }, data: { status: 'closed' } });
+    }
+    return ids;
+  }
+
+  private async withdrawOwnJobApplications(
+    tx: Prisma.TransactionClient,
+    photographerProfileId: string | undefined,
+  ): Promise<string[]> {
+    if (!photographerProfileId) {
+      return [];
+    }
+    const rows = await tx.jobApplication.findMany({
+      where: { photographerId: photographerProfileId, status: 'submitted' },
+      select: { id: true },
+    });
+    const ids = rows.map((row) => row.id);
+    if (ids.length > 0) {
+      await tx.jobApplication.updateMany({
+        where: { id: { in: ids } },
+        data: { status: 'withdrawn' },
+      });
     }
     return ids;
   }

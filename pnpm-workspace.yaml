@@ -13,4 +13,23 @@ minimumReleaseAgeExclude:
   - prettier@3.9.7
 overrides:
   deepmerge-ts: 8.0.2
+  fastify: 5.12.5
   mysql2: 3.24.4
+  # GHSA-ph9p-34f9-6g65 (tmp path traversal, high) and GHSA-7c78-jf6q-g5cm
+  # (tmp type-confusion path traversal, high, fixed one release later):
+  # @lhci/cli depends on tmp@^0.1.0 directly and pulls a second copy via
+  # inquirer>external-editor>tmp@0.0.33; 0.2.7 is the first version patched
+  # against both.
+  tmp: 0.2.7
+  # GHSA-jmr9-qjv8-65gv and GHSA-7pqw-9j4j-h8q3 (extract-zip symlink path
+  # traversal, both high, both "Patched versions: None" - extract-zip's last
+  # release was 2020-06-10). puppeteer-core pulls it in via
+  # @puppeteer/browsers@2.13.2's zip extraction; @puppeteer/browsers@3.0.2
+  # replaced that with tar-fs and dropped extract-zip entirely, so this
+  # overrides the sub-dependency rather than waiting on an extract-zip fix
+  # that will never ship. puppeteer-core@24.43.1 itself still declares
+  # @puppeteer/browsers@^2.10.0, but only uses the parts of its API
+  # (computeExecutablePath, launch helpers) that didn't change between 2.x
+  # and 3.x - verified by re-running the Lighthouse job's consent-granted
+  # puppeteerScript end-to-end after this override, not assumed.
+  '@puppeteer/browsers': 3.0.2

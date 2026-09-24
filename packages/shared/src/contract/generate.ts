@@ -3,6 +3,8 @@ import { registry } from './registry.js';
 import './health.js';
 import './auth.js';
 import './profiles.js';
+import './professionals.js';
+import './job-board.js';
 import './cities.js';
 import './countries.js';
 import './products.js';

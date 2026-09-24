@@ -31,6 +31,10 @@ export const SlugSchema = z
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'must be lowercase alphanumeric words separated by hyphens')
   .openapi({ description: 'URL-safe profile slug', example: 'jane-doe-photography' });
 
+const HTTP_URL_PROTOCOL = /^https?$/;
+
+export const HttpUrlSchema = z.url({ protocol: HTTP_URL_PROTOCOL });
+
 export const LatLngSchema = z
   .object({
     lat: z.number().min(-90).max(90).openapi({ example: 49.6116 }),
@@ -91,6 +95,18 @@ const ERROR_STATUS_DESCRIPTIONS: Record<StandardErrorStatusCode, string> = {
   422: 'Unprocessable entity',
   429: 'Too many requests',
 };
+
+// docs/SECURITY.md: "Email verification required before any marketplace
+// action". Spread into `registerPath` next to `security` so every route in
+// a marketplace contract file (requests, quotes, job-board, professionals)
+// must say explicitly whether it needs a verified email, the same way
+// `x-required-permission` forces every admin route to declare its
+// permission (apps/api/src/openapi's coverage tests check both).
+export const EMAIL_NOT_VERIFIED_ERROR_CODE = 'EMAIL_NOT_VERIFIED';
+
+export function requiresVerifiedEmail(required: boolean) {
+  return { 'x-requires-verified-email': required };
+}
 
 export function errorResponses(codes: readonly StandardErrorStatusCode[]) {
   return Object.fromEntries(

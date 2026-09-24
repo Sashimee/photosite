@@ -7,6 +7,7 @@ import type {
 } from '@photoo/shared';
 import type { z } from 'zod';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { CountriesService } from '../countries/countries.service.js';
 import { buildConsentMatrix, mapConsentRecord } from './consent-mapper.js';
 
 type UpdateConsentsInput = z.infer<typeof UpdateConsentsRequestSchema>;
@@ -20,7 +21,10 @@ interface SessionUser {
 
 @Injectable()
 export class ConsentsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(CountriesService) private readonly countries: CountriesService,
+  ) {}
 
   async getState(user: SessionUser): Promise<ConsentsResponse> {
     const records = await this.prisma.client.consentRecord.findMany({
@@ -109,22 +113,18 @@ export class ConsentsService {
   // server-side and not echoed to the client) rather than a client-facing
   // validation error, matching quotes.service.ts's `getFeePercent`.
   //
-  // TODO(#226): this duplicates the read `CountriesService.getPolicyVersion()`
-  // owns on `feat/1D.7a-settings-api`. That branch isn't in `dev` yet, so
-  // there is nothing to inject here without depending on unmerged code;
-  // once it lands, replace this direct query with a call to that reader
-  // instead of keeping a second one.
+  // Reads through `CountriesService.getPolicyVersion()` (the same reader
+  // `GET /v1/policy-version` uses) rather than querying `PlatformSetting`
+  // directly, so there is exactly one place that knows how a policy version
+  // is stored.
   private async getPolicyVersion(): Promise<string> {
-    const setting = await this.prisma.client.platformSetting.findUnique({
-      where: { key: 'policyVersion' },
-    });
-    const value = setting?.value;
-    if (typeof value !== 'string' || value.length === 0) {
+    const { policyVersion } = await this.countries.getPolicyVersion();
+    if (!policyVersion) {
       throw new Error(
         'consents: PlatformSetting "policyVersion" is missing or invalid - publish a legal ' +
           'text version before consent can be recorded',
       );
     }
-    return value;
+    return policyVersion;
   }
 }
