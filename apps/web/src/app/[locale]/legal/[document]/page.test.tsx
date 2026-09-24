@@ -59,4 +59,17 @@ describe('LegalDocumentPage', () => {
     });
     expect(meta.robots).toEqual({ index: false, follow: false });
   });
+
+  it('still carries a canonical and full hreflang set despite being noindex', async () => {
+    const { generateMetadata } = await import('./page');
+    const meta = await generateMetadata({
+      params: Promise.resolve({ locale: 'en', document: 'privacy' }),
+    });
+    expect(meta.alternates?.canonical).toBe('http://127.0.0.1:3000/en/legal/privacy');
+    expect(meta.alternates?.languages).toMatchObject({
+      en: 'http://127.0.0.1:3000/en/legal/privacy',
+      fr: 'http://127.0.0.1:3000/fr/legal/privacy',
+      'x-default': 'http://127.0.0.1:3000/en/legal/privacy',
+    });
+  });
 });

@@ -4,10 +4,14 @@ import { notFound, redirect } from 'next/navigation';
 
 import { isLocale, type Locale } from '@photoo/shared';
 
+import { buildRobotsMetadata } from '@/lib/robots';
 import { getSession } from '@/lib/session';
 import { sanitizeNextPath } from '@/lib/next-param';
+import { absoluteUrl, localeAlternates } from '@/lib/site-url';
 
 import { TwoFactorForm } from './two-factor-form';
+
+const TWO_FACTOR_PATH = '/sign-in/two-factor';
 
 export async function generateMetadata({
   params,
@@ -19,7 +23,14 @@ export async function generateMetadata({
     return {};
   }
   const t = await getTranslations({ locale, namespace: 'web.auth.twoFactor' });
-  return { title: t('title') };
+  return {
+    title: t('title'),
+    robots: buildRobotsMetadata(false),
+    alternates: {
+      canonical: absoluteUrl(locale, TWO_FACTOR_PATH),
+      languages: localeAlternates(TWO_FACTOR_PATH),
+    },
+  };
 }
 
 export default async function TwoFactorPage({

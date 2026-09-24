@@ -1,3 +1,4 @@
+import { SlugSchema } from '@photoo/shared';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -16,6 +17,33 @@ describe('isCountrySegment', () => {
     expect(isCountrySegment('LU')).toBe(false);
     expect(isCountrySegment('l')).toBe(false);
     expect(isCountrySegment('sofia-martins')).toBe(false);
+  });
+
+  // The 2-letter-segment invariant `/photographers/[slug]` relies on
+  // (`lib/discovery.ts`'s own comment): a country segment and a profile
+  // slug can never both match the same string, because `SlugSchema.min(3)`
+  // makes a 2-letter slug impossible to create in the first place. This
+  // pins that cross-module contract directly against the real schema
+  // instead of trusting the comment to stay true.
+  it('never accepts a string that SlugSchema could also accept', () => {
+    const allLowercasePairs = Array.from({ length: 26 * 26 }, (_, index) => {
+      const first = String.fromCharCode(97 + Math.floor(index / 26));
+      const second = String.fromCharCode(97 + (index % 26));
+      return `${first}${second}`;
+    });
+
+    for (const candidate of allLowercasePairs) {
+      expect(isCountrySegment(candidate)).toBe(true);
+      expect(SlugSchema.safeParse(candidate).success).toBe(false);
+    }
+  });
+
+  it('never accepts a real profile slug shape (3+ chars, SlugSchema-valid)', () => {
+    const realSlugs = ['abc', 'jane-doe-photography', 'sofia-martins', 'lux', 'x2y'];
+    for (const slug of realSlugs) {
+      expect(SlugSchema.safeParse(slug).success).toBe(true);
+      expect(isCountrySegment(slug)).toBe(false);
+    }
   });
 });
 
