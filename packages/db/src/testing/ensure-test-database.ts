@@ -92,9 +92,42 @@ async function createFromTemplate(
   templateName: string,
   owner: string,
 ): Promise<void> {
-  await admin.query(
-    `CREATE DATABASE ${quoteIdent(databaseName)} TEMPLATE ${quoteIdent(templateName)} OWNER ${quoteIdent(owner)}`,
+  try {
+    await admin.query(
+      `CREATE DATABASE ${quoteIdent(databaseName)} TEMPLATE ${quoteIdent(templateName)} OWNER ${quoteIdent(owner)}`,
+    );
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === '55006') {
+      throw new Error(
+        `ensureScopedTestDatabase: template database "${templateName}" is in use by another ` +
+          `session and cannot be cloned. Sessions holding it:\n${await formatTemplateSessions(admin, templateName)}\n` +
+          `Close those connections (e.g. a stray psql, Prisma Studio, or a dev server pointed at ` +
+          `"${templateName}") and retry.`,
+        { cause: error },
+      );
+    }
+    throw error;
+  }
+}
+
+async function formatTemplateSessions(admin: Client, templateName: string): Promise<string> {
+  const result = await admin.query<{
+    pid: number;
+    application_name: string;
+    state: string | null;
+  }>(
+    `SELECT pid, application_name, state FROM pg_stat_activity WHERE datname = $1 AND pid != pg_backend_pid()`,
+    [templateName],
   );
+  if (result.rows.length === 0) {
+    return '  (none found - it may have disconnected between the failed clone and this check)';
+  }
+  return result.rows
+    .map(
+      (row) =>
+        `  pid ${String(row.pid)}: ${row.application_name || '(unknown)'} [${row.state ?? 'unknown'}]`,
+    )
+    .join('\n');
 }
 
 // Returns the name of the most recently applied Prisma migration, or `null`
