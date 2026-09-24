@@ -8,10 +8,14 @@ const connectOrigins = [
   originOf(env.NEXT_PUBLIC_STORAGE_ORIGIN),
 ].filter((origin): origin is string => origin !== null);
 
+const imgOrigins = [originOf(env.NEXT_PUBLIC_MEDIA_BASE_URL)].filter(
+  (origin): origin is string => origin !== null,
+);
+
 export function proxy(request: NextRequest): NextResponse {
   const isDev = process.env.NODE_ENV === 'development';
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
-  const cspHeader = buildCspHeader(nonce, isDev, connectOrigins);
+  const cspHeader = buildCspHeader(nonce, isDev, connectOrigins, imgOrigins);
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);

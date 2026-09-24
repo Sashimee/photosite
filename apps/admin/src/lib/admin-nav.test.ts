@@ -16,6 +16,7 @@ describe('resolveNavSections', () => {
     const health = sections.find((section) => section.id === 'health');
     const users = sections.find((section) => section.id === 'users');
     const verification = sections.find((section) => section.id === 'verification');
+    const moderation = sections.find((section) => section.id === 'moderation');
 
     expect(dashboard).toMatchObject({ href: '/', label: 'nav.dashboard', available: true });
     expect(dashboard?.note).toBeUndefined();
@@ -29,6 +30,12 @@ describe('resolveNavSections', () => {
       available: true,
     });
     expect(verification?.note).toBeUndefined();
+    expect(moderation).toMatchObject({
+      href: '/moderation',
+      label: 'nav.moderation',
+      available: true,
+    });
+    expect(moderation?.note).toBeUndefined();
   });
 
   it('labels a section blocked on our own UI work as coming soon, not API-unavailable', () => {
