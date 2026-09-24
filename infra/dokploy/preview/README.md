@@ -271,12 +271,17 @@ sudo docker exec dokploy-traefik wget -qO- \
 Traefik v3 matchers take exactly one parameter each, so `Method` needs
 `(Method(`GET`) || Method(`HEAD`))` rather than a two-verb list.
 
-**Browser uploads still don't work.** Presigned PUT URLs are signed against
-`S3_ENDPOINT=http://minio:9000` (the internal address, used for both
-buckets), which a browser can't resolve. Fixing this needs MinIO to be
+**Browser uploads still don't work.** Presigned PUT/GET URLs are signed
+against `S3_ENDPOINT=http://minio:9000` (the internal address, used for
+both buckets), which a browser can't resolve. Fixing this needs MinIO to be
 reachable at a stable public hostname whose signature matches - e.g. DNS
 for `s3.footoo.bas.lu` routed to `minio:9000` and `S3_ENDPOINT` pointed at
-it - not just the read-only path this compose file adds.
+it - not just the read-only path this compose file adds. `web`'s CSP
+`connect-src`/`img-src` (`apps/web/src/proxy.ts`, #322) already allow
+whatever `NEXT_PUBLIC_STORAGE_ORIGIN` is set to; once that public hostname
+exists, set `S3_ENDPOINT` and `NEXT_PUBLIC_STORAGE_ORIGIN` to it (build arg
+and runtime env, like `NEXT_PUBLIC_MEDIA_BASE_URL` - see #310 and #303 for
+the general build-arg/cache gaps in this deploy path).
 
 ## Object storage users
 
