@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation';
 
 import { isLocale } from '@photoo/shared';
 
+import { absoluteUrl, localeAlternates } from '@/lib/site-url';
+
 // The real texts are a lawyer task (docs/steps/human-followups.md, 0.7), but
 // an imprint and a privacy policy have to be *reachable* from every page
 // (docs/COMPLIANCE.md: Luxembourg e-commerce law, ePrivacy). Linking to a 404
@@ -15,6 +17,10 @@ type LegalDocument = (typeof LEGAL_DOCUMENTS)[number];
 
 function isLegalDocument(value: string): value is LegalDocument {
   return (LEGAL_DOCUMENTS as readonly string[]).includes(value);
+}
+
+function legalPath(document: LegalDocument): string {
+  return `/legal/${document}`;
 }
 
 export function generateStaticParams() {
@@ -31,10 +37,15 @@ export async function generateMetadata({
     return {};
   }
   const t = await getTranslations({ locale, namespace: 'web.legal' });
+  const path = legalPath(document);
   return {
     title: t(`${document}.title`),
     // Placeholder text must never be indexed as if it were the real policy.
     robots: { index: false, follow: false },
+    alternates: {
+      canonical: absoluteUrl(locale, path),
+      languages: localeAlternates(path),
+    },
   };
 }
 

@@ -4,10 +4,14 @@ import { notFound, redirect } from 'next/navigation';
 
 import { isLocale, type Locale } from '@photoo/shared';
 
+import { buildRobotsMetadata } from '@/lib/robots';
 import { getSession } from '@/lib/session';
 import { sanitizeNextPath } from '@/lib/next-param';
+import { absoluteUrl, localeAlternates } from '@/lib/site-url';
 
 import { SignUpForm } from './sign-up-form';
+
+const SIGN_UP_PATH = '/sign-up';
 
 export async function generateMetadata({
   params,
@@ -19,7 +23,18 @@ export async function generateMetadata({
     return {};
   }
   const t = await getTranslations({ locale, namespace: 'web.auth.signUp' });
-  return { title: t('title') };
+  return {
+    title: t('title'),
+    // Noindexed like the rest of the auth flow (see sign-in/page.tsx), but a
+    // stable canonical + hreflang set still matters here: sign-up is where
+    // ads campaigns land visitors, and UTM params on the query string must
+    // survive onto this URL regardless of indexing status.
+    robots: buildRobotsMetadata(false),
+    alternates: {
+      canonical: absoluteUrl(locale, SIGN_UP_PATH),
+      languages: localeAlternates(SIGN_UP_PATH),
+    },
+  };
 }
 
 export default async function SignUpPage({

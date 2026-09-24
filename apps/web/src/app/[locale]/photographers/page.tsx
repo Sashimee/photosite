@@ -39,11 +39,20 @@ export async function generateMetadata({
 
   const t = await getTranslations({ locale, namespace: 'web.search' });
   const filtered = hasAnyFilterParam(rawParams);
+  const filters = parseSearchParams(rawParams);
+  const { data, response } = await api.GET('/v1/photographers', {
+    params: { query: toApiQuery(filters) },
+    next: { revalidate: REVALIDATE_SECONDS },
+  });
+  if (!data) {
+    throw new Error(`Failed to search photographers: HTTP ${String(response.status)}`);
+  }
+  const isEmpty = data.items.length === 0;
 
   return {
     title: t('metaTitle'),
     description: t('metaDescription'),
-    robots: buildRobotsMetadata(env.NEXT_PUBLIC_ALLOW_INDEXING && !filtered),
+    robots: buildRobotsMetadata(env.NEXT_PUBLIC_ALLOW_INDEXING && !filtered && !isEmpty),
     alternates: {
       canonical: absoluteUrl(locale, SEARCH_PATH),
       languages: localeAlternates(SEARCH_PATH),

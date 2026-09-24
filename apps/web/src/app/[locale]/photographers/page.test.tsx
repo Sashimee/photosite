@@ -74,8 +74,9 @@ describe('generateMetadata (search page)', () => {
     vi.unstubAllEnvs();
   });
 
-  it('is indexable with no filters', async () => {
+  it('is indexable with no filters and at least one result', async () => {
     vi.stubEnv('NEXT_PUBLIC_ALLOW_INDEXING', 'true');
+    mockSearch([PHOTOGRAPHER]);
     const { generateMetadata } = await import('./page');
 
     const metadata = await generateMetadata({
@@ -89,11 +90,25 @@ describe('generateMetadata (search page)', () => {
 
   it('is noindex once any filter param is present', async () => {
     vi.stubEnv('NEXT_PUBLIC_ALLOW_INDEXING', 'true');
+    mockSearch([PHOTOGRAPHER]);
     const { generateMetadata } = await import('./page');
 
     const metadata = await generateMetadata({
       params: Promise.resolve({ locale: 'en' }),
       searchParams: Promise.resolve({ category: 'wedding' }),
+    });
+
+    expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
+
+  it('is noindex once the result set is empty, even with no filters', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ALLOW_INDEXING', 'true');
+    mockSearch([]);
+    const { generateMetadata } = await import('./page');
+
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ locale: 'en' }),
+      searchParams: Promise.resolve({}),
     });
 
     expect(metadata.robots).toEqual({ index: false, follow: false });

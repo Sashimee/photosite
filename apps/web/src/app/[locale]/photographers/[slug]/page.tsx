@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 
-import { DEFAULT_LOCALE, isLocale, SUPPORTED_LOCALES, type Locale } from '@photoo/shared';
+import { isLocale, type Locale } from '@photoo/shared';
 
 import { api } from '@/lib/api';
 import { env } from '@/lib/env';
@@ -12,6 +12,7 @@ import { isCountrySegment } from '@/lib/discovery';
 import { resolveLocalizedText } from '@/lib/localized-text';
 import { buildProfileJsonLd, serializeJsonLd } from '@/lib/profile-jsonld';
 import { buildRobotsMetadata } from '@/lib/robots';
+import { absoluteUrl, localeAlternates } from '@/lib/site-url';
 import { truncateAtWordBoundary } from '@/lib/truncate';
 
 import { CountryLandingPage, generateCountryLandingMetadata } from './country-landing';
@@ -63,8 +64,12 @@ export const loadProfile = cache(async (slug: string) => {
   return { profile: profileResult.data, products: productsResult.data };
 });
 
+function profilePath(slug: string): string {
+  return `/photographers/${slug}`;
+}
+
 function profileUrl(locale: Locale, slug: string): string {
-  return `${env.NEXT_PUBLIC_SITE_URL}/${locale}/photographers/${slug}`;
+  return absoluteUrl(locale, profilePath(slug));
 }
 
 export async function generateMetadata({
@@ -99,12 +104,7 @@ export async function generateMetadata({
     robots: buildRobotsMetadata(env.NEXT_PUBLIC_ALLOW_INDEXING),
     alternates: {
       canonical: profileUrl(locale, slug),
-      languages: {
-        ...Object.fromEntries(
-          SUPPORTED_LOCALES.map((supported) => [supported, profileUrl(supported, slug)]),
-        ),
-        'x-default': profileUrl(DEFAULT_LOCALE, slug),
-      },
+      languages: localeAlternates(profilePath(slug)),
     },
     openGraph: {
       type: 'profile',
