@@ -119,6 +119,12 @@ export default async function EditJobOfferPage({
           <StatusBadge label={tStatus(jobOffer.status)} muted={jobOffer.status !== 'published'} />
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href={`/${locale}/account/job-offers/${jobOffer.id}/applications`}
+            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            {tJobOffers('applicationsCta')}
+          </Link>
           <PublishJobOfferAction jobOfferId={jobOffer.id} status={jobOffer.status} />
           <CloseJobOfferAction jobOfferId={jobOffer.id} status={jobOffer.status} />
           <DeleteJobOfferAction
