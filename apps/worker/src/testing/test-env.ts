@@ -1,11 +1,6 @@
 import type { Env } from '../config/env.js';
 
-// vitest.config.ts scopes TEST_DATABASE_URL/REDIS_URL to a per-worktree,
-// per-workspace database and Redis logical database before this module
-// loads (#225) and reassigns process.env with the result, so this always
-// reflects what the app under test should connect to; the literal
-// fallbacks only matter for a run with neither var set, where every
-// DB/Redis-touching test skips anyway.
+// vitest.config.ts scopes and reassigns TEST_DATABASE_URL/REDIS_URL before this module loads; the fallbacks below only apply when neither var is set.
 export const TEST_ENV: Env = {
   NODE_ENV: 'test',
   DATABASE_URL:

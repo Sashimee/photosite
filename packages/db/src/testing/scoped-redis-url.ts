@@ -1,33 +1,77 @@
-import { createHash } from 'node:crypto';
+import { Redis } from 'ioredis';
 import { findWorktreeRoot, requireValidScope } from './worktree-scope.js';
 
-const LOGICAL_DATABASE_COUNT = 16;
+const MAX_SLOT = 15;
+const REGISTRY_KEY_PREFIX = 'photoo:test-slot:';
+const REGISTRY_DATABASE_INDEX = 0;
 
-// Redis ships 16 logical databases (SELECT 0-15) on one server, which is a
-// far smaller keyspace than Postgres's "create another database" - a hash
-// collision between two (worktree, workspace) pairs is plausible once more
-// than a handful are active at once, unlike the Postgres clone which is
-// structurally collision-free. Good enough for this repo's realistic
-// worktree count, and it's a deterministic collision (the same pair always
-// picks the same index), not a random one, so it stays debuggable rather
-// than flaky - see docs/ARCHITECTURE.md for the full tradeoff.
-//
-// Covers BullMQ queue names and rate-limit/lockout keys (ordinary keys in
-// whichever index the connection selected). Does not cover Socket.IO's
-// redis-adapter pub/sub, which Redis broadcasts across every logical
-// database regardless of SELECT - see socket-io-redis-adapter.ts.
-export function scopedRedisUrl(
+export interface SlotRegistryClient {
+  set(key: string, value: string, mode: 'NX'): Promise<'OK' | null>;
+  get(key: string): Promise<string | null>;
+}
+
+function slotKey(slot: number): string {
+  return `${REGISTRY_KEY_PREFIX}${String(slot)}`;
+}
+
+// Claims one of Redis logical databases 1-15 for `owner` (a worktree root +
+// workspace pair), never 0 - that's the registry's own database, and the
+// index REDIS_URL defaults to with no path, so it's also where dev servers
+// actually run. `SET ... NX` makes each attempt atomic against every other
+// process racing the same registry; a slot already owned by `owner` is
+// reused instead of reclaimed, so repeated calls from the same
+// worktree/workspace converge on one index instead of leaking a new one.
+export async function claimRedisSlot(client: SlotRegistryClient, owner: string): Promise<number> {
+  const occupied: string[] = [];
+  for (let slot = 1; slot <= MAX_SLOT; slot++) {
+    const key = slotKey(slot);
+    if ((await client.set(key, owner, 'NX')) === 'OK') {
+      return slot;
+    }
+    const existingOwner = await client.get(key);
+    if (existingOwner === owner) {
+      return slot;
+    }
+    occupied.push(`  ${String(slot)}: ${existingOwner ?? '(released mid-claim, retry)'}`);
+  }
+
+  throw new Error(
+    `scopedRedisUrl: all ${String(MAX_SLOT)} test Redis slots are claimed and none belongs to this worktree/workspace:\n` +
+      `${occupied.join('\n')}\n` +
+      `Free a slot for a worktree/workspace that no longer exists with ` +
+      `'redis-cli -n ${String(REGISTRY_DATABASE_INDEX)} DEL ${REGISTRY_KEY_PREFIX}<n>'.`,
+  );
+}
+
+export function withDatabaseIndex(baseUrl: string, index: number): string {
+  const url = new URL(baseUrl);
+  url.pathname = `/${String(index)}`;
+  return url.toString();
+}
+
+// Picks a Redis logical database for `scope` scoped to `(git worktree root,
+// workspace)`, claimed through a slot registry kept in database 0 (see
+// claimRedisSlot) so two pairs never collide - unlike a hash of the pair,
+// which this replaced (see docs/ARCHITECTURE.md).
+export async function scopedRedisUrl(
   baseUrl: string,
   scope: string,
   worktreeStartDir = process.cwd(),
-): string {
+): Promise<string> {
   requireValidScope(scope);
 
   const worktreeRoot = findWorktreeRoot(worktreeStartDir);
-  const digest = createHash('sha1').update(`${worktreeRoot}:${scope}`).digest();
-  const databaseIndex = digest.readUInt32BE(0) % LOGICAL_DATABASE_COUNT;
+  const owner = `${worktreeRoot}:${scope}`;
 
-  const url = new URL(baseUrl);
-  url.pathname = `/${String(databaseIndex)}`;
-  return url.toString();
+  const client = new Redis(withDatabaseIndex(baseUrl, REGISTRY_DATABASE_INDEX), {
+    maxRetriesPerRequest: 1,
+    retryStrategy: () => null,
+  });
+  client.on('error', () => undefined);
+  try {
+    const slot = await claimRedisSlot(client, owner);
+    return withDatabaseIndex(baseUrl, slot);
+  } finally {
+    client.disconnect();
+  }
 }

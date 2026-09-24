@@ -46,11 +46,6 @@ export class RedisIoAdapter extends IoAdapter {
   }
 
   connectToRedis(): void {
-    // Redis PUBLISH/SUBSCRIBE crosses every logical database on the server
-    // regardless of which one `this.redisUrl` SELECTs, so the per-worktree
-    // scoping in packages/db/src/testing/scoped-redis-url.ts (ordinary keys
-    // only - BullMQ queues, rate limits) leaves this adapter's channel
-    // unscoped. Known gap (#225 follow-up), not worked around here.
     this.pubClient = new Redis(this.redisUrl, {
       maxRetriesPerRequest: null,
       retryStrategy: (times) => Math.min(times * 200, 5000),
