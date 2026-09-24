@@ -187,6 +187,12 @@ export default async function JobOffersPage({
                 >
                   {t('editCta')}
                 </Link>
+                <Link
+                  href={`/${locale}/account/job-offers/${offer.id}/applications`}
+                  className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  {t('applicationsCta')}
+                </Link>
                 <PublishJobOfferAction jobOfferId={offer.id} status={offer.status} />
                 <CloseJobOfferAction jobOfferId={offer.id} status={offer.status} />
                 <DeleteJobOfferAction jobOfferId={offer.id} />

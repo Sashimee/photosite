@@ -1486,6 +1486,7 @@
       "empty": "No job offers yet. Post your first one to start receiving applications.",
       "loadMore": "Load more",
       "editCta": "Edit",
+      "applicationsCta": "Applications",
       "remoteLabel": "Remote",
       "compensationRange": "{min} – {max}",
       "status": {
@@ -1612,6 +1613,69 @@
           "forbidden": "You don't have access to this action.",
           "tooManyRequests": "You're doing that too fast. Slow down and try again.",
           "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      }
+    },
+    "jobApplications": {
+      "status": {
+        "submitted": "Submitted",
+        "shortlisted": "Shortlisted",
+        "rejected": "Rejected",
+        "withdrawn": "Withdrawn"
+      },
+      "inbox": {
+        "metaTitle": "Applications",
+        "backToList": "Back to job offers",
+        "title": "Applications for \"{title}\"",
+        "intro": "Review who applied and move them forward or reject them.",
+        "empty": "No applications yet.",
+        "loadMore": "Load more",
+        "portfolioLinkLabel": "Portfolio link",
+        "shortlistCta": "Shortlist",
+        "shortlistConfirmTitle": "Shortlist this application?",
+        "shortlistConfirmDescription": "The photographer will be notified that they've been shortlisted.",
+        "shortlistConfirmCta": "Yes, shortlist",
+        "shortlistPending": "Shortlisting…",
+        "shortlistDismissCta": "Cancel",
+        "rejectCta": "Reject",
+        "rejectConfirmTitle": "Reject this application?",
+        "rejectConfirmDescription": "This can't be undone. There is no way to move a rejected application back to shortlisted or submitted. The photographer will be notified.",
+        "rejectConfirmCta": "Yes, reject",
+        "rejectPending": "Rejecting…",
+        "rejectDismissCta": "Cancel",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "invalid": "Check the highlighted fields and try again.",
+          "notFound": "This application could not be found.",
+          "forbidden": "You don't have access to this application.",
+          "conflict": "This application changed elsewhere. Reload and try again.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}.",
+          "alreadyDecided": "This application has already been decided."
+        }
+      },
+      "mine": {
+        "metaTitle": "My applications",
+        "backToAccount": "Back to account",
+        "title": "My applications",
+        "intro": "Job offers you've applied to.",
+        "empty": "You haven't applied to anything yet.",
+        "loadMore": "Load more",
+        "withdrawCta": "Withdraw",
+        "withdrawConfirmTitle": "Withdraw this application?",
+        "withdrawConfirmDescription": "This can't be undone. The company will no longer see you as a candidate for this offer.",
+        "withdrawConfirmCta": "Yes, withdraw",
+        "withdrawPending": "Withdrawing…",
+        "withdrawDismissCta": "Cancel",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "invalid": "Check the highlighted fields and try again.",
+          "notFound": "This application could not be found.",
+          "forbidden": "You don't have access to this application.",
+          "conflict": "This application changed elsewhere. Reload and try again.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}.",
+          "alreadyDecided": "This application has already been decided."
         }
       }
     }
