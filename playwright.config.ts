@@ -37,5 +37,20 @@ export default defineConfig({
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], storageState: AUTH_STATE_PATH },
     },
+    // docs/steps/1B.12-web-e2e.md: a second, independent suite, not an
+    // extension of `tests/smoke` - its own testDir, no `setup`/`smoke-*`
+    // dependency and no shared storageState (every spec here signs in its
+    // own fixture user via apps/web/e2e/support/sign-in.ts). Workers bounded
+    // rather than left at Playwright's local per-core default: the e2e CI
+    // job's runner is already running Postgres, Redis, Mailpit, the API and
+    // the web server at once, the same CPU-oversubscription shape #201 named
+    // for apps/mobile's jest workers.
+    {
+      name: 'e2e',
+      testDir: 'apps/web/e2e',
+      testMatch: /.*\.spec\.ts/,
+      workers: 2,
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
 });
