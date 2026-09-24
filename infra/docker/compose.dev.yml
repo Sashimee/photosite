@@ -31,7 +31,10 @@ services:
       retries: 10
 
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # Built from source and mirrored to GHCR (#326): MinIO Inc. archived
+    # github.com/minio/{minio,mc} and cut off anonymous pulls of their own
+    # quay.io images - see infra/docker/minio-mirror.Dockerfile's comment.
+    image: ghcr.io/sashimee/minio:RELEASE.2025-09-07T16-13-09Z@sha256:321a615934fc2e251df8155f378a99b4b89caec2e3488a99ccd97d1f9b6135be
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -49,7 +52,8 @@ services:
       retries: 10
 
   minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    # See the `minio` service's comment above.
+    image: ghcr.io/sashimee/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a0b9f1a75dc9ca1e96db9055a391bbf72ffbf7e9e5d3329e506fdcf4149cdbd3
     depends_on:
       minio:
         condition: service_healthy
