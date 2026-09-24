@@ -34,6 +34,10 @@ describe('ModerationQueuePage', () => {
     expect(screen.getByText('Moderation queue')).toBeInTheDocument();
     expect(screen.getByTestId('moderation-filters')).toBeInTheDocument();
     expect(screen.getByTestId('moderation-table')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Take down without a report' })).toHaveAttribute(
+      'href',
+      '/moderation/direct-takedown',
+    );
     expect(firstCallProps(moderationFiltersMock)).toEqual({ status: 'open' });
     expect(firstCallProps(moderationTableMock)).toEqual({ status: 'open' });
   });
@@ -50,6 +54,21 @@ describe('ModerationQueuePage', () => {
     expect(firstCallProps(moderationTableMock)).toEqual({
       status: 'resolved',
       targetType: 'request',
+    });
+  });
+
+  it('passes the moderator-initiated toggle through to the table', async () => {
+    const ModerationQueuePage = await loadPage();
+
+    render(
+      await ModerationQueuePage({
+        searchParams: Promise.resolve({ status: 'resolved', moderatorInitiated: 'true' }),
+      }),
+    );
+
+    expect(firstCallProps(moderationTableMock)).toEqual({
+      status: 'resolved',
+      moderatorInitiated: true,
     });
   });
 });

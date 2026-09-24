@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 
+import type { components } from '@photoo/api-client';
 import { TakedownReportRequestSchema } from '@photoo/shared';
 
 import { Button } from '@/components/ui/button';
@@ -22,20 +23,32 @@ import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
 import { fieldErrorMessage } from '@/lib/form-errors';
 
+type AdminReport = components['schemas']['AdminReport'];
+
+// A report-linked takedown resolves an existing report; a direct one (1D.6c,
+// D25) has no report yet and the API synthesises one from
+// `POST /v1/admin/reports/direct-takedown`. Same confirmation, same
+// statement-of-reasons field, same wording either way - only the endpoint
+// differs, so this dialog stays the one place that takedown copy lives
+// rather than a second dialog duplicating it.
+export type TakedownTarget =
+  | { kind: 'report'; reportId: string }
+  | { kind: 'direct'; targetType: 'photographer_profile' | 'job_offer'; targetId: string };
+
 interface TakedownValues {
   resolution: string;
 }
 
 export function TakedownDialog({
-  reportId,
+  target,
   targetLabel,
   onDecided,
   onConflict,
 }: {
-  reportId: string;
+  target: TakedownTarget;
   targetLabel: string;
-  onDecided: () => void;
-  onConflict: () => void;
+  onDecided: (report: AdminReport) => void;
+  onConflict?: () => void;
 }) {
   const t = useTranslations('admin.moderation.detail.actions.takedown');
   const tActions = useTranslations('admin.moderation.detail.actions');
@@ -59,15 +72,20 @@ export function TakedownDialog({
 
   async function onSubmit(values: TakedownValues) {
     setSubmitError(null);
-    const { error } = await api.POST('/v1/admin/reports/{id}/takedown', {
-      params: { path: { id: reportId } },
-      body: values,
-    });
+    const { data, error } =
+      target.kind === 'report'
+        ? await api.POST('/v1/admin/reports/{id}/takedown', {
+            params: { path: { id: target.reportId } },
+            body: values,
+          })
+        : await api.POST('/v1/admin/reports/direct-takedown', {
+            body: { targetType: target.targetType, targetId: target.targetId, ...values },
+          });
     if (error) {
       if (error.code === 'TWO_FACTOR_REQUIRED') {
         return;
       }
-      if (error.code === 'CONFLICT') {
+      if (error.code === 'CONFLICT' && onConflict) {
         setOpen(false);
         onConflict();
         return;
@@ -77,7 +95,7 @@ export function TakedownDialog({
     }
     form.reset({ resolution: '' });
     setOpen(false);
-    onDecided();
+    onDecided(data);
   }
 
   return (

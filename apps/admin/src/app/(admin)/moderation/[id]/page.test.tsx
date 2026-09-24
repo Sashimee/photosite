@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { MODERATOR_INITIATED_REPORT_REASON } from '@photoo/shared';
+
 const serverApiMock = vi.fn();
 vi.mock('@/lib/server-api', () => ({ serverApi: serverApiMock }));
 
@@ -103,6 +105,29 @@ describe('ReportDetailPage', () => {
 
     expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
     expect(document.querySelector('img[src="x"]')).not.toBeInTheDocument();
+  });
+
+  it('renders a moderator-initiated report with an explanation, not the raw sentinel', async () => {
+    const directReport = {
+      ...report,
+      reporterId: null,
+      reason: MODERATOR_INITIATED_REPORT_REASON,
+    };
+    serverApiMock.mockResolvedValue({
+      GET: apiWith(
+        { data: directReport, response: { status: 200 } },
+        { data: { items: [], nextCursor: null }, response: { status: 200 } },
+      ),
+    });
+    const ReportDetailPage = await loadPage();
+
+    render(await ReportDetailPage({ params: Promise.resolve({ id: 'report-1' }) }));
+
+    expect(screen.getByText('Found by a moderator')).toBeInTheDocument();
+    expect(
+      screen.getByText('No public report was filed. A moderator identified this content directly.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(MODERATOR_INITIATED_REPORT_REASON)).not.toBeInTheDocument();
   });
 
   it('hides decision history when the audit-log probe is forbidden', async () => {

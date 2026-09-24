@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { MODERATOR_INITIATED_REPORT_REASON } from '@photoo/shared';
+
 vi.mock('next-intl', async () => {
   const { mockUseTranslations } = await import('@/testing/mock-translations');
   return { useTranslations: mockUseTranslations };
@@ -98,5 +100,42 @@ describe('ModerationTable', () => {
     render(<ModerationTable status="open" />);
 
     expect(await screen.findByText('4 days ago')).toBeInTheDocument();
+  });
+
+  it('renders a moderator-initiated reason as a meaningful label, not the raw sentinel', async () => {
+    const directReport = {
+      ...baseReport,
+      reporterId: null,
+      reason: MODERATOR_INITIATED_REPORT_REASON,
+    };
+    getMock.mockResolvedValueOnce({ data: { items: [directReport], nextCursor: null } });
+    const ModerationTable = await loadModerationTable();
+
+    render(<ModerationTable status="resolved" />);
+
+    expect(
+      await screen.findByText('Taken down directly by a moderator (no report filed)'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(MODERATOR_INITIATED_REPORT_REASON)).not.toBeInTheDocument();
+  });
+
+  it('filters to moderator-initiated reports client-side when requested', async () => {
+    const directReport = {
+      ...baseReport,
+      id: 'report-direct',
+      reporterId: null,
+      reason: MODERATOR_INITIATED_REPORT_REASON,
+    };
+    getMock.mockResolvedValueOnce({
+      data: { items: [baseReport, directReport], nextCursor: null },
+    });
+    const ModerationTable = await loadModerationTable();
+
+    render(<ModerationTable status="resolved" moderatorInitiated />);
+
+    expect(
+      await screen.findByText('Taken down directly by a moderator (no report filed)'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(baseReport.reason)).not.toBeInTheDocument();
   });
 });

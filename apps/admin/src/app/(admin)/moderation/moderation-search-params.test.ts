@@ -26,6 +26,20 @@ describe('parseModerationSearchParams', () => {
       status: 'resolved',
     });
   });
+
+  it('reads the moderator-initiated toggle when set to true', () => {
+    expect(parseModerationSearchParams({ moderatorInitiated: 'true' })).toEqual({
+      status: 'open',
+      moderatorInitiated: true,
+    });
+  });
+
+  it('omits the moderator-initiated toggle for any other value', () => {
+    expect(parseModerationSearchParams({ moderatorInitiated: 'false' })).toEqual({
+      status: 'open',
+    });
+    expect(parseModerationSearchParams({})).toEqual({ status: 'open' });
+  });
 });
 
 describe('moderationFiltersKey', () => {
@@ -33,6 +47,7 @@ describe('moderationFiltersKey', () => {
     const base = moderationFiltersKey({ status: 'open' });
     expect(moderationFiltersKey({ status: 'resolved' })).not.toBe(base);
     expect(moderationFiltersKey({ status: 'open', targetType: 'request' })).not.toBe(base);
+    expect(moderationFiltersKey({ status: 'open', moderatorInitiated: true })).not.toBe(base);
     expect(moderationFiltersKey({ status: 'open' })).toBe(base);
   });
 });

@@ -38,4 +38,20 @@ describe('ModerationFilters', () => {
 
     expect(screen.getByLabelText('Target type')).toHaveValue('');
   });
+
+  it('leaves the moderator-initiated checkbox unchecked by default', async () => {
+    await renderFilters({ status: 'open' });
+
+    expect(
+      screen.getByLabelText('Only content a moderator took down directly, with no report'),
+    ).not.toBeChecked();
+  });
+
+  it('preselects the moderator-initiated checkbox when set', async () => {
+    await renderFilters({ status: 'resolved', moderatorInitiated: true });
+
+    expect(
+      screen.getByLabelText('Only content a moderator took down directly, with no report'),
+    ).toBeChecked();
+  });
 });

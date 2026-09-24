@@ -10,7 +10,11 @@ import type { ModerationFilters as ModerationFiltersValue } from './moderation-s
 const SELECT_CLASSNAME =
   'h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 
-export async function ModerationFilters({ status, targetType }: ModerationFiltersValue) {
+export async function ModerationFilters({
+  status,
+  targetType,
+  moderatorInitiated,
+}: ModerationFiltersValue) {
   const t = await getTranslations('admin.moderation.list.filters');
   const tStatuses = await getTranslations('admin.moderation.statuses');
   const tTargetTypes = await getTranslations('admin.moderation.targetTypes');
@@ -53,6 +57,20 @@ export async function ModerationFilters({ status, targetType }: ModerationFilter
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          id="moderation-search-moderator-initiated"
+          type="checkbox"
+          name="moderatorInitiated"
+          value="true"
+          defaultChecked={moderatorInitiated ?? false}
+          className="h-4 w-4 rounded border-input"
+        />
+        <Label htmlFor="moderation-search-moderator-initiated" className="font-normal">
+          {t('moderatorInitiatedLabel')}
+        </Label>
       </div>
 
       <Button type="submit">{t('submit')}</Button>

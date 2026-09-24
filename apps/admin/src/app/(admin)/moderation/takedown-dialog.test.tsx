@@ -10,16 +10,25 @@ vi.mock('next-intl', async () => {
 const postMock = vi.fn();
 vi.mock('@/lib/api', () => ({ api: { POST: postMock } }));
 
+import type { TakedownTarget } from './takedown-dialog';
+
 async function loadTakedownDialog() {
   return (await import('./takedown-dialog')).TakedownDialog;
 }
 
-async function openDialog(targetLabel = 'Jane Doe Photography') {
+const reportTarget: TakedownTarget = { kind: 'report', reportId: 'report-1' };
+const directTarget: TakedownTarget = {
+  kind: 'direct',
+  targetType: 'photographer_profile',
+  targetId: 'profile-1',
+};
+
+async function openDialog(target: TakedownTarget, targetLabel = 'Jane Doe Photography') {
   const TakedownDialog = await loadTakedownDialog();
   const events = userEvent.setup();
   render(
     <TakedownDialog
-      reportId="report-1"
+      target={target}
       targetLabel={targetLabel}
       onDecided={vi.fn()}
       onConflict={vi.fn()}
@@ -31,13 +40,13 @@ async function openDialog(targetLabel = 'Jane Doe Photography') {
 
 describe('TakedownDialog', () => {
   it('names the target in its confirmation', async () => {
-    await openDialog('Jane Doe Photography');
+    await openDialog(reportTarget, 'Jane Doe Photography');
 
     expect(screen.getByText(/Jane Doe Photography/)).toBeInTheDocument();
   });
 
   it('labels the notice field as sent to both the reporter and the owner', async () => {
-    await openDialog();
+    await openDialog(reportTarget);
 
     expect(
       screen.getByLabelText('Statement of reasons (sent to the reporter and the content owner)'),
@@ -45,7 +54,7 @@ describe('TakedownDialog', () => {
   });
 
   it('requires the notice text before it will submit', async () => {
-    const events = await openDialog();
+    const events = await openDialog(reportTarget);
 
     await events.click(screen.getByRole('button', { name: 'Take down content' }));
 
@@ -53,14 +62,14 @@ describe('TakedownDialog', () => {
     expect(postMock).not.toHaveBeenCalled();
   });
 
-  it('posts the resolution text and calls onDecided on success', async () => {
+  it('posts the resolution text to the report endpoint and calls onDecided on success', async () => {
     postMock.mockResolvedValueOnce({ data: { id: 'report-1', status: 'resolved' } });
     const onDecided = vi.fn();
     const TakedownDialog = await loadTakedownDialog();
     const events = userEvent.setup();
     render(
       <TakedownDialog
-        reportId="report-1"
+        target={reportTarget}
         targetLabel="Jane Doe Photography"
         onDecided={onDecided}
         onConflict={vi.fn()}
@@ -80,7 +89,7 @@ describe('TakedownDialog', () => {
       });
     });
     await waitFor(() => {
-      expect(onDecided).toHaveBeenCalled();
+      expect(onDecided).toHaveBeenCalledWith({ id: 'report-1', status: 'resolved' });
     });
   });
 
@@ -91,7 +100,7 @@ describe('TakedownDialog', () => {
     const events = userEvent.setup();
     render(
       <TakedownDialog
-        reportId="report-1"
+        target={reportTarget}
         targetLabel="Jane Doe Photography"
         onDecided={vi.fn()}
         onConflict={onConflict}
@@ -105,5 +114,59 @@ describe('TakedownDialog', () => {
       expect(onConflict).toHaveBeenCalled();
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('posts a direct takedown to the report-free endpoint with the given target', async () => {
+    postMock.mockResolvedValueOnce({
+      data: { id: 'report-9', status: 'resolved', reporterId: null },
+    });
+    const onDecided = vi.fn();
+    const TakedownDialog = await loadTakedownDialog();
+    const events = userEvent.setup();
+    render(
+      <TakedownDialog
+        target={directTarget}
+        targetLabel="Jane Doe Photography"
+        onDecided={onDecided}
+      />,
+    );
+    await events.click(screen.getByRole('button', { name: 'Take down' }));
+    await events.type(screen.getByLabelText(/Statement of reasons/), 'Found by a moderator.');
+    await events.click(screen.getByRole('button', { name: 'Take down content' }));
+
+    await waitFor(() => {
+      expect(postMock).toHaveBeenCalledWith('/v1/admin/reports/direct-takedown', {
+        body: {
+          targetType: 'photographer_profile',
+          targetId: 'profile-1',
+          resolution: 'Found by a moderator.',
+        },
+      });
+    });
+    await waitFor(() => {
+      expect(onDecided).toHaveBeenCalledWith({
+        id: 'report-9',
+        status: 'resolved',
+        reporterId: null,
+      });
+    });
+  });
+
+  it('shows a generic error for a direct takedown without a conflict handler', async () => {
+    postMock.mockResolvedValueOnce({ error: { code: 'NOT_FOUND' } });
+    const TakedownDialog = await loadTakedownDialog();
+    const events = userEvent.setup();
+    render(
+      <TakedownDialog
+        target={directTarget}
+        targetLabel="Jane Doe Photography"
+        onDecided={vi.fn()}
+      />,
+    );
+    await events.click(screen.getByRole('button', { name: 'Take down' }));
+    await events.type(screen.getByLabelText(/Statement of reasons/), 'Found by a moderator.');
+    await events.click(screen.getByRole('button', { name: 'Take down content' }));
+
+    expect(await screen.findByText("This couldn't be found.")).toBeInTheDocument();
   });
 });
