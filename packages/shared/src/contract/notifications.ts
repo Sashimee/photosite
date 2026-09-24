@@ -28,10 +28,13 @@ export const NotificationPayloadSchema = z
     total: MoneySchema.optional(),
     counterpartName: z.string().min(1).max(NOTIFICATION_TEXT_MAX_LENGTH).optional(),
     conversationId: IdSchema.optional(),
-    reason: z.string().min(1).max(1000).optional(),
+    // Shared by verification rejection (max 1000) and moderation decisions
+    // (max 2000, matching ResolveReportRequestSchema/TakedownReportRequestSchema).
+    reason: z.string().min(1).max(2000).optional(),
     jobOfferId: IdSchema.optional(),
     jobOfferTitle: z.string().min(1).max(NOTIFICATION_TEXT_MAX_LENGTH).optional(),
     jobApplicationId: IdSchema.optional(),
+    moderationOutcome: z.enum(['resolved', 'dismissed', 'takedown', 'restored']).optional(),
   })
   .strict()
   .openapi('NotificationPayload');

@@ -26,6 +26,27 @@ export function buildJobApplicationsPath(locale: string): string {
   return `/${locale}/account/job-applications`;
 }
 
+export function buildModerationNoticePath(locale: string): string {
+  return `/${locale}/account/notifications`;
+}
+
+export function requireModerationOutcome(
+  type: NotificationType,
+  payload: NotificationPayload,
+): NonNullable<NotificationPayload['moderationOutcome']> {
+  if (!payload.moderationOutcome) {
+    throw new Error(`notify templates: "${type}" payload is missing moderationOutcome`);
+  }
+  return payload.moderationOutcome;
+}
+
+export function requireReason(type: NotificationType, payload: NotificationPayload): string {
+  if (!payload.reason) {
+    throw new Error(`notify templates: "${type}" payload is missing reason`);
+  }
+  return payload.reason;
+}
+
 export function requireQuoteId(type: NotificationType, payload: NotificationPayload): string {
   if (!payload.quoteId) {
     throw new Error(`notify templates: "${type}" payload is missing quoteId`);
@@ -90,6 +111,43 @@ function renderHtmlWithLink(template: string, values: Record<string, string>, ur
   return withToken.replaceAll(URL_TOKEN, link(url));
 }
 
+// The DSA statement of reasons lives entirely in this notice, unlike
+// `verification_rejected`'s deep link back to a sign-in-gated detail page:
+// there is no such page for a report's outcome, and the affected party may
+// not even be the account holder who filed it.
+function renderModerationNoticeEmail(
+  type: 'report_decision' | 'moderation_action',
+  payload: NotificationPayload,
+  locale: string,
+  to: string,
+  webAppUrl: string,
+  messages: ReturnType<typeof getMessages>,
+): MailMessage {
+  const outcome = requireModerationOutcome(type, payload);
+  const reason = requireReason(type, payload);
+  const table =
+    type === 'report_decision'
+      ? messages.email.notifications.reportDecision
+      : messages.email.notifications.moderationAction;
+  const template = table[outcome];
+  const url = `${webAppUrl}${buildModerationNoticePath(locale)}`;
+  const preferencesUrl = `${webAppUrl}/${locale}/account/notifications`;
+  const values = { reason };
+
+  const bodyText = formatText(template.body, { ...values, url });
+  const bodyHtml = renderHtmlWithLink(template.body, values, url);
+  const footerText = formatText(messages.email.footer.preferences, { url: preferencesUrl });
+  const footerHtml = renderHtmlWithLink(messages.email.footer.preferences, {}, preferencesUrl);
+
+  return {
+    to,
+    subject: formatText(template.subject, values),
+    text: `${bodyText}\n\n${footerText}`,
+    html: `<p>${bodyHtml}</p><p>${footerHtml}</p>`,
+    headers: { 'List-Unsubscribe': `<${preferencesUrl}>` },
+  };
+}
+
 export function renderNotifyEmail(
   type: NotificationType,
   payload: NotificationPayload,
@@ -99,7 +157,15 @@ export function renderNotifyEmail(
 ): MailMessage {
   const messages = getMessages(locale);
   const t = messages.email.notifications;
-  const templates: Record<NotificationType, { subject: string; body: string }> = {
+
+  if (type === 'report_decision' || type === 'moderation_action') {
+    return renderModerationNoticeEmail(type, payload, locale, to, webAppUrl, messages);
+  }
+
+  const templates: Record<
+    Exclude<NotificationType, 'report_decision' | 'moderation_action'>,
+    { subject: string; body: string }
+  > = {
     quote_received: t.quoteReceived,
     quote_accepted: t.quoteAccepted,
     quote_declined: t.quoteDeclined,

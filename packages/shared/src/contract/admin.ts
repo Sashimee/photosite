@@ -1,6 +1,7 @@
 import {
   ADMIN_PERMISSIONS,
   FEATURE_FLAG_KEYS,
+  PORTFOLIO_IMAGE_STATUSES,
   PROVENANCE_VERDICTS,
   REPORT_STATUSES,
   USER_ROLES,
@@ -95,6 +96,78 @@ export const SetUserRolesRequestSchema = z
   })
   .strict();
 
+// Each variant carries only what a moderator needs to decide, never the
+// reporting user's data or the target owner's email (docs/steps/1D.6-moderation.md).
+// `deletedAt` says whether the target is currently taken down, so the UI can
+// tell a live report from one whose target a moderator already removed.
+export const PhotographerProfileReportTargetSchema = z
+  .object({
+    targetType: z.literal('photographer_profile'),
+    displayName: z.string().max(120),
+    slug: SlugSchema,
+    isPublished: z.boolean(),
+    deletedAt: IsoDateTimeSchema.nullable(),
+  })
+  .strict()
+  .openapi('PhotographerProfileReportTarget');
+
+export const PortfolioImageReportTargetSchema = z
+  .object({
+    targetType: z.literal('portfolio_image'),
+    url: z.url().nullable(),
+    width: z.int().positive().nullable(),
+    height: z.int().positive().nullable(),
+    status: z.enum(PORTFOLIO_IMAGE_STATUSES),
+    deletedAt: IsoDateTimeSchema.nullable(),
+  })
+  .strict()
+  .openapi('PortfolioImageReportTarget');
+
+export const RequestReportTargetSchema = z
+  .object({
+    targetType: z.literal('request'),
+    title: z.string().max(150),
+    description: z.string().max(4000),
+    deletedAt: IsoDateTimeSchema.nullable(),
+  })
+  .strict()
+  .openapi('RequestReportTarget');
+
+export const JobOfferReportTargetSchema = z
+  .object({
+    targetType: z.literal('job_offer'),
+    title: z.string().max(150),
+    description: z.string().max(4000),
+    companyName: z.string().max(120),
+    deletedAt: IsoDateTimeSchema.nullable(),
+  })
+  .strict()
+  .openapi('JobOfferReportTarget');
+
+// `message` has no `.min(1)`: an applicant's account being GDPR-erased
+// blanks it to '' (apps/worker/src/gdpr/sweep/anonymise-deletions.ts)
+// without removing the application row, and this summary must still parse
+// afterwards. `jobOfferTitle` is the professional's own public listing
+// content, not the applicant's data, so it is safe context for deciding
+// whether the message fits that listing.
+export const JobApplicationReportTargetSchema = z
+  .object({
+    targetType: z.literal('job_application'),
+    message: z.string().max(2000),
+    jobOfferTitle: z.string().max(150),
+    deletedAt: IsoDateTimeSchema.nullable(),
+  })
+  .strict()
+  .openapi('JobApplicationReportTarget');
+
+export const AdminReportTargetSchema = z.discriminatedUnion('targetType', [
+  PhotographerProfileReportTargetSchema,
+  PortfolioImageReportTargetSchema,
+  RequestReportTargetSchema,
+  JobOfferReportTargetSchema,
+  JobApplicationReportTargetSchema,
+]);
+
 export const AdminReportSchema = z
   .object({
     id: IdSchema,
@@ -105,6 +178,13 @@ export const AdminReportSchema = z
     status: z.enum(REPORT_STATUSES),
     adminId: IdSchema.nullable(),
     resolution: z.string().max(2000).nullable(),
+    createdAt: IsoDateTimeSchema,
+    // Derived from `Report.updatedAt`: null while `status` is `open`, since
+    // resolve/takedown are the only writes that ever touch an existing
+    // report row and `restore` deliberately does not (docs/steps/1D.6-moderation.md
+    // "restore ... does not reopen the report").
+    resolvedAt: IsoDateTimeSchema.nullable(),
+    target: AdminReportTargetSchema.nullable(),
   })
   .strict()
   .openapi('AdminReport');
@@ -123,6 +203,15 @@ export const ResolveReportRequestSchema = z
   .strict();
 
 export const TakedownReportRequestSchema = z
+  .object({
+    resolution: z.string().min(1).max(2000),
+  })
+  .strict();
+
+// Same shape and weight as `TakedownReportRequestSchema`: a reversal is a
+// moderation decision in its own right and gets its own statement of
+// reasons, not a bare status flip (docs/steps/1D.6-moderation.md).
+export const RestoreReportRequestSchema = z
   .object({
     resolution: z.string().min(1).max(2000),
   })
@@ -706,6 +795,25 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/reports/{id}'),
+  summary: 'Get a report, including a summary of its target',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('moderation'),
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+  },
+  responses: {
+    '200': {
+      description: 'The report',
+      content: { 'application/json': { schema: AdminReportSchema } },
+    },
+    ...errorResponses([401, 403, 404]),
+  },
+});
+
+registry.registerPath({
   method: 'post',
   path: apiPath('/admin/reports/{id}/resolve'),
   summary: 'Resolve a report',
@@ -739,6 +847,26 @@ registry.registerPath({
   responses: {
     '200': {
       description: 'Report resolved and its target taken down',
+      content: { 'application/json': { schema: AdminReportSchema } },
+    },
+    ...errorResponses([400, 401, 403, 404, 409, 422]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/admin/reports/{id}/restore'),
+  summary: "Reverse a takedown, restoring the report's target",
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('moderation'),
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+    body: { content: { 'application/json': { schema: RestoreReportRequestSchema } } },
+  },
+  responses: {
+    '200': {
+      description: 'Target restored',
       content: { 'application/json': { schema: AdminReportSchema } },
     },
     ...errorResponses([400, 401, 403, 404, 409, 422]),

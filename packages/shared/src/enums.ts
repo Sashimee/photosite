@@ -187,6 +187,8 @@ export const NOTIFICATION_TYPES = [
   'verification_rejected',
   'job_application_received',
   'job_application_status_changed',
+  'report_decision',
+  'moderation_action',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
