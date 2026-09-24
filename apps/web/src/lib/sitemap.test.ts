@@ -23,10 +23,23 @@ const PHOTOGRAPHER = {
   displayName: 'Sofia Martins',
 };
 
+const JOB_OFFER = {
+  id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+  slug: 'wedding-second-shooter-luxembourg',
+  title: 'Wedding second shooter',
+};
+
 function items(count: number) {
   return Array.from({ length: count }, (_, index) => ({
     ...PHOTOGRAPHER,
     slug: `slug-${String(index)}`,
+  }));
+}
+
+function jobOfferItems(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    ...JOB_OFFER,
+    slug: `job-slug-${String(index)}`,
   }));
 }
 
@@ -112,6 +125,59 @@ describe('buildSitemapPaths', () => {
     expect(paths).toContain('/photographers/slug-0');
     expect(paths).toContain('/photographers/slug-1');
     expect(paths).toContain('/photographers/slug-2');
+  });
+
+  it('paginates every published job offer', async () => {
+    apiGetMock.mockImplementation(
+      (url: string, options: { params: { query: Record<string, unknown> } }) => {
+        if (url === '/v1/photographers') {
+          return Promise.resolve({
+            data: { items: [], nextCursor: null },
+            response: { status: 200 },
+          });
+        }
+        if (url === '/v1/job-offers') {
+          if (!options.params.query.cursor) {
+            return Promise.resolve({
+              data: { items: jobOfferItems(2), nextCursor: 'page-2' },
+              response: { status: 200 },
+            });
+          }
+          return Promise.resolve({
+            data: { items: [{ ...JOB_OFFER, slug: 'job-slug-2' }], nextCursor: null },
+            response: { status: 200 },
+          });
+        }
+        throw new Error(`unexpected GET ${url}`);
+      },
+    );
+    loadEnabledCountryCodesMock.mockResolvedValue([]);
+
+    const { buildSitemapPaths } = await import('./sitemap');
+    const paths = await buildSitemapPaths();
+
+    expect(paths).toContain('/job-offers/job-slug-0');
+    expect(paths).toContain('/job-offers/job-slug-1');
+    expect(paths).toContain('/job-offers/job-slug-2');
+  });
+
+  it('fails loudly instead of returning a truncated sitemap when the job offers source errors', async () => {
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/v1/photographers') {
+        return Promise.resolve({
+          data: { items: [], nextCursor: null },
+          response: { status: 200 },
+        });
+      }
+      if (url === '/v1/job-offers') {
+        return Promise.resolve({ data: undefined, response: { status: 500 } });
+      }
+      throw new Error(`unexpected GET ${url}`);
+    });
+    loadEnabledCountryCodesMock.mockResolvedValue([]);
+
+    const { buildSitemapPaths } = await import('./sitemap');
+    await expect(buildSitemapPaths()).rejects.toThrow(/HTTP 500/);
   });
 
   // A 2-letter profile slug would be routed as a country landing page
@@ -328,5 +394,45 @@ describe('buildSitemap', () => {
       fr: 'http://127.0.0.1:3000/fr',
       'x-default': 'http://127.0.0.1:3000/en',
     });
+  });
+
+  it('emits one entry per locale for each job offer detail page, with reciprocal hreflang and no lastModified', async () => {
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/v1/photographers') {
+        return Promise.resolve({
+          data: { items: [], nextCursor: null },
+          response: { status: 200 },
+        });
+      }
+      if (url === '/v1/job-offers') {
+        return Promise.resolve({
+          data: { items: [JOB_OFFER], nextCursor: null },
+          response: { status: 200 },
+        });
+      }
+      throw new Error(`unexpected GET ${url}`);
+    });
+    loadEnabledCountryCodesMock.mockResolvedValue([]);
+
+    const { buildSitemap } = await import('./sitemap');
+    const entries = await buildSitemap();
+
+    const jobOfferEntries = entries.filter((entry) =>
+      entry.url.includes(`/job-offers/${JOB_OFFER.slug}`),
+    );
+    expect(jobOfferEntries).toHaveLength(SUPPORTED_LOCALES.length);
+
+    const enEntry = jobOfferEntries.find(
+      (entry) => entry.url === `http://127.0.0.1:3000/en/job-offers/${JOB_OFFER.slug}`,
+    );
+    expect(enEntry?.alternates?.languages).toMatchObject({
+      en: `http://127.0.0.1:3000/en/job-offers/${JOB_OFFER.slug}`,
+      fr: `http://127.0.0.1:3000/fr/job-offers/${JOB_OFFER.slug}`,
+      'x-default': `http://127.0.0.1:3000/en/job-offers/${JOB_OFFER.slug}`,
+    });
+
+    for (const entry of entries) {
+      expect(entry.lastModified).toBeUndefined();
+    }
   });
 });
