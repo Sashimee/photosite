@@ -20,6 +20,9 @@ jobs:
     # service startup plus migrating, seeding and running the previously
     # skipped db/api integration suites against them adds a few minutes.
     timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
     env:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:4010
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
@@ -72,7 +75,7 @@ jobs:
           - 1025:1025
           - 8025:8025
       # No `minio` entry here: GitHub Actions service containers can't be
-      # given a custom command, and quay.io/minio/minio has no default CMD
+      # given a custom command, and ghcr.io/sashimee/minio has no default CMD
       # (it needs `server /data`), so MinIO is started as a plain `docker run`
       # step below instead, using the same image tag as compose.dev.yml.
     steps:
@@ -101,13 +104,22 @@ jobs:
           # bump or a config change invalidates the cache instead of reusing
           # a transform compiled under the old rules.
           key: mobile-jest-transform-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'apps/mobile/babel.config.js', 'apps/mobile/jest.config.js') }}
+      # ghcr.io/sashimee/{minio,mc} are the from-source mirrors built by
+      # .github/workflows/mirror-minio.yml (#326) - logging in with the
+      # job's own GITHUB_TOKEN works whether or not the packages are public,
+      # so this job never depends on that visibility setting.
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Start MinIO, create buckets and allow anonymous reads of photoo-public
         run: |
           docker run -d --name minio \
             -p 9000:9000 \
             -e MINIO_ROOT_USER=photoo_dev \
             -e MINIO_ROOT_PASSWORD=photoo_dev_password \
-            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+            ghcr.io/sashimee/minio:RELEASE.2025-09-07T16-13-09Z@sha256:321a615934fc2e251df8155f378a99b4b89caec2e3488a99ccd97d1f9b6135be server /data
           timeout 60 bash -c 'until curl -sf http://127.0.0.1:9000/minio/health/ready; do sleep 1; done'
           cat > /tmp/photoo-public-anonymous-policy.json <<'EOF'
           {
@@ -126,7 +138,7 @@ jobs:
             --entrypoint sh \
             -e MC_HOST_local=http://photoo_dev:photoo_dev_password@127.0.0.1:9000 \
             -v /tmp/photoo-public-anonymous-policy.json:/tmp/photoo-public-anonymous-policy.json \
-            quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+            ghcr.io/sashimee/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a0b9f1a75dc9ca1e96db9055a391bbf72ffbf7e9e5d3329e506fdcf4149cdbd3 \
             -c "mc mb --ignore-existing local/photoo-private local/photoo-public && mc anonymous set none local/photoo-private && mc anonymous set-json /tmp/photoo-public-anonymous-policy.json local/photoo-public"
       - run: pnpm format:check
       - run: pnpm lint
@@ -182,6 +194,9 @@ jobs:
   browser-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
     env:
       # 127.0.0.1 everywhere, never localhost: Better Auth's CORS allow-list
       # (WEB_ORIGINS) is an exact origin match, and localhost/127.0.0.1 count
@@ -263,13 +278,22 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # ghcr.io/sashimee/{minio,mc} are the from-source mirrors built by
+      # .github/workflows/mirror-minio.yml (#326) - logging in with the
+      # job's own GITHUB_TOKEN works whether or not the packages are public,
+      # so this job never depends on that visibility setting.
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Start MinIO, create buckets and allow anonymous reads of photoo-public
         run: |
           docker run -d --name minio \
             -p 9000:9000 \
             -e MINIO_ROOT_USER=photoo_dev \
             -e MINIO_ROOT_PASSWORD=photoo_dev_password \
-            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+            ghcr.io/sashimee/minio:RELEASE.2025-09-07T16-13-09Z@sha256:321a615934fc2e251df8155f378a99b4b89caec2e3488a99ccd97d1f9b6135be server /data
           timeout 60 bash -c 'until curl -sf http://127.0.0.1:9000/minio/health/ready; do sleep 1; done'
           cat > /tmp/photoo-public-anonymous-policy.json <<'EOF'
           {
@@ -288,7 +312,7 @@ jobs:
             --entrypoint sh \
             -e MC_HOST_local=http://photoo_dev:photoo_dev_password@127.0.0.1:9000 \
             -v /tmp/photoo-public-anonymous-policy.json:/tmp/photoo-public-anonymous-policy.json \
-            quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+            ghcr.io/sashimee/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a0b9f1a75dc9ca1e96db9055a391bbf72ffbf7e9e5d3329e506fdcf4149cdbd3 \
             -c "mc mb --ignore-existing local/photoo-private local/photoo-public && mc anonymous set none local/photoo-private && mc anonymous set-json /tmp/photoo-public-anonymous-policy.json local/photoo-public"
       - name: Create the test database
         env:
@@ -389,6 +413,9 @@ jobs:
     # comparable (docs/steps/1B.12-web-e2e.md). If a spec routinely pushes
     # past that, the fix is to cut or split it, never to raise this number.
     timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
     env:
       # See browser-smoke's copy of this comment before touching any of the
       # 127.0.0.1-vs-localhost, ALLOW_LOCAL_IMAGE_HOSTS or dev-only-secret
@@ -467,13 +494,22 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # ghcr.io/sashimee/{minio,mc} are the from-source mirrors built by
+      # .github/workflows/mirror-minio.yml (#326) - logging in with the
+      # job's own GITHUB_TOKEN works whether or not the packages are public,
+      # so this job never depends on that visibility setting.
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Start MinIO, create buckets and allow anonymous reads of photoo-public
         run: |
           docker run -d --name minio \
             -p 9000:9000 \
             -e MINIO_ROOT_USER=photoo_dev \
             -e MINIO_ROOT_PASSWORD=photoo_dev_password \
-            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+            ghcr.io/sashimee/minio:RELEASE.2025-09-07T16-13-09Z@sha256:321a615934fc2e251df8155f378a99b4b89caec2e3488a99ccd97d1f9b6135be server /data
           timeout 60 bash -c 'until curl -sf http://127.0.0.1:9000/minio/health/ready; do sleep 1; done'
           cat > /tmp/photoo-public-anonymous-policy.json <<'EOF'
           {
@@ -492,7 +528,7 @@ jobs:
             --entrypoint sh \
             -e MC_HOST_local=http://photoo_dev:photoo_dev_password@127.0.0.1:9000 \
             -v /tmp/photoo-public-anonymous-policy.json:/tmp/photoo-public-anonymous-policy.json \
-            quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+            ghcr.io/sashimee/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a0b9f1a75dc9ca1e96db9055a391bbf72ffbf7e9e5d3329e506fdcf4149cdbd3 \
             -c "mc mb --ignore-existing local/photoo-private local/photoo-public && mc anonymous set none local/photoo-private && mc anonymous set-json /tmp/photoo-public-anonymous-policy.json local/photoo-public"
       # Same image/port as compose.dev.yml's clamav service, so CI and local
       # dev scan uploads the same way. Not a GH Actions `services:` entry:
@@ -612,6 +648,9 @@ jobs:
     # 20 minutes leaves real headroom rather than matching a bare measured
     # total.
     timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
     env:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
@@ -676,13 +715,22 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # ghcr.io/sashimee/{minio,mc} are the from-source mirrors built by
+      # .github/workflows/mirror-minio.yml (#326) - logging in with the
+      # job's own GITHUB_TOKEN works whether or not the packages are public,
+      # so this job never depends on that visibility setting.
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Start MinIO, create buckets and allow anonymous reads of photoo-public
         run: |
           docker run -d --name minio \
             -p 9000:9000 \
             -e MINIO_ROOT_USER=photoo_dev \
             -e MINIO_ROOT_PASSWORD=photoo_dev_password \
-            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+            ghcr.io/sashimee/minio:RELEASE.2025-09-07T16-13-09Z@sha256:321a615934fc2e251df8155f378a99b4b89caec2e3488a99ccd97d1f9b6135be server /data
           timeout 60 bash -c 'until curl -sf http://127.0.0.1:9000/minio/health/ready; do sleep 1; done'
           cat > /tmp/photoo-public-anonymous-policy.json <<'EOF'
           {
@@ -701,7 +749,7 @@ jobs:
             --entrypoint sh \
             -e MC_HOST_local=http://photoo_dev:photoo_dev_password@127.0.0.1:9000 \
             -v /tmp/photoo-public-anonymous-policy.json:/tmp/photoo-public-anonymous-policy.json \
-            quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+            ghcr.io/sashimee/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a0b9f1a75dc9ca1e96db9055a391bbf72ffbf7e9e5d3329e506fdcf4149cdbd3 \
             -c "mc mb --ignore-existing local/photoo-private local/photoo-public && mc anonymous set none local/photoo-private && mc anonymous set-json /tmp/photoo-public-anonymous-policy.json local/photoo-public"
       - name: Create the test database
         env:
@@ -790,6 +838,9 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
     services:
       postgres:
         image: postgis/postgis:16-3.5
@@ -807,6 +858,17 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
+      # ghcr.io/sashimee/{minio,mc} are the from-source mirrors built by
+      # .github/workflows/mirror-minio.yml (#326) - logging in with the job's
+      # own GITHUB_TOKEN works whether or not the packages are public, so this
+      # job never depends on that visibility setting. Needed before the build
+      # below too: infra/docker/backup.Dockerfile's `mc` stage FROMs the same
+      # mirror.
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build the backup image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -821,7 +883,7 @@ jobs:
         run: |
           docker run -d --name minio -p 9000:9000 \
             -e MINIO_ROOT_USER=rootuser -e MINIO_ROOT_PASSWORD=rootpassword123 \
-            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+            ghcr.io/sashimee/minio:RELEASE.2025-09-07T16-13-09Z@sha256:321a615934fc2e251df8155f378a99b4b89caec2e3488a99ccd97d1f9b6135be server /data
           timeout 60 bash -c 'until curl -sf http://127.0.0.1:9000/minio/health/ready; do sleep 1; done'
           cat > /tmp/photoo-backup-policy.json <<'EOF'
           {
@@ -836,7 +898,7 @@ jobs:
             --entrypoint sh \
             -e MC_HOST_local=http://rootuser:rootpassword123@127.0.0.1:9000 \
             -v /tmp/photoo-backup-policy.json:/tmp/photoo-backup-policy.json \
-            quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+            ghcr.io/sashimee/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a0b9f1a75dc9ca1e96db9055a391bbf72ffbf7e9e5d3329e506fdcf4149cdbd3 \
             -c "mc mb --ignore-existing local/photoo-backups && mc anonymous set none local/photoo-backups && mc admin user add local backupuser backuppassword123 && mc admin policy create local photoo-backup /tmp/photoo-backup-policy.json && mc admin policy attach local photoo-backup --user backupuser"
 
       - name: Seed rows past the size floor
@@ -866,14 +928,14 @@ jobs:
         run: |
           object=$(docker run --rm --network host \
             -e MC_HOST_local=http://rootuser:rootpassword123@127.0.0.1:9000 \
-            quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+            ghcr.io/sashimee/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a0b9f1a75dc9ca1e96db9055a391bbf72ffbf7e9e5d3329e506fdcf4149cdbd3 \
             find local/photoo-backups/photoo/ci/ --name '*.dump.age')
           test -n "$object"
           mkdir -p /tmp/verify && chmod 777 /tmp/verify
           docker run --rm --network host \
             -e MC_HOST_local=http://rootuser:rootpassword123@127.0.0.1:9000 \
             -v /tmp/verify:/verify \
-            quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z cp "$object" /verify/dump.age
+            ghcr.io/sashimee/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a0b9f1a75dc9ca1e96db9055a391bbf72ffbf7e9e5d3329e506fdcf4149cdbd3 cp "$object" /verify/dump.age
           docker run --rm -v /tmp/verify:/verify -v /tmp/identity.txt:/identity.txt \
             --entrypoint sh photosite-backup:ci -c \
             'age --decrypt -i /identity.txt -o /verify/dump.plain /verify/dump.age && pg_restore --list /verify/dump.plain | grep -q "TABLE DATA"'

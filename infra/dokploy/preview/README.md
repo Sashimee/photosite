@@ -345,7 +345,7 @@ prefix in the same or a different bucket and can never collide.
 ```bash
 docker run --rm --network <project>_internal \
   -e MC_HOST_local=http://<MINIO_BACKUP_ACCESS_KEY>:<MINIO_BACKUP_SECRET_KEY>@minio:9000 \
-  quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+  ghcr.io/sashimee/mc:RELEASE.2025-08-13T08-35-41Z \
   find local/photoo-backups/photoo/preview/ --name '*.dump.age'
 ```
 
