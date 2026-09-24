@@ -350,6 +350,201 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  # docs/steps/1B.12-web-e2e.md: real flows through apps/web (sign-up +
+  # verify, request -> quote -> accept, chat, onboarding, job board), not
+  # `browser-smoke`'s "did the page load". Its own job for the same reason
+  # `browser-smoke` is already separate from `checks`: a much larger, network-
+  # and email-round-trip-heavy suite folded into `browser-smoke` would blow
+  # that job's fast, near-unconditional budget and muddy what a red
+  # `browser-smoke` means. Clones `browser-smoke`'s boot steps rather than
+  # inventing a second way to bring the stack up, and adds a `mailpit`
+  # service (`checks`' own copy) plus a running `apps/worker`, because
+  # `createVerifiedUser` (apps/web/e2e/fixtures/users.ts) needs a real,
+  # delivered verification email - apps/api only enqueues that email
+  # (apps/api/src/testing/test-email-worker.module.ts's own comment: "the
+  # worker owns delivery"), which `browser-smoke`'s pre-verified seeded
+  # accounts never needed.
+  #
+  # Non-blocking while it burns in (docs/steps/1B.12-web-e2e.md "Decisions
+  # for this step"): a flaky e2e suite that blocks merges teaches people to
+  # re-run rather than read, worse than no suite at all - #201/#277/#288/#304
+  # already paid for that lesson elsewhere, and real navigation, real
+  # sockets and real email round trips together are a strictly higher-flake
+  # category than any of those. This job still reports its real result -
+  # no `continue-on-error` hiding a failure the way deploy-preview.yml's
+  # `post-deploy-smoke` once did ("a check nobody can see fail is not a
+  # check") - it simply isn't listed as a required status check in branch
+  # protection yet. Promoting it once it has burned in (repeated clean
+  # passes on real PRs, no failure traceable to the harness itself) is
+  # tracked in docs/steps/human-followups.md as a branch-protection setting,
+  # not something this file can flip on its own.
+  e2e:
+    runs-on: ubuntu-latest
+    # Target: the Playwright run itself under 10 minutes, this whole job
+    # under 20, matching `browser-smoke`'s own budget so the two stay
+    # comparable (docs/steps/1B.12-web-e2e.md). If a spec routinely pushes
+    # past that, the fix is to cut or split it, never to raise this number.
+    timeout-minutes: 20
+    env:
+      # See browser-smoke's copy of this comment before touching any of the
+      # 127.0.0.1-vs-localhost, ALLOW_LOCAL_IMAGE_HOSTS or dev-only-secret
+      # values below - same host, same reasons.
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_MEDIA_BASE_URL: http://127.0.0.1:9000/photoo-public
+      NEXT_PUBLIC_ALLOW_INDEXING: 'false'
+      ALLOW_LOCAL_IMAGE_HOSTS: 'true'
+      DATABASE_URL: postgresql://photoo:photoo_dev_password@127.0.0.1:5432/photoo_test
+      SHADOW_DATABASE_URL: postgresql://photoo:photoo_dev_password@127.0.0.1:5432/photoo_shadow
+      REDIS_URL: redis://127.0.0.1:6379
+      SEED_USER_PASSWORD: correct-horse-battery-staple
+      VERIFICATION_ENCRYPTION_KEY: 9DsORuh9HI1DUnXKM0DKVcgw36Y9NfbLBSlfPmQxwYs=
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_REGION: eu-west-1
+      S3_ACCESS_KEY_ID: photoo_dev
+      S3_SECRET_ACCESS_KEY: photoo_dev_password
+      S3_FORCE_PATH_STYLE: 'true'
+      S3_PRIVATE_BUCKET: photoo-private
+      S3_PUBLIC_BUCKET: photoo-public
+      S3_PUBLIC_BASE_URL: http://127.0.0.1:9000/photoo-public
+      PORT: 4000
+      PUBLIC_API_URL: http://127.0.0.1:4000
+      WEB_ORIGINS: http://127.0.0.1:3000
+      WEB_APP_URL: http://127.0.0.1:3000
+      NODE_ENV: development
+      TRUSTED_PROXIES: ''
+      AUTH_SECRET: dev-only-auth-secret-change-me-please-32-chars-min
+      AUTH_ENCRYPTION_KEY: qA5jxlkWykGDbMKLOSqgSGG+lbzsuDkUWUS8nV9twig=
+      # apps/worker's own SMTP target for the mailpit service below - see the
+      # job comment for why apps/worker has to run here at all.
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: '1025'
+      SMTP_SECURE: 'false'
+      SMTP_FROM: dev@photoo.test
+    services:
+      postgres:
+        image: postgis/postgis:16-3.5
+        env:
+          POSTGRES_USER: photoo
+          POSTGRES_PASSWORD: photoo_dev_password
+          POSTGRES_DB: photoo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U photoo -d photoo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      # Same image/ports as the `checks` job - see its own comment on why
+      # Mailpit is a hard dependency, not an optional one.
+      mailpit:
+        image: axllent/mailpit:v1.31.1
+        ports:
+          - 1025:1025
+          - 8025:8025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Start MinIO, create buckets and allow anonymous reads of photoo-public
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=photoo_dev \
+            -e MINIO_ROOT_PASSWORD=photoo_dev_password \
+            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+          timeout 60 bash -c 'until curl -sf http://127.0.0.1:9000/minio/health/ready; do sleep 1; done'
+          cat > /tmp/photoo-public-anonymous-policy.json <<'EOF'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {"AWS": ["*"]},
+                "Action": ["s3:GetObject"],
+                "Resource": ["arn:aws:s3:::photoo-public/*"]
+              }
+            ]
+          }
+          EOF
+          docker run --rm --network host \
+            --entrypoint sh \
+            -e MC_HOST_local=http://photoo_dev:photoo_dev_password@127.0.0.1:9000 \
+            -v /tmp/photoo-public-anonymous-policy.json:/tmp/photoo-public-anonymous-policy.json \
+            quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+            -c "mc mb --ignore-existing local/photoo-private local/photoo-public && mc anonymous set none local/photoo-private && mc anonymous set-json /tmp/photoo-public-anonymous-policy.json local/photoo-public"
+      - name: Create the test database
+        env:
+          PGPASSWORD: photoo_dev_password
+        run: |
+          psql -h 127.0.0.1 -U photoo -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE photoo_test;'
+          psql -h 127.0.0.1 -U photoo -d photoo_test -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS postgis;'
+      # Same reason as browser-smoke: the seed imports @photoo/shared, and
+      # this job has no typecheck step to build it as a side effect.
+      - name: Build the workspace packages the seed imports
+        run: pnpm turbo run build --filter='@photoo/db^...'
+      - name: Apply Prisma migrations and seed the test database
+        run: pnpm --filter @photoo/db run migrate:deploy && pnpm --filter @photoo/db run seed
+      - name: Build api, web and worker
+        run: pnpm exec turbo run build --filter=@photoo/api... --filter=@photoo/web... --filter=@photoo/worker...
+      - name: Start api, web and worker, wait until all three answer
+        run: |
+          # Same standalone-server reasoning as browser-smoke - see its copy
+          # of this comment.
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/
+          pnpm --filter @photoo/api start &
+          PORT=3000 HOSTNAME=0.0.0.0 node apps/web/.next/standalone/apps/web/server.js &
+          pnpm --filter @photoo/worker start &
+
+          # Same `curl -sS --max-time 5` reasoning as browser-smoke - a wait
+          # that times out silently is a debugging tax on whoever hits it next.
+          wait_for() {
+            local url="$1" deadline=$((SECONDS + 60)) body status
+            body="$(mktemp)"
+            while true; do
+              status="$(curl -sS --max-time 5 -o "$body" -w '%{http_code}' "$url" 2>"$body.err")" \
+                && [ "$status" = 200 ] && { rm -f "$body" "$body.err"; return 0; }
+              if [ "$SECONDS" -ge "$deadline" ]; then
+                echo "::error::$url did not answer with HTTP 200 within 60s (last status: ${status:-none, see curl error below})"
+                echo '--- curl stderr ---'; cat "$body.err"
+                echo '--- response body ---'; cat "$body"
+                rm -f "$body" "$body.err"
+                return 1
+              fi
+              sleep 1
+            done
+          }
+
+          wait_for http://127.0.0.1:4000/health
+          wait_for http://127.0.0.1:3000/en
+          # /ready (not /health) so this also blocks until the worker's own
+          # DB and Redis connections are up - createVerifiedUser needs it
+          # actively consuming the email queue, not just alive.
+          wait_for http://127.0.0.1:4100/ready
+      - name: Install the e2e project's browser
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report-e2e
+          path: playwright-report/
+          retention-days: 7
+
   # Core Web Vitals budget (docs/steps/1B.11-seo.md). Its own job, not a step
   # in `checks` or `browser-smoke`: Lighthouse's timings are sensitive to CPU
   # contention (#201 - the very reason `checks` bounds test worker pools),
