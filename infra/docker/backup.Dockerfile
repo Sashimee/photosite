@@ -9,7 +9,10 @@
 # fetched in separate, currently-supported builder stages and copied in as
 # binaries; the postgis base layer itself never runs apt-get.
 
-FROM quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 AS mc
+# Built from source and mirrored to GHCR (#326): MinIO Inc. archived
+# github.com/minio/{minio,mc} and cut off anonymous pulls of their own
+# quay.io images - see infra/docker/minio-mirror.Dockerfile's comment.
+FROM ghcr.io/sashimee/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a0b9f1a75dc9ca1e96db9055a391bbf72ffbf7e9e5d3329e506fdcf4149cdbd3 AS mc
 
 FROM curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777 AS age-fetch
 ARG AGE_VERSION=1.3.2
