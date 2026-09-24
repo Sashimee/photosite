@@ -106,6 +106,7 @@ export default async function DashboardOverviewPage({
 
   const profileHref = `/${locale}/dashboard/profile`;
   const portfolioHref = `/${locale}/dashboard/portfolio`;
+  const verificationHref = `/${locale}/dashboard/verification`;
 
   return (
     <div className="flex flex-col gap-8">
@@ -192,13 +193,22 @@ export default async function DashboardOverviewPage({
           )}
           description={overview('checklist.verification.description')}
           action={
-            <span className="text-sm text-muted-foreground">
-              {overview(
-                profile
-                  ? 'checklist.verification.comingSoon'
-                  : 'checklist.verification.needsProfile',
-              )}
-            </span>
+            profile ? (
+              <Link
+                href={verificationHref}
+                className="self-start text-sm font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {overview(
+                  profile.verificationStatus === 'unverified'
+                    ? 'checklist.verification.startCta'
+                    : 'checklist.verification.cta',
+                )}
+              </Link>
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                {overview('checklist.verification.needsProfile')}
+              </span>
+            )
           }
         />
 
