@@ -28,6 +28,12 @@ services:
       API_INTERNAL_URL: http://api:4000
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://footoo.bas.lu}
       NEXT_PUBLIC_MEDIA_BASE_URL: ${NEXT_PUBLIC_MEDIA_BASE_URL:-https://footoo.bas.lu/photoo-public}
+      # Empty by default: there is no browser-reachable hostname for `api`'s
+      # S3_ENDPOINT yet (README.md "Public images" - "Browser uploads still
+      # don't work", #322), so direct-to-storage uploads stay CSP-blocked on
+      # this preview until that DNS/routing follow-up lands. Once it does,
+      # set this to the same public hostname S3_ENDPOINT is repointed at.
+      NEXT_PUBLIC_STORAGE_ORIGIN: ${NEXT_PUBLIC_STORAGE_ORIGIN:-}
       NEXT_PUBLIC_ALLOW_INDEXING: ${NEXT_PUBLIC_ALLOW_INDEXING:-false}
       NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
       SENTRY_REQUIRED: ${SENTRY_REQUIRED:-false}

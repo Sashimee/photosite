@@ -20,11 +20,13 @@ describe('env', () => {
       NEXT_PUBLIC_SENTRY_DSN: '',
       SENTRY_REQUIRED: '',
       NEXT_PUBLIC_MEDIA_BASE_URL: '',
+      NEXT_PUBLIC_STORAGE_ORIGIN: '',
     });
 
     expect(env.NEXT_PUBLIC_SENTRY_DSN).toBeUndefined();
     expect(env.SENTRY_REQUIRED).toBeUndefined();
     expect(env.NEXT_PUBLIC_MEDIA_BASE_URL).toBeUndefined();
+    expect(env.NEXT_PUBLIC_STORAGE_ORIGIN).toBeUndefined();
   });
 
   it('requires a site URL', async () => {
@@ -40,6 +42,12 @@ describe('env', () => {
   it('rejects a malformed media base URL', async () => {
     await expect(loadEnv({ NEXT_PUBLIC_MEDIA_BASE_URL: 'not a url' })).rejects.toThrow(
       /NEXT_PUBLIC_MEDIA_BASE_URL/,
+    );
+  });
+
+  it('rejects a malformed storage origin', async () => {
+    await expect(loadEnv({ NEXT_PUBLIC_STORAGE_ORIGIN: 'not a url' })).rejects.toThrow(
+      /NEXT_PUBLIC_STORAGE_ORIGIN/,
     );
   });
 
