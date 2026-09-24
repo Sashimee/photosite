@@ -11,5 +11,6 @@ import { CountriesService } from './countries.service.js';
   imports: [AdminModule],
   controllers: [CountriesController, PolicyVersionController, AdminCountriesController],
   providers: [CountriesService, CountriesRepository, AdminCountriesService, OriginGuard],
+  exports: [CountriesService],
 })
 export class CountriesModule {}
