@@ -614,7 +614,9 @@
       "messages": "Messages",
       "openMenu": "Open menu",
       "closeMenu": "Close menu",
-      "menuTitle": "Navigation"
+      "menuTitle": "Navigation",
+      "postJob": "Post a job",
+      "jobBoard": "Job board"
     },
     "localeSwitcher": {
       "label": "Change language"
@@ -1550,6 +1552,67 @@
         "saving": "Saving…",
         "created": "Draft created.",
         "saved": "Saved."
+      }
+    },
+    "jobBoard": {
+      "metaTitle": "Job board",
+      "metaDescription": "Job offers posted by businesses and professionals looking for photographers.",
+      "title": "Job board",
+      "intro": "Job offers posted by businesses and professionals looking for photographers.",
+      "empty": "No offers posted yet.",
+      "emptyFiltered": "No offers match your filters.",
+      "clearFilters": "Clear filters",
+      "loadMore": "Load more",
+      "remoteLabel": "Remote",
+      "compensationRange": "{min} – {max}",
+      "postedAgo": "Posted {relative}",
+      "filters": {
+        "formLabel": "Job offer filters",
+        "categoryLabel": "Category",
+        "allCategories": "All categories",
+        "countryLabel": "Country",
+        "allCountries": "All countries",
+        "cityLabel": "City",
+        "remoteOnlyLabel": "Remote only",
+        "queryLabel": "Keyword",
+        "submit": "Search"
+      },
+      "detail": {
+        "metaTitle": "{title} at {companyName}",
+        "backToBoard": "Back to job board",
+        "companyWebsiteLabel": "Website",
+        "verifiedBadge": "Verified company",
+        "contactNotice": "Apply below to contact this company — no email or phone number is shown here.",
+        "descriptionHeading": "About this offer",
+        "compensationHeading": "Compensation",
+        "startDateLabel": "Start date",
+        "endDateLabel": "End date",
+        "expiresLabel": "Applications close"
+      },
+      "notFound": {
+        "title": "Job offer not found",
+        "description": "This job offer isn't available anymore, or never existed.",
+        "backCta": "Back to job board"
+      },
+      "apply": {
+        "heading": "Apply to this offer",
+        "messageLabel": "Message",
+        "portfolioLinkLabel": "Portfolio link (optional)",
+        "submitCta": "Send application",
+        "submitting": "Sending…",
+        "success": "Application sent. The company can now see your message.",
+        "signedOutNotice": "Sign in as a photographer to apply.",
+        "signInCta": "Sign in to apply",
+        "alreadyApplied": "You already applied to this offer.",
+        "viewApplicationsCta": "See my applications",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "invalid": "Check the highlighted fields and try again.",
+          "notFound": "This job offer could not be found.",
+          "forbidden": "You don't have access to this action.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
       }
     }
   }
