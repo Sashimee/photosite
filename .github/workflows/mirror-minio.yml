@@ -4,17 +4,21 @@ name: Mirror MinIO images
 # (Community Edition) and cut off anonymous access to their quay.io images
 # and dl.min.io binaries (#326) - every registry and CDN they published to
 # now refuses even a pinned, previously-working tag. There will be no new
-# upstream release to mirror, so this is manual (`workflow_dispatch`), not
-# scheduled: run it again only if infra/docker/minio-mirror.Dockerfile's
-# MINIO_VERSION/MC_VERSION build args change (a deliberate version bump, which
-# cannot happen upstream anymore, or a from-source security patch we apply
-# ourselves). ci.yml, infra/docker/compose.dev.yml,
-# infra/dokploy/preview/compose.yml and infra/docker/backup.Dockerfile all
-# pin the resulting ghcr.io/sashimee/{minio,mc} tag+digest, so a stale mirror
-# is a loud image-pull failure in those, not a silent drift - there is
-# nothing else that needs to "notice" it.
+# upstream release to mirror, so nobody has to remember to keep this fresh:
+# it rebuilds and pushes whenever infra/docker/minio-mirror.Dockerfile itself
+# changes (a deliberate MINIO_VERSION/MC_VERSION bump, which cannot happen
+# upstream anymore, or a from-source security patch we apply ourselves), and
+# `workflow_dispatch` stays as a manual escape hatch. ci.yml,
+# infra/docker/compose.dev.yml, infra/dokploy/preview/compose.yml and
+# infra/docker/backup.Dockerfile all pin the resulting
+# ghcr.io/sashimee/{minio,mc} tag+digest, so a stale mirror is a loud
+# image-pull failure in those, not a silent drift.
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - infra/docker/minio-mirror.Dockerfile
+      - .github/workflows/mirror-minio.yml
 
 permissions:
   contents: read
