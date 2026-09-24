@@ -217,6 +217,31 @@ export const RestoreReportRequestSchema = z
   })
   .strict();
 
+// Content a moderator found themselves, with no `Report` row to hang the
+// audit trail and the notice on (D25, docs/steps/1D.6-moderation.md). The
+// API synthesises one: `reporterId: null`, `reason` set to
+// `MODERATOR_INITIATED_REPORT_REASON`, `status: 'resolved'` from the start.
+// Restricted to the two entry points the plan names; widen this enum, not
+// the underlying takedown/restore machinery, if a third one is ever needed.
+export const DIRECT_TAKEDOWN_TARGET_TYPES = ['photographer_profile', 'job_offer'] as const;
+
+export const DirectTakedownTargetTypeSchema = z
+  .enum(DIRECT_TAKEDOWN_TARGET_TYPES)
+  .openapi({ example: 'photographer_profile' });
+
+export const DirectTakedownRequestSchema = z
+  .object({
+    targetType: DirectTakedownTargetTypeSchema,
+    targetId: IdSchema,
+    resolution: z.string().min(1).max(2000),
+  })
+  .strict();
+
+// The `Report.reason` value for a synthesised report (D25): explains itself
+// to a moderator reading the queue, and lets a later UI tell a
+// moderator-initiated entry apart from a public one without a schema change.
+export const MODERATOR_INITIATED_REPORT_REASON = 'Found by a moderator; no report was filed.';
+
 export const AdminProvenanceCheckSchema = z
   .object({
     id: IdSchema,
@@ -810,6 +835,27 @@ registry.registerPath({
       content: { 'application/json': { schema: AdminReportSchema } },
     },
     ...errorResponses([401, 403, 404]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/admin/reports/direct-takedown'),
+  summary: 'Take down a profile or job offer a moderator found without a prior report',
+  description:
+    'Synthesises a Report with reporterId: null, already resolved, so the takedown gets the same audit trail, statement of reasons and restore path as a reported one.',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('moderation'),
+  request: {
+    body: { content: { 'application/json': { schema: DirectTakedownRequestSchema } } },
+  },
+  responses: {
+    '201': {
+      description: 'A report was synthesised and its target taken down',
+      content: { 'application/json': { schema: AdminReportSchema } },
+    },
+    ...errorResponses([400, 401, 403, 404, 409, 422]),
   },
 });
 

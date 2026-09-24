@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   AdminReportsQuerySchema,
+  DirectTakedownRequestSchema,
   IdSchema,
   ResolveReportRequestSchema,
   RestoreReportRequestSchema,
@@ -42,6 +43,24 @@ export class AdminReportsController {
   ) {
     await this.adminAccess.requirePermission(request, 'moderation');
     return this.adminReports.list(query);
+  }
+
+  @HttpCode(201)
+  @Post('direct-takedown')
+  async directTakedown(
+    @Body(new ZodValidationPipe(DirectTakedownRequestSchema))
+    body: ReturnType<(typeof DirectTakedownRequestSchema)['parse']>,
+    @Req() request: FastifyRequest,
+  ) {
+    const { user } = await this.adminAccess.requirePermission(request, 'moderation');
+    await this.rateLimit.enforce(user.id);
+    return this.adminReports.directTakedown(
+      user,
+      body.targetType,
+      body.targetId,
+      body.resolution,
+      request.ip,
+    );
   }
 
   @Get(':id')
