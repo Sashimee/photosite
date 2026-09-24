@@ -22,10 +22,12 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
   const messagesHref = `/${locale}/messages`;
   const links: NavLink[] = [
     { href: `/${locale}/photographers`, label: t('findPhotographer') },
-    // "For photographers" (1B.8) and "Jobs" (1B.9) have no pages yet. They
-    // stay out of the nav rather than linking to a 404 - and rather than
-    // getting a stub, because unlike the legal documents nothing requires
-    // them to be reachable before their step lands.
+    { href: `/${locale}/job-offers`, label: t('jobBoard') },
+    { href: `/${locale}/account/professional-profile`, label: t('postJob') },
+    // "For photographers" (1B.8) has no page yet. It stays out of the nav
+    // rather than linking to a 404 - and rather than getting a stub, because
+    // unlike the legal documents nothing requires it to be reachable before
+    // its step lands.
     ...(user ? [{ href: messagesHref, label: t('messages') }] : []),
   ];
 
