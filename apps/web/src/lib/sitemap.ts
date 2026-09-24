@@ -13,6 +13,7 @@ import { isCountrySegment } from './discovery';
 import { absoluteUrl, localeAlternates } from './site-url';
 
 const PHOTOGRAPHERS_PAGE_LIMIT = 100;
+const JOB_OFFERS_PAGE_LIMIT = 100;
 
 // Mirrors the checks each page's own `generateMetadata` already makes before
 // setting `robots: buildRobotsMetadata(... && !isEmpty)`, so the sitemap can
@@ -42,9 +43,6 @@ async function fetchStaticPaths(): Promise<string[]> {
     paths.push('/job-offers');
   }
 
-  // TODO(1B.11c): add `/job-offers/{slug}` for every open offer from
-  // `GET /v1/job-offers`, once the job board (1B.9) is live - see this
-  // module's own doc comment for the shape a new source function should take.
   return paths;
 }
 
@@ -71,6 +69,37 @@ async function fetchPhotographerProfilePaths(): Promise<string[]> {
         );
       }
       paths.push(`/photographers/${item.slug}`);
+    }
+    if (!data.nextCursor) {
+      break;
+    }
+    cursor = data.nextCursor;
+  }
+
+  return paths;
+}
+
+// `GET /v1/job-offers` already filters to `published`, unexpired
+// (`expiresAt > now()`) and non-soft-deleted rows server-side
+// (job-board.repository.ts), so every slug paged through here is genuinely
+// public - no extra status check needed on this side, unlike the
+// country-segment guard the profile source above carries for its own path
+// shape.
+async function fetchJobOfferDetailPaths(): Promise<string[]> {
+  const paths: string[] = [];
+  let cursor: string | undefined;
+
+  for (;;) {
+    const { data, response } = await api.GET('/v1/job-offers', {
+      params: { query: { limit: JOB_OFFERS_PAGE_LIMIT, ...(cursor ? { cursor } : {}) } },
+    });
+    if (!data) {
+      throw new Error(
+        `Failed to page through job offers for the sitemap: HTTP ${String(response.status)}`,
+      );
+    }
+    for (const item of data.items) {
+      paths.push(`/job-offers/${item.slug}`);
     }
     if (!data.nextCursor) {
       break;
@@ -125,19 +154,14 @@ function toSitemapEntries(paths: readonly string[]): MetadataRoute.Sitemap {
   );
 }
 
-// The single seam 1B.11c needs: add a `fetchJobOfferDetailPaths()` source
-// alongside the ones above (paginating `GET /v1/job-offers` the same way
-// `fetchPhotographerProfilePaths` paginates `/v1/photographers`, mapping each
-// item's `slug` to `/job-offers/{slug}`) and include it in the
-// `Promise.all` below - no restructuring of this function or of
-// `app/sitemap.ts`.
 export async function buildSitemapPaths(): Promise<string[]> {
-  const [staticPaths, profilePaths, landingPaths] = await Promise.all([
+  const [staticPaths, profilePaths, landingPaths, jobOfferPaths] = await Promise.all([
     fetchStaticPaths(),
     fetchPhotographerProfilePaths(),
     fetchDiscoveryLandingPaths(),
+    fetchJobOfferDetailPaths(),
   ]);
-  return [...staticPaths, ...profilePaths, ...landingPaths];
+  return [...staticPaths, ...profilePaths, ...landingPaths, ...jobOfferPaths];
 }
 
 export async function buildSitemap(): Promise<MetadataRoute.Sitemap> {
