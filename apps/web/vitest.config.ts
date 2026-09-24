@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [react()],
@@ -12,6 +12,12 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // e2e/**/*.spec.ts (1B.12) is Playwright's suite, run via `pnpm
+    // test:e2e`/its own `playwright.config.ts` project, not Vitest's -
+    // without this, Vitest's default include glob (**/*.spec.ts) picks up
+    // those files too and fails them (`test.describe() to be called here`,
+    // since they never run under the Playwright test runner).
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     // Component tests here render, drive `userEvent` and await a mocked
     // fetch; that is comfortably under a second locally and close to (or
     // over) vitest's 5s default on a CI runner, so they failed only on CI.
