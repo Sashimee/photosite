@@ -2,7 +2,7 @@
 
 Work in `docs/PLAN.md` that needs Alex. The /loop run skips these and keeps building around them. Each entry says what is needed, what it unblocks and what happens meanwhile.
 
-Last updated: 2026-09-17.
+Last updated: 2026-09-24.
 
 ## Open decisions (`docs/DECISIONS.md`)
 
@@ -65,6 +65,12 @@ Last updated: 2026-09-17.
 |-------|------------------|--------|----------------------|
 | `seedProfessionalJobOffer` (`packages/db/src/seed.ts`) creates exactly one professional profile with exactly one *published* offer and zero `JobApplication` rows — every other state 1B.9 has to render (draft, closed, expired, an inbox with at least one application) has nothing to click through locally without creating it by hand first | A schema-migrator follow-up to extend the seed with a draft offer, a closed offer, an offer near `expiresAt`, and at least one seeded application (ideally one `submitted`, one `shortlisted`/`rejected`) from an already-seeded photographer | Manual verification of 1B.9's non-happy-path states on the local stack and preview | 1B.9 ships its own component/page tests for these states regardless; only the "does it look right against real data" manual check is affected |
 | `1B.5` (request form) and `1B.8d` (send-quote) were built before the `EMAIL_NOT_VERIFIED` guard (#273) shipped and don't special-case that error code — a real (if narrow, OAuth-sign-up-only) user hits a generic error toast there today, the same dead end #290 was filed to fix elsewhere | A follow-up ticket to reuse 1B.9's `EmailVerificationRequired` component in those two already-merged flows | Nothing new — this is an existing, live gap, not something 1B.9 introduces | Users with a verified email (the large majority — see #290's own analysis of how an unverified session even happens) never see it |
+
+## Web e2e (1B.12)
+
+| Issue | Needed from Alex | Blocks | Workaround meanwhile |
+|-------|------------------|--------|----------------------|
+| The new `e2e` CI job ships non-blocking (report-only) for an initial burn-in period, by design — a flaky e2e suite that gates merges is worse than none | Promote it to a required branch-protection status check once it has passed repeatedly across real PRs with no harness-attributable failure; this is a repo-admin setting, not something a PR can flip on its own | Merges are never blocked by a genuinely flaky e2e run in the meantime | The job still reports its result on every PR, so its trend is visible before it gates anything |
 
 ## Payments (1A.8) — the biggest schedule risk
 
