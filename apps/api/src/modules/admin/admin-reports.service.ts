@@ -1,5 +1,11 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
-import type { AdminReportSchema, AdminReportsQuerySchema, NotificationType } from '@photoo/shared';
+import {
+  MODERATOR_INITIATED_REPORT_REASON,
+  type AdminReportSchema,
+  type AdminReportsQuerySchema,
+  type DirectTakedownTargetTypeSchema,
+  type NotificationType,
+} from '@photoo/shared';
 import type { PrismaClient, Report } from '@photoo/db';
 import type { z } from 'zod';
 import { APP_CONFIG, type Env } from '../../config/env.js';
@@ -8,6 +14,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import {
   buildReportTargetSummary,
   getReportTargetOwnerId,
+  reportTargetExists,
   restoreReportTarget,
   takeDownReportTarget,
 } from '../reports/report-targets.js';
@@ -17,6 +24,7 @@ import { AdminReportsRepository } from './admin-reports.repository.js';
 
 type ReportsQuery = z.infer<typeof AdminReportsQuerySchema>;
 type ReportDto = z.infer<typeof AdminReportSchema>;
+type DirectTakedownTargetType = z.infer<typeof DirectTakedownTargetTypeSchema>;
 type ModerationOutcome = 'resolved' | 'dismissed' | 'takedown' | 'restored';
 
 interface AdminActor {
@@ -258,5 +266,55 @@ export class AdminReportsService {
     await this.notifyDecision(existing, 'restored', resolution);
 
     return mapReport(existing, this.prisma.client, this.baseUrl);
+  }
+
+  // D25 (docs/DECISIONS.md): a takedown a moderator found without a public
+  // report synthesises a Report (`reporterId: null`, already `resolved`)
+  // rather than being a parallel action, so it gets the exact same audit
+  // trail, statement of reasons and restore path as a reported one, and
+  // shows up in the same queue by `targetId`.
+  async directTakedown(
+    admin: AdminActor,
+    targetType: DirectTakedownTargetType,
+    targetId: string,
+    resolution: string,
+    ip: string | undefined,
+  ): Promise<ReportDto> {
+    const exists = await reportTargetExists(this.prisma.client, targetType, targetId);
+    if (!exists) {
+      throw notFound();
+    }
+
+    const created = await this.prisma.client.$transaction(async (tx) => {
+      const report = await tx.report.create({
+        data: {
+          reporterId: null,
+          targetType,
+          targetId,
+          reason: MODERATOR_INITIATED_REPORT_REASON,
+          status: 'resolved',
+          adminId: admin.id,
+          resolution,
+        },
+      });
+
+      const targetRemoved = await takeDownReportTarget(tx, targetType, targetId);
+
+      await this.auditService.record(tx, {
+        actorId: admin.id,
+        action: 'report.direct_takedown',
+        targetType: 'Report',
+        targetId: report.id,
+        before: null,
+        after: { status: 'resolved', resolution, targetType, targetId, targetRemoved },
+        ip: ip ?? null,
+      });
+
+      return report;
+    });
+
+    await this.notifyDecision({ reporterId: null, targetType, targetId }, 'takedown', resolution);
+
+    return mapReport(created, this.prisma.client, this.baseUrl);
   }
 }

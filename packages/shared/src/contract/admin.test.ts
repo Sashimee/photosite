@@ -9,6 +9,7 @@ import {
   AdminReportsQuerySchema,
   AdminUserSearchQuerySchema,
   AdminVerificationCasesQuerySchema,
+  DirectTakedownRequestSchema,
   PlatformSettingsSchema,
   PublishLegalTextRequestSchema,
   RefundBookingRequestSchema,
@@ -175,6 +176,45 @@ describe('AdminReportSchema and ResolveReportRequestSchema', () => {
     expect(RestoreReportRequestSchema.safeParse({ resolution: 'Wrongly removed' }).success).toBe(
       true,
     );
+  });
+});
+
+describe('DirectTakedownRequestSchema', () => {
+  it('accepts a photographer_profile or job_offer target with a resolution', () => {
+    expect(
+      DirectTakedownRequestSchema.safeParse({
+        targetType: 'photographer_profile',
+        targetId: id,
+        resolution: 'Confirmed impersonation, profile removed',
+      }).success,
+    ).toBe(true);
+    expect(
+      DirectTakedownRequestSchema.safeParse({
+        targetType: 'job_offer',
+        targetId: id,
+        resolution: 'Confirmed fraud, offer removed',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a target type outside the two named entry points', () => {
+    expect(
+      DirectTakedownRequestSchema.safeParse({
+        targetType: 'portfolio_image',
+        targetId: id,
+        resolution: 'Removed',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires a resolution', () => {
+    expect(
+      DirectTakedownRequestSchema.safeParse({
+        targetType: 'photographer_profile',
+        targetId: id,
+        resolution: '',
+      }).success,
+    ).toBe(false);
   });
 });
 
