@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 import { ensureScopedTestDatabase } from './src/testing/ensure-test-database.js';
 
 // Scopes TEST_DATABASE_URL to this worktree and workspace before any test file loads; see docs/ARCHITECTURE.md's "Test-database isolation".
+// The SCOPED guard makes this idempotent: vitest re-evaluates this config in-process on every watch-mode rerun, and without it each rerun would re-clone the database.
 if (process.env.TEST_DATABASE_URL && !process.env.PHOTOO_TEST_DATABASE_URL_SCOPED) {
   const scoped = await ensureScopedTestDatabase(process.env.TEST_DATABASE_URL, 'db');
   process.env.TEST_DATABASE_URL = scoped.url;

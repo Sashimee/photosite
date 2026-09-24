@@ -2,6 +2,7 @@ import { ensureScopedTestDatabase, scopedRedisUrl } from '@photoo/db/testing';
 import { defineConfig } from 'vitest/config';
 
 // Scopes TEST_DATABASE_URL/REDIS_URL to this worktree and workspace before any test file loads; see docs/ARCHITECTURE.md's "Test-database isolation".
+// Both SCOPED guards make this idempotent: vitest re-evaluates this config in-process on every watch-mode rerun, and without them each rerun would re-clone the database and re-claim (leaking) a Redis slot.
 if (process.env.TEST_DATABASE_URL && !process.env.PHOTOO_TEST_DATABASE_URL_SCOPED) {
   const scoped = await ensureScopedTestDatabase(process.env.TEST_DATABASE_URL, 'api');
   process.env.TEST_DATABASE_URL = scoped.url;
