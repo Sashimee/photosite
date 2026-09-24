@@ -494,6 +494,19 @@ jobs:
             -v /tmp/photoo-public-anonymous-policy.json:/tmp/photoo-public-anonymous-policy.json \
             quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
             -c "mc mb --ignore-existing local/photoo-private local/photoo-public && mc anonymous set none local/photoo-private && mc anonymous set-json /tmp/photoo-public-anonymous-policy.json local/photoo-public"
+      # Same image/port as compose.dev.yml's clamav service, so CI and local
+      # dev scan uploads the same way. Not a GH Actions `services:` entry:
+      # those start before any step runs, which would serialize freshclam's
+      # startup sync in front of everything below; a plain `docker run`
+      # here instead lets it warm up in the background while the build,
+      # migrate and seed steps run, so by the time "Start api, web and
+      # worker" gates on it (below), it has typically already finished.
+      # CLAMAV_HOST/CLAMAV_PORT are left unset because apps/worker's own
+      # defaults (127.0.0.1:3310, apps/worker/src/config/env.ts) already
+      # match this.
+      - name: Start ClamAV in the background
+        run: |
+          docker run -d --name clamav -p 3310:3310 clamav/clamav:1.5.4-debian13-slim
       - name: Create the test database
         env:
           PGPASSWORD: photoo_dev_password
@@ -536,6 +549,28 @@ jobs:
             done
           }
 
+          # clamdcheck.sh is the same readiness command compose.dev.yml's
+          # clamav service uses; it fails fast with a real message
+          # ("ERROR: Unable to contact server") while freshclam's startup
+          # sync is still running, rather than hanging or false-passing on
+          # a container that's merely started. 180s covers a cold signature
+          # database pull (compose.dev.yml's own comment: "several minutes"
+          # on a cold volume); in practice this has already finished during
+          # the build/migrate/seed steps above and returns immediately.
+          wait_for_clamd() {
+            local deadline=$((SECONDS + 180)) output
+            while true; do
+              output="$(docker exec clamav clamdcheck.sh 2>&1)" && return 0
+              if [ "$SECONDS" -ge "$deadline" ]; then
+                echo "::error::clamd did not become ready within 180s (clamdcheck.sh: ${output})"
+                echo '--- clamav container logs ---'; docker logs clamav
+                return 1
+              fi
+              sleep 2
+            done
+          }
+
+          wait_for_clamd
           wait_for http://127.0.0.1:4000/health
           wait_for http://127.0.0.1:3000/en
           # /ready (not /health) so this also blocks until the worker's own
