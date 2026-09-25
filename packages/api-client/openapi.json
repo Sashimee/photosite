@@ -4616,13 +4616,23 @@
             "maxLength": 60
           },
           "targetId": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid",
-            "description": "UUID identifier",
-            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "description": "UUID identifier",
+                "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$",
+                "description": "ISO 3166-1 alpha-2 country code",
+                "example": "LU"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "before": {},
           "after": {},
@@ -17231,13 +17241,22 @@
           },
           {
             "schema": {
-              "type": "string",
-              "format": "uuid",
-              "description": "UUID identifier",
-              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "UUID identifier",
+                  "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{2}$",
+                  "description": "ISO 3166-1 alpha-2 country code",
+                  "example": "LU"
+                }
+              ]
             },
             "required": false,
-            "description": "UUID identifier",
             "name": "targetId",
             "in": "query"
           },

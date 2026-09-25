@@ -398,7 +398,7 @@ export const AdminAuditLogQuerySchema = z
   .object({
     actorId: IdSchema.optional(),
     entityType: z.string().min(1).max(60).optional(),
-    targetId: IdSchema.optional(),
+    targetId: IdSchema.or(CountryCodeSchema).optional(),
     from: IsoDateTimeSchema.optional(),
     to: IsoDateTimeSchema.optional(),
     cursor: z.string().min(1).optional(),
@@ -412,7 +412,7 @@ export const AdminAuditLogEntrySchema = z
     actorId: IdSchema.nullable(),
     action: z.string().min(1).max(100),
     targetType: z.string().min(1).max(60),
-    targetId: IdSchema.nullable(),
+    targetId: IdSchema.or(CountryCodeSchema).nullable(),
     before: z.unknown().nullable(),
     after: z.unknown().nullable(),
     ip: z.string().min(1).max(64).nullable(),

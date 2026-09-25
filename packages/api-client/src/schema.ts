@@ -9583,7 +9583,6 @@ export interface paths {
                     /** @description UUID identifier */
                     actorId?: string;
                     entityType?: string;
-                    /** @description UUID identifier */
                     targetId?: string;
                     /** @description ISO 8601 date-time */
                     from?: string;
@@ -12511,11 +12510,6 @@ export interface components {
             actorId: string | null;
             action: string;
             targetType: string;
-            /**
-             * Format: uuid
-             * @description UUID identifier
-             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
-             */
             targetId: string | null;
             before?: unknown;
             after?: unknown;
