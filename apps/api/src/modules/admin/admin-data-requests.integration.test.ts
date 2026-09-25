@@ -1159,4 +1159,138 @@ describe('admin data requests integration', () => {
       });
     });
   });
+
+  describe('POST /v1/admin/data-requests/:id/retry-export', () => {
+    it('returns 403 for an admin without the support permission', async () => {
+      const admin = await makeAdmin('retry-no-permission', ['finance']);
+      const subject = await createSubjectUser('retry-no-permission');
+      const failed = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'failed',
+        requestedAt: new Date(),
+        failureReason: 'export_failed',
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/data-requests/${failed.id}/retry-export`,
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(403);
+    });
+
+    it('returns 404 for an unknown id', async () => {
+      const admin = await makeAdmin('retry-not-found', ['support']);
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/data-requests/${randomUUID()}/retry-export`,
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('returns 409 when the source request is not a failed export', async () => {
+      const admin = await makeAdmin('retry-not-failed', ['support']);
+      const subject = await createSubjectUser('retry-not-failed');
+      const ready = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'ready',
+        requestedAt: new Date(),
+        completedAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/data-requests/${ready.id}/retry-export`,
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(409);
+    });
+
+    it('returns 409 when the source is a failed delete request, not an export', async () => {
+      const admin = await makeAdmin('retry-wrong-type', ['support']);
+      const subject = await createSubjectUser('retry-wrong-type');
+      const failedDelete = await createDataRequest({
+        userId: subject.id,
+        type: 'delete',
+        status: 'failed',
+        requestedAt: new Date(),
+        failureReason: 'delete_failed',
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/data-requests/${failedDelete.id}/retry-export`,
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(409);
+    });
+
+    it('returns 409 when the user already has a pending or processing export', async () => {
+      const admin = await makeAdmin('retry-already-open', ['support']);
+      const subject = await createSubjectUser('retry-already-open');
+      const failed = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'failed',
+        requestedAt: new Date(Date.now() - 1000),
+        failureReason: 'export_failed',
+      });
+      await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'processing',
+        requestedAt: new Date(),
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/data-requests/${failed.id}/retry-export`,
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(409);
+    });
+
+    it('creates a new pending export, enqueues it, and writes an audit row', async () => {
+      const admin = await makeAdmin('retry-ok', ['support']);
+      const subject = await createSubjectUser('retry-ok');
+      const failed = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'failed',
+        requestedAt: new Date(Date.now() - 60_000),
+        failureReason: 'export_failed',
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/data-requests/${failed.id}/retry-export`,
+        headers: admin.headers,
+        remoteAddress: FAKE_IP,
+      });
+      expect(response.statusCode).toBe(201);
+      const body = response.json<DataRequestBody>();
+      expect(body.id).not.toBe(failed.id);
+      expect(body.type).toBe('export');
+      expect(body.status).toBe('pending');
+      expect(body.user.id).toBe(subject.id);
+
+      const created = await prisma.dataRequest.findUnique({ where: { id: body.id } });
+      expect(created?.userId).toBe(subject.id);
+      expect(created?.type).toBe('export');
+      expect(created?.status).toBe('pending');
+
+      const auditRow = await prisma.auditLog.findFirst({
+        where: { action: 'data_request.export_retried', targetId: body.id },
+      });
+      expect(auditRow).not.toBeNull();
+      expect(auditRow?.actorType).toBe('admin');
+      expect(auditRow?.actorId).toBe(admin.id);
+      expect(auditRow?.targetType).toBe('DataRequest');
+      expect(auditRow?.before).toEqual({ sourceId: failed.id });
+    });
+  });
 });

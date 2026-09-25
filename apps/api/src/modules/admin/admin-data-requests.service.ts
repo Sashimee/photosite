@@ -1,10 +1,14 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { HttpException, Inject, Injectable } from '@nestjs/common';
+import { Prisma } from '@photoo/db';
 import {
   type AdminDataRequestSchema,
   type AdminDataRequestsQuerySchema,
   gdprResponseDueAt,
 } from '@photoo/shared';
 import type { z } from 'zod';
+import { GdprExportQueueService } from '../gdpr/gdpr-export-queue.service.js';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { AdminAuditService } from './admin-audit.service.js';
 import {
   decodeAdminDataRequestCursor,
   encodeAdminDataRequestCursor,
@@ -14,6 +18,18 @@ import {
   AdminDataRequestsRepository,
   type SuccessfulExport,
 } from './admin-data-requests.repository.js';
+
+interface AdminActor {
+  id: string;
+}
+
+function notFound(): HttpException {
+  return new HttpException({ code: 'NOT_FOUND', message: 'Data request not found' }, 404);
+}
+
+function conflict(message: string): HttpException {
+  return new HttpException({ code: 'CONFLICT', message }, 409);
+}
 
 type Query = z.infer<typeof AdminDataRequestsQuerySchema>;
 type DataRequestDto = z.infer<typeof AdminDataRequestSchema>;
@@ -121,7 +137,10 @@ function mapDataRequest(
 @Injectable()
 export class AdminDataRequestsService {
   constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(AdminDataRequestsRepository) private readonly repository: AdminDataRequestsRepository,
+    @Inject(AdminAuditService) private readonly auditService: AdminAuditService,
+    @Inject(GdprExportQueueService) private readonly exportQueue: GdprExportQueueService,
   ) {}
 
   async list(query: Query): Promise<{ items: DataRequestDto[]; nextCursor: string | null }> {
@@ -151,5 +170,45 @@ export class AdminDataRequestsService {
       items: page.map((row) => mapDataRequest(row, latestSuccessByUser, successesByUser)),
       nextCursor,
     };
+  }
+
+  // Bypasses DataRequestsRateLimitService: this is a support action, not a
+  // user-initiated request, so the per-user GDPR rate limit doesn't apply.
+  async retryExport(admin: AdminActor, id: string): Promise<DataRequestDto> {
+    const source = await this.repository.findById(id);
+    if (!source) {
+      throw notFound();
+    }
+    if (source.type !== 'export' || source.status !== 'failed') {
+      throw conflict('Source request is not a failed export');
+    }
+    const openExport = await this.repository.findOpenExportForUser(source.user.id);
+    if (openExport) {
+      throw conflict('User already has a pending or processing export');
+    }
+
+    let created: AdminDataRequestRow;
+    try {
+      created = await this.prisma.client.$transaction(async (tx) => {
+        const row = await this.repository.createExport(tx, source.user.id);
+        await this.auditService.record(tx, {
+          actorId: admin.id,
+          action: 'data_request.export_retried',
+          targetType: 'DataRequest',
+          targetId: row.id,
+          before: { sourceId: id },
+        });
+        return row;
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw conflict('User already has a pending or processing export');
+      }
+      throw error;
+    }
+
+    await this.exportQueue.enqueue(created.id);
+
+    return mapDataRequest(created, new Map(), new Map());
   }
 }

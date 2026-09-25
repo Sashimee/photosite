@@ -60,6 +60,24 @@ export class AdminDataRequestsRepository {
     });
   }
 
+  async findById(id: string): Promise<AdminDataRequestRow | null> {
+    return this.prisma.client.dataRequest.findUnique({ where: { id }, select: dataRequestSelect });
+  }
+
+  async findOpenExportForUser(userId: string): Promise<{ id: string } | null> {
+    return this.prisma.client.dataRequest.findFirst({
+      where: { userId, type: 'export', status: { in: ['pending', 'processing'] } },
+      select: { id: true },
+    });
+  }
+
+  async createExport(tx: Prisma.TransactionClient, userId: string): Promise<AdminDataRequestRow> {
+    return tx.dataRequest.create({
+      data: { userId, type: 'export', status: 'pending' },
+      select: dataRequestSelect,
+    });
+  }
+
   async list(filters: AdminDataRequestFilters): Promise<AdminDataRequestRow[]> {
     const and: Prisma.DataRequestWhereInput[] = [];
     if (filters.status) {
