@@ -77,7 +77,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
       </dl>
 
       <Link
-        href={`/data-requests?userId=${id}`}
+        href={`/data-requests?${new URLSearchParams({ userId: id }).toString()}`}
         className="text-sm underline-offset-4 hover:underline"
       >
         {t('dataRequestsLink')}
