@@ -1,6 +1,6 @@
 # #375 – Export ready/failed emails and admin retry
 
-Follow-up to 1A.12 (compliance review of #358). Agents: api-developer (shared, email, worker, api), web-developer (admin button), i18n-maintainer (drafts), test-writer.
+Follow-up to 1A.12 (compliance review of #358). Agents: api-developer (shared, email, worker, api), web-developer (admin button), test-writer.
 
 ## Emails
 
@@ -9,7 +9,7 @@ Follow-up to 1A.12 (compliance review of #358). Agents: api-developer (shared, e
   - `data-export-failed` with `{to, url}`.
   - `url` is `${WEB_APP_URL}/account`. The web export UI there is tracked in #399.
   - Like the other members, they carry no locale and render in `en` for now.
-- `packages/i18n/messages/en.json`: add `email.dataExportReady.{subject,body}` (body takes `{url}` and `{expiresAt}`) and `email.dataExportFailed.{subject,body}`. Add drafts in fr/de/pt/es.
+- `packages/i18n/messages/en.json`: add `email.dataExportReady.{subject,body}` (body takes `{url}` and `{expiresAt}`) and `email.dataExportFailed.{subject,body}`. fr/de/pt/es stay empty until step 2.3 (docs/steps/0.10), falling back to en.
 - `packages/email`: add render cases next to `account-deletion-requested` and preview fixtures. `EMAIL_TEMPLATE_NAMES` in `packages/shared/src/contract/admin.ts` gains both names, because the type assertion there requires it.
 - Worker:
   - `queue-workers.service.ts` creates a `Queue(EMAIL_QUEUE_NAME)` producer and passes it to `createGdprExportProcessor`, together with `webAppUrl`.
