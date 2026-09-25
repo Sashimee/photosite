@@ -41,6 +41,7 @@ function cursorWhere(cursor: AdminDataRequestCursor): Prisma.DataRequestWhereInp
 export interface SuccessfulExport {
   userId: string;
   requestedAt: Date;
+  completedAt: Date | null;
 }
 
 @Injectable()
@@ -55,7 +56,7 @@ export class AdminDataRequestsRepository {
     }
     return this.prisma.client.dataRequest.findMany({
       where: { userId: { in: userIds }, type: 'export', status: { in: ['ready', 'completed'] } },
-      select: { userId: true, requestedAt: true },
+      select: { userId: true, requestedAt: true, completedAt: true },
     });
   }
 

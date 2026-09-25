@@ -38,6 +38,19 @@ function buildLatestSuccessByUser(rows: SuccessfulExport[]): Map<string, Date> {
   return latest;
 }
 
+function buildSuccessesByUser(rows: SuccessfulExport[]): Map<string, SuccessfulExport[]> {
+  const byUser = new Map<string, SuccessfulExport[]>();
+  for (const row of rows) {
+    const current = byUser.get(row.userId);
+    if (current) {
+      current.push(row);
+    } else {
+      byUser.set(row.userId, [row]);
+    }
+  }
+  return byUser;
+}
+
 function responseDueAt(
   row: AdminDataRequestRow,
   latestSuccessByUser: Map<string, Date>,
@@ -52,19 +65,43 @@ function responseDueAt(
   return gdprResponseDueAt(row.requestedAt);
 }
 
-function isAnsweredLate(row: AdminDataRequestRow): boolean {
-  if (row.type !== 'export' || (row.status !== 'ready' && row.status !== 'completed')) {
+// The Art. 12(3) clock for a failed export still runs from that row's own
+// requestedAt, even when a later retry is what actually answered it.
+function isFailedAnsweredLate(
+  row: AdminDataRequestRow,
+  successesByUser: Map<string, SuccessfulExport[]>,
+): boolean {
+  const laterCompletions = (successesByUser.get(row.user.id) ?? [])
+    .filter((success) => success.requestedAt > row.requestedAt)
+    .map((success) => success.completedAt)
+    .filter((completedAt): completedAt is Date => completedAt !== null);
+  if (laterCompletions.length === 0) {
     return false;
   }
-  if (!row.completedAt) {
+  const earliest = laterCompletions.reduce((min, date) => (date < min ? date : min));
+  return earliest > gdprResponseDueAt(row.requestedAt);
+}
+
+function isAnsweredLate(
+  row: AdminDataRequestRow,
+  successesByUser: Map<string, SuccessfulExport[]>,
+): boolean {
+  if (row.type !== 'export') {
     return false;
   }
-  return row.completedAt > gdprResponseDueAt(row.requestedAt);
+  if (row.status === 'ready' || row.status === 'completed') {
+    return row.completedAt !== null && row.completedAt > gdprResponseDueAt(row.requestedAt);
+  }
+  if (row.status === 'failed') {
+    return isFailedAnsweredLate(row, successesByUser);
+  }
+  return false;
 }
 
 function mapDataRequest(
   row: AdminDataRequestRow,
   latestSuccessByUser: Map<string, Date>,
+  successesByUser: Map<string, SuccessfulExport[]>,
 ): DataRequestDto {
   return {
     id: row.id,
@@ -76,7 +113,7 @@ function mapDataRequest(
     failureReason: row.failureReason,
     cancelledAt: row.cancelledAt?.toISOString() ?? null,
     responseDueAt: responseDueAt(row, latestSuccessByUser)?.toISOString() ?? null,
-    answeredLate: isAnsweredLate(row),
+    answeredLate: isAnsweredLate(row, successesByUser),
     user: row.user,
   };
 }
@@ -108,9 +145,10 @@ export class AdminDataRequestsService {
     ];
     const successfulExports = await this.repository.listSuccessfulExports(awaitingUserIds);
     const latestSuccessByUser = buildLatestSuccessByUser(successfulExports);
+    const successesByUser = buildSuccessesByUser(successfulExports);
 
     return {
-      items: page.map((row) => mapDataRequest(row, latestSuccessByUser)),
+      items: page.map((row) => mapDataRequest(row, latestSuccessByUser, successesByUser)),
       nextCursor,
     };
   }

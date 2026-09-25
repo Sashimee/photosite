@@ -8096,7 +8096,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row that has not produced a copy yet, or null if it does not apply. `answeredLate` is true for an export row with status ready or completed whose completedAt is after gdprResponseDueAt(requestedAt); false otherwise (delete rows, cancelled, not yet answered, or completedAt null). */
+        /** List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row that has not produced a copy yet, or null if it does not apply. `answeredLate` is true for an export row with status ready or completed whose completedAt is after gdprResponseDueAt(requestedAt); for a failed export it is true when the earliest completedAt among the same user's later exports is after the failed row's gdprResponseDueAt(requestedAt); false otherwise (delete rows, cancelled, not yet answered, or completedAt null). */
         get: {
             parameters: {
                 query?: {
