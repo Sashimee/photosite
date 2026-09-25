@@ -36,6 +36,7 @@ const baseRequest = {
   failureReason: null,
   cancelledAt: null,
   responseDueAt: null,
+  answeredLate: false,
   user: { id: 'a1a1a1a1-1111-1111-1111-111111111111', email: 'alice@example.com' },
 };
 
@@ -160,6 +161,38 @@ describe('DataRequestsTable', () => {
 
     await screen.findByText('a***@example.com');
     expect(screen.getByText('Not applicable')).toBeInTheDocument();
+  });
+
+  it('shows "Answered late" for the response due column when answeredLate is true', async () => {
+    const answeredLate = {
+      ...baseRequest,
+      completedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      answeredLate: true,
+    };
+    getMock.mockResolvedValueOnce({ data: { items: [answeredLate], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(await screen.findByText('Answered late')).toBeInTheDocument();
+  });
+
+  it('prefers the response due date over the "Answered late" label when both are present', async () => {
+    const overdueAndAnsweredLate = {
+      ...baseRequest,
+      status: 'failed' as const,
+      responseDueAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      answeredLate: true,
+    };
+    getMock.mockResolvedValueOnce({ data: { items: [overdueAndAnsweredLate], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(
+      await screen.findByText(`${formatExpected(overdueAndAnsweredLate.responseDueAt)} (Overdue)`),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Answered late')).not.toBeInTheDocument();
   });
 
   it('shows a future response due date without marking it overdue', async () => {

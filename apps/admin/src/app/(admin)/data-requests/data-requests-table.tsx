@@ -93,6 +93,11 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
       header: t('columns.responseDueAt'),
       cell: (row) => {
         if (row.responseDueAt === null) {
+          if (row.answeredLate) {
+            return (
+              <span className="font-medium text-destructive">{tResponseDue('answeredLate')}</span>
+            );
+          }
           return t('placeholders.notApplicable');
         }
         if (hasPassed(row.responseDueAt)) {

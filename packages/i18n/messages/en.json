@@ -527,7 +527,8 @@
           "unset": "–"
         },
         "responseDue": {
-          "overdue": "Overdue"
+          "overdue": "Overdue",
+          "answeredLate": "Answered late"
         },
         "gracePeriod": {
           "dueNow": "Due now",

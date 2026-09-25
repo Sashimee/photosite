@@ -466,6 +466,7 @@ describe('AdminDataRequestSchema', () => {
     failureReason: null,
     cancelledAt: null,
     responseDueAt: null,
+    answeredLate: false,
     user: { id, email: 'user@example.com' },
   };
 
@@ -487,6 +488,24 @@ describe('AdminDataRequestSchema', () => {
     const withoutResponseDueAt: Partial<typeof validRequest> = { ...validRequest };
     delete withoutResponseDueAt.responseDueAt;
     expect(AdminDataRequestSchema.safeParse(withoutResponseDueAt).success).toBe(false);
+  });
+
+  it('accepts an export answered late', () => {
+    expect(AdminDataRequestSchema.safeParse({ ...validRequest, answeredLate: true }).success).toBe(
+      true,
+    );
+  });
+
+  it('rejects a missing answeredLate', () => {
+    const withoutAnsweredLate: Partial<typeof validRequest> = { ...validRequest };
+    delete withoutAnsweredLate.answeredLate;
+    expect(AdminDataRequestSchema.safeParse(withoutAnsweredLate).success).toBe(false);
+  });
+
+  it('rejects a non-boolean answeredLate', () => {
+    expect(
+      AdminDataRequestSchema.safeParse({ ...validRequest, answeredLate: 'true' }).success,
+    ).toBe(false);
   });
 
   it('rejects an exportKey field', () => {

@@ -24,6 +24,7 @@ interface DataRequestBody {
   failureReason: string | null;
   cancelledAt: string | null;
   responseDueAt: string | null;
+  answeredLate: boolean;
   user: { id: string; email: string };
   exportKey?: string;
 }
@@ -164,6 +165,7 @@ describe('admin data requests integration', () => {
     exportKey?: string;
     expiresAt?: Date;
     failureReason?: string;
+    completedAt?: Date;
   }): Promise<{ id: string }> {
     const row = await prisma.dataRequest.create({
       data: {
@@ -174,6 +176,7 @@ describe('admin data requests integration', () => {
         ...(spec.exportKey ? { exportKey: spec.exportKey } : {}),
         ...(spec.expiresAt ? { expiresAt: spec.expiresAt } : {}),
         ...(spec.failureReason ? { failureReason: spec.failureReason } : {}),
+        ...(spec.completedAt ? { completedAt: spec.completedAt } : {}),
       },
     });
     return { id: row.id };
@@ -728,6 +731,431 @@ describe('admin data requests integration', () => {
         const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
         const item = body.items.find((candidate) => candidate.id === deletion.id);
         expect(item?.responseDueAt).toBeNull();
+      });
+    });
+
+    describe('answeredLate', () => {
+      it('is true on a ready export completed after the due date, and responseDueAt stays null', async () => {
+        const admin = await makeAdmin('late-ready', ['support']);
+        const subject = await createSubjectUser('late-ready');
+        const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(requestedAt);
+        const ready = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt,
+          completedAt: new Date(due.getTime() + 1),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === ready.id);
+        expect(item?.answeredLate).toBe(true);
+        expect(item?.responseDueAt).toBeNull();
+      });
+
+      it('is true on a ready export past its expiresAt that was completed after the due date, and responseDueAt stays null', async () => {
+        const admin = await makeAdmin('late-ready-expired', ['support']);
+        const subject = await createSubjectUser('late-ready-expired');
+        const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(requestedAt);
+        const expiredReady = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt,
+          completedAt: new Date(due.getTime() + 1),
+          expiresAt: new Date(Date.now() - 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === expiredReady.id);
+        expect(item?.answeredLate).toBe(true);
+        expect(item?.responseDueAt).toBeNull();
+      });
+
+      it('is true on a completed export completed after the due date, and responseDueAt stays null', async () => {
+        const admin = await makeAdmin('late-completed', ['support']);
+        const subject = await createSubjectUser('late-completed');
+        const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(requestedAt);
+        const completed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'completed',
+          requestedAt,
+          completedAt: new Date(due.getTime() + 1),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === completed.id);
+        expect(item?.answeredLate).toBe(true);
+        expect(item?.responseDueAt).toBeNull();
+      });
+
+      it('is false when completedAt exactly equals the due date', async () => {
+        const admin = await makeAdmin('late-on-time', ['support']);
+        const subject = await createSubjectUser('late-on-time');
+        const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(requestedAt);
+        const onTime = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt,
+          completedAt: due,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === onTime.id);
+        expect(item?.answeredLate).toBe(false);
+      });
+
+      it('is false when completedAt is before the due date', async () => {
+        const admin = await makeAdmin('late-early', ['support']);
+        const subject = await createSubjectUser('late-early');
+        const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(requestedAt);
+        const early = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt,
+          completedAt: new Date(due.getTime() - 1),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === early.id);
+        expect(item?.answeredLate).toBe(false);
+      });
+
+      it('clamps the due date to the end of February for a January 31 request, and treats a completion one millisecond later as late', async () => {
+        const admin = await makeAdmin('late-clamp-late', ['support']);
+        const subject = await createSubjectUser('late-clamp-late');
+        const requestedAt = new Date('2026-01-31T10:00:00.000Z');
+        const due = gdprResponseDueAt(requestedAt);
+        expect(due.toISOString()).toBe('2026-02-28T10:00:00.000Z');
+        const clamped = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'completed',
+          requestedAt,
+          completedAt: new Date(due.getTime() + 1),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === clamped.id);
+        expect(item?.answeredLate).toBe(true);
+      });
+
+      it('treats a completion at the exact clamped instant for a January 31 request as on time', async () => {
+        const admin = await makeAdmin('late-clamp-on-time', ['support']);
+        const subject = await createSubjectUser('late-clamp-on-time');
+        const requestedAt = new Date('2026-01-31T10:00:00.000Z');
+        const due = gdprResponseDueAt(requestedAt);
+        const clamped = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'completed',
+          requestedAt,
+          completedAt: due,
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === clamped.id);
+        expect(item?.answeredLate).toBe(false);
+      });
+
+      it('is false on a delete row even with a late completedAt', async () => {
+        const admin = await makeAdmin('late-delete', ['support']);
+        const subject = await createSubjectUser('late-delete');
+        const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(requestedAt);
+        const deletion = await createDataRequest({
+          userId: subject.id,
+          type: 'delete',
+          status: 'completed',
+          requestedAt,
+          completedAt: new Date(due.getTime() + 1),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === deletion.id);
+        expect(item?.answeredLate).toBe(false);
+      });
+
+      it('is false on a cancelled export even with a late completedAt', async () => {
+        const admin = await makeAdmin('late-cancelled', ['support']);
+        const subject = await createSubjectUser('late-cancelled');
+        const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(requestedAt);
+        const cancelled = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'cancelled',
+          requestedAt,
+          completedAt: new Date(due.getTime() + 1),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === cancelled.id);
+        expect(item?.answeredLate).toBe(false);
+      });
+
+      it.each(['pending', 'processing', 'failed'] as const)(
+        'is false on a %s export even with a late completedAt',
+        async (status) => {
+          const admin = await makeAdmin(`late-${status}`, ['support']);
+          const subject = await createSubjectUser(`late-${status}`);
+          const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+          const due = gdprResponseDueAt(requestedAt);
+          const row = await createDataRequest({
+            userId: subject.id,
+            type: 'export',
+            status,
+            requestedAt,
+            completedAt: new Date(due.getTime() + 1),
+            ...(status === 'failed' ? { failureReason: 'export_failed' } : {}),
+          });
+
+          const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+          const item = body.items.find((candidate) => candidate.id === row.id);
+          expect(item?.answeredLate).toBe(false);
+        },
+      );
+
+      it.each(['ready', 'completed'] as const)(
+        'is false on a %s export with a null completedAt',
+        async (status) => {
+          const admin = await makeAdmin(`late-null-${status}`, ['support']);
+          const subject = await createSubjectUser(`late-null-${status}`);
+          const row = await createDataRequest({
+            userId: subject.id,
+            type: 'export',
+            status,
+            requestedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+            ...(status === 'ready'
+              ? { expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }
+              : {}),
+          });
+
+          const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+          const item = body.items.find((candidate) => candidate.id === row.id);
+          expect(item?.answeredLate).toBe(false);
+        },
+      );
+    });
+
+    describe('answeredLate for a failed export later answered by a newer export', () => {
+      it('is true when the retry completes after the failed request’s due date', async () => {
+        const admin = await makeAdmin('late-retry-late', ['support']);
+        const subject = await createSubjectUser('late-retry-late');
+        const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(requestedAt);
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt,
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(requestedAt.getTime() + 1000),
+          completedAt: new Date(due.getTime() + 1),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.answeredLate).toBe(true);
+      });
+
+      it('is false when the retry completes on or before the failed request’s due date', async () => {
+        const admin = await makeAdmin('late-retry-on-time', ['support']);
+        const subject = await createSubjectUser('late-retry-on-time');
+        const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(requestedAt);
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt,
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(requestedAt.getTime() + 1000),
+          completedAt: due,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.answeredLate).toBe(false);
+      });
+
+      it('is false, and responseDueAt is non-null, when there is no later success', async () => {
+        const admin = await makeAdmin('late-retry-none', ['support']);
+        const subject = await createSubjectUser('late-retry-none');
+        const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(requestedAt);
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt,
+          failureReason: 'export_failed',
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.answeredLate).toBe(false);
+        expect(item?.responseDueAt).toBe(due.toISOString());
+      });
+
+      it('is false when the only success is earlier than the failed request, not later', async () => {
+        const admin = await makeAdmin('late-retry-earlier', ['support']);
+        const subject = await createSubjectUser('late-retry-earlier');
+        const base = Date.now() - 10 * 24 * 60 * 60 * 1000;
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(base - 1000),
+          completedAt: new Date(base + 365 * 24 * 60 * 60 * 1000),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt: new Date(base),
+          failureReason: 'export_failed',
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.answeredLate).toBe(false);
+      });
+
+      it('uses the earliest later completedAt when several retries followed the failure', async () => {
+        const admin = await makeAdmin('late-retry-earliest', ['support']);
+        const subject = await createSubjectUser('late-retry-earliest');
+        const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(requestedAt);
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt,
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'completed',
+          requestedAt: new Date(requestedAt.getTime() + 1000),
+          completedAt: new Date(due.getTime() - 1),
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(requestedAt.getTime() + 2000),
+          completedAt: new Date(due.getTime() + 1),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.answeredLate).toBe(false);
+      });
+
+      it('is false when the retry completes exactly on the due date (1ms before the late boundary)', async () => {
+        const admin = await makeAdmin('late-retry-1ms-before', ['support']);
+        const subject = await createSubjectUser('late-retry-1ms-before');
+        const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(requestedAt);
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt,
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(requestedAt.getTime() + 1000),
+          completedAt: new Date(due.getTime() - 1),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.answeredLate).toBe(false);
+      });
+
+      it('is true when the retry completes 1ms after the due date', async () => {
+        const admin = await makeAdmin('late-retry-1ms-after', ['support']);
+        const subject = await createSubjectUser('late-retry-1ms-after');
+        const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(requestedAt);
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt,
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(requestedAt.getTime() + 1000),
+          completedAt: new Date(due.getTime() + 1),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.answeredLate).toBe(true);
+      });
+
+      it('clamps the due date to the end of February for a January 31 request when checking a retry', async () => {
+        const admin = await makeAdmin('late-retry-clamp', ['support']);
+        const subject = await createSubjectUser('late-retry-clamp');
+        const requestedAt = new Date('2026-01-31T10:00:00.000Z');
+        const due = gdprResponseDueAt(requestedAt);
+        expect(due.toISOString()).toBe('2026-02-28T10:00:00.000Z');
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt,
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(requestedAt.getTime() + 1000),
+          completedAt: new Date(due.getTime() + 1),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.answeredLate).toBe(true);
       });
     });
   });
