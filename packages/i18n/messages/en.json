@@ -744,7 +744,7 @@
     },
     "dataExportFailed": {
       "subject": "Your {appName} data export failed",
-      "body": "We couldn't prepare your data export. Our team has been notified and will retry it for you. If it keeps failing, contact support. You can check its status here: {url}"
+      "body": "We couldn't prepare your data export. Please contact support so we can look into it and retry it for you. You can check its status here: {url}"
     },
     "footer": {
       "preferences": "Manage your notification preferences: {url}"
