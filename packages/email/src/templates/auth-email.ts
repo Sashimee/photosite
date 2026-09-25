@@ -16,8 +16,12 @@ function link(url: string): string {
   return `<a href="${escaped}">${escaped}</a>`;
 }
 
-function renderHtmlWithLink(template: string, url: string): string {
-  return formatHtml(template, { url: URL_TOKEN }).replaceAll(URL_TOKEN, link(url));
+function renderHtmlWithLink(
+  template: string,
+  url: string,
+  values: Record<string, string> = {},
+): string {
+  return formatHtml(template, { ...values, url: URL_TOKEN }).replaceAll(URL_TOKEN, link(url));
 }
 
 // The auth jobs (verify-email, reset-password, account-exists,
@@ -57,6 +61,22 @@ export function renderAuthEmail(job: EmailJob, to: string): MailMessage {
         subject: formatText(t.accountDeletionRequested.subject, { appName }),
         text: formatText(t.accountDeletionRequested.body, { url: job.url }),
         html: `<p>${renderHtmlWithLink(t.accountDeletionRequested.body, job.url)}</p>`,
+      };
+    case 'data-export-ready':
+      return {
+        to,
+        subject: formatText(t.dataExportReady.subject, { appName }),
+        text: formatText(t.dataExportReady.body, { url: job.url, expiresAt: job.expiresAt }),
+        html: `<p>${renderHtmlWithLink(t.dataExportReady.body, job.url, {
+          expiresAt: job.expiresAt,
+        })}</p>`,
+      };
+    case 'data-export-failed':
+      return {
+        to,
+        subject: formatText(t.dataExportFailed.subject, { appName }),
+        text: formatText(t.dataExportFailed.body, { url: job.url }),
+        html: `<p>${renderHtmlWithLink(t.dataExportFailed.body, job.url)}</p>`,
       };
   }
 }

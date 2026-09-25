@@ -57,6 +57,37 @@ describe('renderAuthEmail', () => {
     );
   });
 
+  it('renders a data-export-ready job with the expiry date and download link', () => {
+    const message = renderAuthEmail(
+      {
+        type: 'data-export-ready',
+        to: 'jane@example.com',
+        url: 'https://photoo.lu/account',
+        expiresAt: '2026-01-08T00:00:00.000Z',
+      },
+      'jane@example.com',
+    );
+    expect(message.subject).toMatch(/data export is ready/);
+    expect(message.text).toContain('https://photoo.lu/account');
+    expect(message.text).toContain('2026-01-08T00:00:00.000Z');
+    expect(message.html).toContain('<a href="https://photoo.lu/account">');
+    expect(message.html).toContain('2026-01-08T00:00:00.000Z');
+  });
+
+  it('renders a data-export-failed job with the retry link', () => {
+    const message = renderAuthEmail(
+      {
+        type: 'data-export-failed',
+        to: 'jane@example.com',
+        url: 'https://photoo.lu/account',
+      },
+      'jane@example.com',
+    );
+    expect(message.subject).toMatch(/data export failed/);
+    expect(message.text).toContain('https://photoo.lu/account');
+    expect(message.html).toContain('<a href="https://photoo.lu/account">');
+  });
+
   it('HTML-escapes a url containing an ampersand', () => {
     const message = renderAuthEmail(
       {
