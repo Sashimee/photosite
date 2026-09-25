@@ -1,0 +1,386 @@
+import { randomUUID } from 'node:crypto';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { createPrismaClient, type PrismaClient } from '@photoo/db';
+import type { AdminPermission } from '@photoo/shared';
+import { Redis } from 'ioredis';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { createTestApp } from '../../testing/create-test-app.js';
+import { waitForLinkInEmail } from '../../testing/mailpit.js';
+import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
+import { generateTotpCode } from '../../testing/totp.js';
+import { TEST_ENV } from '../../testing/test-env.js';
+
+const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL', 'REDIS_URL']);
+const PASSWORD = `photoo-test-${randomUUID()}`;
+const FAKE_IP = '10.50.22.1';
+
+interface DataRequestBody {
+  id: string;
+  type: string;
+  status: string;
+  requestedAt: string;
+  completedAt: string | null;
+  expiresAt: string | null;
+  failureReason: string | null;
+  cancelledAt: string | null;
+  user: { id: string; email: string } | null;
+  exportKey?: string;
+}
+
+interface PageBody<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+describe('admin data requests integration', () => {
+  if (!testEnv) {
+    it.skip('skipped: TEST_DATABASE_URL or REDIS_URL is not set', () => undefined);
+    return;
+  }
+
+  let app: NestFastifyApplication;
+  let prisma: PrismaClient;
+  let redis: Redis;
+  const createdUserIds: string[] = [];
+
+  function fastify() {
+    return app.getHttpAdapter().getInstance();
+  }
+
+  function uniqueEmail(label: string): string {
+    return `data-requests-admin-${label}-${randomUUID()}@photoo.test`;
+  }
+
+  function sessionCookieHeader(response: {
+    cookies: { name: string; value: string }[];
+  }): string | undefined {
+    const cookie = response.cookies.find((candidate) => candidate.name === 'photoo_session');
+    return cookie ? `${cookie.name}=${cookie.value}` : undefined;
+  }
+
+  function extractFragmentToken(link: string): string | null {
+    const hashIndex = link.indexOf('#token=');
+    if (hashIndex === -1) {
+      return null;
+    }
+    return decodeURIComponent(link.slice(hashIndex + '#token='.length));
+  }
+
+  async function signUpVerifyAndSignIn(label: string): Promise<{ id: string; email: string }> {
+    const email = uniqueEmail(label);
+    const signUpResponse = await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/sign-up',
+      remoteAddress: FAKE_IP,
+      payload: { email, password: PASSWORD, roles: ['client'], locale: 'en' },
+    });
+    const userId = signUpResponse.json<{ user: { id: string } }>().user.id;
+    createdUserIds.push(userId);
+
+    const link = await waitForLinkInEmail(email, /https?:\/\/\S*verify-email#token=\S+/);
+    const token = extractFragmentToken(link);
+    if (!token) {
+      throw new Error(`no token found in verification link: ${link}`);
+    }
+    await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/verify-email',
+      remoteAddress: FAKE_IP,
+      payload: { token },
+    });
+
+    return { id: userId, email };
+  }
+
+  async function makeAdmin(
+    label: string,
+    permissions: readonly AdminPermission[] = [],
+  ): Promise<{ headers: { cookie: string; origin: string }; id: string; email: string }> {
+    const admin = await signUpVerifyAndSignIn(label);
+    await prisma.user.update({ where: { id: admin.id }, data: { roles: ['admin'] } });
+    for (const permission of permissions) {
+      await prisma.adminPermissionGrant.upsert({
+        where: { userId_permission: { userId: admin.id, permission } },
+        create: { userId: admin.id, permission, grantedByAdminId: admin.id },
+        update: {},
+      });
+    }
+
+    const signInResponse = await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/sign-in',
+      remoteAddress: FAKE_IP,
+      payload: { email: admin.email, password: PASSWORD },
+    });
+    let cookie = sessionCookieHeader(signInResponse);
+    if (!cookie) {
+      throw new Error('expected a session cookie on sign-in');
+    }
+
+    const enrollResponse = await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/totp/enroll',
+      headers: { cookie, origin: 'http://localhost:3000' },
+      payload: { password: PASSWORD },
+    });
+    const { secret } = enrollResponse.json<{ secret: string }>();
+    const verifyResponse = await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/totp/verify',
+      headers: { cookie, origin: 'http://localhost:3000' },
+      payload: { code: generateTotpCode(secret) },
+    });
+    cookie = sessionCookieHeader(verifyResponse) ?? cookie;
+
+    return {
+      headers: { cookie, origin: 'http://localhost:3000' },
+      id: admin.id,
+      email: admin.email,
+    };
+  }
+
+  async function createSubjectUser(label: string): Promise<{ id: string; email: string }> {
+    const email = uniqueEmail(`subject-${label}`);
+    const user = await prisma.user.create({
+      data: {
+        email,
+        emailVerifiedAt: new Date(),
+        locale: 'en',
+        countryCode: 'LU',
+        roles: ['client'],
+        status: 'active',
+      },
+    });
+    createdUserIds.push(user.id);
+    return { id: user.id, email };
+  }
+
+  async function createDataRequest(spec: {
+    userId: string;
+    type: 'export' | 'delete';
+    status: 'pending' | 'processing' | 'ready' | 'completed' | 'failed' | 'cancelled';
+    requestedAt: Date;
+    exportKey?: string;
+  }): Promise<{ id: string }> {
+    const row = await prisma.dataRequest.create({
+      data: {
+        userId: spec.userId,
+        type: spec.type,
+        status: spec.status,
+        requestedAt: spec.requestedAt,
+        ...(spec.exportKey ? { exportKey: spec.exportKey } : {}),
+      },
+    });
+    return { id: row.id };
+  }
+
+  async function fetchPage(
+    query: string,
+    cursor: string | null,
+    headers: Record<string, string | undefined>,
+  ): Promise<PageBody<DataRequestBody>> {
+    const cursorParam = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
+    const response = await fastify().inject({
+      method: 'GET',
+      url: `/v1/admin/data-requests?${query}${cursorParam}`,
+      headers,
+    });
+    return response.json<PageBody<DataRequestBody>>();
+  }
+
+  async function clearRateLimitKeys(): Promise<void> {
+    const patterns = [`rate-limit:auth:*:${FAKE_IP}`, `lockout:auth:*:${FAKE_IP}`];
+    const globbed = (await Promise.all(patterns.map((pattern) => redis.keys(pattern)))).flat();
+    if (globbed.length > 0) {
+      await redis.del(...globbed);
+    }
+  }
+
+  beforeAll(async () => {
+    app = await createTestApp({
+      ...TEST_ENV,
+      DATABASE_URL: testEnv.TEST_DATABASE_URL,
+      REDIS_URL: testEnv.REDIS_URL,
+    });
+    prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
+    redis = new Redis(testEnv.REDIS_URL);
+    await clearRateLimitKeys();
+  });
+
+  afterEach(async () => {
+    await clearRateLimitKeys();
+  });
+
+  afterAll(async () => {
+    if (createdUserIds.length > 0) {
+      await prisma.dataRequest.deleteMany({ where: { userId: { in: createdUserIds } } });
+      await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+    }
+    await prisma.$disconnect();
+    redis.disconnect();
+    await app.close();
+  });
+
+  describe('GET /v1/admin/data-requests', () => {
+    it('returns 401 when unauthenticated', async () => {
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/data-requests',
+        headers: { origin: 'http://localhost:3000' },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('returns 403 for an admin without the support permission', async () => {
+      const admin = await makeAdmin('list-no-permission', ['finance']);
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(403);
+    });
+
+    it('returns 400 for an unknown status filter', async () => {
+      const admin = await makeAdmin('list-bad-status', ['support']);
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/data-requests?status=archived',
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('returns 400 for an unknown type filter', async () => {
+      const admin = await makeAdmin('list-bad-type', ['support']);
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/data-requests?type=wipe',
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('lists requests newest first with the owning user and never exposes exportKey', async () => {
+      const admin = await makeAdmin('list-ok', ['support']);
+      const subject = await createSubjectUser('list-ok');
+      const base = Date.now();
+      await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'ready',
+        requestedAt: new Date(base - 2000),
+        exportKey: 'private/should-not-leak.zip',
+      });
+      const newer = await createDataRequest({
+        userId: subject.id,
+        type: 'delete',
+        status: 'pending',
+        requestedAt: new Date(base - 1000),
+      });
+
+      const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+      expect(body.items.length).toBe(2);
+      expect(body.items[0]?.id).toBe(newer.id);
+      expect(body.items.every((item) => item.user?.id === subject.id)).toBe(true);
+      expect(body.items.every((item) => item.user?.email === subject.email)).toBe(true);
+      expect(body.items.every((item) => !('exportKey' in item))).toBe(true);
+    });
+
+    it('filters by status', async () => {
+      const admin = await makeAdmin('filter-status', ['support']);
+      const subject = await createSubjectUser('filter-status');
+      const base = Date.now();
+      await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'completed',
+        requestedAt: new Date(base - 1000),
+      });
+      const pending = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'pending',
+        requestedAt: new Date(base),
+      });
+
+      const body = await fetchPage(`userId=${subject.id}&status=pending`, null, admin.headers);
+      expect(body.items.map((item) => item.id)).toEqual([pending.id]);
+    });
+
+    it('filters by type', async () => {
+      const admin = await makeAdmin('filter-type', ['support']);
+      const subject = await createSubjectUser('filter-type');
+      const base = Date.now();
+      await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'pending',
+        requestedAt: new Date(base - 1000),
+      });
+      const deletion = await createDataRequest({
+        userId: subject.id,
+        type: 'delete',
+        status: 'pending',
+        requestedAt: new Date(base),
+      });
+
+      const body = await fetchPage(`userId=${subject.id}&type=delete`, null, admin.headers);
+      expect(body.items.map((item) => item.id)).toEqual([deletion.id]);
+    });
+
+    it('filters by userId', async () => {
+      const admin = await makeAdmin('filter-user', ['support']);
+      const subjectA = await createSubjectUser('filter-user-a');
+      const subjectB = await createSubjectUser('filter-user-b');
+      const base = Date.now();
+      const requestA = await createDataRequest({
+        userId: subjectA.id,
+        type: 'export',
+        status: 'pending',
+        requestedAt: new Date(base - 1000),
+      });
+      await createDataRequest({
+        userId: subjectB.id,
+        type: 'export',
+        status: 'pending',
+        requestedAt: new Date(base),
+      });
+
+      const body = await fetchPage(`userId=${subjectA.id}`, null, admin.headers);
+      expect(body.items.map((item) => item.id)).toEqual([requestA.id]);
+    });
+
+    it('paginates with no gaps or repeats', async () => {
+      const admin = await makeAdmin('pagination', ['support']);
+      const subject = await createSubjectUser('pagination');
+      const base = Date.now();
+      const created: string[] = [];
+      for (let i = 0; i < 5; i += 1) {
+        const row = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'completed',
+          requestedAt: new Date(base - i * 1000),
+        });
+        created.push(row.id);
+      }
+
+      const items: DataRequestBody[] = [];
+      let cursor: string | null = null;
+      const query = `userId=${subject.id}&limit=2`;
+      for (let page = 0; page < 40; page += 1) {
+        const body = await fetchPage(query, cursor, admin.headers);
+        expect(body.items.length).toBeLessThanOrEqual(2);
+        items.push(...body.items);
+        cursor = body.nextCursor;
+        if (!cursor) break;
+      }
+
+      expect(items.length).toBe(5);
+      const ids = items.map((item) => item.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids).toEqual(created);
+    });
+  });
+});

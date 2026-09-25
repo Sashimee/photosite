@@ -9,6 +9,9 @@ import { AdminAuditLogController } from './admin-audit-log.controller.js';
 import { AdminAuditLogRepository } from './admin-audit-log.repository.js';
 import { AdminAuditLogService } from './admin-audit-log.service.js';
 import { AdminAuditService } from './admin-audit.service.js';
+import { AdminDataRequestsController } from './admin-data-requests.controller.js';
+import { AdminDataRequestsRepository } from './admin-data-requests.repository.js';
+import { AdminDataRequestsService } from './admin-data-requests.service.js';
 import { AdminEmailTemplatesController } from './admin-email-templates.controller.js';
 import { AdminEmailTemplatesService } from './admin-email-templates.service.js';
 import { AdminMeController } from './admin-me.controller.js';
@@ -33,6 +36,7 @@ import { AdminUsersService } from './admin-users.service.js';
     AdminAuditLogController,
     AdminReportsController,
     AdminEmailTemplatesController,
+    AdminDataRequestsController,
   ],
   providers: [
     AdminAccessService,
@@ -48,6 +52,8 @@ import { AdminUsersService } from './admin-users.service.js';
     AdminReportsService,
     AdminReportsRepository,
     AdminEmailTemplatesService,
+    AdminDataRequestsService,
+    AdminDataRequestsRepository,
     OriginGuard,
   ],
   exports: [
