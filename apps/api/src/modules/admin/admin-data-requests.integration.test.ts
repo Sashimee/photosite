@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createPrismaClient, type PrismaClient } from '@photoo/db';
-import { gdprResponseDueAt, type AdminPermission } from '@photoo/shared';
+import { GDPR_EXPORT_QUEUE_NAME, gdprResponseDueAt, type AdminPermission } from '@photoo/shared';
+import { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp } from '../../testing/create-test-app.js';
@@ -43,6 +44,8 @@ describe('admin data requests integration', () => {
   let app: NestFastifyApplication;
   let prisma: PrismaClient;
   let redis: Redis;
+  let exportQueueConnection: Redis;
+  let exportQueue: Queue;
   const createdUserIds: string[] = [];
 
   function fastify() {
@@ -212,6 +215,8 @@ describe('admin data requests integration', () => {
     });
     prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
     redis = new Redis(testEnv.REDIS_URL);
+    exportQueueConnection = new Redis(testEnv.REDIS_URL, { maxRetriesPerRequest: null });
+    exportQueue = new Queue(GDPR_EXPORT_QUEUE_NAME, { connection: exportQueueConnection });
     await clearRateLimitKeys();
   });
 
@@ -225,6 +230,8 @@ describe('admin data requests integration', () => {
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
     await prisma.$disconnect();
+    await exportQueue.close();
+    exportQueueConnection.disconnect();
     redis.disconnect();
     await app.close();
   });
@@ -1161,6 +1168,15 @@ describe('admin data requests integration', () => {
   });
 
   describe('POST /v1/admin/data-requests/:id/retry-export', () => {
+    it('returns 401 when unauthenticated', async () => {
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/data-requests/${randomUUID()}/retry-export`,
+        headers: { origin: 'http://localhost:3000' },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
     it('returns 403 for an admin without the support permission', async () => {
       const admin = await makeAdmin('retry-no-permission', ['finance']);
       const subject = await createSubjectUser('retry-no-permission');
@@ -1205,6 +1221,24 @@ describe('admin data requests integration', () => {
       const response = await fastify().inject({
         method: 'POST',
         url: `/v1/admin/data-requests/${ready.id}/retry-export`,
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(409);
+    });
+
+    it('returns 409 when the source request is a pending export', async () => {
+      const admin = await makeAdmin('retry-pending', ['support']);
+      const subject = await createSubjectUser('retry-pending');
+      const pending = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'pending',
+        requestedAt: new Date(),
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/data-requests/${pending.id}/retry-export`,
         headers: admin.headers,
       });
       expect(response.statusCode).toBe(409);
@@ -1292,6 +1326,42 @@ describe('admin data requests integration', () => {
       expect(auditRow?.targetType).toBe('DataRequest');
       expect(auditRow?.before).toEqual({ sourceId: failed.id });
       expect(auditRow?.ip).toBe(FAKE_IP);
+
+      const enqueuedJob = await exportQueue.getJob(body.id);
+      expect(enqueuedJob).not.toBeNull();
+      expect(enqueuedJob?.data).toEqual({ dataRequestId: body.id });
+    });
+
+    it('lets only one of two concurrent retries for the same source succeed', async () => {
+      const admin = await makeAdmin('retry-concurrent', ['support']);
+      const subject = await createSubjectUser('retry-concurrent');
+      const failed = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'failed',
+        requestedAt: new Date(Date.now() - 60_000),
+        failureReason: 'export_failed',
+      });
+
+      const [first, second] = await Promise.all([
+        fastify().inject({
+          method: 'POST',
+          url: `/v1/admin/data-requests/${failed.id}/retry-export`,
+          headers: admin.headers,
+        }),
+        fastify().inject({
+          method: 'POST',
+          url: `/v1/admin/data-requests/${failed.id}/retry-export`,
+          headers: admin.headers,
+        }),
+      ]);
+      const statusCodes = [first.statusCode, second.statusCode].sort();
+      expect(statusCodes).toEqual([201, 409]);
+
+      const createdRows = await prisma.dataRequest.findMany({
+        where: { userId: subject.id, id: { not: failed.id } },
+      });
+      expect(createdRows).toHaveLength(1);
     });
   });
 });
