@@ -7297,7 +7297,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel a data request during its grace period. Only a deletion request can be cancelled, and only before anonymisation runs. A soft-deleted account has no session, so `token` (the single-use value mailed at deletion time) is accepted in place of one. */
+        /** Cancel a data request during its grace period. Only a deletion request can be cancelled, and only within the 30-day grace period; after it, 409 even if anonymisation has not run yet. A soft-deleted account has no session, so `token` (the single-use value mailed at deletion time) is accepted in place of one. */
         post: {
             parameters: {
                 query?: never;
