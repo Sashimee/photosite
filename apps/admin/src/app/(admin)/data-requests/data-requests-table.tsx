@@ -33,7 +33,10 @@ export function DataRequestsTable({ status, type, userId }: DataRequestsFilters)
       id: 'user',
       header: t('columns.user'),
       cell: (row) => (
-        <Link href={`/users/${row.user.id}`} className="underline-offset-4 hover:underline">
+        <Link
+          href={`/users/${encodeURIComponent(row.user.id)}`}
+          className="underline-offset-4 hover:underline"
+        >
           {maskEmail(row.user.email)}
         </Link>
       ),
