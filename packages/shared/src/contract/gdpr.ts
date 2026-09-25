@@ -1,4 +1,9 @@
-import { CONSENT_PURPOSES, DATA_REQUEST_STATUSES, DATA_REQUEST_TYPES } from '../enums.js';
+import {
+  CONSENT_PURPOSES,
+  DATA_REQUEST_CHANNELS,
+  DATA_REQUEST_STATUSES,
+  DATA_REQUEST_TYPES,
+} from '../enums.js';
 import { IdSchema, IsoDateTimeSchema, errorResponses } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
@@ -150,6 +155,7 @@ export const DataRequestSchema = z
     id: IdSchema,
     type: z.enum(DATA_REQUEST_TYPES),
     status: z.enum(DATA_REQUEST_STATUSES),
+    channel: z.enum(DATA_REQUEST_CHANNELS),
     requestedAt: IsoDateTimeSchema,
     completedAt: IsoDateTimeSchema.nullable(),
     expiresAt: IsoDateTimeSchema.nullable(),

@@ -1,5 +1,6 @@
 import {
   ADMIN_PERMISSIONS,
+  DATA_REQUEST_CHANNELS,
   DATA_REQUEST_STATUSES,
   DATA_REQUEST_TYPES,
   FEATURE_FLAG_KEYS,
@@ -567,6 +568,7 @@ export const AdminDataRequestSchema = DataRequestSchema.extend({
 export const AdminDataRequestsQuerySchema = CursorPaginationQuerySchema.extend({
   status: z.enum(DATA_REQUEST_STATUSES).optional(),
   type: z.enum(DATA_REQUEST_TYPES).optional(),
+  channel: z.enum(DATA_REQUEST_CHANNELS).optional(),
   userId: IdSchema.optional(),
 }).strict();
 
@@ -623,6 +625,45 @@ registry.registerPath({
       content: { 'application/json': { schema: AdminDataRequestSchema } },
     },
     ...errorResponses([400, 401, 403, 404, 409, 429]),
+  },
+});
+
+export const AdminLogDataRequestBodySchema = z
+  .object({
+    userId: IdSchema,
+    type: z.enum(DATA_REQUEST_TYPES),
+    channel: z.enum(['email', 'support']),
+    receivedAt: IsoDateTimeSchema,
+  })
+  .strict();
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/admin/data-requests'),
+  summary: 'Log a GDPR request received off-platform',
+  description:
+    'Records a data subject request that reached the user by email or through support, so it ' +
+    'meets the same Art. 12(3) deadline as an in-app request. `requestedAt` is set to `receivedAt`, ' +
+    'so `responseDueAt` counts from when the request was received, not from when it was logged. ' +
+    '`400` if `receivedAt` is more than 1 minute in the future or more than 30 days in the past. ' +
+    'Returns 409 with a distinct `code`: `EXPORT_OPEN` or `DELETE_OPEN` if the user already has an ' +
+    "open request of that type, `USER_SUSPENDED` or `USER_DELETED` if the user's account is no " +
+    'longer active, or `BLOCKING_OBLIGATIONS` if a delete is blocked by the same obligations as ' +
+    'self-service deletion.',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('support'),
+  request: {
+    body: {
+      content: { 'application/json': { schema: AdminLogDataRequestBodySchema } },
+    },
+  },
+  responses: {
+    '201': {
+      description: 'The logged data request',
+      content: { 'application/json': { schema: AdminDataRequestSchema } },
+    },
+    ...errorResponses([400, 401, 403, 404, 409]),
   },
 });
 

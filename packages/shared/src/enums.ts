@@ -136,6 +136,10 @@ export const DATA_REQUEST_STATUSES = [
 
 export type DataRequestStatus = (typeof DATA_REQUEST_STATUSES)[number];
 
+export const DATA_REQUEST_CHANNELS = ['in_app', 'email', 'support'] as const;
+
+export type DataRequestChannel = (typeof DATA_REQUEST_CHANNELS)[number];
+
 export const ADMIN_PERMISSIONS = [
   'support',
   'moderation',

@@ -147,6 +147,7 @@ function mapDataRequest(
     id: row.id,
     type: row.type,
     status: row.status,
+    channel: row.channel,
     requestedAt: row.requestedAt.toISOString(),
     completedAt: row.completedAt?.toISOString() ?? null,
     expiresAt: row.expiresAt?.toISOString() ?? null,
@@ -172,6 +173,7 @@ export class AdminDataRequestsService {
     const rows = await this.repository.list({
       ...(query.status ? { status: query.status } : {}),
       ...(query.type ? { type: query.type } : {}),
+      ...(query.channel ? { channel: query.channel } : {}),
       ...(query.userId ? { userId: query.userId } : {}),
       ...(cursor ? { cursor } : {}),
       limit: query.limit,

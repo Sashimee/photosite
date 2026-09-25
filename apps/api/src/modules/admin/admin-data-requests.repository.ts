@@ -1,11 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { DataRequestStatus, DataRequestType, Prisma, UserStatus } from '@photoo/db';
+import type {
+  DataRequestChannel,
+  DataRequestStatus,
+  DataRequestType,
+  Prisma,
+  UserStatus,
+} from '@photoo/db';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AdminDataRequestCursor } from './admin-data-request-cursor.js';
 
 export interface AdminDataRequestFilters {
   status?: DataRequestStatus;
   type?: DataRequestType;
+  channel?: DataRequestChannel;
   userId?: string;
   cursor?: AdminDataRequestCursor;
   limit: number;
@@ -17,6 +24,7 @@ const dataRequestSelect = {
   id: true,
   type: true,
   status: true,
+  channel: true,
   requestedAt: true,
   completedAt: true,
   expiresAt: true,
@@ -118,6 +126,9 @@ export class AdminDataRequestsRepository {
     }
     if (filters.type) {
       and.push({ type: filters.type });
+    }
+    if (filters.channel) {
+      and.push({ channel: filters.channel });
     }
     if (filters.userId) {
       and.push({ userId: filters.userId });

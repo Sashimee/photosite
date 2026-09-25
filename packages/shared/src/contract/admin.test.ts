@@ -460,6 +460,7 @@ describe('AdminDataRequestSchema', () => {
     id,
     type: 'delete',
     status: 'pending',
+    channel: 'in_app',
     requestedAt: '2026-08-01T10:00:00.000Z',
     completedAt: null,
     expiresAt: null,

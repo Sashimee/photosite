@@ -3379,6 +3379,14 @@
               "cancelled"
             ]
           },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "in_app",
+              "email",
+              "support"
+            ]
+          },
           "requestedAt": {
             "type": "string",
             "format": "date-time",
@@ -3425,6 +3433,7 @@
           "id",
           "type",
           "status",
+          "channel",
           "requestedAt",
           "completedAt",
           "expiresAt",
@@ -3749,6 +3758,14 @@
               "cancelled"
             ]
           },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "in_app",
+              "email",
+              "support"
+            ]
+          },
           "requestedAt": {
             "type": "string",
             "format": "date-time",
@@ -3827,6 +3844,7 @@
           "id",
           "type",
           "status",
+          "channel",
           "requestedAt",
           "completedAt",
           "expiresAt",
@@ -15560,6 +15578,19 @@
           {
             "schema": {
               "type": "string",
+              "enum": [
+                "in_app",
+                "email",
+                "support"
+              ]
+            },
+            "required": false,
+            "name": "channel",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid",
               "description": "UUID identifier",
               "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
@@ -15623,6 +15654,125 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Log a GDPR request received off-platform",
+        "description": "Records a data subject request that reached the user by email or through support, so it meets the same Art. 12(3) deadline as an in-app request. `requestedAt` is set to `receivedAt`, so `responseDueAt` counts from when the request was received, not from when it was logged. `400` if `receivedAt` is more than 1 minute in the future or more than 30 days in the past. Returns 409 with a distinct `code`: `EXPORT_OPEN` or `DELETE_OPEN` if the user already has an open request of that type, `USER_SUSPENDED` or `USER_DELETED` if the user's account is no longer active, or `BLOCKING_OBLIGATIONS` if a delete is blocked by the same obligations as self-service deletion.",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "support",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "UUID identifier",
+                    "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "export",
+                      "delete"
+                    ]
+                  },
+                  "channel": {
+                    "type": "string",
+                    "enum": [
+                      "email",
+                      "support"
+                    ]
+                  },
+                  "receivedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "ISO 8601 date-time",
+                    "example": "2026-09-16T12:00:00.000Z"
+                  }
+                },
+                "required": [
+                  "userId",
+                  "type",
+                  "channel",
+                  "receivedAt"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The logged data request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDataRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
