@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@photoo/db';
-import { PUBLIC_UPLOAD_PURPOSES } from '@photoo/shared';
+import { GDPR_DELETION_GRACE_PERIOD_MS, PUBLIC_UPLOAD_PURPOSES } from '@photoo/shared';
 import type { Logger } from 'nestjs-pino';
 import type { RecordAuditLogInput } from '../../common/audit-log.service.js';
 
@@ -20,8 +20,6 @@ export interface AnonymiseDeletionsResult {
   usersFailed: number;
 }
 
-// docs/steps/1A.12-gdpr.md "anonymise deletions past 30 days".
-const GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 // `en` is the source-of-truth locale (CLAUDE.md), not a nullable field.
 const ANONYMISED_LOCALE = 'en';
 const ANONYMISED_DISPLAY_NAME = 'Deleted user';
@@ -183,7 +181,7 @@ async function anonymiseOne(
 export async function anonymiseDeletions(
   deps: AnonymiseDeletionsDeps,
 ): Promise<AnonymiseDeletionsResult> {
-  const cutoff = new Date(Date.now() - GRACE_PERIOD_MS);
+  const cutoff = new Date(Date.now() - GDPR_DELETION_GRACE_PERIOD_MS);
   const due = await deps.prisma.client.dataRequest.findMany({
     where: { type: 'delete', status: 'pending', requestedAt: { lte: cutoff } },
     select: { id: true, userId: true },

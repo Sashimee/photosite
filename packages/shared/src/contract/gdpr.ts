@@ -3,6 +3,10 @@ import { IdSchema, IsoDateTimeSchema, errorResponses } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
 
+// docs/steps/1A.12-gdpr.md "anonymise deletions past 30 days"; also drives
+// the grace-period countdown shown on the admin data-requests list.
+export const GDPR_DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+
 // `exportKey` is the private S3 object key and is never returned to a
 // client: `GET .../download` issues a short-lived presigned URL from it
 // instead (docs/steps/1A.12-gdpr.md "The export is a zip..."). `failureReason`

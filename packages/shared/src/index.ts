@@ -405,6 +405,7 @@ export {
 } from './contract/reports.js';
 
 export {
+  GDPR_DELETION_GRACE_PERIOD_MS,
   CancelDataRequestRequestSchema,
   ConsentPurposeSchema,
   ConsentRecordSchema,
