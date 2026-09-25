@@ -1,15 +1,17 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { components } from '@photoo/api-client';
-import { SUPPORTED_LOCALES, type Locale } from '@photoo/shared';
+import { AUTH_EMAIL_TEMPLATE_NAMES, SUPPORTED_LOCALES, type Locale } from '@photoo/shared';
 
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
-import { apiErrorMessage } from '@/lib/api-errors';
+import { apiErrorMessage, type ApiErrorLike } from '@/lib/api-errors';
+
+const AUTH_EMAIL_TEMPLATE_NAME_SET: ReadonlySet<string> = new Set(AUTH_EMAIL_TEMPLATE_NAMES);
 
 type EmailTemplateName = components['schemas']['EmailTemplateName'];
 type AdminEmailTemplatePreview = components['schemas']['AdminEmailTemplatePreview'];
@@ -29,11 +31,10 @@ export function EmailPreviewPanel({ templates }: { templates: EmailTemplateName[
   const [locale, setLocale] = useState<Locale>('en');
   const [status, setStatus] = useState<Status>('loading');
   const [preview, setPreview] = useState<AdminEmailTemplatePreview | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<ApiErrorLike | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  const tErrorsRef = useRef(tErrors);
-  tErrorsRef.current = tErrors;
+  const isAuthTemplate = AUTH_EMAIL_TEMPLATE_NAME_SET.has(template ?? '');
 
   useEffect(() => {
     if (!template) {
@@ -42,7 +43,7 @@ export function EmailPreviewPanel({ templates }: { templates: EmailTemplateName[
     const currentTemplate = template;
     let cancelled = false;
     setStatus('loading');
-    setErrorMessage(null);
+    setApiError(null);
 
     async function load() {
       const { data, error } = await api.GET('/v1/admin/email-templates/{template}/preview', {
@@ -52,8 +53,7 @@ export function EmailPreviewPanel({ templates }: { templates: EmailTemplateName[
         return;
       }
       if (!data) {
-        const translate = tErrorsRef.current;
-        setErrorMessage(apiErrorMessage(translate, translate('errors.generic'), error));
+        setApiError(error);
         setStatus('error');
         return;
       }
@@ -70,6 +70,11 @@ export function EmailPreviewPanel({ templates }: { templates: EmailTemplateName[
   if (!template) {
     return <p className="text-sm text-muted-foreground">{t('empty')}</p>;
   }
+
+  const errorMessage =
+    status === 'error'
+      ? apiErrorMessage(tErrors, tErrors('errors.generic'), apiError ?? undefined)
+      : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -96,6 +101,7 @@ export function EmailPreviewPanel({ templates }: { templates: EmailTemplateName[
           <select
             id="email-preview-locale"
             value={locale}
+            disabled={isAuthTemplate}
             onChange={(event) => {
               setLocale(event.target.value as Locale);
             }}
@@ -107,6 +113,9 @@ export function EmailPreviewPanel({ templates }: { templates: EmailTemplateName[
               </option>
             ))}
           </select>
+          {isAuthTemplate ? (
+            <p className="text-xs text-muted-foreground">{t('authLocaleNote')}</p>
+          ) : null}
         </div>
       </div>
 

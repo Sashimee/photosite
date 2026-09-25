@@ -606,6 +606,7 @@
         "empty": "No email templates are available to preview.",
         "templateLabel": "Template",
         "localeLabel": "Locale",
+        "authLocaleNote": "Account emails are always sent in English",
         "subjectLabel": "Subject",
         "htmlLabel": "HTML",
         "textLabel": "Text"

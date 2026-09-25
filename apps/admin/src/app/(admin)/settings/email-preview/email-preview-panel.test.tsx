@@ -14,7 +14,7 @@ vi.mock('@/lib/api', () => ({ api: { GET: getMock } }));
 
 type EmailTemplateName = components['schemas']['EmailTemplateName'];
 
-const templates: EmailTemplateName[] = ['verify-email', 'reset-password'];
+const templates: EmailTemplateName[] = ['verify-email', 'reset-password', 'quote_received'];
 
 const preview = {
   subject: 'Verify your email',
@@ -82,19 +82,55 @@ describe('EmailPreviewPanel', () => {
   });
 
   it('refetches when the locale changes', async () => {
-    getMock.mockResolvedValueOnce({ data: preview }).mockResolvedValueOnce({ data: preview });
+    getMock
+      .mockResolvedValueOnce({ data: preview })
+      .mockResolvedValueOnce({
+        data: { subject: 'A new quote', html: '<p>Quote</p>', text: 'Quote' },
+      })
+      .mockResolvedValueOnce({
+        data: { subject: 'A new quote', html: '<p>Quote</p>', text: 'Quote' },
+      });
     const EmailPreviewPanel = await loadEmailPreviewPanel();
     const events = userEvent.setup();
     render(<EmailPreviewPanel templates={templates} />);
     await screen.findByText('Verify your email');
 
+    await events.selectOptions(screen.getByLabelText('Template'), 'quote_received');
+    await screen.findByText('A new quote');
+
     await events.selectOptions(screen.getByLabelText('Locale'), 'fr');
 
     await waitFor(() => {
       expect(getMock).toHaveBeenLastCalledWith('/v1/admin/email-templates/{template}/preview', {
-        params: { path: { template: 'verify-email' }, query: { locale: 'fr' } },
+        params: { path: { template: 'quote_received' }, query: { locale: 'fr' } },
       });
     });
+  });
+
+  it('disables the locale select and shows a note for an auth template', async () => {
+    getMock.mockResolvedValueOnce({ data: preview });
+    const EmailPreviewPanel = await loadEmailPreviewPanel();
+    render(<EmailPreviewPanel templates={templates} />);
+    await screen.findByText('Verify your email');
+
+    expect(screen.getByLabelText('Locale')).toBeDisabled();
+    expect(screen.getByText('Account emails are always sent in English')).toBeInTheDocument();
+  });
+
+  it('enables the locale select and hides the note for a transactional template', async () => {
+    getMock.mockResolvedValueOnce({ data: preview }).mockResolvedValueOnce({
+      data: { subject: 'A new quote', html: '<p>Quote</p>', text: 'Quote' },
+    });
+    const EmailPreviewPanel = await loadEmailPreviewPanel();
+    const events = userEvent.setup();
+    render(<EmailPreviewPanel templates={templates} />);
+    await screen.findByText('Verify your email');
+
+    await events.selectOptions(screen.getByLabelText('Template'), 'quote_received');
+    await screen.findByText('A new quote');
+
+    expect(screen.getByLabelText('Locale')).toBeEnabled();
+    expect(screen.queryByText('Account emails are always sent in English')).not.toBeInTheDocument();
   });
 
   it('shows a mapped error message and retries on demand', async () => {
