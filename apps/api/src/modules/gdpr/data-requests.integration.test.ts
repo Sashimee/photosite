@@ -699,6 +699,47 @@ describe('data requests integration', () => {
       expect(response.statusCode).toBe(409);
     });
 
+    it('returns the "no longer pending" message, not the grace-period one, for an already-completed row past the grace period', async () => {
+      const user = await signUpAndSignIn('cancel-completed-past-grace', ['client']);
+      const created = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/data-requests',
+        headers: { ...authHeaders(user.token), origin: 'http://localhost:3000' },
+        payload: { type: 'delete' },
+      });
+      const dataRequestId = created.json<DataRequestBody>().id;
+      await prisma.dataRequest.update({
+        where: { id: dataRequestId },
+        data: {
+          status: 'completed',
+          completedAt: new Date(),
+          requestedAt: new Date(Date.now() - GDPR_DELETION_GRACE_PERIOD_MS - 1000),
+        },
+      });
+
+      const link = await waitForLinkInEmail(
+        user.email,
+        /https?:\/\/\S*account\/deletion\/cancel\/\S+#token=\S+/,
+      );
+      const token = extractFragmentToken(link);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/me/data-requests/${dataRequestId}/cancel`,
+        headers: { origin: 'http://localhost:3000' },
+        payload: { token },
+      });
+      expect(response.statusCode).toBe(409);
+      const body = response.json<ApiErrorBody>();
+      expect(body.message).toBe('Data request is no longer pending');
+      expect(body.message).not.toMatch(/grace period/i);
+
+      const unchanged = await prisma.dataRequest.findUniqueOrThrow({
+        where: { id: dataRequestId },
+      });
+      expect(unchanged.status).toBe('completed');
+    });
+
     it('returns 409 once the grace period has ended, and changes nothing', async () => {
       const user = await signUpAndSignIn('cancel-past-grace', ['client']);
       const created = await fastify().inject({
@@ -750,36 +791,7 @@ describe('data requests integration', () => {
       expect(auditRow).toBeNull();
     });
 
-    it('returns 409 exactly at the grace period boundary', async () => {
-      const user = await signUpAndSignIn('cancel-grace-boundary', ['client']);
-      const created = await fastify().inject({
-        method: 'POST',
-        url: '/v1/me/data-requests',
-        headers: { ...authHeaders(user.token), origin: 'http://localhost:3000' },
-        payload: { type: 'delete' },
-      });
-      const dataRequestId = created.json<DataRequestBody>().id;
-      await prisma.dataRequest.update({
-        where: { id: dataRequestId },
-        data: { requestedAt: new Date(Date.now() - GDPR_DELETION_GRACE_PERIOD_MS) },
-      });
-
-      const link = await waitForLinkInEmail(
-        user.email,
-        /https?:\/\/\S*account\/deletion\/cancel\/\S+#token=\S+/,
-      );
-      const token = extractFragmentToken(link);
-
-      const response = await fastify().inject({
-        method: 'POST',
-        url: `/v1/me/data-requests/${dataRequestId}/cancel`,
-        headers: { origin: 'http://localhost:3000' },
-        payload: { token },
-      });
-      expect(response.statusCode).toBe(409);
-    });
-
-    it('still cancels a few seconds inside the grace period', async () => {
+    it('still cancels a few minutes inside the grace period', async () => {
       const user = await signUpAndSignIn('cancel-within-grace', ['client']);
       const created = await fastify().inject({
         method: 'POST',
@@ -788,16 +800,17 @@ describe('data requests integration', () => {
         payload: { type: 'delete' },
       });
       const dataRequestId = created.json<DataRequestBody>().id;
-      await prisma.dataRequest.update({
-        where: { id: dataRequestId },
-        data: { requestedAt: new Date(Date.now() - GDPR_DELETION_GRACE_PERIOD_MS + 5000) },
-      });
 
       const link = await waitForLinkInEmail(
         user.email,
         /https?:\/\/\S*account\/deletion\/cancel\/\S+#token=\S+/,
       );
       const token = extractFragmentToken(link);
+
+      await prisma.dataRequest.update({
+        where: { id: dataRequestId },
+        data: { requestedAt: new Date(Date.now() - GDPR_DELETION_GRACE_PERIOD_MS + 60_000) },
+      });
 
       const response = await fastify().inject({
         method: 'POST',
