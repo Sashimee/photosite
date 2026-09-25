@@ -60,8 +60,14 @@ export class AdminDataRequestsController {
     body: ReturnType<(typeof AdminLogDataRequestBodySchema)['parse']>,
     @Req() request: FastifyRequest,
   ) {
-    const { user } = await this.adminAccess.requirePermission(request, 'support');
-    await this.rateLimit.enforce(user.id);
-    return this.adminDataRequests.logOffline(user, body, request.ip);
+    const session = await this.adminAccess.requirePermission(request, 'support', {
+      requires2fa: body.type === 'delete',
+    });
+    if (body.type === 'delete') {
+      await this.rateLimit.enforceDelete(session.user.id);
+    } else {
+      await this.rateLimit.enforce(session.user.id);
+    }
+    return this.adminDataRequests.logOffline(session, body, request.ip);
   }
 }

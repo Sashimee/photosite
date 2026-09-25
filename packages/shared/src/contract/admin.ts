@@ -660,6 +660,10 @@ registry.registerPath({
     'time the row is logged; `responseDueAt` is computed from `receivedAt`, so the deadline counts ' +
     'from when the request was received, not from when it was logged. ' +
     '`400` if `receivedAt` is more than 1 minute in the future or more than 30 days in the past. ' +
+    '`type: "delete"` requires a second factor verified in the last 15 minutes, same as any ' +
+    '`x-requires-2fa` route; returns `403 TWO_FACTOR_REQUIRED` otherwise. Returns ' +
+    '`403 PROTECTED_TARGET` if `userId` is the acting admin, has the admin role, or holds any ' +
+    'admin permission grant, unless the actor is a superadmin with a fresh second factor. ' +
     'Returns 409 with a distinct `code`: `EXPORT_OPEN` or `DELETE_OPEN` if the user already has an ' +
     "open request of that type, `USER_SUSPENDED` or `USER_DELETED` if the user's account is no " +
     'longer active, or `BLOCKING_OBLIGATIONS` if a delete is blocked by the same obligations as ' +

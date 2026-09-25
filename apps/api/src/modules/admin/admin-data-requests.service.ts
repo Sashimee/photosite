@@ -1,6 +1,6 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@photoo/db';
-import type { DataRequestChannel, PrismaClient } from '@photoo/db';
+import type { DataRequestChannel, PrismaClient, UserRole } from '@photoo/db';
 import {
   type AdminDataRequestSchema,
   type AdminDataRequestsQuerySchema,
@@ -13,6 +13,8 @@ import { assertNoBlockingObligations } from '../gdpr/blocking-obligations.js';
 import { DataRequestsService } from '../gdpr/data-requests.service.js';
 import { GdprExportQueueService } from '../gdpr/gdpr-export-queue.service.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import type { SessionContext } from '../auth/session.js';
+import { AdminAccessService } from './admin-access.service.js';
 import { AdminAuditService } from './admin-audit.service.js';
 import {
   decodeAdminDataRequestCursor,
@@ -30,6 +32,16 @@ interface AdminActor {
 
 function notFound(): HttpException {
   return new HttpException({ code: 'NOT_FOUND', message: 'Data request not found' }, 404);
+}
+
+function protectedTarget(): HttpException {
+  return new HttpException(
+    {
+      code: 'PROTECTED_TARGET',
+      message: 'This user cannot be targeted by this action',
+    },
+    403,
+  );
 }
 
 function conflict(code: string, message: string): HttpException {
@@ -217,6 +229,7 @@ export class AdminDataRequestsService {
     @Inject(AdminAuditService) private readonly auditService: AdminAuditService,
     @Inject(GdprExportQueueService) private readonly exportQueue: GdprExportQueueService,
     @Inject(DataRequestsService) private readonly dataRequestsService: DataRequestsService,
+    @Inject(AdminAccessService) private readonly adminAccess: AdminAccessService,
   ) {}
 
   async list(query: Query): Promise<{ items: DataRequestDto[]; nextCursor: string | null }> {
@@ -330,7 +343,7 @@ export class AdminDataRequestsService {
   }
 
   async logOffline(
-    admin: AdminActor,
+    session: SessionContext,
     body: LogOfflineInput,
     ip: string | undefined,
   ): Promise<DataRequestDto> {
@@ -341,6 +354,7 @@ export class AdminDataRequestsService {
     if (!user) {
       throw notFound();
     }
+    await this.assertTargetNotProtected(session, user);
     if (user.status !== 'active') {
       throw conflictForUserStatus(user.status);
     }
@@ -349,10 +363,31 @@ export class AdminDataRequestsService {
       throw conflictForOpenType(body.type);
     }
 
+    const admin: AdminActor = { id: session.user.id };
     if (body.type === 'export') {
       return this.logOfflineExport(admin, user, body.channel, receivedAt, ip);
     }
     return this.logOfflineDeletion(admin, user, body.channel, receivedAt, ip);
+  }
+
+  // #417: an admin can't self-target or reach into another admin's account
+  // through the offline logging endpoint, unless they're a superadmin acting
+  // with a fresh second factor (AdminAccessService.isSuperadminWithFreshTwoFactor).
+  private async assertTargetNotProtected(
+    session: SessionContext,
+    target: { id: string; roles: UserRole[] },
+  ): Promise<void> {
+    const isProtected =
+      target.id === session.user.id ||
+      target.roles.includes('admin') ||
+      (await this.repository.hasAnyAdminPermissionGrant(target.id));
+    if (!isProtected) {
+      return;
+    }
+    if (await this.adminAccess.isSuperadminWithFreshTwoFactor(session)) {
+      return;
+    }
+    throw protectedTarget();
   }
 
   private async logOfflineExport(

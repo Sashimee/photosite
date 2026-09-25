@@ -4,6 +4,7 @@ import type {
   DataRequestStatus,
   DataRequestType,
   Prisma,
+  UserRole,
   UserStatus,
 } from '@photoo/db';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -92,11 +93,19 @@ export class AdminDataRequestsRepository {
 
   async findUserForOffline(
     userId: string,
-  ): Promise<{ id: string; email: string; status: UserStatus } | null> {
+  ): Promise<{ id: string; email: string; status: UserStatus; roles: UserRole[] } | null> {
     return this.prisma.client.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, status: true },
+      select: { id: true, email: true, status: true, roles: true },
     });
+  }
+
+  async hasAnyAdminPermissionGrant(userId: string): Promise<boolean> {
+    const grant = await this.prisma.client.adminPermissionGrant.findFirst({
+      where: { userId },
+      select: { id: true },
+    });
+    return grant !== null;
   }
 
   async findOpenRequestForUser(
