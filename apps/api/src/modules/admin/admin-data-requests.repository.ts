@@ -31,7 +31,9 @@ export type AdminDataRequestRow = Prisma.DataRequestGetPayload<{
 
 function cursorWhere(cursor: AdminDataRequestCursor): Prisma.DataRequestWhereInput {
   const requestedAt = new Date(cursor.requestedAt);
+  // Redundant with the OR; gives Postgres a start bound on DataRequest_requestedAt_id_idx.
   return {
+    requestedAt: { lte: requestedAt },
     OR: [{ requestedAt: { lt: requestedAt } }, { requestedAt, id: { lt: cursor.id } }],
   };
 }
