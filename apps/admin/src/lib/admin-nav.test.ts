@@ -17,6 +17,7 @@ describe('resolveNavSections', () => {
     const users = sections.find((section) => section.id === 'users');
     const verification = sections.find((section) => section.id === 'verification');
     const moderation = sections.find((section) => section.id === 'moderation');
+    const dataRequests = sections.find((section) => section.id === 'data-requests');
     const settings = sections.find((section) => section.id === 'settings');
 
     expect(dashboard).toMatchObject({ href: '/', label: 'nav.dashboard', available: true });
@@ -37,6 +38,12 @@ describe('resolveNavSections', () => {
       available: true,
     });
     expect(moderation?.note).toBeUndefined();
+    expect(dataRequests).toMatchObject({
+      href: '/data-requests',
+      label: 'nav.dataRequests',
+      available: true,
+    });
+    expect(dataRequests?.note).toBeUndefined();
     expect(settings).toMatchObject({
       href: '/settings',
       label: 'nav.settings',
@@ -65,6 +72,7 @@ describe('resolveNavSections', () => {
       'provenance',
       'finance',
       'moderation',
+      'data-requests',
       'settings',
     ]);
   });

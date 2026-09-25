@@ -65,6 +65,7 @@
         "provenance": "Provenance",
         "finance": "Finance",
         "moderation": "Moderation",
+        "dataRequests": "Data requests",
         "settings": "Settings",
         "comingSoon": "Coming in step {step}",
         "availableAfter": "Available after step {step}"
@@ -203,7 +204,8 @@
             "action": "Action",
             "actor": "Actor"
           }
-        }
+        },
+        "dataRequestsLink": "View data requests"
       }
     },
     "verification": {
@@ -487,6 +489,56 @@
         "notFound": {
           "title": "Nothing found",
           "description": "No published content matches that slug. If it was already taken down, find it in the moderation queue with the resolved status and the moderator-initiated filter."
+        }
+      }
+    },
+    "dataRequests": {
+      "types": {
+        "export": "Export",
+        "delete": "Deletion"
+      },
+      "statuses": {
+        "pending": "Pending",
+        "processing": "Processing",
+        "ready": "Ready",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "list": {
+        "title": "Data requests",
+        "caption": "GDPR data requests, newest first",
+        "verificationDocumentsNote": "Copies of verification documents aren't available here. A subject who wants copies of theirs goes through the manual support process, not this list.",
+        "columns": {
+          "user": "User",
+          "type": "Type",
+          "status": "Status",
+          "requestedAt": "Requested",
+          "completedAt": "Completed",
+          "failureReason": "Failure reason",
+          "gracePeriod": "Grace period"
+        },
+        "placeholders": {
+          "none": "None",
+          "notApplicable": "Not applicable"
+        },
+        "gracePeriod": {
+          "dueNow": "Due now",
+          "remaining": "{days, plural, one {# day left} other {# days left}}"
+        },
+        "empty": {
+          "title": "No data requests match your filters.",
+          "hint": "Try clearing the status, type or user id filter."
+        },
+        "filters": {
+          "formLabel": "Data request filters",
+          "userIdLabel": "User id",
+          "userIdPlaceholder": "User id",
+          "typeLabel": "Type",
+          "allTypes": "All types",
+          "statusLabel": "Status",
+          "allStatuses": "All statuses",
+          "submit": "Search"
         }
       }
     },
@@ -931,8 +983,14 @@
         "body": "Your application for {jobOfferTitle} was updated"
       },
       "reportDecision": {
-        "resolved": { "title": "Your report was reviewed", "body": "See the outcome by email" },
-        "dismissed": { "title": "Your report was reviewed", "body": "See the outcome by email" },
+        "resolved": {
+          "title": "Your report was reviewed",
+          "body": "See the outcome by email"
+        },
+        "dismissed": {
+          "title": "Your report was reviewed",
+          "body": "See the outcome by email"
+        },
         "takedown": {
           "title": "Content you reported was removed",
           "body": "See the details by email"
@@ -951,8 +1009,14 @@
           "title": "A report about your content was dismissed",
           "body": "See the outcome by email"
         },
-        "takedown": { "title": "Your content was removed", "body": "See the details by email" },
-        "restored": { "title": "Your content was restored", "body": "See the details by email" }
+        "takedown": {
+          "title": "Your content was removed",
+          "body": "See the details by email"
+        },
+        "restored": {
+          "title": "Your content was restored",
+          "body": "See the details by email"
+        }
       }
     }
   },

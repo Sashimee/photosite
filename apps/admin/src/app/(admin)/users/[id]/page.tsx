@@ -1,4 +1,5 @@
 import { getTranslations } from 'next-intl/server';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { serverApi } from '@/lib/server-api';
@@ -74,6 +75,13 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
         <dt className="text-muted-foreground">{t('fields.lastLoginAt')}</dt>
         <dd className="text-foreground">{user.lastLoginAt ?? t('fields.never')}</dd>
       </dl>
+
+      <Link
+        href={`/data-requests?userId=${id}`}
+        className="text-sm underline-offset-4 hover:underline"
+      >
+        {t('dataRequestsLink')}
+      </Link>
 
       <UserActions user={user} canManageRoles={allowRoles} />
 

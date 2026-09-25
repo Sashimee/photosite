@@ -60,6 +60,26 @@ describe('UserDetailPage', () => {
     expect(screen.getByText('alice@example.com')).toBeInTheDocument();
   });
 
+  it("links through to that user's data requests", async () => {
+    serverApiMock.mockResolvedValue({
+      GET: vi
+        .fn()
+        .mockResolvedValueOnce({ data: user, response: { status: 200 } })
+        .mockResolvedValueOnce({
+          data: { items: [], nextCursor: null },
+          response: { status: 200 },
+        }),
+    });
+    const UserDetailPage = await loadPage();
+
+    render(await UserDetailPage({ params: Promise.resolve({ id: 'user-1' }) }));
+
+    expect(screen.getByRole('link', { name: 'View data requests' })).toHaveAttribute(
+      'href',
+      '/data-requests?userId=user-1',
+    );
+  });
+
   it('shows the audit trail and passes canManageRoles when the audit-log probe succeeds', async () => {
     serverApiMock.mockResolvedValue({
       GET: vi
