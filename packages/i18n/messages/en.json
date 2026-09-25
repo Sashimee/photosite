@@ -597,6 +597,18 @@
             }
           }
         }
+      },
+      "emailPreview": {
+        "title": "Email templates",
+        "description": "Preview a rendered email template with sample data. This never sends mail.",
+        "manageLink": "Preview templates",
+        "back": "Back to settings",
+        "empty": "No email templates are available to preview.",
+        "templateLabel": "Template",
+        "localeLabel": "Locale",
+        "subjectLabel": "Subject",
+        "htmlLabel": "HTML",
+        "textLabel": "Text"
       }
     }
   },
