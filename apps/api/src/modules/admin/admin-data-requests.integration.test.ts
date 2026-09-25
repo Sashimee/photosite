@@ -20,6 +20,7 @@ interface DataRequestBody {
   id: string;
   type: string;
   status: string;
+  channel: string;
   requestedAt: string;
   completedAt: string | null;
   expiresAt: string | null;
@@ -1682,6 +1683,428 @@ describe('admin data requests integration', () => {
         where: { userId: subject.id, id: { not: failed.id } },
       });
       expect(createdRows).toHaveLength(1);
+    });
+  });
+
+  describe('POST /v1/admin/data-requests', () => {
+    it('returns 401 when unauthenticated', async () => {
+      const subject = await createSubjectUser('log-unauth');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: { origin: 'http://localhost:3000' },
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('returns 403 for an admin without the support permission', async () => {
+      const admin = await makeAdmin('log-no-permission', ['finance']);
+      const subject = await createSubjectUser('log-no-permission');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+    });
+
+    it('returns 404 for an unknown user', async () => {
+      const admin = await makeAdmin('log-unknown-user', ['support']);
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: randomUUID(),
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('returns 400 when receivedAt is more than a minute in the future', async () => {
+      const admin = await makeAdmin('log-future', ['support']);
+      const subject = await createSubjectUser('log-future');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date(Date.now() + 120_000).toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json<{ code: string }>().code).toBe('VALIDATION_ERROR');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('accepts receivedAt safely inside the future skew allowance', async () => {
+      const admin = await makeAdmin('log-future-ok', ['support']);
+      const subject = await createSubjectUser('log-future-ok');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date(Date.now() + 30_000).toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(201);
+    });
+
+    it('returns 400 when receivedAt is more than 30 days in the past', async () => {
+      const admin = await makeAdmin('log-too-old', ['support']);
+      const subject = await createSubjectUser('log-too-old');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json<{ code: string }>().code).toBe('VALIDATION_ERROR');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('accepts receivedAt safely inside the 30 day age allowance', async () => {
+      const admin = await makeAdmin('log-old-ok', ['support']);
+      const subject = await createSubjectUser('log-old-ok');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(201);
+    });
+
+    it('returns 409 EXPORT_OPEN when the user already has an open export request', async () => {
+      const admin = await makeAdmin('log-export-open', ['support']);
+      const subject = await createSubjectUser('log-export-open');
+      await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'pending',
+        requestedAt: new Date(),
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json<{ code: string }>().code).toBe('EXPORT_OPEN');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(1);
+    });
+
+    it('returns 409 DELETE_OPEN when the user already has an open deletion request', async () => {
+      const admin = await makeAdmin('log-delete-open', ['support']);
+      const subject = await createSubjectUser('log-delete-open');
+      await createDataRequest({
+        userId: subject.id,
+        type: 'delete',
+        status: 'pending',
+        requestedAt: new Date(),
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'delete',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json<{ code: string }>().code).toBe('DELETE_OPEN');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(1);
+    });
+
+    it('returns 409 USER_SUSPENDED for a suspended user', async () => {
+      const admin = await makeAdmin('log-suspended', ['support']);
+      const subject = await createSubjectUser('log-suspended', 'suspended');
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json<{ code: string }>().code).toBe('USER_SUSPENDED');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('returns 409 USER_DELETED for an already deleted user', async () => {
+      const admin = await makeAdmin('log-deleted', ['support']);
+      const subject = await createSubjectUser('log-deleted', 'deleted');
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'delete',
+          channel: 'support',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json<{ code: string }>().code).toBe('USER_DELETED');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('returns 409 BLOCKING_OBLIGATIONS when a verification case is in review', async () => {
+      const admin = await makeAdmin('log-blocked-verification', ['support']);
+      const subject = await createSubjectUser('log-blocked-verification');
+      await prisma.verificationCase.create({
+        data: { userId: subject.id, countryCode: 'LU', status: 'in_review' },
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'delete',
+          channel: 'support',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(409);
+      const errorBody = response.json<{ code: string; details?: { reason?: string } }>();
+      expect(errorBody.code).toBe('BLOCKING_OBLIGATIONS');
+      expect(errorBody.details?.reason).toBe('VERIFICATION_IN_REVIEW');
+
+      const user = await prisma.user.findUniqueOrThrow({ where: { id: subject.id } });
+      expect(user.status).toBe('active');
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    describe('export', () => {
+      it.each(['email', 'support'] as const)(
+        'creates a pending export logged over %s, enqueues it, and writes an audit row',
+        async (channel) => {
+          const admin = await makeAdmin(`log-export-ok-${channel}`, ['support']);
+          const subject = await createSubjectUser(`log-export-ok-${channel}`);
+          const receivedAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+
+          const response = await fastify().inject({
+            method: 'POST',
+            url: '/v1/admin/data-requests',
+            headers: admin.headers,
+            remoteAddress: FAKE_IP,
+            payload: {
+              userId: subject.id,
+              type: 'export',
+              channel,
+              receivedAt: receivedAt.toISOString(),
+            },
+          });
+          expect(response.statusCode).toBe(201);
+          const body = response.json<DataRequestBody>();
+          expect(body.type).toBe('export');
+          expect(body.status).toBe('pending');
+          expect(body.channel).toBe(channel);
+          expect(body.user.id).toBe(subject.id);
+          expect(body.answeredLate).toBe(false);
+          expect(body.responseDueAt).toBe(
+            gdprResponseDueAt(receivedAt, 'Europe/Luxembourg').toISOString(),
+          );
+
+          const created = await prisma.dataRequest.findUnique({ where: { id: body.id } });
+          expect(created?.userId).toBe(subject.id);
+          expect(created?.type).toBe('export');
+          expect(created?.status).toBe('pending');
+          expect(created?.channel).toBe(channel);
+          expect(created?.requestedAt.toISOString()).toBe(receivedAt.toISOString());
+
+          const auditRow = await prisma.auditLog.findFirst({
+            where: { action: 'data_request.logged_offline', targetId: body.id },
+          });
+          expect(auditRow).not.toBeNull();
+          expect(auditRow?.actorType).toBe('admin');
+          expect(auditRow?.actorId).toBe(admin.id);
+          expect(auditRow?.targetType).toBe('DataRequest');
+          expect(auditRow?.before).toBeNull();
+          expect(auditRow?.after).toEqual({
+            type: 'export',
+            channel,
+            receivedAt: receivedAt.toISOString(),
+            userId: subject.id,
+          });
+          expect(auditRow?.ip).toBe(FAKE_IP);
+
+          const enqueuedJob = await exportQueue.getJob(body.id);
+          expect(enqueuedJob).not.toBeNull();
+          expect(enqueuedJob?.data).toEqual({ dataRequestId: body.id });
+        },
+      );
+
+      it('marks the new row failed and rethrows when enqueueing it fails', async () => {
+        const admin = await makeAdmin('log-export-enqueue-fails', ['support']);
+        const subject = await createSubjectUser('log-export-enqueue-fails');
+
+        const queueService = app.get(GdprExportQueueService);
+        const originalAdd = queueService.queue.add.bind(queueService.queue);
+        queueService.queue.add = (() => {
+          throw new Error('simulated enqueue failure');
+        }) as typeof queueService.queue.add;
+
+        let response;
+        try {
+          response = await fastify().inject({
+            method: 'POST',
+            url: '/v1/admin/data-requests',
+            headers: admin.headers,
+            payload: {
+              userId: subject.id,
+              type: 'export',
+              channel: 'email',
+              receivedAt: new Date().toISOString(),
+            },
+          });
+        } finally {
+          queueService.queue.add = originalAdd;
+        }
+        expect(response.statusCode).toBe(500);
+
+        const createdRows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+        expect(createdRows).toHaveLength(1);
+        const createdRow = createdRows[0];
+        expect(createdRow).toBeDefined();
+        if (!createdRow) throw new Error('expected the logged row to exist');
+        expect(createdRow.status).toBe('failed');
+        expect(createdRow.failureReason).toBe('enqueue_failed');
+
+        const failureAuditRow = await prisma.auditLog.findFirst({
+          where: { action: 'data_request.export_failed', targetId: createdRow.id },
+        });
+        expect(failureAuditRow).not.toBeNull();
+        expect(failureAuditRow?.after).toEqual({ status: 'failed', reason: 'enqueue_failed' });
+      });
+    });
+
+    describe('delete', () => {
+      it('soft-deletes the user, clears sessions, and writes an audit row with the channel', async () => {
+        const admin = await makeAdmin('log-delete-ok', ['support']);
+        const subject = await createSubjectUser('log-delete-ok');
+        await prisma.session.create({
+          data: {
+            userId: subject.id,
+            tokenHash: randomUUID(),
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          },
+        });
+        const receivedAt = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/admin/data-requests',
+          headers: admin.headers,
+          remoteAddress: FAKE_IP,
+          payload: {
+            userId: subject.id,
+            type: 'delete',
+            channel: 'support',
+            receivedAt: receivedAt.toISOString(),
+          },
+        });
+        expect(response.statusCode).toBe(201);
+        const body = response.json<DataRequestBody>();
+        expect(body.type).toBe('delete');
+        expect(body.status).toBe('pending');
+        expect(body.channel).toBe('support');
+        expect(body.responseDueAt).toBeNull();
+        expect(body.answeredLate).toBe(false);
+
+        const user = await prisma.user.findUniqueOrThrow({ where: { id: subject.id } });
+        expect(user.status).toBe('deleted');
+        expect(user.deletedAt).not.toBeNull();
+
+        const sessions = await prisma.session.findMany({ where: { userId: subject.id } });
+        expect(sessions).toHaveLength(0);
+
+        const auditRow = await prisma.auditLog.findFirst({
+          where: { action: 'data_request.logged_offline', targetId: body.id },
+        });
+        expect(auditRow).not.toBeNull();
+        expect(auditRow?.actorType).toBe('admin');
+        expect(auditRow?.actorId).toBe(admin.id);
+        expect(auditRow?.targetType).toBe('DataRequest');
+        expect(auditRow?.before).toEqual({ userStatus: 'active', profileIsPublished: null });
+        expect(auditRow?.after).toEqual({
+          userStatus: 'deleted',
+          cancelledRequestIds: [],
+          declinedQuoteIds: [],
+          withdrawnQuoteIds: [],
+          closedJobOfferIds: [],
+          withdrawnJobApplicationIds: [],
+          channel: 'support',
+          receivedAt: receivedAt.toISOString(),
+        });
+        expect(auditRow?.ip).toBe(FAKE_IP);
+      });
     });
   });
 });
