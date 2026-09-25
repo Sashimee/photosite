@@ -566,6 +566,7 @@ model DataRequest {
 
   @@index([userId])
   @@index([status, requestedAt])
+  @@index([requestedAt(sort: Desc), id(sort: Desc)])
 }
 
 // Generic upload record referenced by id from Attachment, VerificationDocument,
