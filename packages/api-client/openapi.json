@@ -4662,6 +4662,50 @@
         ],
         "additionalProperties": false
       },
+      "EmailTemplateName": {
+        "type": "string",
+        "enum": [
+          "verify-email",
+          "reset-password",
+          "account-exists",
+          "account-deletion-requested",
+          "quote_received",
+          "quote_accepted",
+          "quote_declined",
+          "quote_withdrawn",
+          "quote_expired",
+          "verification_approved",
+          "verification_rejected",
+          "job_application_received",
+          "job_application_status_changed",
+          "report_decision",
+          "moderation_action"
+        ],
+        "example": "quote_received"
+      },
+      "AdminEmailTemplatePreview": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "subject",
+          "html",
+          "text"
+        ],
+        "additionalProperties": false
+      },
       "CreateReportResponse": {
         "type": "object",
         "properties": {
@@ -17368,6 +17412,149 @@
           },
           "422": {
             "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/email-templates": {
+      "get": {
+        "summary": "List the email templates that can be previewed",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "superadmin",
+        "responses": {
+          "200": {
+            "description": "Every previewable template name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EmailTemplateName"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/email-templates/{template}/preview": {
+      "get": {
+        "summary": "Render an email template with fake sample data",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "superadmin",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/EmailTemplateName"
+            },
+            "required": true,
+            "name": "template",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en",
+                "fr",
+                "de",
+                "pt",
+                "es"
+              ],
+              "description": "BCP 47 locale",
+              "example": "en"
+            },
+            "required": true,
+            "description": "BCP 47 locale",
+            "name": "locale",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rendered subject, HTML body and text body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEmailTemplatePreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
