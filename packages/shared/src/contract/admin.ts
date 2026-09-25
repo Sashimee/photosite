@@ -540,13 +540,7 @@ registry.registerPath({
   },
 });
 
-// `user` mirrors how 1A.12's anonymisation worker
-// (apps/worker/src/gdpr/sweep/anonymise-deletions.ts) handles a completed
-// deletion: it overwrites the `User` row in place (email rewritten to
-// `deleted-<id>@deleted.invalid`) rather than removing it, and
-// `DataRequest.user` is a required relation, so support always sees a
-// user here - just an anonymised one once the deletion has run its
-// 30-day grace period.
+// `user` is never null; it may be anonymised once the deletion's grace period has run.
 export const AdminDataRequestSchema = DataRequestSchema.extend({
   user: z
     .object({
