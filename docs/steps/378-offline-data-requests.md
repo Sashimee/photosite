@@ -11,6 +11,7 @@ Follow-up to 1A.12 (compliance review of #358). A data subject can exercise thei
 
 - Add `enum DataRequestChannel { in_app email support }` and `DataRequest.channel DataRequestChannel @default(in_app)`.
   - Existing rows backfill to `in_app`. No index is needed.
+- Add `DataRequest.receivedAt DateTime @default(now())`: when the data subject made the request. Existing rows backfill to `requestedAt`. It drives the Art. 12(3) deadline only (#416).
 - Update `docs/DATA-MODEL.md` to match.
 
 ## Contract
@@ -40,7 +41,14 @@ The endpoint lives on `AdminDataRequestsController` and follows the `retry-expor
 2. The admin mutation rate limit.
 3. `AdminDataRequestsService.logOffline(admin, body, ip)`.
 
-`requestedAt` is set to `receivedAt`, so the existing `responseDueAt` (`gdprResponseDueAt(requestedAt, country.timezone)`) counts from the moment the request was received, not from the moment it was logged.
+`requestedAt` is always the server's `now()` when the row is logged. `receivedAt` stores the body's value, and `responseDueAt` is computed as `gdprResponseDueAt(receivedAt, country.timezone)`, so the deadline counts from receipt. Self-service rows set both to `now()`. `requestedAt` must never be backdated. The deletion sweep counts the grace period from it, and decision 1A.12 says the grace period is never shortened (#416).
+
+Guards (#417, security review):
+
+- Refuse a target that is the actor, has the admin role, or holds any `AdminPermissionGrant`, with 403 `PROTECTED_TARGET`. The only exception is a superadmin actor with 2FA.
+- The delete route requires fresh 2FA (`requires2fa: true` in the controller and in the contract flag). It also uses a stricter per-admin rate limit than the other admin mutations.
+- `assertNoBlockingObligations` runs inside the deletion transaction. A CONFLICT from the unique index is re-mapped to the open-request or user-status code.
+- Post-commit side effects (email, socket disconnect) are caught and logged. They don't turn a committed deletion into a 500.
 
 - **Export.**
   1. In one transaction, re-check that the user is `active`.
@@ -56,7 +64,7 @@ The endpoint lives on `AdminDataRequestsController` and follows the `retry-expor
     - cancelling or withdrawing requests, quotes, job offers and applications.
   - Self-service and admin both call that helper. The admin path writes `data_request.logged_offline` instead of `data_request.deletion_requested`, with the same `before`/`after` shape plus `channel` and `receivedAt`.
   - After commit, the admin path also disconnects the chat socket and sends the deletion email, as self-service does.
-  - Because `requestedAt` is the received-at time, the grace period (and so anonymisation) ends one month after receipt. That matches the legal deadline.
+  - The grace period runs a full 30 days from logging, so the email's "30 days to cancel" stays true. Whether a soft-delete answers the request within one month is a question for the lawyer (#411).
 - **responseDueAt for deletes.** It stays `null` for delete rows. The deletion takes effect when the row is logged, so the request is answered at creation. The one-month limit on anonymisation is enforced by the sweep, not by a support deadline.
 
 ## Admin UI
@@ -66,7 +74,9 @@ The endpoint lives on `AdminDataRequestsController` and follows the `retry-expor
   - type;
   - channel;
   - received at: date and time, defaulting to now.
-- The dialog confirms before submitting. A delete also shows a warning that the account is deleted immediately.
+- After the user id is entered, the dialog looks up the account and shows its masked email and name (#418). A delete needs an explicit second confirm step styled as destructive. Its warning says the account is closed now, the user is emailed a cancel link, and the account is anonymised after 30 days.
+- The `received at` input is bounded by `min` (now − 30 days) and `max` (now), in the admin's local timezone, and is sent as UTC.
+- `TWO_FACTOR_REQUIRED` gets its own message and is not swallowed. `BLOCKING_OBLIGATIONS` shows one message per `details.reason`. The loggable channels are derived from `DATA_REQUEST_CHANNELS`.
 - Each 409 `code` is mapped to its own message, and the list refreshes on success.
 - A **Channel** column and filter are added to the table.
 - All strings live in `packages/i18n` (en).
