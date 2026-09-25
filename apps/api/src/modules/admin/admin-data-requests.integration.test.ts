@@ -1291,6 +1291,7 @@ describe('admin data requests integration', () => {
       expect(auditRow?.actorId).toBe(admin.id);
       expect(auditRow?.targetType).toBe('DataRequest');
       expect(auditRow?.before).toEqual({ sourceId: failed.id });
+      expect(auditRow?.ip).toBe(FAKE_IP);
     });
   });
 });

@@ -174,7 +174,11 @@ export class AdminDataRequestsService {
 
   // Bypasses DataRequestsRateLimitService: this is a support action, not a
   // user-initiated request, so the per-user GDPR rate limit doesn't apply.
-  async retryExport(admin: AdminActor, id: string): Promise<DataRequestDto> {
+  async retryExport(
+    admin: AdminActor,
+    id: string,
+    ip: string | undefined,
+  ): Promise<DataRequestDto> {
     const source = await this.repository.findById(id);
     if (!source) {
       throw notFound();
@@ -197,6 +201,7 @@ export class AdminDataRequestsService {
           targetType: 'DataRequest',
           targetId: row.id,
           before: { sourceId: id },
+          ip: ip ?? null,
         });
         return row;
       });

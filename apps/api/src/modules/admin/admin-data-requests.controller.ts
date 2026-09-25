@@ -45,6 +45,6 @@ export class AdminDataRequestsController {
   ) {
     const { user } = await this.adminAccess.requirePermission(request, 'support');
     await this.rateLimit.enforce(user.id);
-    return this.adminDataRequests.retryExport(user, id);
+    return this.adminDataRequests.retryExport(user, id, request.ip);
   }
 }
