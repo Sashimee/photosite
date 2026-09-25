@@ -11,6 +11,9 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./postgres/init-test-db.sh:/docker-entrypoint-initdb.d/10-init-test-db.sh:ro
+      # Named 11- so it runs after the image's own 10_postgis.sh and can drop
+      # the extensions that script installs beyond schema.prisma's.
+      - ./postgres/drop-postgis-extras.sh:/docker-entrypoint-initdb.d/11-drop-postgis-extras.sh:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
       interval: 5s
