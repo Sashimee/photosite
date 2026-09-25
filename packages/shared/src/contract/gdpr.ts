@@ -43,9 +43,13 @@ interface ZonedParts {
   second: number;
 }
 
+const zonedFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
 function createZonedFormatter(timeZone: string): Intl.DateTimeFormat {
+  const cached = zonedFormatterCache.get(timeZone);
+  if (cached) return cached;
   try {
-    return new Intl.DateTimeFormat('en-US', {
+    const formatter = new Intl.DateTimeFormat('en-US', {
       timeZone,
       hourCycle: 'h23',
       year: 'numeric',
@@ -55,6 +59,8 @@ function createZonedFormatter(timeZone: string): Intl.DateTimeFormat {
       minute: '2-digit',
       second: '2-digit',
     });
+    zonedFormatterCache.set(timeZone, formatter);
+    return formatter;
   } catch (error) {
     throw new Error(`gdprResponseDueAt: invalid IANA time zone "${timeZone}"`, { cause: error });
   }
@@ -94,8 +100,9 @@ function zoneOffsetMs(formatter: Intl.DateTimeFormat, instant: Date): number {
 // zone's offsets a day either side bound any DST transition near it. Each
 // offset that round-trips back to the same wall time gives a real instant; in
 // a fall-back overlap both do and the earlier one is taken. In a spring-forward
-// gap neither does, and the larger offset yields the instant just before the
-// gap. Either way the deadline errs early, never late.
+// gap neither does, and the larger offset shifts the target back by the gap's
+// length (02:30 in a one-hour 02:00-03:00 gap becomes 01:30). Either way the
+// deadline errs early, never late.
 function zonedWallTimeToUtc(nominal: number, formatter: Intl.DateTimeFormat): number {
   const offsets = [nominal - DAY_MS, nominal + DAY_MS].map((sample) =>
     zoneOffsetMs(formatter, new Date(sample)),
