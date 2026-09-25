@@ -493,6 +493,13 @@
       }
     },
     "dataRequests": {
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "forbidden": "You don't have permission to do this.",
+        "notFound": "This couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "conflict": "That couldn't be completed because something changed. Please retry."
+      },
       "types": {
         "export": "Export",
         "delete": "Deletion"
@@ -519,7 +526,8 @@
           "expiresAt": "Expires",
           "failureReason": "Failure reason",
           "responseDueAt": "Response due",
-          "gracePeriod": "Grace period"
+          "gracePeriod": "Grace period",
+          "actions": "Actions"
         },
         "placeholders": {
           "none": "None",
@@ -549,6 +557,12 @@
           "statusLabel": "Status",
           "allStatuses": "All statuses",
           "submit": "Search"
+        },
+        "retryExport": {
+          "trigger": "Retry export",
+          "title": "Retry this export?",
+          "consequences": "This creates a new export request for the user and starts it right away. It doesn't change the failed request itself.",
+          "confirm": "Confirm retry"
         }
       }
     },
