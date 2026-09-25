@@ -11,6 +11,20 @@ import type { MailMessage } from '../mail-message.js';
 // binary and diffs unreviewable (#262).
 const URL_TOKEN = '\u0001AUTH_URL\u0001';
 
+const expiresAtFormatter = new Intl.DateTimeFormat('en-GB', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'Europe/Luxembourg',
+  timeZoneName: 'short',
+});
+
+function formatExpiresAt(expiresAt: string): string {
+  return expiresAtFormatter.format(new Date(expiresAt));
+}
+
 function link(url: string): string {
   const escaped = escapeHtml(url);
   return `<a href="${escaped}">${escaped}</a>`;
@@ -62,15 +76,17 @@ export function renderAuthEmail(job: EmailJob, to: string): MailMessage {
         text: formatText(t.accountDeletionRequested.body, { url: job.url }),
         html: `<p>${renderHtmlWithLink(t.accountDeletionRequested.body, job.url)}</p>`,
       };
-    case 'data-export-ready':
+    case 'data-export-ready': {
+      const expiresAt = formatExpiresAt(job.expiresAt);
       return {
         to,
         subject: formatText(t.dataExportReady.subject, { appName }),
-        text: formatText(t.dataExportReady.body, { url: job.url, expiresAt: job.expiresAt }),
+        text: formatText(t.dataExportReady.body, { url: job.url, expiresAt }),
         html: `<p>${renderHtmlWithLink(t.dataExportReady.body, job.url, {
-          expiresAt: job.expiresAt,
+          expiresAt,
         })}</p>`,
       };
+    }
     case 'data-export-failed':
       return {
         to,
