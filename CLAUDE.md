@@ -23,7 +23,7 @@ pnpm + Turborepo monorepo, TypeScript strict everywhere.
 - `apps/mobile` Expo (React Native, expo-router, NativeWind, i18next) – App Store + Play Store via EAS
 - `apps/api` NestJS (Fastify) – REST + OpenAPI, Socket.IO chat, Better Auth (fallback Passport)
 - `apps/worker` NestJS standalone – BullMQ jobs: images (sharp), provenance (AI detection, reverse search, C2PA, EXIF), email (Brevo), push (Expo), payouts/release, GDPR exports
-- `packages/db` Prisma + PostgreSQL 16 + PostGIS; `packages/shared` zod schemas/enums/fee helper; `packages/api-client` generated from OpenAPI; `packages/i18n` ICU catalogs (en, fr, de, pt, es); `packages/config` eslint/tsconfig
+- `packages/db` Prisma + PostgreSQL 16 + PostGIS; `packages/shared` zod schemas/enums/fee helper; `packages/api-client` generated from OpenAPI; `packages/i18n` ICU catalogs (en, fr, de, pt, es); `packages/email` email templates and render helpers (pure, used by worker to send and api to preview); `packages/config` eslint/tsconfig
 - Redis 7, S3-compatible EU object storage, ClamAV (upload virus scanning), Stripe Connect Express, Sentry
 - Hosting: VPS dok.seil.pro with Dokploy; preview (noindex) at footoo.bas.lu from `main`, staging from `dev`, production from `main` (later phases)
 
