@@ -1,4 +1,6 @@
 -- AlterTable
-ALTER TABLE "Country" ADD COLUMN "timezone" TEXT NOT NULL DEFAULT 'Europe/Luxembourg';
+ALTER TABLE "Country" ADD COLUMN "timezone" TEXT;
 
-ALTER TABLE "Country" ALTER COLUMN "timezone" DROP DEFAULT;
+UPDATE "Country" SET "timezone" = 'Europe/Luxembourg' WHERE "code" = 'LU';
+
+ALTER TABLE "Country" ALTER COLUMN "timezone" SET NOT NULL;
