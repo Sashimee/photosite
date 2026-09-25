@@ -2,8 +2,9 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next-intl/server', async () => {
-  const { translate } = await import('@/testing/mock-translations');
+  const { mockUseFormatter, translate } = await import('@/testing/mock-translations');
   return {
+    getFormatter: () => mockUseFormatter(),
     getTranslations: (namespace: string) => (key: string, values?: Record<string, unknown>) =>
       translate(namespace, key, values),
   };
@@ -121,6 +122,8 @@ describe('ReportTargetSummary', () => {
       },
     });
 
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Taken down on Sep 20, 2026, 2:00 AM GMT+2.',
+    );
   });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
 
 import type { components } from '@photoo/api-client';
@@ -33,6 +33,7 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
   const tStatuses = useTranslations('admin.dataRequests.statuses');
   const tGracePeriod = useTranslations('admin.dataRequests.list.gracePeriod');
   const tResponseDue = useTranslations('admin.dataRequests.list.responseDue');
+  const format = useFormatter();
 
   if (userIdInvalid) {
     return null;
@@ -64,17 +65,23 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
     {
       id: 'requestedAt',
       header: t('columns.requestedAt'),
-      cell: (row) => row.requestedAt,
+      cell: (row) => format.dateTime(new Date(row.requestedAt), 'medium'),
     },
     {
       id: 'completedAt',
       header: t('columns.completedAt'),
-      cell: (row) => row.completedAt ?? t('placeholders.none'),
+      cell: (row) =>
+        row.completedAt
+          ? format.dateTime(new Date(row.completedAt), 'medium')
+          : t('placeholders.none'),
     },
     {
       id: 'expiresAt',
       header: t('columns.expiresAt'),
-      cell: (row) => row.expiresAt ?? t('placeholders.unset'),
+      cell: (row) =>
+        row.expiresAt
+          ? format.dateTime(new Date(row.expiresAt), 'medium')
+          : t('placeholders.unset'),
     },
     {
       id: 'failureReason',
@@ -91,11 +98,11 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
         if (hasPassed(row.responseDueAt)) {
           return (
             <span className="font-medium text-destructive">
-              {row.responseDueAt} ({tResponseDue('overdue')})
+              {format.dateTime(new Date(row.responseDueAt), 'medium')} ({tResponseDue('overdue')})
             </span>
           );
         }
-        return row.responseDueAt;
+        return format.dateTime(new Date(row.responseDueAt), 'medium');
       },
     },
     {

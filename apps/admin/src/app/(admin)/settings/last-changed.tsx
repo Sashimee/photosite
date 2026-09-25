@@ -1,4 +1,4 @@
-import { getTranslations } from 'next-intl/server';
+import { getFormatter, getTranslations } from 'next-intl/server';
 
 import { serverApi } from '@/lib/server-api';
 
@@ -20,6 +20,7 @@ export async function LastChanged({
   }
 
   const t = await getTranslations('admin.settings.lastChanged');
+  const format = await getFormatter();
   const entry = data.items[0];
 
   return (
@@ -27,8 +28,11 @@ export async function LastChanged({
       <span className="font-medium text-foreground">{t('label')}</span>{' '}
       {entry
         ? entry.actorId
-          ? t('by', { actorId: entry.actorId, date: entry.occurredAt })
-          : t('bySystem', { date: entry.occurredAt })
+          ? t('by', {
+              actorId: entry.actorId,
+              date: format.dateTime(new Date(entry.occurredAt), 'medium'),
+            })
+          : t('bySystem', { date: format.dateTime(new Date(entry.occurredAt), 'medium') })
         : t('never')}
     </p>
   );

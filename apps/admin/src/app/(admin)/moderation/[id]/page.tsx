@@ -1,4 +1,4 @@
-import { getTranslations } from 'next-intl/server';
+import { getFormatter, getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 
 import { serverApi } from '@/lib/server-api';
@@ -50,6 +50,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
 
   const t = await getTranslations('admin.moderation.detail');
   const tStatuses = await getTranslations('admin.moderation.statuses');
+  const format = await getFormatter();
 
   return (
     <section className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-12">
@@ -62,11 +63,13 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
         <dt className="text-muted-foreground">{t('fields.status')}</dt>
         <dd className="text-foreground">{tStatuses(report.status)}</dd>
         <dt className="text-muted-foreground">{t('fields.createdAt')}</dt>
-        <dd className="text-foreground">{report.createdAt}</dd>
+        <dd className="text-foreground">{format.dateTime(new Date(report.createdAt), 'medium')}</dd>
         {report.resolvedAt ? (
           <>
             <dt className="text-muted-foreground">{t('fields.resolvedAt')}</dt>
-            <dd className="text-foreground">{report.resolvedAt}</dd>
+            <dd className="text-foreground">
+              {format.dateTime(new Date(report.resolvedAt), 'medium')}
+            </dd>
           </>
         ) : null}
         <dt className="text-muted-foreground">{t('fields.reporter')}</dt>

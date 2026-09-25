@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getFormatter, getTranslations } from 'next-intl/server';
 
 import { serverApi } from '@/lib/server-api';
 import {
@@ -28,6 +28,7 @@ export default async function CountryDetailPage({ params }: { params: Promise<{ 
   const t = await getTranslations('admin.settings.detail');
   const tCountries = await getTranslations('admin.settings.countries');
   const tErrors = await getTranslations('admin.settings');
+  const format = await getFormatter();
 
   if (countriesResult.response.status === 403 || legalTextsResult.response.status === 403) {
     return (
@@ -117,7 +118,9 @@ export default async function CountryDetailPage({ params }: { params: Promise<{ 
                     <TableCell className="font-mono">{version.version}</TableCell>
                     <TableCell>{version.kind}</TableCell>
                     <TableCell>{version.locale}</TableCell>
-                    <TableCell>{version.publishedAt}</TableCell>
+                    <TableCell>
+                      {format.dateTime(new Date(version.publishedAt), 'medium')}
+                    </TableCell>
                     <TableCell className="font-mono text-xs">
                       {version.publishedByAdminId}
                     </TableCell>

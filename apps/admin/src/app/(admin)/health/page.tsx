@@ -1,4 +1,4 @@
-import { getTranslations } from 'next-intl/server';
+import { getFormatter, getTranslations } from 'next-intl/server';
 
 import { getBuildInfo } from '@/lib/build-info';
 
@@ -6,6 +6,7 @@ import { ReadinessTable } from './readiness-table';
 
 export default async function HealthPage() {
   const t = await getTranslations('admin.health');
+  const format = await getFormatter();
   const build = getBuildInfo();
 
   return (
@@ -18,7 +19,11 @@ export default async function HealthPage() {
           <dt className="text-muted-foreground">{t('buildInfo.version')}</dt>
           <dd className="font-mono text-foreground">{build.version}</dd>
           <dt className="text-muted-foreground">{t('buildInfo.builtAt')}</dt>
-          <dd className="text-foreground">{build.builtAt ?? t('buildInfo.unknown')}</dd>
+          <dd className="text-foreground">
+            {build.builtAt
+              ? format.dateTime(new Date(build.builtAt), 'medium')
+              : t('buildInfo.unknown')}
+          </dd>
         </dl>
       </div>
 

@@ -16,10 +16,11 @@ vi.mock('next/headers', () => ({ headers: headersMock }));
 vi.mock('next/navigation', () => ({ notFound: notFoundMock, redirect: redirectMock }));
 
 vi.mock('next-intl/server', async () => {
-  const { translate } = await import('@/testing/mock-translations');
+  const { mockUseFormatter, translate } = await import('@/testing/mock-translations');
   return {
     getTranslations: (namespace: string) => (key: string, values?: Record<string, unknown>) =>
       translate(namespace, key, values),
+    getFormatter: () => mockUseFormatter(),
   };
 });
 

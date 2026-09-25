@@ -3,16 +3,26 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { components } from '@photoo/api-client';
 
+import { ADMIN_FORMATS, ADMIN_TIME_ZONE } from '@/lib/datetime';
+
 const serverApiMock = vi.fn();
 
 vi.mock('@/lib/server-api', () => ({ serverApi: serverApiMock }));
 vi.mock('next-intl/server', async () => {
-  const { translate } = await import('@/testing/mock-translations');
+  const { mockUseFormatter, translate } = await import('@/testing/mock-translations');
   return {
     getTranslations: (namespace: string) => (key: string, values?: Record<string, unknown>) =>
       translate(namespace, key, values),
+    getFormatter: () => mockUseFormatter(),
   };
 });
+
+function formatExpected(iso: string) {
+  return new Intl.DateTimeFormat('en', {
+    ...ADMIN_FORMATS.dateTime.medium,
+    timeZone: ADMIN_TIME_ZONE,
+  }).format(new Date(iso));
+}
 
 async function loadLastChanged() {
   const mod = await import('./last-changed');
@@ -45,7 +55,9 @@ describe('LastChanged', () => {
 
     render(await LastChanged({ entityType: 'PlatformSetting' }));
 
-    expect(screen.getByText('By admin-42 on 2026-02-01T09:00:00.000Z')).toBeInTheDocument();
+    expect(
+      screen.getByText(`By admin-42 on ${formatExpected('2026-02-01T09:00:00.000Z')}`),
+    ).toBeInTheDocument();
     expect(getMock).toHaveBeenCalledWith('/v1/admin/audit-log', {
       params: { query: { entityType: 'PlatformSetting', limit: 1 } },
     });
@@ -76,7 +88,9 @@ describe('LastChanged', () => {
 
     render(await LastChanged({ entityType: 'PlatformSetting' }));
 
-    expect(screen.getByText('By the system on 2026-03-05T00:00:00.000Z')).toBeInTheDocument();
+    expect(
+      screen.getByText(`By the system on ${formatExpected('2026-03-05T00:00:00.000Z')}`),
+    ).toBeInTheDocument();
   });
 
   it('renders the never-changed state for an empty audit log', async () => {

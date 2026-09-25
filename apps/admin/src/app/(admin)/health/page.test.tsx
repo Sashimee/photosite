@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { ADMIN_FORMATS, ADMIN_TIME_ZONE } from '@/lib/datetime';
+
 const getBuildInfoMock = vi.fn();
 
 vi.mock('@/lib/build-info', () => ({ getBuildInfo: getBuildInfoMock }));
@@ -8,12 +10,20 @@ vi.mock('./readiness-table', () => ({
   ReadinessTable: () => <div>readiness-table</div>,
 }));
 vi.mock('next-intl/server', async () => {
-  const { translate } = await import('@/testing/mock-translations');
+  const { mockUseFormatter, translate } = await import('@/testing/mock-translations');
   return {
     getTranslations: (namespace: string) => (key: string, values?: Record<string, unknown>) =>
       translate(namespace, key, values),
+    getFormatter: () => mockUseFormatter(),
   };
 });
+
+function formatExpected(iso: string) {
+  return new Intl.DateTimeFormat('en', {
+    ...ADMIN_FORMATS.dateTime.medium,
+    timeZone: ADMIN_TIME_ZONE,
+  }).format(new Date(iso));
+}
 
 async function loadPage() {
   const mod = await import('./page');
@@ -29,7 +39,7 @@ describe('HealthPage', () => {
 
     expect(screen.getByText('System health')).toBeInTheDocument();
     expect(screen.getByText('abc1234')).toBeInTheDocument();
-    expect(screen.getByText('2026-09-01T00:00:00.000Z')).toBeInTheDocument();
+    expect(screen.getByText(formatExpected('2026-09-01T00:00:00.000Z'))).toBeInTheDocument();
     expect(screen.getByText('readiness-table')).toBeInTheDocument();
   });
 
