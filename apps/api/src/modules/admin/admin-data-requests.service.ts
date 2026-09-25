@@ -184,7 +184,7 @@ export class AdminDataRequestsService {
       throw notFound();
     }
     if (source.type !== 'export' || source.status !== 'failed') {
-      throw conflict('Source request is not a failed export');
+      throw conflict('Only a failed export can be retried');
     }
     const userStatus = await this.repository.findUserStatus(source.user.id);
     if (userStatus !== 'active') {
@@ -205,6 +205,7 @@ export class AdminDataRequestsService {
           targetType: 'DataRequest',
           targetId: row.id,
           before: { sourceId: id },
+          after: { status: 'pending' },
           ip: ip ?? null,
         });
         return row;
