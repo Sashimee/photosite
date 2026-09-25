@@ -14,7 +14,7 @@ import { api } from '@/lib/api';
 import { maskEmail } from '@/lib/user-mask';
 
 import type { DataRequestsFilters } from './data-requests-search-params';
-import { graceDaysRemaining } from './grace-period';
+import { graceDaysRemaining, isOverdueDeletion } from './grace-period';
 
 type AdminDataRequest = components['schemas']['AdminDataRequest'];
 
@@ -81,6 +81,9 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
       cell: (row) => {
         if (!isPendingDeletion(row)) {
           return t('placeholders.notApplicable');
+        }
+        if (isOverdueDeletion(row.requestedAt, row.failureReason)) {
+          return <span className="font-medium text-destructive">{tGracePeriod('overdue')}</span>;
         }
         const days = graceDaysRemaining(row.requestedAt);
         return days === 0 ? tGracePeriod('dueNow') : tGracePeriod('remaining', { days });
