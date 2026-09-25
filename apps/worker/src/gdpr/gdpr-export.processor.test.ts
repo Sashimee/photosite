@@ -32,6 +32,7 @@ interface FakeUser {
 interface TestDeps {
   deps: GdprExportDeps;
   update: ReturnType<typeof vi.fn>;
+  updateMany: ReturnType<typeof vi.fn>;
   auditRecord: ReturnType<typeof vi.fn>;
   emailAdd: ReturnType<typeof vi.fn>;
 }
@@ -42,20 +43,22 @@ function fakeDeps(
   dataRequest: FakeDataRequest | null,
   userFails = false,
   user: FakeUser | null = ACTIVE_USER,
+  options: { updateManyCount?: number; emailAddImpl?: () => Promise<void> } = {},
 ): TestDeps {
   const update = vi.fn(() => Promise.resolve(dataRequest));
+  const updateMany = vi.fn(() => Promise.resolve({ count: options.updateManyCount ?? 1 }));
   const findUnique = vi.fn(() => Promise.resolve(dataRequest));
   const findUniqueOrThrow = vi.fn(() =>
     userFails ? Promise.reject(new Error('boom')) : Promise.resolve(null),
   );
   const findUniqueUser = vi.fn(() => Promise.resolve(user));
   const auditRecord = vi.fn(() => Promise.resolve());
-  const emailAdd = vi.fn(() => Promise.resolve());
+  const emailAdd = vi.fn(options.emailAddImpl ?? (() => Promise.resolve()));
 
   const deps: GdprExportDeps = {
     prisma: {
       client: {
-        dataRequest: { findUnique, update },
+        dataRequest: { findUnique, update, updateMany },
         user: { findUniqueOrThrow, findUnique: findUniqueUser },
       },
     } as never,
@@ -70,7 +73,7 @@ function fakeDeps(
     webAppUrl: 'https://example.test',
   };
 
-  return { deps, update, auditRecord, emailAdd };
+  return { deps, update, updateMany, auditRecord, emailAdd };
 }
 
 describe('createGdprExportProcessor', () => {
@@ -115,7 +118,7 @@ describe('createGdprExportProcessor', () => {
   });
 
   it('marks the request failed with a stable reason on the final attempt', async () => {
-    const { deps, update, auditRecord, emailAdd } = fakeDeps(
+    const { deps, update, updateMany, auditRecord, emailAdd } = fakeDeps(
       { id: DATA_REQUEST_ID, userId: 'user-1', type: 'export', status: 'pending' },
       true,
     );
@@ -127,8 +130,8 @@ describe('createGdprExportProcessor', () => {
       where: { id: DATA_REQUEST_ID },
       data: { status: 'processing' },
     });
-    expect(update).toHaveBeenCalledWith({
-      where: { id: DATA_REQUEST_ID },
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: DATA_REQUEST_ID, status: 'processing' },
       data: { status: 'failed', failureReason: 'export_failed' },
     });
     expect(auditRecord).toHaveBeenCalledWith(
@@ -144,6 +147,25 @@ describe('createGdprExportProcessor', () => {
       },
       expect.objectContaining({ jobId: `data-export-failed-${DATA_REQUEST_ID}` }),
     );
+  });
+
+  it('leaves the row ready and sends no failed email when the row already moved past processing', async () => {
+    const { deps, updateMany, auditRecord, emailAdd } = fakeDeps(
+      { id: DATA_REQUEST_ID, userId: 'user-1', type: 'export', status: 'pending' },
+      true,
+      ACTIVE_USER,
+      { updateManyCount: 0 },
+    );
+    const processor = createGdprExportProcessor(deps);
+
+    await expect(processor(fakeJob(3, 3))).rejects.toThrow('boom');
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: DATA_REQUEST_ID, status: 'processing' },
+      data: { status: 'failed', failureReason: 'export_failed' },
+    });
+    expect(auditRecord).not.toHaveBeenCalled();
+    expect(emailAdd).not.toHaveBeenCalled();
   });
 
   it('leaves status at processing and does not write an audit row before the final attempt', async () => {

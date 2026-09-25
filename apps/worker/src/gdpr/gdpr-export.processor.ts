@@ -110,7 +110,13 @@ export function createGdprExportProcessor(deps: GdprExportDeps): Processor<GdprE
       );
       return;
     }
-    if (dataRequest.status === 'ready' || dataRequest.status === 'cancelled') {
+    if (dataRequest.status === 'cancelled') {
+      return;
+    }
+    if (dataRequest.status === 'ready') {
+      if (dataRequest.expiresAt) {
+        await notifyExportReady(deps, dataRequest.id, dataRequest.userId, dataRequest.expiresAt);
+      }
       return;
     }
 
@@ -118,6 +124,8 @@ export function createGdprExportProcessor(deps: GdprExportDeps): Processor<GdprE
       where: { id: dataRequest.id },
       data: { status: 'processing' },
     });
+
+    let readyExpiresAt: Date;
 
     try {
       const data = await collectExportData(deps.prisma.client, dataRequest.userId);
@@ -167,24 +175,28 @@ export function createGdprExportProcessor(deps: GdprExportDeps): Processor<GdprE
         targetId: dataRequest.id,
         after: { status: 'ready', rowCounts: manifest.files },
       });
-      await notifyExportReady(deps, dataRequest.id, dataRequest.userId, expiresAt);
+      readyExpiresAt = expiresAt;
     } catch (error) {
       if (isFinalAttempt(job)) {
-        await deps.prisma.client.dataRequest.update({
-          where: { id: dataRequest.id },
+        const failedUpdate = await deps.prisma.client.dataRequest.updateMany({
+          where: { id: dataRequest.id, status: 'processing' },
           data: { status: 'failed', failureReason: EXPORT_FAILURE_REASON },
         });
-        await deps.auditLog.record({
-          actorType: 'system',
-          actorId: null,
-          action: 'data_request.export_failed',
-          targetType: 'DataRequest',
-          targetId: dataRequest.id,
-          after: { status: 'failed', failureReason: EXPORT_FAILURE_REASON },
-        });
-        await notifyExportFailed(deps, dataRequest.id, dataRequest.userId);
+        if (failedUpdate.count === 1) {
+          await deps.auditLog.record({
+            actorType: 'system',
+            actorId: null,
+            action: 'data_request.export_failed',
+            targetType: 'DataRequest',
+            targetId: dataRequest.id,
+            after: { status: 'failed', failureReason: EXPORT_FAILURE_REASON },
+          });
+          await notifyExportFailed(deps, dataRequest.id, dataRequest.userId);
+        }
       }
       throw error;
     }
+
+    await notifyExportReady(deps, dataRequest.id, dataRequest.userId, readyExpiresAt);
   };
 }
