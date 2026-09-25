@@ -41,6 +41,8 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
   let dueUser2Id: string;
   let dueRequest2Id: string;
   let profile2Id: string;
+  let staleFailureUserId: string;
+  let staleFailureRequestId: string;
 
   beforeAll(async () => {
     prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
@@ -255,6 +257,30 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
       },
     });
     dueRequest2Id = dueRequest2.id;
+
+    const staleFailureUser = await prisma.user.create({
+      data: {
+        email: `gdpr-anon-stale-failure-${runId}@photoo.test`,
+        name: 'Fx Anon Stale Failure',
+        locale: 'en',
+        countryCode: 'LU',
+        roles: ['client'],
+        status: 'deleted',
+        deletedAt: THIRTY_ONE_DAYS_AGO,
+      },
+    });
+    staleFailureUserId = staleFailureUser.id;
+
+    const staleFailureRequest = await prisma.dataRequest.create({
+      data: {
+        userId: staleFailureUserId,
+        type: 'delete',
+        status: 'pending',
+        requestedAt: THIRTY_ONE_DAYS_AGO,
+        failureReason: 'anonymisation_failed',
+      },
+    });
+    staleFailureRequestId = staleFailureRequest.id;
   });
 
   afterAll(async () => {
@@ -279,10 +305,12 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
       where: { targetType: 'User', targetId: { in: [dueUserId, dueUser2Id] } },
     });
     await prisma.dataRequest.deleteMany({
-      where: { id: { in: [dueRequestId, notDueRequestId, dueRequest2Id] } },
+      where: { id: { in: [dueRequestId, notDueRequestId, dueRequest2Id, staleFailureRequestId] } },
     });
     await prisma.user.deleteMany({
-      where: { id: { in: [dueUserId, notDueUserId, employerId, dueUser2Id] } },
+      where: {
+        id: { in: [dueUserId, notDueUserId, employerId, dueUser2Id, staleFailureUserId] },
+      },
     });
     await prisma.$disconnect();
   });
@@ -305,6 +333,12 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
     const dueRow = await prisma.dataRequest.findUniqueOrThrow({ where: { id: dueRequestId } });
     expect(dueRow.status).toBe('completed');
     expect(dueRow.completedAt).not.toBeNull();
+
+    const staleFailureRow = await prisma.dataRequest.findUniqueOrThrow({
+      where: { id: staleFailureRequestId },
+    });
+    expect(staleFailureRow.status).toBe('completed');
+    expect(staleFailureRow.failureReason).toBeNull();
 
     const sessions = await prisma.session.findMany({ where: { userId: dueUserId } });
     const devices = await prisma.device.findMany({ where: { userId: dueUserId } });

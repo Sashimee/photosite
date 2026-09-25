@@ -2,6 +2,7 @@ import type { PrismaClient } from '@photoo/db';
 import { GDPR_DELETION_GRACE_PERIOD_MS, PUBLIC_UPLOAD_PURPOSES } from '@photoo/shared';
 import type { Logger } from 'nestjs-pino';
 import type { RecordAuditLogInput } from '../../common/audit-log.service.js';
+import { reportSweepFailure } from '../../common/monitoring/report-sweep-failure.js';
 
 export interface AnonymiseStorage {
   config: { privateBucket: string; publicBucket: string };
@@ -138,7 +139,7 @@ async function anonymiseOne(
 
     await tx.dataRequest.update({
       where: { id: dataRequestId },
-      data: { status: 'completed', completedAt: new Date() },
+      data: { status: 'completed', completedAt: new Date(), failureReason: null },
     });
 
     const result: AnonymisationCounts = {
@@ -199,6 +200,19 @@ export async function anonymiseDeletions(
         { err: error, dataRequestId: request.id },
         'gdpr-sweep: failed to anonymise a deletion request',
       );
+      reportSweepFailure('anonymise-deletions', error, { dataRequestId: request.id });
+
+      try {
+        await deps.prisma.client.dataRequest.update({
+          where: { id: request.id },
+          data: { failureReason: 'anonymisation_failed' },
+        });
+      } catch (updateError) {
+        deps.logger.error(
+          { err: updateError, dataRequestId: request.id },
+          'gdpr-sweep: failed to record the failureReason on a deletion request',
+        );
+      }
     }
   }
 
