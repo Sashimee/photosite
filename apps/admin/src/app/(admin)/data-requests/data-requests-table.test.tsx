@@ -87,6 +87,23 @@ describe('DataRequestsTable', () => {
     expect(await screen.findByText('1 day left')).toBeInTheDocument();
   });
 
+  it('shows "Due now" once the grace period has elapsed', async () => {
+    const overdueDeletion = {
+      ...baseRequest,
+      id: '3fa85f64-5717-4562-b3fc-2c963f66afa9',
+      type: 'delete' as const,
+      status: 'pending' as const,
+      completedAt: null,
+      requestedAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+    getMock.mockResolvedValueOnce({ data: { items: [overdueDeletion], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(await screen.findByText('Due now')).toBeInTheDocument();
+  });
+
   it('explains the match rules in the empty state', async () => {
     getMock.mockResolvedValueOnce({ data: { items: [], nextCursor: null } });
     const DataRequestsTable = await loadDataRequestsTable();
