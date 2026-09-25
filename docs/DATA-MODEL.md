@@ -28,7 +28,7 @@ Entity outline for the Prisma schema in `packages/db`. Field lists are the minim
 
 ## Verification
 
-- **Country** – code (PK), name, enabled, currency, vatRate, requiredDocuments (JSON list: key, label per locale, description, accepted types), legalTexts (JSON), defaultLocale.
+- **Country** – code (PK), name, enabled, currency, vatRate, requiredDocuments (JSON list: key, label per locale, description, accepted types), legalTexts (JSON), defaultLocale, timezone (IANA zone name, e.g. `Europe/Luxembourg`; non-null, no lasting default — every country states its own zone explicitly).
 - **VerificationCase** – userId, countryCode, status (`draft`, `submitted`, `in_review`, `approved`, `rejected`, `expired`), businessName, vatNumber and businessRegistrationNumber (encrypted at the application level, AES-256-GCM, key from `VERIFICATION_ENCRYPTION_KEY`, separate from `AUTH_ENCRYPTION_KEY` so they rotate independently), submittedAt, decidedAt, assignedAdminId (nullable, set when an admin starts review), decidedByAdminId (nullable, the admin who approved or rejected), rejectionReason (nullable, 1–1000 chars, set on reject).
 - **VerificationDocument** – caseId, documentKey (from Country.requiredDocuments), uploadId (unique, references `Upload` in place of raw storage keys; `Upload.objectKey`/`mimeType`/`actualSizeBytes`/`virusScanStatus` are read from the upload instead of being duplicated), createdAt. Unique on `(caseId, documentKey)`; re-attaching the same key while the case is `draft` replaces the previous document row.
 

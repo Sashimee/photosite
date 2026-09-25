@@ -49,6 +49,24 @@ describe('admin data requests integration', () => {
   let exportQueue: Queue;
   const createdUserIds: string[] = [];
 
+  // Country.code requires exactly two uppercase letters; draw a fresh random
+  // one per attempt and retry on collision (mirrors countries.integration
+  // .test.ts's createTestCountry) rather than upserting into a row another
+  // suite may have created, which would hijack and then delete it out from
+  // under that suite.
+  function randomCountryCode(): string {
+    const pick = () => String.fromCharCode(65 + Math.floor(Math.random() * 16));
+    return `${pick()}${pick()}`;
+  }
+  const FIXTURE_COUNTRY_TIMEZONE = 'Asia/Tokyo';
+  let fixtureCountryCode: string | undefined;
+  function requireFixtureCountryCode(): string {
+    if (!fixtureCountryCode) {
+      throw new Error('fixtureCountryCode is not set: beforeAll must run first');
+    }
+    return fixtureCountryCode;
+  }
+
   function fastify() {
     return app.getHttpAdapter().getInstance();
   }
@@ -148,6 +166,7 @@ describe('admin data requests integration', () => {
   async function createSubjectUser(
     label: string,
     status: 'active' | 'suspended' | 'deleted' = 'active',
+    countryCode = 'LU',
   ): Promise<{ id: string; email: string }> {
     const email = uniqueEmail(`subject-${label}`);
     const user = await prisma.user.create({
@@ -155,7 +174,7 @@ describe('admin data requests integration', () => {
         email,
         emailVerifiedAt: new Date(),
         locale: 'en',
-        countryCode: 'LU',
+        countryCode,
         roles: ['client'],
         status,
         ...(status === 'deleted' ? { deletedAt: new Date() } : {}),
@@ -223,6 +242,31 @@ describe('admin data requests integration', () => {
     exportQueueConnection = new Redis(testEnv.REDIS_URL, { maxRetriesPerRequest: null });
     exportQueue = new Queue(GDPR_EXPORT_QUEUE_NAME, { connection: exportQueueConnection });
     await clearRateLimitKeys();
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const code = randomCountryCode();
+      try {
+        await prisma.country.create({
+          data: {
+            code,
+            name: 'Fixture Non-Luxembourg Country',
+            enabled: false,
+            currency: 'JPY',
+            vatRate: 0,
+            requiredDocuments: [],
+            legalTexts: {},
+            defaultLocale: 'en',
+            timezone: FIXTURE_COUNTRY_TIMEZONE,
+          },
+        });
+        fixtureCountryCode = code;
+        break;
+      } catch {
+        continue;
+      }
+    }
+    if (!fixtureCountryCode) {
+      throw new Error('could not create fixture country: no unused code found');
+    }
   });
 
   afterEach(async () => {
@@ -233,6 +277,9 @@ describe('admin data requests integration', () => {
     if (createdUserIds.length > 0) {
       await prisma.dataRequest.deleteMany({ where: { userId: { in: createdUserIds } } });
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+    }
+    if (fixtureCountryCode) {
+      await prisma.country.deleteMany({ where: { code: fixtureCountryCode } });
     }
     await prisma.$disconnect();
     await exportQueue.close();
@@ -535,7 +582,9 @@ describe('admin data requests integration', () => {
 
         const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
         const item = body.items.find((candidate) => candidate.id === failed.id);
-        expect(item?.responseDueAt).toBe(gdprResponseDueAt(requestedAt).toISOString());
+        expect(item?.responseDueAt).toBe(
+          gdprResponseDueAt(requestedAt, 'Europe/Luxembourg').toISOString(),
+        );
       });
 
       it('is null on a failed export superseded by a later successful export', async () => {
@@ -624,7 +673,9 @@ describe('admin data requests integration', () => {
 
         const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
         const item = body.items.find((candidate) => candidate.id === failed.id);
-        expect(item?.responseDueAt).toBe(gdprResponseDueAt(new Date(base - 1000)).toISOString());
+        expect(item?.responseDueAt).toBe(
+          gdprResponseDueAt(new Date(base - 1000), 'Europe/Luxembourg').toISOString(),
+        );
       });
 
       it('is not cleared by a later export that is itself still pending', async () => {
@@ -647,7 +698,9 @@ describe('admin data requests integration', () => {
 
         const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
         const item = body.items.find((candidate) => candidate.id === failed.id);
-        expect(item?.responseDueAt).toBe(gdprResponseDueAt(new Date(base - 2000)).toISOString());
+        expect(item?.responseDueAt).toBe(
+          gdprResponseDueAt(new Date(base - 2000), 'Europe/Luxembourg').toISOString(),
+        );
       });
 
       it('is null on a completed export', async () => {
@@ -710,7 +763,9 @@ describe('admin data requests integration', () => {
         const body = await fetchPage(`status=failed&type=export&limit=100`, null, admin.headers);
         const itemA = body.items.find((candidate) => candidate.id === failedA.id);
         const itemB = body.items.find((candidate) => candidate.id === failedB.id);
-        expect(itemA?.responseDueAt).toBe(gdprResponseDueAt(new Date(base - 3000)).toISOString());
+        expect(itemA?.responseDueAt).toBe(
+          gdprResponseDueAt(new Date(base - 3000), 'Europe/Luxembourg').toISOString(),
+        );
         expect(itemB?.responseDueAt).toBeNull();
       });
 
@@ -728,6 +783,31 @@ describe('admin data requests integration', () => {
         const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
         const item = body.items.find((candidate) => candidate.id === ready.id);
         expect(item?.responseDueAt).toBeNull();
+      });
+
+      it('is computed in the subject user country timezone, not always Europe/Luxembourg', async () => {
+        const admin = await makeAdmin('due-country-tz', ['support']);
+        const subject = await createSubjectUser(
+          'due-country-tz',
+          'active',
+          requireFixtureCountryCode(),
+        );
+        const requestedAt = new Date('2026-01-29T15:30:00.000Z');
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt,
+          failureReason: 'export_failed',
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        const expected = gdprResponseDueAt(requestedAt, FIXTURE_COUNTRY_TIMEZONE).toISOString();
+        expect(expected).not.toBe(
+          gdprResponseDueAt(requestedAt, 'Europe/Luxembourg').toISOString(),
+        );
+        expect(item?.responseDueAt).toBe(expected);
       });
 
       it('is null on a delete row', async () => {
@@ -751,7 +831,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-ready', ['support']);
         const subject = await createSubjectUser('late-ready');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const ready = await createDataRequest({
           userId: subject.id,
           type: 'export',
@@ -771,7 +851,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-ready-expired', ['support']);
         const subject = await createSubjectUser('late-ready-expired');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const expiredReady = await createDataRequest({
           userId: subject.id,
           type: 'export',
@@ -791,7 +871,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-completed', ['support']);
         const subject = await createSubjectUser('late-completed');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const completed = await createDataRequest({
           userId: subject.id,
           type: 'export',
@@ -810,7 +890,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-on-time', ['support']);
         const subject = await createSubjectUser('late-on-time');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const onTime = await createDataRequest({
           userId: subject.id,
           type: 'export',
@@ -829,7 +909,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-early', ['support']);
         const subject = await createSubjectUser('late-early');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const early = await createDataRequest({
           userId: subject.id,
           type: 'export',
@@ -848,7 +928,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-clamp-late', ['support']);
         const subject = await createSubjectUser('late-clamp-late');
         const requestedAt = new Date('2026-01-31T10:00:00.000Z');
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         expect(due.toISOString()).toBe('2026-02-28T10:00:00.000Z');
         const clamped = await createDataRequest({
           userId: subject.id,
@@ -867,7 +947,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-clamp-on-time', ['support']);
         const subject = await createSubjectUser('late-clamp-on-time');
         const requestedAt = new Date('2026-01-31T10:00:00.000Z');
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const clamped = await createDataRequest({
           userId: subject.id,
           type: 'export',
@@ -885,7 +965,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-delete', ['support']);
         const subject = await createSubjectUser('late-delete');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const deletion = await createDataRequest({
           userId: subject.id,
           type: 'delete',
@@ -903,7 +983,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-cancelled', ['support']);
         const subject = await createSubjectUser('late-cancelled');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const cancelled = await createDataRequest({
           userId: subject.id,
           type: 'export',
@@ -923,7 +1003,7 @@ describe('admin data requests integration', () => {
           const admin = await makeAdmin(`late-${status}`, ['support']);
           const subject = await createSubjectUser(`late-${status}`);
           const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-          const due = gdprResponseDueAt(requestedAt);
+          const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
           const row = await createDataRequest({
             userId: subject.id,
             type: 'export',
@@ -959,6 +1039,31 @@ describe('admin data requests integration', () => {
           expect(item?.answeredLate).toBe(false);
         },
       );
+
+      it('is computed against the due date in the subject user country timezone', async () => {
+        const admin = await makeAdmin('late-country-tz', ['support']);
+        const subject = await createSubjectUser(
+          'late-country-tz',
+          'active',
+          requireFixtureCountryCode(),
+        );
+        const requestedAt = new Date('2026-01-29T15:30:00.000Z');
+        const dueInFixtureCountry = gdprResponseDueAt(requestedAt, FIXTURE_COUNTRY_TIMEZONE);
+        const dueInLuxembourg = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
+        expect(dueInFixtureCountry.getTime()).toBeLessThan(dueInLuxembourg.getTime());
+        const completedAt = new Date(dueInFixtureCountry.getTime() + 1);
+        const completed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'completed',
+          requestedAt,
+          completedAt,
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === completed.id);
+        expect(item?.answeredLate).toBe(true);
+      });
     });
 
     describe('answeredLate for a failed export later answered by a newer export', () => {
@@ -966,7 +1071,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-retry-late', ['support']);
         const subject = await createSubjectUser('late-retry-late');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const failed = await createDataRequest({
           userId: subject.id,
           type: 'export',
@@ -992,7 +1097,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-retry-on-time', ['support']);
         const subject = await createSubjectUser('late-retry-on-time');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const failed = await createDataRequest({
           userId: subject.id,
           type: 'export',
@@ -1018,7 +1123,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-retry-none', ['support']);
         const subject = await createSubjectUser('late-retry-none');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const failed = await createDataRequest({
           userId: subject.id,
           type: 'export',
@@ -1062,7 +1167,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-retry-earliest', ['support']);
         const subject = await createSubjectUser('late-retry-earliest');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const failed = await createDataRequest({
           userId: subject.id,
           type: 'export',
@@ -1095,7 +1200,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-retry-1ms-before', ['support']);
         const subject = await createSubjectUser('late-retry-1ms-before');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const failed = await createDataRequest({
           userId: subject.id,
           type: 'export',
@@ -1121,7 +1226,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-retry-1ms-after', ['support']);
         const subject = await createSubjectUser('late-retry-1ms-after');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         const failed = await createDataRequest({
           userId: subject.id,
           type: 'export',
@@ -1147,7 +1252,7 @@ describe('admin data requests integration', () => {
         const admin = await makeAdmin('late-retry-clamp', ['support']);
         const subject = await createSubjectUser('late-retry-clamp');
         const requestedAt = new Date('2026-01-31T10:00:00.000Z');
-        const due = gdprResponseDueAt(requestedAt);
+        const due = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
         expect(due.toISOString()).toBe('2026-02-28T10:00:00.000Z');
         const failed = await createDataRequest({
           userId: subject.id,

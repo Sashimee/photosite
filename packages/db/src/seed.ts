@@ -51,16 +51,26 @@ export const LUXEMBOURG_REQUIRED_DOCUMENTS = [
   },
 ];
 
+const LUXEMBOURG_TIMEZONE = 'Europe/Luxembourg';
+
 // Backfills `requiredDocuments` on an existing row so a DB seeded before its
 // `description` field matched `RequiredDocumentSchema` (a plain string, not
 // localized text) gets corrected on the next seed run.
 async function seedCountry(prisma: ReturnType<typeof createPrismaClient>): Promise<void> {
   const existing = await prisma.country.findUnique({ where: { code: 'LU' } });
   if (existing) {
-    if (!isDeepStrictEqual(existing.requiredDocuments, LUXEMBOURG_REQUIRED_DOCUMENTS)) {
+    const requiredDocumentsChanged = !isDeepStrictEqual(
+      existing.requiredDocuments,
+      LUXEMBOURG_REQUIRED_DOCUMENTS,
+    );
+    const timezoneChanged = existing.timezone !== LUXEMBOURG_TIMEZONE;
+    if (requiredDocumentsChanged || timezoneChanged) {
       await prisma.country.update({
         where: { code: 'LU' },
-        data: { requiredDocuments: LUXEMBOURG_REQUIRED_DOCUMENTS },
+        data: {
+          ...(requiredDocumentsChanged && { requiredDocuments: LUXEMBOURG_REQUIRED_DOCUMENTS }),
+          ...(timezoneChanged && { timezone: LUXEMBOURG_TIMEZONE }),
+        },
       });
     }
     return;
@@ -75,6 +85,7 @@ async function seedCountry(prisma: ReturnType<typeof createPrismaClient>): Promi
       requiredDocuments: LUXEMBOURG_REQUIRED_DOCUMENTS,
       legalTexts: {},
       defaultLocale: 'fr',
+      timezone: LUXEMBOURG_TIMEZONE,
     },
   });
 }

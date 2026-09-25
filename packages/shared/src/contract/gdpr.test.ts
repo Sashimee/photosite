@@ -88,39 +88,134 @@ describe('DataRequestSchema', () => {
 
 describe('gdprResponseDueAt', () => {
   it('adds one calendar month for a normal date', () => {
-    expect(gdprResponseDueAt(new Date('2026-09-16T12:00:00.000Z')).toISOString()).toBe(
+    expect(gdprResponseDueAt(new Date('2026-09-16T12:00:00.000Z'), 'UTC').toISOString()).toBe(
       '2026-10-16T12:00:00.000Z',
     );
   });
 
   it('clamps to the last day of a shorter target month', () => {
-    expect(gdprResponseDueAt(new Date('2026-01-31T00:00:00.000Z')).toISOString()).toBe(
+    expect(gdprResponseDueAt(new Date('2026-01-31T00:00:00.000Z'), 'UTC').toISOString()).toBe(
       '2026-02-28T00:00:00.000Z',
     );
   });
 
   it('clamps to Feb 29 on a leap year', () => {
-    expect(gdprResponseDueAt(new Date('2028-01-31T00:00:00.000Z')).toISOString()).toBe(
+    expect(gdprResponseDueAt(new Date('2028-01-31T00:00:00.000Z'), 'UTC').toISOString()).toBe(
       '2028-02-29T00:00:00.000Z',
     );
   });
 
   it('rolls over the year when requested in December', () => {
-    expect(gdprResponseDueAt(new Date('2026-12-15T08:30:00.000Z')).toISOString()).toBe(
+    expect(gdprResponseDueAt(new Date('2026-12-15T08:30:00.000Z'), 'UTC').toISOString()).toBe(
       '2027-01-15T08:30:00.000Z',
     );
   });
 
   it('clamps to the last day of a target month with 30 days', () => {
-    expect(gdprResponseDueAt(new Date('2026-08-31T00:00:00.000Z')).toISOString()).toBe(
+    expect(gdprResponseDueAt(new Date('2026-08-31T00:00:00.000Z'), 'UTC').toISOString()).toBe(
       '2026-09-30T00:00:00.000Z',
     );
   });
 
   it('preserves the time of day, including milliseconds, when clamping', () => {
-    expect(gdprResponseDueAt(new Date('2026-01-31T14:23:05.123Z')).toISOString()).toBe(
+    expect(gdprResponseDueAt(new Date('2026-01-31T14:23:05.123Z'), 'UTC').toISOString()).toBe(
       '2026-02-28T14:23:05.123Z',
     );
+  });
+
+  it('returns the UTC result when it is earlier than the zoned one, just after local midnight', () => {
+    // 2026-02-28T23:30Z is 2026-03-01T00:30 CET in Luxembourg, so the zoned
+    // calculation adds a month to that and lands on 2026-04-01T00:30 CEST
+    // (2026-03-31T22:30Z), a day later than the UTC result of
+    // 2026-03-28T23:30Z. The earlier, UTC, result wins.
+    expect(
+      gdprResponseDueAt(new Date('2026-02-28T23:30:00.000Z'), 'Europe/Luxembourg').toISOString(),
+    ).toBe('2026-03-28T23:30:00.000Z');
+  });
+
+  it('returns the zoned result when it is earlier than the UTC one, clamped in the local month', () => {
+    // 2026-01-30T23:30Z is 2026-01-31T00:30 CET in Luxembourg. Adding a
+    // month and clamping to the last day of February 2026 gives
+    // 2026-02-28T00:30 CET (2026-02-27T23:30Z), a day earlier than the UTC
+    // result of 2026-02-28T23:30Z. The earlier, zoned, result wins.
+    expect(
+      gdprResponseDueAt(new Date('2026-01-30T23:30:00.000Z'), 'Europe/Luxembourg').toISOString(),
+    ).toBe('2026-02-27T23:30:00.000Z');
+  });
+
+  it('resolves a spring-forward gap target by shifting it back by the gap length, landing before the gap (Europe/Luxembourg)', () => {
+    // Local target is 2048-02-29T02:30 + 1 month = 2048-03-29T02:30, inside
+    // the Europe/Luxembourg gap where clocks jump from 02:00 to 03:00.
+    expect(
+      gdprResponseDueAt(new Date('2048-02-29T01:30:00.000Z'), 'Europe/Luxembourg').toISOString(),
+    ).toBe('2048-03-29T00:30:00.000Z');
+  });
+
+  it('resolves a spring-forward gap target by shifting it back by the gap length, landing before the gap (America/New_York)', () => {
+    // Local target is 2026-02-08T02:30 + 1 month = 2026-03-08T02:30, inside
+    // the America/New_York gap where clocks jump from 02:00 to 03:00.
+    expect(
+      gdprResponseDueAt(new Date('2026-02-08T07:30:00.000Z'), 'America/New_York').toISOString(),
+    ).toBe('2026-03-08T06:30:00.000Z');
+  });
+
+  it('resolves a fall-back overlap target to the earlier instant (Europe/Luxembourg)', () => {
+    // Local target is 2026-09-25T02:30 + 1 month = 2026-10-25T02:30, which
+    // occurs twice in Europe/Luxembourg as clocks fall back from CEST to
+    // CET. The earlier (CEST) instant wins.
+    expect(
+      gdprResponseDueAt(new Date('2026-09-25T00:30:00.000Z'), 'Europe/Luxembourg').toISOString(),
+    ).toBe('2026-10-25T00:30:00.000Z');
+  });
+
+  it('resolves a fall-back overlap target to the earlier instant (America/New_York)', () => {
+    // Local target is 2026-10-01T01:30 + 1 month = 2026-11-01T01:30, which
+    // occurs twice in America/New_York as clocks fall back from EDT to EST.
+    // The earlier (EDT) instant wins.
+    expect(
+      gdprResponseDueAt(new Date('2026-10-01T05:30:00.000Z'), 'America/New_York').toISOString(),
+    ).toBe('2026-11-01T05:30:00.000Z');
+  });
+
+  it('resolves a fall-back overlap target to the earlier instant in a positive-offset zone (Australia/Sydney)', () => {
+    // Local target is 2026-03-05T02:30 + 1 month = 2026-04-05T02:30, which
+    // occurs twice in Australia/Sydney as clocks fall back from AEDT to
+    // AEST. The earlier (AEDT) instant wins.
+    expect(
+      gdprResponseDueAt(new Date('2026-03-04T15:30:00.000Z'), 'Australia/Sydney').toISOString(),
+    ).toBe('2026-04-04T15:30:00.000Z');
+  });
+
+  it('clamps to Feb 29 on a leap year in a zone other than UTC', () => {
+    expect(
+      gdprResponseDueAt(new Date('2028-01-30T23:30:00.000Z'), 'Europe/Luxembourg').toISOString(),
+    ).toBe('2028-02-28T23:30:00.000Z');
+  });
+
+  it('preserves non-zero milliseconds exactly through the zoned calculation', () => {
+    expect(
+      gdprResponseDueAt(new Date('2026-06-16T12:00:00.789Z'), 'Europe/Luxembourg').toISOString(),
+    ).toBe('2026-07-16T12:00:00.789Z');
+  });
+
+  it('throws with the zone name for an invalid IANA time zone', () => {
+    expect(() => gdprResponseDueAt(new Date('2026-09-16T12:00:00.000Z'), 'Not/AZone')).toThrow(
+      'Not/AZone',
+    );
+  });
+
+  it('is never later than the UTC result, for every hour of a year in several zones', () => {
+    const zones = ['Europe/Luxembourg', 'America/New_York', 'Australia/Lord_Howe'];
+    const start = new Date('2026-01-01T00:00:00.000Z').getTime();
+    const hoursInYear = 365 * 24;
+    for (const zone of zones) {
+      for (let hour = 0; hour < hoursInYear; hour += 1) {
+        const requestedAt = new Date(start + hour * 60 * 60 * 1000);
+        const zoned = gdprResponseDueAt(requestedAt, zone);
+        const utc = gdprResponseDueAt(requestedAt, 'UTC');
+        expect(zoned.getTime()).toBeLessThanOrEqual(utc.getTime());
+      }
+    }
   });
 });
 

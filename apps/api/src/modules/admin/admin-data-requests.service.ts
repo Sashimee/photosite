@@ -85,7 +85,7 @@ function responseDueAt(
   if (latestSuccess && latestSuccess > row.requestedAt) {
     return null;
   }
-  return gdprResponseDueAt(row.requestedAt);
+  return gdprResponseDueAt(row.requestedAt, row.user.country.timezone);
 }
 
 // The Art. 12(3) clock for a failed export still runs from that row's own
@@ -102,7 +102,7 @@ function isFailedAnsweredLate(
     return false;
   }
   const earliest = laterCompletions.reduce((min, date) => (date < min ? date : min));
-  return earliest > gdprResponseDueAt(row.requestedAt);
+  return earliest > gdprResponseDueAt(row.requestedAt, row.user.country.timezone);
 }
 
 function isAnsweredLate(
@@ -113,7 +113,10 @@ function isAnsweredLate(
     return false;
   }
   if (row.status === 'ready' || row.status === 'completed') {
-    return row.completedAt !== null && row.completedAt > gdprResponseDueAt(row.requestedAt);
+    return (
+      row.completedAt !== null &&
+      row.completedAt > gdprResponseDueAt(row.requestedAt, row.user.country.timezone)
+    );
   }
   if (row.status === 'failed') {
     return isFailedAnsweredLate(row, successesByUser);
@@ -151,7 +154,7 @@ function mapDataRequest(
     cancelledAt: row.cancelledAt?.toISOString() ?? null,
     responseDueAt: responseDueAt(row, latestSuccessByUser)?.toISOString() ?? null,
     answeredLate: isAnsweredLate(row, successesByUser),
-    user: row.user,
+    user: { id: row.user.id, email: row.user.email },
   };
 }
 

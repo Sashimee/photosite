@@ -22,7 +22,7 @@ const dataRequestSelect = {
   expiresAt: true,
   failureReason: true,
   cancelledAt: true,
-  user: { select: { id: true, email: true } },
+  user: { select: { id: true, email: true, country: { select: { timezone: true } } } },
 } satisfies Prisma.DataRequestSelect;
 
 export type AdminDataRequestRow = Prisma.DataRequestGetPayload<{
