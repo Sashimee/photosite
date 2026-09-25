@@ -163,6 +163,20 @@ describe('DataRequestsTable', () => {
     expect(screen.getByText('Not applicable')).toBeInTheDocument();
   });
 
+  it('shows "Answered late" for the response due column when answeredLate is true', async () => {
+    const answeredLate = {
+      ...baseRequest,
+      completedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      answeredLate: true,
+    };
+    getMock.mockResolvedValueOnce({ data: { items: [answeredLate], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(await screen.findByText('Answered late')).toBeInTheDocument();
+  });
+
   it('shows a future response due date without marking it overdue', async () => {
     const dueSoon = {
       ...baseRequest,
