@@ -36,7 +36,7 @@ function cursorWhere(cursor: AdminDataRequestCursor): Prisma.DataRequestWhereInp
   };
 }
 
-export interface LaterSuccessfulExport {
+export interface SuccessfulExport {
   userId: string;
   requestedAt: Date;
 }
@@ -46,8 +46,8 @@ export class AdminDataRequestsRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   // Batched over every user on the page, so working out whether a retry already
-  // answered a failed/expired export costs one query per page, not one per row.
-  async listSuccessfulExports(userIds: string[]): Promise<LaterSuccessfulExport[]> {
+  // answered a failed export costs one query per page, not one per row.
+  async listSuccessfulExports(userIds: string[]): Promise<SuccessfulExport[]> {
     if (userIds.length === 0) {
       return [];
     }

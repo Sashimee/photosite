@@ -541,10 +541,10 @@ registry.registerPath({
 });
 
 // `user` is never null; it may be anonymised once the deletion's grace period has run.
-// `responseDueAt` is the Art. 12(3) deadline for an export row still unanswered
-// (pending/processing/failed, or ready past its expiresAt) unless a later export
-// for the same user already reached ready/completed. Null for delete rows,
-// completed/cancelled exports and a ready export still downloadable (#358).
+// `responseDueAt` is the Art. 12(3) deadline for an export row that never produced
+// a copy (pending/processing/failed) unless a later export for the same user
+// already reached ready/completed. Null for delete rows and for ready, completed
+// or cancelled exports; a ready export past its expiresAt was still answered (#358).
 export const AdminDataRequestSchema = DataRequestSchema.extend({
   responseDueAt: IsoDateTimeSchema.nullable(),
   user: z
@@ -568,7 +568,7 @@ registry.registerPath({
   path: apiPath('/admin/data-requests'),
   summary:
     'List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an ' +
-    'export row still unanswered, or null if it does not apply.',
+    'export row that has not produced a copy yet, or null if it does not apply.',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('support'),

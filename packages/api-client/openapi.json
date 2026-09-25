@@ -15492,7 +15492,7 @@
     },
     "/v1/admin/data-requests": {
       "get": {
-        "summary": "List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row still unanswered, or null if it does not apply.",
+        "summary": "List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row that has not produced a copy yet, or null if it does not apply.",
         "tags": [
           "admin"
         ],

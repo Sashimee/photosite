@@ -8096,7 +8096,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row still unanswered, or null if it does not apply. */
+        /** List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row that has not produced a copy yet, or null if it does not apply. */
         get: {
             parameters: {
                 query?: {
