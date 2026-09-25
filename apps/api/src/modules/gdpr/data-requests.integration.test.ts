@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createPrismaClient, type PrismaClient } from '@photoo/db';
+import { GDPR_DELETION_GRACE_PERIOD_MS } from '@photoo/shared';
 import { Redis } from 'ioredis';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp } from '../../testing/create-test-app.js';
@@ -696,6 +697,116 @@ describe('data requests integration', () => {
         payload: { token },
       });
       expect(response.statusCode).toBe(409);
+    });
+
+    it('returns 409 once the grace period has ended, and changes nothing', async () => {
+      const user = await signUpAndSignIn('cancel-past-grace', ['client']);
+      const created = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/data-requests',
+        headers: { ...authHeaders(user.token), origin: 'http://localhost:3000' },
+        payload: { type: 'delete' },
+      });
+      const dataRequestId = created.json<DataRequestBody>().id;
+      await prisma.dataRequest.update({
+        where: { id: dataRequestId },
+        data: {
+          requestedAt: new Date(Date.now() - GDPR_DELETION_GRACE_PERIOD_MS - 1000),
+          failureReason: 'anonymisation_failed',
+        },
+      });
+
+      const link = await waitForLinkInEmail(
+        user.email,
+        /https?:\/\/\S*account\/deletion\/cancel\/\S+#token=\S+/,
+      );
+      const token = extractFragmentToken(link);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/me/data-requests/${dataRequestId}/cancel`,
+        headers: { origin: 'http://localhost:3000' },
+        payload: { token },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json<ApiErrorBody>().message).toMatch(/grace period has ended/i);
+
+      const unchanged = await prisma.dataRequest.findUniqueOrThrow({
+        where: { id: dataRequestId },
+      });
+      expect(unchanged.status).toBe('pending');
+      expect(unchanged.cancelledAt).toBeNull();
+
+      const restored = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+      expect(restored.status).toBe('deleted');
+
+      const auditRow = await prisma.auditLog.findFirst({
+        where: {
+          targetType: 'DataRequest',
+          targetId: dataRequestId,
+          action: 'data_request.cancelled',
+        },
+      });
+      expect(auditRow).toBeNull();
+    });
+
+    it('returns 409 exactly at the grace period boundary', async () => {
+      const user = await signUpAndSignIn('cancel-grace-boundary', ['client']);
+      const created = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/data-requests',
+        headers: { ...authHeaders(user.token), origin: 'http://localhost:3000' },
+        payload: { type: 'delete' },
+      });
+      const dataRequestId = created.json<DataRequestBody>().id;
+      await prisma.dataRequest.update({
+        where: { id: dataRequestId },
+        data: { requestedAt: new Date(Date.now() - GDPR_DELETION_GRACE_PERIOD_MS) },
+      });
+
+      const link = await waitForLinkInEmail(
+        user.email,
+        /https?:\/\/\S*account\/deletion\/cancel\/\S+#token=\S+/,
+      );
+      const token = extractFragmentToken(link);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/me/data-requests/${dataRequestId}/cancel`,
+        headers: { origin: 'http://localhost:3000' },
+        payload: { token },
+      });
+      expect(response.statusCode).toBe(409);
+    });
+
+    it('still cancels a few seconds inside the grace period', async () => {
+      const user = await signUpAndSignIn('cancel-within-grace', ['client']);
+      const created = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/data-requests',
+        headers: { ...authHeaders(user.token), origin: 'http://localhost:3000' },
+        payload: { type: 'delete' },
+      });
+      const dataRequestId = created.json<DataRequestBody>().id;
+      await prisma.dataRequest.update({
+        where: { id: dataRequestId },
+        data: { requestedAt: new Date(Date.now() - GDPR_DELETION_GRACE_PERIOD_MS + 5000) },
+      });
+
+      const link = await waitForLinkInEmail(
+        user.email,
+        /https?:\/\/\S*account\/deletion\/cancel\/\S+#token=\S+/,
+      );
+      const token = extractFragmentToken(link);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/me/data-requests/${dataRequestId}/cancel`,
+        headers: { origin: 'http://localhost:3000' },
+        payload: { token },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json<DataRequestBody>().status).toBe('cancelled');
     });
   });
 
