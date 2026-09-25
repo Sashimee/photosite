@@ -23,7 +23,7 @@ interface DataRequestBody {
   expiresAt: string | null;
   failureReason: string | null;
   cancelledAt: string | null;
-  user: { id: string; email: string } | null;
+  user: { id: string; email: string };
   exportKey?: string;
 }
 
@@ -241,6 +241,22 @@ describe('admin data requests integration', () => {
       expect(response.statusCode).toBe(403);
     });
 
+    it('returns 403 TWO_FACTOR_REQUIRED for a support admin whose session has no verified second factor', async () => {
+      const admin = await makeAdmin('list-no-2fa', ['support']);
+      await prisma.session.updateMany({
+        where: { userId: admin.id },
+        data: { twoFactorVerifiedAt: null },
+      });
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('TWO_FACTOR_REQUIRED');
+    });
+
     it('returns 400 for an unknown status filter', async () => {
       const admin = await makeAdmin('list-bad-status', ['support']);
       const response = await fastify().inject({
@@ -259,6 +275,39 @@ describe('admin data requests integration', () => {
         headers: admin.headers,
       });
       expect(response.statusCode).toBe(400);
+    });
+
+    it('returns 400 for a cursor that does not decode to a valid cursor payload', async () => {
+      const admin = await makeAdmin('list-bad-cursor', ['support']);
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/data-requests?cursor=not-a-valid-cursor',
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('returns 400 for a cursor forged from another endpoint', async () => {
+      const admin = await makeAdmin('list-foreign-cursor', ['support']);
+      const foreignCursor = Buffer.from(
+        JSON.stringify({ createdAt: new Date().toISOString(), id: randomUUID() }),
+        'utf8',
+      ).toString('base64url');
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/data-requests?cursor=${encodeURIComponent(foreignCursor)}`,
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('returns an empty page with a null cursor when nothing matches the filters', async () => {
+      const admin = await makeAdmin('list-empty', ['support']);
+      const subject = await createSubjectUser('list-empty');
+
+      const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+      expect(body.items).toEqual([]);
+      expect(body.nextCursor).toBeNull();
     });
 
     it('lists requests newest first with the owning user and never exposes exportKey', async () => {
@@ -282,9 +331,10 @@ describe('admin data requests integration', () => {
       const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
       expect(body.items.length).toBe(2);
       expect(body.items[0]?.id).toBe(newer.id);
-      expect(body.items.every((item) => item.user?.id === subject.id)).toBe(true);
-      expect(body.items.every((item) => item.user?.email === subject.email)).toBe(true);
+      expect(body.items.every((item) => item.user.id === subject.id)).toBe(true);
+      expect(body.items.every((item) => item.user.email === subject.email)).toBe(true);
       expect(body.items.every((item) => !('exportKey' in item))).toBe(true);
+      expect(JSON.stringify(body)).not.toContain('private/should-not-leak.zip');
     });
 
     it('filters by status', async () => {
