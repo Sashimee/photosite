@@ -565,6 +565,7 @@ model DataRequest {
   status        DataRequestStatus  @default(pending)
   channel       DataRequestChannel @default(in_app)
   requestedAt   DateTime           @default(now())
+  receivedAt    DateTime           @default(now())
   completedAt   DateTime?
   exportKey     String?
   expiresAt     DateTime?
