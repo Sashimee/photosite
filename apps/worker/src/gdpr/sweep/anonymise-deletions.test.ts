@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
-import { anonymiseDeletions } from './anonymise-deletions.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ANONYMISATION_FAILURE_REASON, anonymiseDeletions } from './anonymise-deletions.js';
+
+vi.mock('@sentry/node', () => ({
+  isInitialized: vi.fn(() => true),
+  captureException: vi.fn(),
+}));
 
 interface FakeUpload {
   id: string;
@@ -11,11 +16,18 @@ interface FakeUpload {
 function fakePrisma(options: {
   due: { id: string; userId: string }[];
   failUserId?: string;
+  failFailureReasonWriteForRequestId?: string;
   uploads?: FakeUpload[];
   photographerProfile?: { id: string } | null;
   professionalProfile?: { id: string } | null;
 }) {
   const dataRequestUpdate = vi.fn(() => Promise.resolve());
+  const dataRequestUpdateMany = vi.fn((args: { where: { id: string; status: string } }) => {
+    if (options.failFailureReasonWriteForRequestId === args.where.id) {
+      return Promise.reject(new Error('db unavailable'));
+    }
+    return Promise.resolve();
+  });
   const userUpdate = vi.fn((args: { where: { id: string } }) => {
     if (args.where.id === options.failUserId) {
       return Promise.reject(new Error('user row vanished'));
@@ -28,7 +40,11 @@ function fakePrisma(options: {
   const jobApplicationUpdateMany = vi.fn(() => Promise.resolve({ count: 2 }));
 
   const client = {
-    dataRequest: { findMany: vi.fn(() => Promise.resolve(options.due)), update: dataRequestUpdate },
+    dataRequest: {
+      findMany: vi.fn(() => Promise.resolve(options.due)),
+      update: dataRequestUpdate,
+      updateMany: dataRequestUpdateMany,
+    },
     photographerProfile: {
       findUnique: vi.fn(() => Promise.resolve(options.photographerProfile ?? null)),
       update: photographerProfileUpdate,
@@ -54,6 +70,7 @@ function fakePrisma(options: {
   return {
     client,
     dataRequestUpdate,
+    dataRequestUpdateMany,
     userUpdate,
     photographerProfileUpdate,
     professionalProfileUpdate,
@@ -62,6 +79,10 @@ function fakePrisma(options: {
 }
 
 describe('anonymiseDeletions', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('logs and continues when a stray upload object cannot be deleted', async () => {
     const { client } = fakePrisma({
       due: [{ id: 'req-ok', userId: 'user-ok' }],
@@ -132,16 +153,124 @@ describe('anonymiseDeletions', () => {
     expect(result.usersFailed).toBe(1);
     expect(dataRequestUpdate).toHaveBeenCalledWith({
       where: { id: 'req-ok' },
-      data: { status: 'completed', completedAt: expect.any(Date) as Date },
+      data: { status: 'completed', completedAt: expect.any(Date) as Date, failureReason: null },
     });
     expect(dataRequestUpdate).not.toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'req-fail' } }),
+      expect.objectContaining({
+        where: { id: 'req-fail' },
+        data: expect.objectContaining({ status: 'completed' }) as object,
+      }),
     );
     expect(auditRecord).toHaveBeenCalledTimes(1);
     expect(loggerError).toHaveBeenCalledWith(
       expect.objectContaining({ dataRequestId: 'req-fail' }),
       expect.any(String),
     );
+  });
+
+  it('records a stable failureReason and keeps the request pending when anonymiseOne fails', async () => {
+    const { client, dataRequestUpdateMany } = fakePrisma({
+      due: [{ id: 'req-fail', userId: 'user-fail' }],
+      failUserId: 'user-fail',
+    });
+
+    await anonymiseDeletions({
+      prisma: { client } as never,
+      storage: {
+        config: { privateBucket: 'private', publicBucket: 'public' },
+        deleteObject: vi.fn(() => Promise.resolve()),
+      },
+      auditLog: { record: vi.fn(() => Promise.resolve()) },
+      logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+    });
+
+    expect(dataRequestUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'req-fail', status: 'pending' },
+      data: { failureReason: ANONYMISATION_FAILURE_REASON },
+    });
+  });
+
+  it('only flags the request as failed if it is still pending, so an audit-log throw after a successful commit cannot overwrite a completed row', async () => {
+    const { client, dataRequestUpdateMany } = fakePrisma({
+      due: [{ id: 'req-ok', userId: 'user-ok' }],
+    });
+    const auditRecord = vi.fn(() => Promise.reject(new Error('audit log unavailable')));
+
+    const result = await anonymiseDeletions({
+      prisma: { client } as never,
+      storage: {
+        config: { privateBucket: 'private', publicBucket: 'public' },
+        deleteObject: vi.fn(() => Promise.resolve()),
+      },
+      auditLog: { record: auditRecord },
+      logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+    });
+
+    expect(result.usersFailed).toBe(1);
+    expect(dataRequestUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'req-ok', status: 'pending' },
+      data: { failureReason: ANONYMISATION_FAILURE_REASON },
+    });
+  });
+
+  it('does not stop the sweep when the failureReason write itself fails', async () => {
+    const { client, dataRequestUpdate } = fakePrisma({
+      due: [
+        { id: 'req-fail', userId: 'user-fail' },
+        { id: 'req-ok', userId: 'user-ok' },
+      ],
+      failUserId: 'user-fail',
+      failFailureReasonWriteForRequestId: 'req-fail',
+    });
+    const loggerError = vi.fn();
+
+    const result = await anonymiseDeletions({
+      prisma: { client } as never,
+      storage: {
+        config: { privateBucket: 'private', publicBucket: 'public' },
+        deleteObject: vi.fn(() => Promise.resolve()),
+      },
+      auditLog: { record: vi.fn(() => Promise.resolve()) },
+      logger: { log: vi.fn(), warn: vi.fn(), error: loggerError } as never,
+    });
+
+    expect(result.usersAnonymised).toBe(1);
+    expect(result.usersFailed).toBe(1);
+    expect(dataRequestUpdate).toHaveBeenCalledWith({
+      where: { id: 'req-ok' },
+      data: { status: 'completed', completedAt: expect.any(Date) as Date, failureReason: null },
+    });
+    expect(loggerError).toHaveBeenCalledWith(
+      expect.objectContaining({ dataRequestId: 'req-fail' }),
+      expect.stringContaining('failureReason'),
+    );
+  });
+
+  it('reports the failure to Sentry tagged with the gdpr phase, without the user id', async () => {
+    const Sentry = await import('@sentry/node');
+    vi.mocked(Sentry.captureException).mockClear();
+    const { client } = fakePrisma({
+      due: [{ id: 'req-fail', userId: 'user-fail' }],
+      failUserId: 'user-fail',
+    });
+
+    await anonymiseDeletions({
+      prisma: { client } as never,
+      storage: {
+        config: { privateBucket: 'private', publicBucket: 'public' },
+        deleteObject: vi.fn(() => Promise.resolve()),
+      },
+      auditLog: { record: vi.fn(() => Promise.resolve()) },
+      logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+    });
+
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    const [, context] = vi.mocked(Sentry.captureException).mock.calls[0] as [
+      unknown,
+      { tags: Record<string, unknown>; extra: Record<string, unknown> },
+    ];
+    expect(context.tags).toEqual({ gdpr_phase: 'anonymise-deletions' });
+    expect(context.extra).toEqual({ dataRequestId: 'req-fail' });
   });
 
   it('replaces displayName and slug, and anonymises job applications when a photographer profile exists', async () => {

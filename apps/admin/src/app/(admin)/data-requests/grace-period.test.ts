@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { graceDaysRemaining } from './grace-period';
+import { graceDaysRemaining, isOverdueDeletion } from './grace-period';
 
 describe('graceDaysRemaining', () => {
   const now = new Date('2026-09-25T12:00:00.000Z');
@@ -23,5 +23,29 @@ describe('graceDaysRemaining', () => {
 
   it('is zero exactly at the deadline instant', () => {
     expect(graceDaysRemaining('2026-08-26T12:00:00.000Z', now)).toBe(0);
+  });
+});
+
+describe('isOverdueDeletion', () => {
+  const now = new Date('2026-09-25T12:00:00.000Z');
+
+  it('is not overdue exactly at the deadline instant', () => {
+    expect(isOverdueDeletion('2026-08-26T12:00:00.000Z', null, now)).toBe(false);
+  });
+
+  it('is not overdue exactly at the deadline plus the slack', () => {
+    expect(isOverdueDeletion('2026-08-25T12:00:00.000Z', null, now)).toBe(false);
+  });
+
+  it('is overdue just past the deadline plus the slack', () => {
+    expect(isOverdueDeletion('2026-08-25T11:59:59.999Z', null, now)).toBe(true);
+  });
+
+  it('is overdue with a failureReason set even before the deadline', () => {
+    expect(isOverdueDeletion('2026-09-20T12:00:00.000Z', 'anonymisation_failed', now)).toBe(true);
+  });
+
+  it('is not overdue with no failureReason and time left in the grace period', () => {
+    expect(isOverdueDeletion('2026-09-20T12:00:00.000Z', null, now)).toBe(false);
   });
 });

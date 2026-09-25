@@ -526,6 +526,7 @@
         },
         "gracePeriod": {
           "dueNow": "Due now",
+          "overdue": "Overdue",
           "remaining": "{days, plural, one {# day left} other {# days left}}"
         },
         "empty": {
