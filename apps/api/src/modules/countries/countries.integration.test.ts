@@ -186,9 +186,10 @@ describe('countries integration', () => {
   // Starting from 'M' keeps every generated code alphabetically after the
   // seeded 'LU', so it can never become auth's default-country pick
   // (`ORDER BY code ASC LIMIT 1` over enabled countries) for a sign-up
-  // racing in another test file against the same database.
+  // racing in another test file against the same database. Stopping at 'Y'
+  // keeps 'ZZ' free as the never-existing code other tests rely on.
   function randomCountryCode(): string {
-    const pick = () => String.fromCharCode(77 + Math.floor(Math.random() * 14));
+    const pick = () => String.fromCharCode(77 + Math.floor(Math.random() * 13));
     return `${pick()}${pick()}`;
   }
 
