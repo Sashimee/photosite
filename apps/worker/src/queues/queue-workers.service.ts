@@ -355,6 +355,8 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
         storage: this.storage,
         auditLog: this.auditLog,
         logger: this.logger,
+        monitorSlug: GDPR_SWEEP_SCHEDULER_ID,
+        monitorIntervalMs: this.config.GDPR_SWEEP_INTERVAL_MS,
       }),
       {
         connection: this.newConnection(),
