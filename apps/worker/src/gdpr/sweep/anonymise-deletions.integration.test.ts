@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { createPrismaClient, type PrismaClient } from '@photoo/db';
+import { createPrismaClient, type Prisma, type PrismaClient } from '@photoo/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AuditLogService } from '../../common/audit-log.service.js';
 import { StorageService } from '../../storage/storage.service.js';
@@ -15,6 +15,23 @@ function fakeLogger() {
 
 const THIRTY_ONE_DAYS_AGO = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
 const ONE_DAY_AGO = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+function racingPrismaClient(
+  prisma: PrismaClient,
+  onFirstTransaction: () => Promise<void>,
+): PrismaClient {
+  let intercepted = false;
+  return new Proxy(prisma, {
+    get(target, prop) {
+      if (prop === '$transaction' && !intercepted) {
+        intercepted = true;
+        return async (fn: (tx: Prisma.TransactionClient) => Promise<unknown>) =>
+          onFirstTransaction().then(() => prisma.$transaction(fn));
+      }
+      return Reflect.get(target, prop) as unknown;
+    },
+  });
+}
 
 describe('anonymiseDeletions against a real database and MinIO', () => {
   if (!testEnv) {
@@ -324,6 +341,7 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
     });
 
     expect(result.usersAnonymised).toBeGreaterThanOrEqual(2);
+    expect(result.usersSkipped).toBe(0);
 
     const dueUser = await prisma.user.findUniqueOrThrow({ where: { id: dueUserId } });
     expect(dueUser.email).toBe(`deleted-${dueUserId}@deleted.invalid`);
@@ -422,6 +440,7 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
     });
     expect(second.usersAnonymised).toBe(0);
     expect(second.usersFailed).toBe(0);
+    expect(second.usersSkipped).toBe(0);
 
     const jobApplicationAfterSecondRun = await prisma.jobApplication.findUniqueOrThrow({
       where: { id: jobApplicationId },
@@ -438,5 +457,171 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
       where: { id: profileId },
     });
     expect(profileAfterSecondRun.slug).toBe(`deleted-${profileId}`);
+  });
+
+  it('skips a deletion request that is cancelled after findMany but before its claim, leaving the user active', async () => {
+    const raceUser = await prisma.user.create({
+      data: {
+        email: `gdpr-anon-race-${runId}@photoo.test`,
+        name: 'Fx Anon Race',
+        locale: 'en',
+        countryCode: 'LU',
+        roles: ['client'],
+        status: 'deleted',
+        deletedAt: THIRTY_ONE_DAYS_AGO,
+      },
+    });
+    const raceRequest = await prisma.dataRequest.create({
+      data: {
+        userId: raceUser.id,
+        type: 'delete',
+        status: 'pending',
+        requestedAt: THIRTY_ONE_DAYS_AGO,
+      },
+    });
+
+    try {
+      const client = racingPrismaClient(prisma, async () => {
+        await prisma.$transaction(async (tx) => {
+          await tx.dataRequest.update({
+            where: { id: raceRequest.id },
+            data: { status: 'cancelled', cancelledAt: new Date() },
+          });
+          await tx.user.update({
+            where: { id: raceUser.id },
+            data: { status: 'active', deletedAt: null },
+          });
+        });
+      });
+
+      const result = await anonymiseDeletions({
+        prisma: { client },
+        storage,
+        auditLog,
+        logger: fakeLogger() as never,
+      });
+
+      expect(result).toEqual({ usersAnonymised: 0, usersFailed: 0, usersSkipped: 1 });
+
+      const raceUserRow = await prisma.user.findUniqueOrThrow({ where: { id: raceUser.id } });
+      expect(raceUserRow.status).toBe('active');
+      expect(raceUserRow.email).toBe(`gdpr-anon-race-${runId}@photoo.test`);
+      expect(raceUserRow.name).toBe('Fx Anon Race');
+
+      const raceRequestRow = await prisma.dataRequest.findUniqueOrThrow({
+        where: { id: raceRequest.id },
+      });
+      expect(raceRequestRow.status).toBe('cancelled');
+      expect(raceRequestRow.completedAt).toBeNull();
+      expect(raceRequestRow.cancelledAt).not.toBeNull();
+
+      const auditRow = await prisma.auditLog.findFirst({
+        where: { targetType: 'User', targetId: raceUser.id, action: 'gdpr_sweep.anonymised' },
+      });
+      expect(auditRow).toBeNull();
+    } finally {
+      await prisma.dataRequest.deleteMany({ where: { id: raceRequest.id } });
+      await prisma.user.deleteMany({ where: { id: raceUser.id } });
+    }
+  });
+
+  it('processes a mixed batch: one request loses the race, the other completes normally', async () => {
+    const raceUser = await prisma.user.create({
+      data: {
+        email: `gdpr-anon-mixed-race-${runId}@photoo.test`,
+        name: 'Fx Anon Mixed Race',
+        locale: 'en',
+        countryCode: 'LU',
+        roles: ['client'],
+        status: 'deleted',
+        deletedAt: THIRTY_ONE_DAYS_AGO,
+      },
+    });
+    const raceRequest = await prisma.dataRequest.create({
+      data: {
+        userId: raceUser.id,
+        type: 'delete',
+        status: 'pending',
+        requestedAt: THIRTY_ONE_DAYS_AGO,
+      },
+    });
+    const completeUser = await prisma.user.create({
+      data: {
+        email: `gdpr-anon-mixed-complete-${runId}@photoo.test`,
+        name: 'Fx Anon Mixed Complete',
+        locale: 'en',
+        countryCode: 'LU',
+        roles: ['client'],
+        status: 'deleted',
+        deletedAt: THIRTY_ONE_DAYS_AGO,
+      },
+    });
+    const completeRequest = await prisma.dataRequest.create({
+      data: {
+        userId: completeUser.id,
+        type: 'delete',
+        status: 'pending',
+        requestedAt: THIRTY_ONE_DAYS_AGO,
+      },
+    });
+
+    try {
+      const client = racingPrismaClient(prisma, async () => {
+        await prisma.$transaction(async (tx) => {
+          await tx.dataRequest.update({
+            where: { id: raceRequest.id },
+            data: { status: 'cancelled', cancelledAt: new Date() },
+          });
+          await tx.user.update({
+            where: { id: raceUser.id },
+            data: { status: 'active', deletedAt: null },
+          });
+        });
+      });
+
+      const result = await anonymiseDeletions({
+        prisma: { client },
+        storage,
+        auditLog,
+        logger: fakeLogger() as never,
+      });
+
+      expect(result).toEqual({ usersAnonymised: 1, usersFailed: 0, usersSkipped: 1 });
+
+      const raceUserRow = await prisma.user.findUniqueOrThrow({ where: { id: raceUser.id } });
+      expect(raceUserRow.status).toBe('active');
+      expect(raceUserRow.email).toBe(`gdpr-anon-mixed-race-${runId}@photoo.test`);
+
+      const raceRequestRow = await prisma.dataRequest.findUniqueOrThrow({
+        where: { id: raceRequest.id },
+      });
+      expect(raceRequestRow.status).toBe('cancelled');
+      expect(raceRequestRow.completedAt).toBeNull();
+
+      const completeUserRow = await prisma.user.findUniqueOrThrow({
+        where: { id: completeUser.id },
+      });
+      expect(completeUserRow.email).toBe(`deleted-${completeUser.id}@deleted.invalid`);
+      expect(completeUserRow.name).toBeNull();
+
+      const completeRequestRow = await prisma.dataRequest.findUniqueOrThrow({
+        where: { id: completeRequest.id },
+      });
+      expect(completeRequestRow.status).toBe('completed');
+      expect(completeRequestRow.completedAt).not.toBeNull();
+
+      const auditRow = await prisma.auditLog.findFirst({
+        where: { targetType: 'User', targetId: completeUser.id, action: 'gdpr_sweep.anonymised' },
+      });
+      expect(auditRow).not.toBeNull();
+    } finally {
+      await prisma.auditLog.deleteMany({
+        where: { targetType: 'User', targetId: completeUser.id, action: 'gdpr_sweep.anonymised' },
+      });
+      await prisma.dataRequest.deleteMany({
+        where: { id: { in: [raceRequest.id, completeRequest.id] } },
+      });
+      await prisma.user.deleteMany({ where: { id: { in: [raceUser.id, completeUser.id] } } });
+    }
   });
 });

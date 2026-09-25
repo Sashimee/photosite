@@ -17,17 +17,22 @@ function fakePrisma(options: {
   due: { id: string; userId: string }[];
   failUserId?: string;
   failFailureReasonWriteForRequestId?: string;
+  skipRequestId?: string;
   uploads?: FakeUpload[];
   photographerProfile?: { id: string } | null;
   professionalProfile?: { id: string } | null;
 }) {
-  const dataRequestUpdate = vi.fn(() => Promise.resolve());
-  const dataRequestUpdateMany = vi.fn((args: { where: { id: string; status: string } }) => {
-    if (options.failFailureReasonWriteForRequestId === args.where.id) {
-      return Promise.reject(new Error('db unavailable'));
-    }
-    return Promise.resolve();
-  });
+  const dataRequestUpdateMany = vi.fn(
+    (args: { where: { id: string; status: string; requestedAt?: { lte: Date } } }) => {
+      if (args.where.requestedAt) {
+        return Promise.resolve({ count: options.skipRequestId === args.where.id ? 0 : 1 });
+      }
+      if (options.failFailureReasonWriteForRequestId === args.where.id) {
+        return Promise.reject(new Error('db unavailable'));
+      }
+      return Promise.resolve({ count: 1 });
+    },
+  );
   const userUpdate = vi.fn((args: { where: { id: string } }) => {
     if (args.where.id === options.failUserId) {
       return Promise.reject(new Error('user row vanished'));
@@ -42,7 +47,6 @@ function fakePrisma(options: {
   const client = {
     dataRequest: {
       findMany: vi.fn(() => Promise.resolve(options.due)),
-      update: dataRequestUpdate,
       updateMany: dataRequestUpdateMany,
     },
     photographerProfile: {
@@ -69,7 +73,6 @@ function fakePrisma(options: {
 
   return {
     client,
-    dataRequestUpdate,
     dataRequestUpdateMany,
     userUpdate,
     photographerProfileUpdate,
@@ -81,6 +84,68 @@ function fakePrisma(options: {
 describe('anonymiseDeletions', () => {
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('skips a request that was cancelled between findMany and the claim, without anonymising it', async () => {
+    const { client } = fakePrisma({
+      due: [{ id: 'req-cancelled', userId: 'user-cancelled' }],
+      skipRequestId: 'req-cancelled',
+    });
+    const auditRecord = vi.fn(() => Promise.resolve());
+    const deleteObject = vi.fn(() => Promise.resolve());
+    const loggerLog = vi.fn();
+
+    const result = await anonymiseDeletions({
+      prisma: { client } as never,
+      storage: { config: { privateBucket: 'private', publicBucket: 'public' }, deleteObject },
+      auditLog: { record: auditRecord },
+      logger: { log: loggerLog, warn: vi.fn(), error: vi.fn() } as never,
+    });
+
+    expect(result).toEqual({ usersAnonymised: 0, usersFailed: 0, usersSkipped: 1 });
+    expect(client.user.update).not.toHaveBeenCalled();
+    expect(deleteObject).not.toHaveBeenCalled();
+    expect(auditRecord).not.toHaveBeenCalled();
+    expect(loggerLog).toHaveBeenCalledWith({ dataRequestId: 'req-cancelled' }, expect.any(String));
+    expect(loggerLog).toHaveBeenCalledWith(
+      { usersAnonymised: 0, usersFailed: 0, usersSkipped: 1 },
+      expect.any(String),
+    );
+  });
+
+  it('keeps sweeping after a skipped request and claims with the same cutoff it selected with', async () => {
+    const { client } = fakePrisma({
+      due: [
+        { id: 'req-cancelled', userId: 'user-cancelled' },
+        { id: 'req-ok', userId: 'user-ok' },
+      ],
+      skipRequestId: 'req-cancelled',
+    });
+    const auditRecord = vi.fn(() => Promise.resolve());
+
+    const result = await anonymiseDeletions({
+      prisma: { client } as never,
+      storage: {
+        config: { privateBucket: 'private', publicBucket: 'public' },
+        deleteObject: vi.fn(() => Promise.resolve()),
+      },
+      auditLog: { record: auditRecord },
+      logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+    });
+
+    expect(result).toEqual({ usersAnonymised: 1, usersFailed: 0, usersSkipped: 1 });
+    expect(auditRecord).toHaveBeenCalledTimes(1);
+    expect(auditRecord).toHaveBeenCalledWith(expect.objectContaining({ targetId: 'user-ok' }));
+
+    const selectCutoff = (
+      client.dataRequest.findMany.mock.calls[0] as unknown as [
+        { where: { requestedAt: { lte: Date } } },
+      ]
+    )[0].where.requestedAt.lte;
+    const claimCutoffs = client.dataRequest.updateMany.mock.calls
+      .map(([args]) => args.where.requestedAt?.lte)
+      .filter((cutoff): cutoff is Date => cutoff !== undefined);
+    expect(claimCutoffs).toEqual([selectCutoff, selectCutoff]);
   });
 
   it('logs and continues when a stray upload object cannot be deleted', async () => {
@@ -129,7 +194,7 @@ describe('anonymiseDeletions', () => {
   });
 
   it('anonymises the other rows when one fails, and counts both outcomes', async () => {
-    const { client, dataRequestUpdate } = fakePrisma({
+    const { client, dataRequestUpdateMany } = fakePrisma({
       due: [
         { id: 'req-ok', userId: 'user-ok' },
         { id: 'req-fail', userId: 'user-fail' },
@@ -151,16 +216,15 @@ describe('anonymiseDeletions', () => {
 
     expect(result.usersAnonymised).toBe(1);
     expect(result.usersFailed).toBe(1);
-    expect(dataRequestUpdate).toHaveBeenCalledWith({
-      where: { id: 'req-ok' },
+    expect(dataRequestUpdateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'req-ok',
+        type: 'delete',
+        status: 'pending',
+        requestedAt: { lte: expect.any(Date) as Date },
+      },
       data: { status: 'completed', completedAt: expect.any(Date) as Date, failureReason: null },
     });
-    expect(dataRequestUpdate).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'req-fail' },
-        data: expect.objectContaining({ status: 'completed' }) as object,
-      }),
-    );
     expect(auditRecord).toHaveBeenCalledTimes(1);
     expect(loggerError).toHaveBeenCalledWith(
       expect.objectContaining({ dataRequestId: 'req-fail' }),
@@ -214,7 +278,7 @@ describe('anonymiseDeletions', () => {
   });
 
   it('does not stop the sweep when the failureReason write itself fails', async () => {
-    const { client, dataRequestUpdate } = fakePrisma({
+    const { client, dataRequestUpdateMany } = fakePrisma({
       due: [
         { id: 'req-fail', userId: 'user-fail' },
         { id: 'req-ok', userId: 'user-ok' },
@@ -236,8 +300,13 @@ describe('anonymiseDeletions', () => {
 
     expect(result.usersAnonymised).toBe(1);
     expect(result.usersFailed).toBe(1);
-    expect(dataRequestUpdate).toHaveBeenCalledWith({
-      where: { id: 'req-ok' },
+    expect(dataRequestUpdateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'req-ok',
+        type: 'delete',
+        status: 'pending',
+        requestedAt: { lte: expect.any(Date) as Date },
+      },
       data: { status: 'completed', completedAt: expect.any(Date) as Date, failureReason: null },
     });
     expect(loggerError).toHaveBeenCalledWith(
