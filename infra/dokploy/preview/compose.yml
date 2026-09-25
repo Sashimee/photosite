@@ -275,6 +275,7 @@ services:
     image: alpine:3.22@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8
     user: '0:0'
     restart: 'no'
+    network_mode: none
     volumes:
       - minio-data:/data
     entrypoint: ['chown', '-R', '1001:1001', '/data']
