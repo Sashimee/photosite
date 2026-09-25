@@ -545,8 +545,12 @@ registry.registerPath({
 // a copy (pending/processing/failed) unless a later export for the same user
 // already reached ready/completed. Null for delete rows and for ready, completed
 // or cancelled exports; a ready export past its expiresAt was still answered (#358).
+// `answeredLate` is true for an export row with status ready or completed whose
+// completedAt is after gdprResponseDueAt(requestedAt); false otherwise (delete
+// rows, cancelled, not yet answered, or completedAt null).
 export const AdminDataRequestSchema = DataRequestSchema.extend({
   responseDueAt: IsoDateTimeSchema.nullable(),
+  answeredLate: z.boolean(),
   user: z
     .object({
       id: IdSchema,
@@ -568,7 +572,10 @@ registry.registerPath({
   path: apiPath('/admin/data-requests'),
   summary:
     'List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an ' +
-    'export row that has not produced a copy yet, or null if it does not apply.',
+    'export row that has not produced a copy yet, or null if it does not apply. ' +
+    '`answeredLate` is true for an export row with status ready or completed whose completedAt ' +
+    'is after gdprResponseDueAt(requestedAt); false otherwise (delete rows, cancelled, not yet ' +
+    'answered, or completedAt null).',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('support'),

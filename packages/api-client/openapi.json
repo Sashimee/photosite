@@ -3799,6 +3799,9 @@
             "description": "ISO 8601 date-time",
             "example": "2026-09-16T12:00:00.000Z"
           },
+          "answeredLate": {
+            "type": "boolean"
+          },
           "user": {
             "type": "object",
             "properties": {
@@ -3830,6 +3833,7 @@
           "failureReason",
           "cancelledAt",
           "responseDueAt",
+          "answeredLate",
           "user"
         ],
         "additionalProperties": false
@@ -15492,7 +15496,7 @@
     },
     "/v1/admin/data-requests": {
       "get": {
-        "summary": "List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row that has not produced a copy yet, or null if it does not apply.",
+        "summary": "List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row that has not produced a copy yet, or null if it does not apply. `answeredLate` is true for an export row with status ready or completed whose completedAt is after gdprResponseDueAt(requestedAt); false otherwise (delete rows, cancelled, not yet answered, or completedAt null).",
         "tags": [
           "admin"
         ],

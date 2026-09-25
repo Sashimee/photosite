@@ -52,6 +52,16 @@ function responseDueAt(
   return gdprResponseDueAt(row.requestedAt);
 }
 
+function isAnsweredLate(row: AdminDataRequestRow): boolean {
+  if (row.type !== 'export' || (row.status !== 'ready' && row.status !== 'completed')) {
+    return false;
+  }
+  if (!row.completedAt) {
+    return false;
+  }
+  return row.completedAt > gdprResponseDueAt(row.requestedAt);
+}
+
 function mapDataRequest(
   row: AdminDataRequestRow,
   latestSuccessByUser: Map<string, Date>,
@@ -66,6 +76,7 @@ function mapDataRequest(
     failureReason: row.failureReason,
     cancelledAt: row.cancelledAt?.toISOString() ?? null,
     responseDueAt: responseDueAt(row, latestSuccessByUser)?.toISOString() ?? null,
+    answeredLate: isAnsweredLate(row),
     user: row.user,
   };
 }

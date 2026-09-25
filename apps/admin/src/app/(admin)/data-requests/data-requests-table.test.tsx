@@ -36,6 +36,7 @@ const baseRequest = {
   failureReason: null,
   cancelledAt: null,
   responseDueAt: null,
+  answeredLate: false,
   user: { id: 'a1a1a1a1-1111-1111-1111-111111111111', email: 'alice@example.com' },
 };
 
