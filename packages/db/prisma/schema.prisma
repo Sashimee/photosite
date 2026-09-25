@@ -255,6 +255,7 @@ model Country {
   requiredDocuments Json
   legalTexts        Json
   defaultLocale     String
+  timezone          String
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

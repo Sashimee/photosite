@@ -349,6 +349,7 @@ describe('verification integration', () => {
         requiredDocuments: [],
         legalTexts: {},
         defaultLocale: 'en',
+        timezone: 'Europe/Luxembourg',
       },
       update: { enabled: false },
     });

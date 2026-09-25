@@ -211,6 +211,7 @@ describe('countries integration', () => {
             requiredDocuments: [],
             legalTexts: {},
             defaultLocale: 'en',
+            timezone: 'Europe/Luxembourg',
             ...overrides,
           },
         });
