@@ -595,6 +595,28 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/admin/data-requests/{id}/retry-export'),
+  summary: 'Retry a failed export as a new request',
+  description:
+    "Creates a new export DataRequest for the failed export's user and enqueues it. Bypasses the " +
+    'per-user GDPR rate limit, because this is a support action.',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('support'),
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+  },
+  responses: {
+    '201': {
+      description: 'The new export request',
+      content: { 'application/json': { schema: AdminDataRequestSchema } },
+    },
+    ...errorResponses([401, 403, 404, 409]),
+  },
+});
+
 export const AdminVerificationCasesQuerySchema = CursorPaginationQuerySchema.extend({
   status: z.enum(VERIFICATION_CASE_STATUSES).optional(),
   countryCode: CountryCodeSchema.optional(),
@@ -1116,6 +1138,8 @@ export const AUTH_EMAIL_TEMPLATE_NAMES = [
   'reset-password',
   'account-exists',
   'account-deletion-requested',
+  'data-export-ready',
+  'data-export-failed',
 ] as const;
 
 type IsExact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
