@@ -24,25 +24,39 @@ interface FakeDataRequest {
   status: string;
 }
 
+interface FakeUser {
+  email: string;
+  deletedAt: Date | null;
+}
+
 interface TestDeps {
   deps: GdprExportDeps;
   update: ReturnType<typeof vi.fn>;
   auditRecord: ReturnType<typeof vi.fn>;
+  emailAdd: ReturnType<typeof vi.fn>;
 }
 
-function fakeDeps(dataRequest: FakeDataRequest | null, userFails = false): TestDeps {
+const ACTIVE_USER: FakeUser = { email: 'user@example.test', deletedAt: null };
+
+function fakeDeps(
+  dataRequest: FakeDataRequest | null,
+  userFails = false,
+  user: FakeUser | null = ACTIVE_USER,
+): TestDeps {
   const update = vi.fn(() => Promise.resolve(dataRequest));
   const findUnique = vi.fn(() => Promise.resolve(dataRequest));
   const findUniqueOrThrow = vi.fn(() =>
     userFails ? Promise.reject(new Error('boom')) : Promise.resolve(null),
   );
+  const findUniqueUser = vi.fn(() => Promise.resolve(user));
   const auditRecord = vi.fn(() => Promise.resolve());
+  const emailAdd = vi.fn(() => Promise.resolve());
 
   const deps: GdprExportDeps = {
     prisma: {
       client: {
         dataRequest: { findUnique, update },
-        user: { findUniqueOrThrow },
+        user: { findUniqueOrThrow, findUnique: findUniqueUser },
       },
     } as never,
     storage: {
@@ -52,9 +66,11 @@ function fakeDeps(dataRequest: FakeDataRequest | null, userFails = false): TestD
     },
     auditLog: { record: auditRecord },
     logger: fakeLogger(),
+    emailQueue: { add: emailAdd },
+    webAppUrl: 'https://example.test',
   };
 
-  return { deps, update, auditRecord };
+  return { deps, update, auditRecord, emailAdd };
 }
 
 describe('createGdprExportProcessor', () => {
@@ -98,7 +114,7 @@ describe('createGdprExportProcessor', () => {
   });
 
   it('marks the request failed with a stable reason on the final attempt', async () => {
-    const { deps, update, auditRecord } = fakeDeps(
+    const { deps, update, auditRecord, emailAdd } = fakeDeps(
       { id: DATA_REQUEST_ID, userId: 'user-1', type: 'export', status: 'pending' },
       true,
     );
@@ -117,10 +133,20 @@ describe('createGdprExportProcessor', () => {
     expect(auditRecord).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'data_request.export_failed' }),
     );
+    expect(emailAdd).toHaveBeenCalledTimes(1);
+    expect(emailAdd).toHaveBeenCalledWith(
+      'data-export-failed',
+      {
+        type: 'data-export-failed',
+        to: ACTIVE_USER.email,
+        url: 'https://example.test/account',
+      },
+      expect.objectContaining({ jobId: `data-export-failed:${DATA_REQUEST_ID}` }),
+    );
   });
 
   it('leaves status at processing and does not write an audit row before the final attempt', async () => {
-    const { deps, update, auditRecord } = fakeDeps(
+    const { deps, update, auditRecord, emailAdd } = fakeDeps(
       { id: DATA_REQUEST_ID, userId: 'user-1', type: 'export', status: 'pending' },
       true,
     );
@@ -134,5 +160,19 @@ describe('createGdprExportProcessor', () => {
       data: { status: 'processing' },
     });
     expect(auditRecord).not.toHaveBeenCalled();
+    expect(emailAdd).not.toHaveBeenCalled();
+  });
+
+  it('sends no email when the export user is soft-deleted or anonymised', async () => {
+    const { deps, emailAdd } = fakeDeps(
+      { id: DATA_REQUEST_ID, userId: 'user-1', type: 'export', status: 'pending' },
+      true,
+      { email: ACTIVE_USER.email, deletedAt: new Date() },
+    );
+    const processor = createGdprExportProcessor(deps);
+
+    await expect(processor(fakeJob(3, 3))).rejects.toThrow('boom');
+
+    expect(emailAdd).not.toHaveBeenCalled();
   });
 });

@@ -115,6 +115,9 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
     const gdprSweepQueue = new Queue(GDPR_SWEEP_QUEUE_NAME, {
       connection: this.newConnection(),
     });
+    const emailQueue = new Queue(EMAIL_QUEUE_NAME, {
+      connection: this.newConnection(),
+    });
     this.queues.push(
       imageProcessQueue,
       uploadsCleanupQueue,
@@ -126,6 +129,7 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       notificationsCleanupQueue,
       gdprExportQueue,
       gdprSweepQueue,
+      emailQueue,
     );
 
     // Redis being unreachable at boot must not crash the whole process (the
@@ -341,6 +345,8 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
         storage: this.storage,
         auditLog: this.auditLog,
         logger: this.logger,
+        emailQueue,
+        webAppUrl: this.config.WEB_APP_URL,
       }),
       {
         connection: this.newConnection(),
