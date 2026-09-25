@@ -10,6 +10,7 @@ import { waitForLinkInEmail } from '../../testing/mailpit.js';
 import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
 import { generateTotpCode } from '../../testing/totp.js';
 import { TEST_ENV } from '../../testing/test-env.js';
+import { GdprExportQueueService } from '../gdpr/gdpr-export-queue.service.js';
 
 const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL', 'REDIS_URL']);
 const PASSWORD = `photoo-test-${randomUUID()}`;
@@ -1330,6 +1331,59 @@ describe('admin data requests integration', () => {
       const enqueuedJob = await exportQueue.getJob(body.id);
       expect(enqueuedJob).not.toBeNull();
       expect(enqueuedJob?.data).toEqual({ dataRequestId: body.id });
+    });
+
+    it('marks the new row failed and rethrows when enqueueing it fails', async () => {
+      const admin = await makeAdmin('retry-enqueue-fails', ['support']);
+      const subject = await createSubjectUser('retry-enqueue-fails');
+      const failed = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'failed',
+        requestedAt: new Date(Date.now() - 60_000),
+        failureReason: 'export_failed',
+      });
+
+      const queueService = app.get(GdprExportQueueService);
+      const originalAdd = queueService.queue.add.bind(queueService.queue);
+      queueService.queue.add = (() => {
+        throw new Error('simulated enqueue failure');
+      }) as typeof queueService.queue.add;
+
+      let response;
+      try {
+        response = await fastify().inject({
+          method: 'POST',
+          url: `/v1/admin/data-requests/${failed.id}/retry-export`,
+          headers: admin.headers,
+        });
+      } finally {
+        queueService.queue.add = originalAdd;
+      }
+      expect(response.statusCode).toBe(500);
+
+      const createdRows = await prisma.dataRequest.findMany({
+        where: { userId: subject.id, id: { not: failed.id } },
+      });
+      expect(createdRows).toHaveLength(1);
+      const createdRow = createdRows[0];
+      expect(createdRow).toBeDefined();
+      if (!createdRow) throw new Error('expected the retried row to exist');
+      expect(createdRow.status).toBe('failed');
+      expect(createdRow.failureReason).toBe('enqueue_failed');
+
+      const retryResponse = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/data-requests/${createdRow.id}/retry-export`,
+        headers: admin.headers,
+      });
+      expect(retryResponse.statusCode).toBe(201);
+      const retryBody = retryResponse.json<DataRequestBody>();
+      expect(retryBody.status).toBe('pending');
+
+      const enqueuedJob = await exportQueue.getJob(retryBody.id);
+      expect(enqueuedJob).not.toBeNull();
+      expect(enqueuedJob?.data).toEqual({ dataRequestId: retryBody.id });
     });
 
     it('lets only one of two concurrent retries for the same source succeed', async () => {

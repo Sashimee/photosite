@@ -212,7 +212,15 @@ export class AdminDataRequestsService {
       throw error;
     }
 
-    await this.exportQueue.enqueue(created.id);
+    try {
+      await this.exportQueue.enqueue(created.id);
+    } catch (error) {
+      await this.prisma.client.dataRequest.updateMany({
+        where: { id: created.id, status: 'pending' },
+        data: { status: 'failed', failureReason: 'enqueue_failed' },
+      });
+      throw error;
+    }
 
     return mapDataRequest(created, new Map(), new Map());
   }
