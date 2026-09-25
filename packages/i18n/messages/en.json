@@ -503,7 +503,8 @@
         "ready": "Ready",
         "completed": "Completed",
         "failed": "Failed",
-        "cancelled": "Cancelled"
+        "cancelled": "Cancelled",
+        "expired": "Expired"
       },
       "list": {
         "title": "Data requests",
@@ -517,12 +518,16 @@
           "completedAt": "Completed",
           "expiresAt": "Expires",
           "failureReason": "Failure reason",
+          "responseDueAt": "Response due",
           "gracePeriod": "Grace period"
         },
         "placeholders": {
           "none": "None",
           "notApplicable": "Not applicable",
           "unset": "–"
+        },
+        "responseDue": {
+          "overdue": "Overdue"
         },
         "gracePeriod": {
           "dueNow": "Due now",

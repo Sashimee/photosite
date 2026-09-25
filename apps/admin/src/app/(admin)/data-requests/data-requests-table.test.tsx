@@ -26,6 +26,7 @@ const baseRequest = {
   expiresAt: '2026-09-09T12:00:00.000Z',
   failureReason: null,
   cancelledAt: null,
+  responseDueAt: null,
   user: { id: 'a1a1a1a1-1111-1111-1111-111111111111', email: 'alice@example.com' },
 };
 
@@ -105,6 +106,80 @@ describe('DataRequestsTable', () => {
 
     await screen.findByText('a***@example.com');
     expect(screen.getByText('–')).toBeInTheDocument();
+  });
+
+  it('shows "Ready" for a ready export whose expiry has not passed', async () => {
+    const downloadable = {
+      ...baseRequest,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    };
+    getMock.mockResolvedValueOnce({ data: { items: [downloadable], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(await screen.findByText('Ready')).toBeInTheDocument();
+  });
+
+  it('shows "Expired" instead of "Ready" for a ready export past its expiry', async () => {
+    const expired = {
+      ...baseRequest,
+      expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    };
+    getMock.mockResolvedValueOnce({ data: { items: [expired], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(await screen.findByText('Expired')).toBeInTheDocument();
+    expect(screen.queryByText('Ready')).not.toBeInTheDocument();
+  });
+
+  it('shows "Not applicable" for the response due column when responseDueAt is null', async () => {
+    const deletion = {
+      ...baseRequest,
+      type: 'delete' as const,
+      status: 'pending' as const,
+      completedAt: null,
+      requestedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      responseDueAt: null,
+    };
+    getMock.mockResolvedValueOnce({ data: { items: [deletion], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    await screen.findByText('a***@example.com');
+    expect(screen.getByText('Not applicable')).toBeInTheDocument();
+  });
+
+  it('shows a future response due date without marking it overdue', async () => {
+    const dueSoon = {
+      ...baseRequest,
+      status: 'failed' as const,
+      responseDueAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    };
+    getMock.mockResolvedValueOnce({ data: { items: [dueSoon], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(await screen.findByText(dueSoon.responseDueAt)).toBeInTheDocument();
+    expect(screen.queryByText('Overdue')).not.toBeInTheDocument();
+  });
+
+  it('marks a past response due date as overdue', async () => {
+    const overdueExport = {
+      ...baseRequest,
+      status: 'failed' as const,
+      responseDueAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    };
+    getMock.mockResolvedValueOnce({ data: { items: [overdueExport], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(await screen.findByText(`${overdueExport.responseDueAt} (Overdue)`)).toBeInTheDocument();
   });
 
   it('shows the grace period countdown only for a pending deletion', async () => {
