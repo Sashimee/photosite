@@ -143,7 +143,7 @@ describe('gdprResponseDueAt', () => {
     ).toBe('2026-02-27T23:30:00.000Z');
   });
 
-  it('resolves a spring-forward gap target to the instant just before the gap (Europe/Luxembourg)', () => {
+  it('resolves a spring-forward gap target by shifting it back by the gap length, landing before the gap (Europe/Luxembourg)', () => {
     // Local target is 2048-02-29T02:30 + 1 month = 2048-03-29T02:30, inside
     // the Europe/Luxembourg gap where clocks jump from 02:00 to 03:00.
     expect(
@@ -151,7 +151,7 @@ describe('gdprResponseDueAt', () => {
     ).toBe('2048-03-29T00:30:00.000Z');
   });
 
-  it('resolves a spring-forward gap target to the instant just before the gap (America/New_York)', () => {
+  it('resolves a spring-forward gap target by shifting it back by the gap length, landing before the gap (America/New_York)', () => {
     // Local target is 2026-02-08T02:30 + 1 month = 2026-03-08T02:30, inside
     // the America/New_York gap where clocks jump from 02:00 to 03:00.
     expect(
@@ -202,6 +202,20 @@ describe('gdprResponseDueAt', () => {
     expect(() => gdprResponseDueAt(new Date('2026-09-16T12:00:00.000Z'), 'Not/AZone')).toThrow(
       'Not/AZone',
     );
+  });
+
+  it('is never later than the UTC result, for every hour of a year in several zones', () => {
+    const zones = ['Europe/Luxembourg', 'America/New_York', 'Australia/Lord_Howe'];
+    const start = new Date('2026-01-01T00:00:00.000Z').getTime();
+    const hoursInYear = 365 * 24;
+    for (const zone of zones) {
+      for (let hour = 0; hour < hoursInYear; hour += 1) {
+        const requestedAt = new Date(start + hour * 60 * 60 * 1000);
+        const zoned = gdprResponseDueAt(requestedAt, zone);
+        const utc = gdprResponseDueAt(requestedAt, 'UTC');
+        expect(zoned.getTime()).toBeLessThanOrEqual(utc.getTime());
+      }
+    }
   });
 });
 
