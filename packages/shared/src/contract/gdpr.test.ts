@@ -88,37 +88,37 @@ describe('DataRequestSchema', () => {
 
 describe('gdprResponseDueAt', () => {
   it('adds one calendar month for a normal date', () => {
-    expect(gdprResponseDueAt(new Date('2026-09-16T12:00:00.000Z')).toISOString()).toBe(
+    expect(gdprResponseDueAt(new Date('2026-09-16T12:00:00.000Z'), 'UTC').toISOString()).toBe(
       '2026-10-16T12:00:00.000Z',
     );
   });
 
   it('clamps to the last day of a shorter target month', () => {
-    expect(gdprResponseDueAt(new Date('2026-01-31T00:00:00.000Z')).toISOString()).toBe(
+    expect(gdprResponseDueAt(new Date('2026-01-31T00:00:00.000Z'), 'UTC').toISOString()).toBe(
       '2026-02-28T00:00:00.000Z',
     );
   });
 
   it('clamps to Feb 29 on a leap year', () => {
-    expect(gdprResponseDueAt(new Date('2028-01-31T00:00:00.000Z')).toISOString()).toBe(
+    expect(gdprResponseDueAt(new Date('2028-01-31T00:00:00.000Z'), 'UTC').toISOString()).toBe(
       '2028-02-29T00:00:00.000Z',
     );
   });
 
   it('rolls over the year when requested in December', () => {
-    expect(gdprResponseDueAt(new Date('2026-12-15T08:30:00.000Z')).toISOString()).toBe(
+    expect(gdprResponseDueAt(new Date('2026-12-15T08:30:00.000Z'), 'UTC').toISOString()).toBe(
       '2027-01-15T08:30:00.000Z',
     );
   });
 
   it('clamps to the last day of a target month with 30 days', () => {
-    expect(gdprResponseDueAt(new Date('2026-08-31T00:00:00.000Z')).toISOString()).toBe(
+    expect(gdprResponseDueAt(new Date('2026-08-31T00:00:00.000Z'), 'UTC').toISOString()).toBe(
       '2026-09-30T00:00:00.000Z',
     );
   });
 
   it('preserves the time of day, including milliseconds, when clamping', () => {
-    expect(gdprResponseDueAt(new Date('2026-01-31T14:23:05.123Z')).toISOString()).toBe(
+    expect(gdprResponseDueAt(new Date('2026-01-31T14:23:05.123Z'), 'UTC').toISOString()).toBe(
       '2026-02-28T14:23:05.123Z',
     );
   });
