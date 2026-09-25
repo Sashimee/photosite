@@ -23,6 +23,7 @@ describe('gdpr-export email jobId against a real Redis', () => {
   let queue: Queue | undefined;
 
   afterEach(async () => {
+    await queue?.obliterate({ force: true });
     await queue?.close();
     connection?.disconnect();
     connection = undefined;
@@ -31,7 +32,8 @@ describe('gdpr-export email jobId against a real Redis', () => {
 
   it('accepts the colon-free jobId and dedups a second add with the same id', async () => {
     connection = new Redis(testEnv.REDIS_URL, { maxRetriesPerRequest: null });
-    queue = new Queue(EMAIL_QUEUE_NAME, { connection });
+    // A throwaway queue keeps the job count isolated from leftovers of earlier runs.
+    queue = new Queue(`${EMAIL_QUEUE_NAME}-jobid-test-${randomUUID()}`, { connection });
 
     const dataRequestId = randomUUID();
     const jobId = `data-export-ready-${dataRequestId}`;
