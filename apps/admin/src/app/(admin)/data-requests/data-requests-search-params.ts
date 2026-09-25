@@ -12,6 +12,7 @@ export interface DataRequestsFilters {
   status?: DataRequestStatus;
   type?: DataRequestType;
   userId?: string;
+  userIdInvalid?: boolean;
 }
 
 function first(value: string | string[] | undefined): string | undefined {
@@ -36,10 +37,12 @@ export function parseDataRequestsSearchParams(
   return {
     ...(status && isDataRequestStatus(status) ? { status } : {}),
     ...(type && isDataRequestType(type) ? { type } : {}),
-    ...(userId && IdSchema.safeParse(userId).success ? { userId } : {}),
+    ...(userId
+      ? { userId, ...(IdSchema.safeParse(userId).success ? {} : { userIdInvalid: true }) }
+      : {}),
   };
 }
 
 export function dataRequestsFiltersKey(filters: DataRequestsFilters): string {
-  return `${filters.status ?? ''}|${filters.type ?? ''}|${filters.userId ?? ''}`;
+  return `${filters.status ?? ''}|${filters.type ?? ''}|${filters.userId ?? ''}|${String(filters.userIdInvalid ?? false)}`;
 }

@@ -22,11 +22,15 @@ function isPendingDeletion(row: AdminDataRequest): boolean {
   return row.type === 'delete' && row.status === 'pending';
 }
 
-export function DataRequestsTable({ status, type, userId }: DataRequestsFilters) {
+export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataRequestsFilters) {
   const t = useTranslations('admin.dataRequests.list');
   const tTypes = useTranslations('admin.dataRequests.types');
   const tStatuses = useTranslations('admin.dataRequests.statuses');
   const tGracePeriod = useTranslations('admin.dataRequests.list.gracePeriod');
+
+  if (userIdInvalid) {
+    return null;
+  }
 
   const columns: DataTableColumn<AdminDataRequest>[] = [
     {

@@ -40,7 +40,23 @@ describe('DataRequestsTable', () => {
     expect(screen.queryByText('alice@example.com')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'a***@example.com' })).toHaveAttribute(
       'href',
-      `/users/${baseRequest.user.id}`,
+      `/users/${encodeURIComponent(baseRequest.user.id)}`,
+    );
+  });
+
+  it('encodes the user id in the user detail link', async () => {
+    const withEncodableId = {
+      ...baseRequest,
+      user: { id: 'a1/a1?a1=1', email: 'alice@example.com' },
+    };
+    getMock.mockResolvedValueOnce({ data: { items: [withEncodableId], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(await screen.findByRole('link', { name: 'a***@example.com' })).toHaveAttribute(
+      'href',
+      `/users/${encodeURIComponent(withEncodableId.user.id)}`,
     );
   });
 
@@ -61,13 +77,14 @@ describe('DataRequestsTable', () => {
   });
 
   it('shows placeholders for a null completedAt and failureReason', async () => {
-    getMock.mockResolvedValueOnce({ data: { items: [baseRequest], nextCursor: null } });
+    const noCompletedAt = { ...baseRequest, completedAt: null };
+    getMock.mockResolvedValueOnce({ data: { items: [noCompletedAt], nextCursor: null } });
     const DataRequestsTable = await loadDataRequestsTable();
 
     render(<DataRequestsTable />);
 
     await screen.findByText('a***@example.com');
-    expect(screen.getAllByText('None').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('None')).toHaveLength(2);
   });
 
   it('shows the export expiry date', async () => {
@@ -131,6 +148,15 @@ describe('DataRequestsTable', () => {
     render(<DataRequestsTable />);
 
     expect(await screen.findByText('No data requests match your filters.')).toBeInTheDocument();
+  });
+
+  it('does not call the API when the userId filter is invalid', async () => {
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    const { container } = render(<DataRequestsTable userId="not-a-uuid" userIdInvalid />);
+
+    expect(container).toBeEmptyDOMElement();
+    expect(getMock).not.toHaveBeenCalled();
   });
 
   it('forwards the filters and cursor to the API on every page', async () => {

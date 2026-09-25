@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { DataRequestsFilters as DataRequestsFiltersValue } from './data-requests-search-params';
 
@@ -16,8 +16,8 @@ const dataRequestsTableMock = vi.fn(() => <div data-testid="data-requests-table"
 vi.mock('./data-requests-filters', () => ({ DataRequestsFilters: dataRequestsFiltersMock }));
 vi.mock('./data-requests-table', () => ({ DataRequestsTable: dataRequestsTableMock }));
 
-function firstCallProps(mock: typeof dataRequestsFiltersMock | typeof dataRequestsTableMock) {
-  return (mock.mock.calls[0] as [DataRequestsFiltersValue] | undefined)?.[0];
+function lastCallProps(mock: typeof dataRequestsFiltersMock | typeof dataRequestsTableMock) {
+  return (mock.mock.lastCall as [DataRequestsFiltersValue] | undefined)?.[0];
 }
 
 async function loadPage() {
@@ -26,6 +26,10 @@ async function loadPage() {
 }
 
 describe('DataRequestsPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders the title, the verification-documents note, and passes the parsed filters through', async () => {
     const DataRequestsPage = await loadPage();
 
@@ -47,12 +51,12 @@ describe('DataRequestsPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('data-requests-filters')).toBeInTheDocument();
     expect(screen.getByTestId('data-requests-table')).toBeInTheDocument();
-    expect(firstCallProps(dataRequestsFiltersMock)).toEqual({
+    expect(lastCallProps(dataRequestsFiltersMock)).toEqual({
       status: 'pending',
       type: 'delete',
       userId: '11111111-1111-4111-8111-111111111111',
     });
-    expect(firstCallProps(dataRequestsTableMock)).toMatchObject({
+    expect(lastCallProps(dataRequestsTableMock)).toMatchObject({
       status: 'pending',
       type: 'delete',
       userId: '11111111-1111-4111-8111-111111111111',
@@ -64,6 +68,21 @@ describe('DataRequestsPage', () => {
 
     render(await DataRequestsPage({ searchParams: Promise.resolve({ status: 'not-a-status' }) }));
 
-    expect(firstCallProps(dataRequestsTableMock)?.status).toBeUndefined();
+    expect(lastCallProps(dataRequestsTableMock)?.status).toBeUndefined();
+  });
+
+  it('passes an invalid userId through to the filters and the table', async () => {
+    const DataRequestsPage = await loadPage();
+
+    render(await DataRequestsPage({ searchParams: Promise.resolve({ userId: 'not-a-uuid' }) }));
+
+    expect(lastCallProps(dataRequestsFiltersMock)).toEqual({
+      userId: 'not-a-uuid',
+      userIdInvalid: true,
+    });
+    expect(lastCallProps(dataRequestsTableMock)).toMatchObject({
+      userId: 'not-a-uuid',
+      userIdInvalid: true,
+    });
   });
 });

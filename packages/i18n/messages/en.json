@@ -536,6 +536,7 @@
           "formLabel": "Data request filters",
           "userIdLabel": "User id",
           "userIdPlaceholder": "User id",
+          "userIdInvalid": "Enter a valid user id.",
           "typeLabel": "Type",
           "allTypes": "All types",
           "statusLabel": "Status",

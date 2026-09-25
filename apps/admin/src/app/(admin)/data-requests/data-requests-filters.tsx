@@ -11,7 +11,12 @@ import type { DataRequestsFilters as DataRequestsFiltersValue } from './data-req
 const SELECT_CLASSNAME =
   'h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 
-export async function DataRequestsFilters({ status, type, userId }: DataRequestsFiltersValue) {
+export async function DataRequestsFilters({
+  status,
+  type,
+  userId,
+  userIdInvalid,
+}: DataRequestsFiltersValue) {
   const t = await getTranslations('admin.dataRequests.list.filters');
   const tStatuses = await getTranslations('admin.dataRequests.statuses');
   const tTypes = await getTranslations('admin.dataRequests.types');
@@ -30,7 +35,18 @@ export async function DataRequestsFilters({ status, type, userId }: DataRequests
           name="userId"
           defaultValue={userId}
           placeholder={t('userIdPlaceholder')}
+          aria-invalid={userIdInvalid ? true : undefined}
+          aria-describedby={userIdInvalid ? 'data-requests-search-user-id-error' : undefined}
         />
+        {userIdInvalid ? (
+          <p
+            id="data-requests-search-user-id-error"
+            role="alert"
+            className="text-xs text-destructive"
+          >
+            {t('userIdInvalid')}
+          </p>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-1.5">

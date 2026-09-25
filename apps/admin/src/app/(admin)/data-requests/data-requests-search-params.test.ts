@@ -27,9 +27,15 @@ describe('parseDataRequestsSearchParams', () => {
     ).toEqual({ userId: '11111111-1111-4111-8111-111111111111' });
   });
 
-  it('drops a userId that is not a UUID', () => {
-    expect(parseDataRequestsSearchParams({ userId: 'abc' })).toEqual({});
-    expect(parseDataRequestsSearchParams({ userId: "' OR 1=1 --" })).toEqual({});
+  it('keeps a userId that is not a UUID, flagged as invalid', () => {
+    expect(parseDataRequestsSearchParams({ userId: 'abc' })).toEqual({
+      userId: 'abc',
+      userIdInvalid: true,
+    });
+    expect(parseDataRequestsSearchParams({ userId: "' OR 1=1 --" })).toEqual({
+      userId: "' OR 1=1 --",
+      userIdInvalid: true,
+    });
   });
 
   it('drops a status or type outside the known enum', () => {

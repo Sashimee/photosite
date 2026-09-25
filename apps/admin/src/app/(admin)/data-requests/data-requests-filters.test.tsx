@@ -38,4 +38,18 @@ describe('DataRequestsFilters', () => {
     expect(screen.getByLabelText('Type')).toHaveValue('delete');
     expect(screen.getByLabelText('Status')).toHaveValue('pending');
   });
+
+  it('keeps the raw userId in the input and shows an invalid-id message', async () => {
+    await renderFilters({ userId: 'not-a-uuid', userIdInvalid: true });
+
+    expect(screen.getByLabelText('User id')).toHaveValue('not-a-uuid');
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a valid user id.');
+    expect(screen.getByLabelText('User id')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('does not show the invalid-id message for a valid userId', async () => {
+    await renderFilters({ userId: '11111111-1111-1111-1111-111111111111' });
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });
