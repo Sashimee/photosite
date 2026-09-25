@@ -353,6 +353,8 @@ export {
   AdminBookingSchema,
   AdminCountryLegalTextsResponseSchema,
   AdminCountrySchema,
+  AdminDataRequestSchema,
+  AdminDataRequestsQuerySchema,
   AdminEmailTemplatePreviewQuerySchema,
   AdminEmailTemplatePreviewSchema,
   AdminLegalTextVersionSchema,
