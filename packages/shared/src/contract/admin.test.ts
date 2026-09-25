@@ -3,6 +3,8 @@ import {
   AdminBookingSchema,
   AdminCountryLegalTextsResponseSchema,
   AdminCountrySchema,
+  AdminDataRequestSchema,
+  AdminDataRequestsQuerySchema,
   AdminEmailTemplatePreviewQuerySchema,
   AdminLegalTextVersionSchema,
   AdminProvenanceCheckSchema,
@@ -450,6 +452,65 @@ describe('AdminVerificationCasesQuerySchema', () => {
 
   it('rejects an unknown status', () => {
     expect(AdminVerificationCasesQuerySchema.safeParse({ status: 'archived' }).success).toBe(false);
+  });
+});
+
+describe('AdminDataRequestSchema', () => {
+  const validRequest = {
+    id,
+    type: 'delete',
+    status: 'pending',
+    requestedAt: '2026-08-01T10:00:00.000Z',
+    completedAt: null,
+    expiresAt: null,
+    failureReason: null,
+    cancelledAt: null,
+    user: { id, email: 'user@example.com' },
+  };
+
+  it('accepts a well-formed data request', () => {
+    expect(AdminDataRequestSchema.safeParse(validRequest).success).toBe(true);
+  });
+
+  it('rejects an exportKey field', () => {
+    expect(
+      AdminDataRequestSchema.safeParse({ ...validRequest, exportKey: 'private/key.zip' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a null user', () => {
+    expect(AdminDataRequestSchema.safeParse({ ...validRequest, user: null }).success).toBe(false);
+  });
+
+  it('rejects an unknown status', () => {
+    expect(AdminDataRequestSchema.safeParse({ ...validRequest, status: 'archived' }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe('AdminDataRequestsQuerySchema', () => {
+  it('defaults limit to 20 with no filters', () => {
+    const result = AdminDataRequestsQuerySchema.parse({});
+    expect(result.limit).toBe(20);
+    expect(result.status).toBeUndefined();
+    expect(result.type).toBeUndefined();
+    expect(result.userId).toBeUndefined();
+  });
+
+  it('accepts status, type and userId filters', () => {
+    expect(
+      AdminDataRequestsQuerySchema.safeParse({ status: 'pending', type: 'delete', userId: id })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects an unknown status', () => {
+    expect(AdminDataRequestsQuerySchema.safeParse({ status: 'archived' }).success).toBe(false);
+  });
+
+  it('rejects an unknown type', () => {
+    expect(AdminDataRequestsQuerySchema.safeParse({ type: 'wipe' }).success).toBe(false);
   });
 });
 

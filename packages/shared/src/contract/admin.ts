@@ -1,5 +1,7 @@
 import {
   ADMIN_PERMISSIONS,
+  DATA_REQUEST_STATUSES,
+  DATA_REQUEST_TYPES,
   FEATURE_FLAG_KEYS,
   NOTIFICATION_TYPES,
   PORTFOLIO_IMAGE_STATUSES,
@@ -26,6 +28,7 @@ import {
   errorResponses,
   paginatedResponseSchema,
 } from './common.js';
+import { DataRequestSchema } from './gdpr.js';
 import { ADMIN_SECURITY, apiPath, registry } from './registry.js';
 import { AdminVerificationCaseSchema, AdminVerificationCaseSummarySchema } from './verification.js';
 import { z } from './zod.js';
@@ -534,6 +537,43 @@ registry.registerPath({
       content: { 'application/json': { schema: AdminUserSchema } },
     },
     ...errorResponses([400, 401, 403, 404, 422]),
+  },
+});
+
+// `user` is never null; it may be anonymised once the deletion's grace period has run.
+export const AdminDataRequestSchema = DataRequestSchema.extend({
+  user: z
+    .object({
+      id: IdSchema,
+      email: z.email(),
+    })
+    .strict(),
+})
+  .strict()
+  .openapi('AdminDataRequest');
+
+export const AdminDataRequestsQuerySchema = CursorPaginationQuerySchema.extend({
+  status: z.enum(DATA_REQUEST_STATUSES).optional(),
+  type: z.enum(DATA_REQUEST_TYPES).optional(),
+  userId: IdSchema.optional(),
+}).strict();
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/data-requests'),
+  summary: 'List GDPR data requests, newest first',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('support'),
+  request: {
+    query: AdminDataRequestsQuerySchema,
+  },
+  responses: {
+    '200': {
+      description: 'A page of data requests',
+      content: { 'application/json': { schema: paginatedResponseSchema(AdminDataRequestSchema) } },
+    },
+    ...errorResponses([400, 401, 403]),
   },
 });
 
