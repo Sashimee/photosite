@@ -1,7 +1,7 @@
 import {
-  isChannelAvailable,
-  NOTIFICATION_TYPES,
+  AUTH_EMAIL_TEMPLATE_NAMES,
   type EmailJob,
+  type EmailTemplateName,
   type Locale,
   type NotificationPayload,
   type NotificationType,
@@ -40,19 +40,6 @@ const SAMPLE_NOTIFICATION_PAYLOAD: NotificationPayload = {
   jobApplicationId: '00000000-0000-4000-8000-000000000005',
   moderationOutcome: 'resolved',
 };
-
-export const AUTH_EMAIL_TEMPLATE_NAMES = Object.keys(AUTH_EMAIL_SAMPLE_JOBS) as EmailJob['type'][];
-
-export const NOTIFY_EMAIL_TEMPLATE_NAMES = NOTIFICATION_TYPES.filter((type) =>
-  isChannelAvailable(type, 'email'),
-);
-
-export const EMAIL_TEMPLATE_NAMES = [
-  ...AUTH_EMAIL_TEMPLATE_NAMES,
-  ...NOTIFY_EMAIL_TEMPLATE_NAMES,
-] as const;
-
-export type EmailTemplateName = (typeof EMAIL_TEMPLATE_NAMES)[number];
 
 const AUTH_EMAIL_TEMPLATE_NAME_SET: ReadonlySet<string> = new Set(AUTH_EMAIL_TEMPLATE_NAMES);
 

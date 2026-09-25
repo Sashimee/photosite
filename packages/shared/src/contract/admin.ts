@@ -12,6 +12,7 @@ import {
   type FeatureFlagKey,
 } from '../enums.js';
 import { isChannelAvailable } from '../notification-channels.js';
+import type { EmailJob } from '../queues.js';
 import { UserSchema } from './auth.js';
 import { BookingBaseSchema } from './bookings.js';
 import {
@@ -1052,16 +1053,18 @@ registry.registerPath({
   },
 });
 
-// Mirrors @photoo/email's EMAIL_TEMPLATE_NAMES (packages/email/src/preview.ts).
-// packages/email depends on packages/shared, so shared can't import it back;
-// AUTH_EMAIL_TEMPLATE_NAMES is kept in sync with EmailJobSchema's literals by
-// hand, and a packages/email test asserts the two full lists stay equal.
 export const AUTH_EMAIL_TEMPLATE_NAMES = [
   'verify-email',
   'reset-password',
   'account-exists',
   'account-deletion-requested',
 ] as const;
+
+type IsExact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+type Expect<T extends true> = T;
+export type AuthEmailTemplateNamesCoverEmailJobTypes = Expect<
+  IsExact<(typeof AUTH_EMAIL_TEMPLATE_NAMES)[number], EmailJob['type']>
+>;
 
 export const NOTIFY_EMAIL_TEMPLATE_NAMES = NOTIFICATION_TYPES.filter((type) =>
   isChannelAvailable(type, 'email'),

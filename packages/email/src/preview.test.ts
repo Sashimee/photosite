@@ -1,14 +1,11 @@
 import {
-  EMAIL_TEMPLATE_NAMES as SHARED_EMAIL_TEMPLATE_NAMES,
-  SUPPORTED_LOCALES,
-} from '@photoo/shared';
-import { describe, expect, it } from 'vitest';
-import {
   AUTH_EMAIL_TEMPLATE_NAMES,
   EMAIL_TEMPLATE_NAMES,
   NOTIFY_EMAIL_TEMPLATE_NAMES,
-  renderPreview,
-} from './preview.js';
+  SUPPORTED_LOCALES,
+} from '@photoo/shared';
+import { describe, expect, it } from 'vitest';
+import { renderPreview } from './preview.js';
 
 const UNRESOLVED_PLACEHOLDER = /\{[a-zA-Z]+\}/;
 
@@ -24,12 +21,6 @@ describe('EMAIL_TEMPLATE_NAMES', () => {
     expect(EMAIL_TEMPLATE_NAMES).toHaveLength(
       AUTH_EMAIL_TEMPLATE_NAMES.length + NOTIFY_EMAIL_TEMPLATE_NAMES.length,
     );
-  });
-
-  // @photoo/shared can't import @photoo/email (the dependency runs the other
-  // way), so it keeps its own copy of AUTH_EMAIL_TEMPLATE_NAMES by hand.
-  it('matches the copy kept in @photoo/shared for contract validation', () => {
-    expect([...SHARED_EMAIL_TEMPLATE_NAMES]).toEqual([...EMAIL_TEMPLATE_NAMES]);
   });
 });
 
