@@ -142,7 +142,7 @@ describe('createGdprExportProcessor', () => {
         to: ACTIVE_USER.email,
         url: 'https://example.test/account',
       },
-      expect.objectContaining({ jobId: `data-export-failed:${DATA_REQUEST_ID}` }),
+      expect.objectContaining({ jobId: `data-export-failed-${DATA_REQUEST_ID}` }),
     );
   });
 

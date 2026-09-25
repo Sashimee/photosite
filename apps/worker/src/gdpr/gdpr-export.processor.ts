@@ -62,7 +62,7 @@ async function notifyExportReady(
     expiresAt: expiresAt.toISOString(),
   };
   await deps.emailQueue.add(job.type, job, {
-    jobId: `${job.type}:${dataRequestId}`,
+    jobId: `${job.type}-${dataRequestId}`,
     removeOnComplete: true,
     removeOnFail: { age: EMAIL_JOB_FAILED_RETENTION_SECONDS },
   });
@@ -84,7 +84,7 @@ async function notifyExportFailed(
     url: `${deps.webAppUrl}/account`,
   };
   await deps.emailQueue.add(job.type, job, {
-    jobId: `${job.type}:${dataRequestId}`,
+    jobId: `${job.type}-${dataRequestId}`,
     removeOnComplete: true,
     removeOnFail: { age: EMAIL_JOB_FAILED_RETENTION_SECONDS },
   });
