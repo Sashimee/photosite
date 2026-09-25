@@ -7,7 +7,7 @@ RUN corepack enable && corepack prepare pnpm@12.4.2 --activate
 WORKDIR /app
 
 # turbo prune trims the workspace to @photoo/api and the packages it depends
-# on (db, shared, config) before anything is installed.
+# on (db, email, shared, config) before anything is installed.
 FROM base AS pruner
 RUN npm install --global turbo@2.10.13
 COPY . .
