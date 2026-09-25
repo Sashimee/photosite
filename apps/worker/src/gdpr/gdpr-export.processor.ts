@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@photoo/db';
-import { GdprExportJobSchema, type GdprExportJob } from '@photoo/shared';
+import { EmailJobSchema, GdprExportJobSchema, type GdprExportJob } from '@photoo/shared';
 import type { Job, Processor } from 'bullmq';
 import type { Logger } from 'nestjs-pino';
 import type { RecordAuditLogInput } from '../common/audit-log.service.js';
@@ -55,12 +55,12 @@ async function notifyExportReady(
     return;
   }
 
-  const job = {
+  const job = EmailJobSchema.parse({
     type: 'data-export-ready' as const,
     to: email,
     url: `${deps.webAppUrl}/account`,
     expiresAt: expiresAt.toISOString(),
-  };
+  });
   await deps.emailQueue.add(job.type, job, {
     jobId: `${job.type}-${dataRequestId}`,
     removeOnComplete: true,
@@ -78,11 +78,11 @@ async function notifyExportFailed(
     return;
   }
 
-  const job = {
+  const job = EmailJobSchema.parse({
     type: 'data-export-failed' as const,
     to: email,
     url: `${deps.webAppUrl}/account`,
-  };
+  });
   await deps.emailQueue.add(job.type, job, {
     jobId: `${job.type}-${dataRequestId}`,
     removeOnComplete: true,
