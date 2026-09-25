@@ -50,6 +50,8 @@ Last updated: 2026-09-24.
 | The 30-day deletion grace period and the retention table in `docs/COMPLIANCE.md` (10-year ledger, 5-year verification records, 90-day chat purge) are our reading of the law, not a lawyer's | Confirm the figures with the lawyer, and confirm that the self-service export may exclude verification document *bytes* (metadata included) as long as a documented manual route exists | Nothing in code — the numbers are constants in one place and a change is a one-line edit | The plan implements the current table and keeps every figure as a named constant |
 | The deletion confirmation and grace-period notice must state what survives deletion and for how long | Approve the wording | Real user-facing copy | Placeholder English copy in `packages/i18n`, translations after approval |
 | A subject who insists on copies of their verification documents needs a manual process (identity check before release) | Define the support process | – | Nothing is built for this in Phase 1; the export README points at support |
+| `DataRequest` rows have no retention period (#354). They record that a request was made and honoured, but they reference a user and must not live forever | Confirm a period with the lawyer (proposal: 5 years after completion) | A purge job, once the figure is set | Rows are kept; nothing purges them |
+| Support staff see a masked email and the request history on `/admin/data-requests` (1D.2b) | Confirm the privacy policy covers staff access to request records | Public launch | None, the admin app is internal |
 
 ## Job board (1A.13)
 
