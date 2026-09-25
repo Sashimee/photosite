@@ -150,6 +150,27 @@ describe('EmailJobSchema', () => {
     ).toBe(false);
   });
 
+  it('rejects a data-export-ready job with a non-email "to"', () => {
+    expect(
+      EmailJobSchema.safeParse({
+        type: 'data-export-ready',
+        to: 'not-an-email',
+        url: 'https://photoo.lu/account',
+        expiresAt: '2026-01-08T00:00:00.000Z',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a data-export-ready job missing url', () => {
+    expect(
+      EmailJobSchema.safeParse({
+        type: 'data-export-ready',
+        to: 'client@photoo.test',
+        expiresAt: '2026-01-08T00:00:00.000Z',
+      }).success,
+    ).toBe(false);
+  });
+
   it('accepts a data-export-failed job', () => {
     const result = EmailJobSchema.safeParse({
       type: 'data-export-failed',
@@ -157,6 +178,25 @@ describe('EmailJobSchema', () => {
       url: 'https://photoo.lu/account',
     });
     expect(result.success).toBe(true);
+  });
+
+  it('rejects a data-export-failed job with a non-email "to"', () => {
+    expect(
+      EmailJobSchema.safeParse({
+        type: 'data-export-failed',
+        to: 'not-an-email',
+        url: 'https://photoo.lu/account',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a data-export-failed job missing url', () => {
+    expect(
+      EmailJobSchema.safeParse({
+        type: 'data-export-failed',
+        to: 'client@photoo.test',
+      }).success,
+    ).toBe(false);
   });
 
   it('rejects a data-export-failed job with unknown extra keys', () => {
