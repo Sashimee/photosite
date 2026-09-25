@@ -18,6 +18,7 @@ const columns: DataTableColumn<Row>[] = [{ id: 'name', header: 'Name', cell: (ro
 
 function renderTable(
   fetchPage: (cursor: string | undefined) => Promise<DataTableFetchResult<Row>>,
+  refreshSignal?: number,
 ) {
   return render(
     <DataTable
@@ -26,6 +27,7 @@ function renderTable(
       getRowId={(row) => row.id}
       caption="Test rows"
       emptyState={<p>No rows match your search.</p>}
+      {...(refreshSignal === undefined ? {} : { refreshSignal })}
     />,
   );
 }
@@ -75,6 +77,44 @@ describe('DataTable', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(await screen.findByText('Bob')).toBeInTheDocument();
     expect(fetchPage).toHaveBeenCalledTimes(2);
+  });
+
+  it('refetches the current page in place when refreshSignal changes, without remounting to page one', async () => {
+    const fetchPage = vi.fn((cursor: string | undefined) => {
+      if (cursor === undefined) {
+        return Promise.resolve({
+          data: { items: [{ id: '1', name: 'Alice' }], nextCursor: 'page-2' },
+        });
+      }
+      if (cursor === 'page-2') {
+        return Promise.resolve({ data: { items: [{ id: '2', name: 'Bob' }], nextCursor: null } });
+      }
+      return Promise.reject(new Error(`unexpected cursor ${cursor}`));
+    });
+    const { rerender } = renderTable(fetchPage, 0);
+    const user = userEvent.setup();
+
+    await screen.findByText('Alice');
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByText('Bob');
+    expect(fetchPage).toHaveBeenCalledTimes(2);
+
+    rerender(
+      <DataTable
+        columns={columns}
+        fetchPage={fetchPage}
+        getRowId={(row) => row.id}
+        caption="Test rows"
+        emptyState={<p>No rows match your search.</p>}
+        refreshSignal={1}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchPage).toHaveBeenCalledTimes(3);
+    });
+    expect(fetchPage).toHaveBeenNthCalledWith(3, 'page-2');
+    expect(screen.getByText('Bob')).toBeInTheDocument();
   });
 
   it('disables next when there is no further cursor and previous on page one', async () => {

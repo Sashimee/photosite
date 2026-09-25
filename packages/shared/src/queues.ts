@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IdSchema } from './contract/common.js';
+import { IdSchema, IsoDateTimeSchema } from './contract/common.js';
 
 export const QUEUE_NAMES = [
   'email',
@@ -48,6 +48,15 @@ export const EmailJobSchema = z.discriminatedUnion('type', [
   // is unconditional (no notification-preference gate) because a deletion
   // confirmation is not optional mail.
   z.object({ type: z.literal('account-deletion-requested'), to: z.email(), url: z.url() }).strict(),
+  z
+    .object({
+      type: z.literal('data-export-ready'),
+      to: z.email(),
+      url: z.url(),
+      expiresAt: IsoDateTimeSchema,
+    })
+    .strict(),
+  z.object({ type: z.literal('data-export-failed'), to: z.email(), url: z.url() }).strict(),
 ]);
 
 export type EmailJob = z.infer<typeof EmailJobSchema>;

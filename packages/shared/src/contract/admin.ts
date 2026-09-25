@@ -1,5 +1,7 @@
 import {
   ADMIN_PERMISSIONS,
+  DATA_REQUEST_STATUSES,
+  DATA_REQUEST_TYPES,
   FEATURE_FLAG_KEYS,
   NOTIFICATION_TYPES,
   PORTFOLIO_IMAGE_STATUSES,
@@ -26,6 +28,7 @@ import {
   errorResponses,
   paginatedResponseSchema,
 } from './common.js';
+import { DataRequestSchema } from './gdpr.js';
 import { ADMIN_SECURITY, apiPath, registry } from './registry.js';
 import { AdminVerificationCaseSchema, AdminVerificationCaseSummarySchema } from './verification.js';
 import { z } from './zod.js';
@@ -534,6 +537,92 @@ registry.registerPath({
       content: { 'application/json': { schema: AdminUserSchema } },
     },
     ...errorResponses([400, 401, 403, 404, 422]),
+  },
+});
+
+// `user` is never null; it may be anonymised once the deletion's grace period has run.
+// `responseDueAt` is the Art. 12(3) deadline for an export row that never produced
+// a copy (pending/processing/failed) unless a later export for the same user
+// already reached ready/completed. Null for delete rows and for ready, completed
+// or cancelled exports; a ready export past its expiresAt was still answered (#358).
+// `answeredLate` is true for an export row with status ready or completed whose
+// completedAt is after gdprResponseDueAt(requestedAt, timezone). For a failed export it is
+// true when the earliest completedAt among the same user's later exports is after
+// the failed row's gdprResponseDueAt(requestedAt, timezone); false otherwise (delete
+// rows, cancelled, not yet answered, or completedAt null). `timezone` is the
+// requesting user's country's IANA zone (Country.timezone).
+export const AdminDataRequestSchema = DataRequestSchema.extend({
+  responseDueAt: IsoDateTimeSchema.nullable(),
+  answeredLate: z.boolean(),
+  user: z
+    .object({
+      id: IdSchema,
+      email: z.email(),
+    })
+    .strict(),
+})
+  .strict()
+  .openapi('AdminDataRequest');
+
+export const AdminDataRequestsQuerySchema = CursorPaginationQuerySchema.extend({
+  status: z.enum(DATA_REQUEST_STATUSES).optional(),
+  type: z.enum(DATA_REQUEST_TYPES).optional(),
+  userId: IdSchema.optional(),
+}).strict();
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/data-requests'),
+  summary:
+    'List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an ' +
+    'export row that has not produced a copy yet, or null if it does not apply. It is computed ' +
+    "in the requesting user's country timezone, and is never later than the same deadline " +
+    'computed in UTC. ' +
+    '`answeredLate` is true for an export row with status ready or completed whose completedAt ' +
+    'is after gdprResponseDueAt(requestedAt, timezone); for a failed export it is true when the ' +
+    "earliest completedAt among the same user's later exports is after the failed row's " +
+    'gdprResponseDueAt(requestedAt, timezone); false otherwise (delete rows, cancelled, not yet ' +
+    'answered, or completedAt null).',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('support'),
+  request: {
+    query: AdminDataRequestsQuerySchema,
+  },
+  responses: {
+    '200': {
+      description: 'A page of data requests',
+      content: { 'application/json': { schema: paginatedResponseSchema(AdminDataRequestSchema) } },
+    },
+    ...errorResponses([400, 401, 403]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/admin/data-requests/{id}/retry-export'),
+  summary: 'Retry a failed export as a new request',
+  description:
+    "Creates a new export DataRequest for the failed export's user and enqueues it. Bypasses the " +
+    'per-user GDPR rate limit, because this is a support action; still subject to the per-admin ' +
+    'mutation rate limit (429). Returns 409 with a distinct `code`: `EXPORT_NOT_FAILED` if the ' +
+    "source request isn't a failed export, `USER_SUSPENDED` or `USER_DELETED` if the user's " +
+    'account is no longer active, `EXPORT_ALREADY_RETRIED` if this source has already been ' +
+    'retried once, `EXPORT_OPEN` if the user already has a pending or processing export, or ' +
+    '`EXPORT_ALREADY_ANSWERED` if the user already holds an unexpired export or completed a ' +
+    'later one that answers the source request.',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('support'),
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+  },
+  responses: {
+    '201': {
+      description: 'The new export request',
+      content: { 'application/json': { schema: AdminDataRequestSchema } },
+    },
+    ...errorResponses([400, 401, 403, 404, 409, 429]),
   },
 });
 
@@ -1058,6 +1147,8 @@ export const AUTH_EMAIL_TEMPLATE_NAMES = [
   'reset-password',
   'account-exists',
   'account-deletion-requested',
+  'data-export-ready',
+  'data-export-failed',
 ] as const;
 
 type IsExact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;

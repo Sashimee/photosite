@@ -1,7 +1,8 @@
 import type { PrismaClient } from '@photoo/db';
-import { PUBLIC_UPLOAD_PURPOSES } from '@photoo/shared';
+import { GDPR_DELETION_GRACE_PERIOD_MS, PUBLIC_UPLOAD_PURPOSES } from '@photoo/shared';
 import type { Logger } from 'nestjs-pino';
 import type { RecordAuditLogInput } from '../../common/audit-log.service.js';
+import { reportSweepFailure } from '../../common/monitoring/report-sweep-failure.js';
 
 export interface AnonymiseStorage {
   config: { privateBucket: string; publicBucket: string };
@@ -18,14 +19,14 @@ export interface AnonymiseDeletionsDeps {
 export interface AnonymiseDeletionsResult {
   usersAnonymised: number;
   usersFailed: number;
+  usersSkipped: number;
 }
 
-// docs/steps/1A.12-gdpr.md "anonymise deletions past 30 days".
-const GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 // `en` is the source-of-truth locale (CLAUDE.md), not a nullable field.
 const ANONYMISED_LOCALE = 'en';
 const ANONYMISED_DISPLAY_NAME = 'Deleted user';
 const ANONYMISED_COMPANY_NAME = 'Deleted company';
+export const ANONYMISATION_FAILURE_REASON = 'anonymisation_failed';
 
 interface AnonymisationCounts {
   sessions: number;
@@ -45,10 +46,25 @@ async function anonymiseOne(
   deps: AnonymiseDeletionsDeps,
   dataRequestId: string,
   userId: string,
-): Promise<void> {
+  cutoff: Date,
+): Promise<'anonymised' | 'skipped'> {
   const objectsToDelete: { bucket: string; key: string }[] = [];
 
   const counts = await deps.prisma.client.$transaction(async (tx) => {
+    // Claimed first so exactly one of this sweep and a concurrent cancel wins the row.
+    const claim = await tx.dataRequest.updateMany({
+      where: {
+        id: dataRequestId,
+        type: 'delete',
+        status: 'pending',
+        requestedAt: { lte: cutoff },
+      },
+      data: { status: 'completed', completedAt: new Date(), failureReason: null },
+    });
+    if (claim.count === 0) {
+      return 'skipped' as const;
+    }
+
     const profile = await tx.photographerProfile.findUnique({
       where: { userId },
       select: { id: true, avatarUploadId: true, coverUploadId: true },
@@ -138,11 +154,6 @@ async function anonymiseOne(
       },
     });
 
-    await tx.dataRequest.update({
-      where: { id: dataRequestId },
-      data: { status: 'completed', completedAt: new Date() },
-    });
-
     const result: AnonymisationCounts = {
       sessions: sessions.count,
       devices: devices.count,
@@ -158,6 +169,14 @@ async function anonymiseOne(
     };
     return result;
   });
+
+  if (counts === 'skipped') {
+    deps.logger.log(
+      { dataRequestId },
+      'gdpr-sweep: deletion request no longer pending at claim time, skipped',
+    );
+    return 'skipped';
+  }
 
   for (const object of objectsToDelete) {
     try {
@@ -178,12 +197,14 @@ async function anonymiseOne(
     targetId: userId,
     after: counts,
   });
+
+  return 'anonymised';
 }
 
 export async function anonymiseDeletions(
   deps: AnonymiseDeletionsDeps,
 ): Promise<AnonymiseDeletionsResult> {
-  const cutoff = new Date(Date.now() - GRACE_PERIOD_MS);
+  const cutoff = new Date(Date.now() - GDPR_DELETION_GRACE_PERIOD_MS);
   const due = await deps.prisma.client.dataRequest.findMany({
     where: { type: 'delete', status: 'pending', requestedAt: { lte: cutoff } },
     select: { id: true, userId: true },
@@ -191,22 +212,40 @@ export async function anonymiseDeletions(
 
   let usersAnonymised = 0;
   let usersFailed = 0;
+  let usersSkipped = 0;
   for (const request of due) {
     try {
-      await anonymiseOne(deps, request.id, request.userId);
-      usersAnonymised += 1;
+      const outcome = await anonymiseOne(deps, request.id, request.userId, cutoff);
+      if (outcome === 'skipped') {
+        usersSkipped += 1;
+      } else {
+        usersAnonymised += 1;
+      }
     } catch (error) {
       usersFailed += 1;
       deps.logger.error(
         { err: error, dataRequestId: request.id },
         'gdpr-sweep: failed to anonymise a deletion request',
       );
+      reportSweepFailure('anonymise-deletions', error, { dataRequestId: request.id });
+
+      try {
+        await deps.prisma.client.dataRequest.updateMany({
+          where: { id: request.id, status: 'pending' },
+          data: { failureReason: ANONYMISATION_FAILURE_REASON },
+        });
+      } catch (updateError) {
+        deps.logger.error(
+          { err: updateError, dataRequestId: request.id },
+          'gdpr-sweep: failed to record the failureReason on a deletion request',
+        );
+      }
     }
   }
 
   deps.logger.log(
-    { usersAnonymised, usersFailed },
+    { usersAnonymised, usersFailed, usersSkipped },
     'gdpr-sweep: anonymise-deletions phase complete',
   );
-  return { usersAnonymised, usersFailed };
+  return { usersAnonymised, usersFailed, usersSkipped };
 }

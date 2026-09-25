@@ -12,10 +12,11 @@ const notFoundMock = vi.fn(() => {
 vi.mock('next/navigation', () => ({ notFound: notFoundMock }));
 
 vi.mock('next-intl/server', async () => {
-  const { translate } = await import('@/testing/mock-translations');
+  const { mockUseFormatter, translate } = await import('@/testing/mock-translations');
   return {
     getTranslations: (namespace: string) => (key: string, values?: Record<string, unknown>) =>
       translate(namespace, key, values),
+    getFormatter: () => mockUseFormatter(),
   };
 });
 

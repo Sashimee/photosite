@@ -2,8 +2,8 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next-intl', async () => {
-  const { mockUseTranslations } = await import('@/testing/mock-translations');
-  return { useTranslations: mockUseTranslations };
+  const { mockUseFormatter, mockUseTranslations } = await import('@/testing/mock-translations');
+  return { useTranslations: mockUseTranslations, useFormatter: mockUseFormatter };
 });
 
 const getMock = vi.fn();

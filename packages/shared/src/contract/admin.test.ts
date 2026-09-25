@@ -3,6 +3,8 @@ import {
   AdminBookingSchema,
   AdminCountryLegalTextsResponseSchema,
   AdminCountrySchema,
+  AdminDataRequestSchema,
+  AdminDataRequestsQuerySchema,
   AdminEmailTemplatePreviewQuerySchema,
   AdminLegalTextVersionSchema,
   AdminProvenanceCheckSchema,
@@ -450,6 +452,101 @@ describe('AdminVerificationCasesQuerySchema', () => {
 
   it('rejects an unknown status', () => {
     expect(AdminVerificationCasesQuerySchema.safeParse({ status: 'archived' }).success).toBe(false);
+  });
+});
+
+describe('AdminDataRequestSchema', () => {
+  const validRequest = {
+    id,
+    type: 'delete',
+    status: 'pending',
+    requestedAt: '2026-08-01T10:00:00.000Z',
+    completedAt: null,
+    expiresAt: null,
+    failureReason: null,
+    cancelledAt: null,
+    responseDueAt: null,
+    answeredLate: false,
+    user: { id, email: 'user@example.com' },
+  };
+
+  it('accepts a well-formed data request', () => {
+    expect(AdminDataRequestSchema.safeParse(validRequest).success).toBe(true);
+  });
+
+  it('accepts an export with a responseDueAt', () => {
+    expect(
+      AdminDataRequestSchema.safeParse({
+        ...validRequest,
+        type: 'export',
+        responseDueAt: '2026-09-01T10:00:00.000Z',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a missing responseDueAt', () => {
+    const withoutResponseDueAt: Partial<typeof validRequest> = { ...validRequest };
+    delete withoutResponseDueAt.responseDueAt;
+    expect(AdminDataRequestSchema.safeParse(withoutResponseDueAt).success).toBe(false);
+  });
+
+  it('accepts an export answered late', () => {
+    expect(AdminDataRequestSchema.safeParse({ ...validRequest, answeredLate: true }).success).toBe(
+      true,
+    );
+  });
+
+  it('rejects a missing answeredLate', () => {
+    const withoutAnsweredLate: Partial<typeof validRequest> = { ...validRequest };
+    delete withoutAnsweredLate.answeredLate;
+    expect(AdminDataRequestSchema.safeParse(withoutAnsweredLate).success).toBe(false);
+  });
+
+  it('rejects a non-boolean answeredLate', () => {
+    expect(
+      AdminDataRequestSchema.safeParse({ ...validRequest, answeredLate: 'true' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an exportKey field', () => {
+    expect(
+      AdminDataRequestSchema.safeParse({ ...validRequest, exportKey: 'private/key.zip' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a null user', () => {
+    expect(AdminDataRequestSchema.safeParse({ ...validRequest, user: null }).success).toBe(false);
+  });
+
+  it('rejects an unknown status', () => {
+    expect(AdminDataRequestSchema.safeParse({ ...validRequest, status: 'archived' }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe('AdminDataRequestsQuerySchema', () => {
+  it('defaults limit to 20 with no filters', () => {
+    const result = AdminDataRequestsQuerySchema.parse({});
+    expect(result.limit).toBe(20);
+    expect(result.status).toBeUndefined();
+    expect(result.type).toBeUndefined();
+    expect(result.userId).toBeUndefined();
+  });
+
+  it('accepts status, type and userId filters', () => {
+    expect(
+      AdminDataRequestsQuerySchema.safeParse({ status: 'pending', type: 'delete', userId: id })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects an unknown status', () => {
+    expect(AdminDataRequestsQuerySchema.safeParse({ status: 'archived' }).success).toBe(false);
+  });
+
+  it('rejects an unknown type', () => {
+    expect(AdminDataRequestsQuerySchema.safeParse({ type: 'wipe' }).success).toBe(false);
   });
 });
 

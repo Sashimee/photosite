@@ -44,6 +44,19 @@ describe('UsersTable', () => {
     );
   });
 
+  it('encodes the user id in the detail link', async () => {
+    const withEncodableId = { ...baseUser, id: 'a1/a1?a1=1#x' };
+    getMock.mockResolvedValueOnce({ data: { items: [withEncodableId], nextCursor: null } });
+    const UsersTable = await loadUsersTable();
+
+    render(<UsersTable />);
+
+    expect(await screen.findByRole('link', { name: withEncodableId.id })).toHaveAttribute(
+      'href',
+      '/users/a1%2Fa1%3Fa1%3D1%23x',
+    );
+  });
+
   it('shows the translated role and status', async () => {
     getMock.mockResolvedValueOnce({ data: { items: [baseUser], nextCursor: null } });
     const UsersTable = await loadUsersTable();

@@ -3,6 +3,144 @@ import { IdSchema, IsoDateTimeSchema, errorResponses } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
 
+// docs/steps/1A.12-gdpr.md "anonymise deletions past 30 days"; also drives
+// the grace-period countdown shown on the admin data-requests list.
+export const GDPR_DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+
+// GDPR Art. 12(3): one calendar month from `requestedAt` to respond to a
+// data subject request.
+export const GDPR_RESPONSE_PERIOD_MONTHS = 1;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Calendar-month arithmetic in UTC, clamped to the last day of the target
+// month (e.g. Jan 31 -> Feb 28, or Feb 29 on a leap year).
+function addResponsePeriodUtc(requestedAt: Date): Date {
+  const year = requestedAt.getUTCFullYear();
+  const month = requestedAt.getUTCMonth();
+  const targetMonth = month + GDPR_RESPONSE_PERIOD_MONTHS;
+  const lastDayOfTargetMonth = new Date(Date.UTC(year, targetMonth + 1, 0)).getUTCDate();
+  const day = Math.min(requestedAt.getUTCDate(), lastDayOfTargetMonth);
+  return new Date(
+    Date.UTC(
+      year,
+      targetMonth,
+      day,
+      requestedAt.getUTCHours(),
+      requestedAt.getUTCMinutes(),
+      requestedAt.getUTCSeconds(),
+      requestedAt.getUTCMilliseconds(),
+    ),
+  );
+}
+
+interface ZonedParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+}
+
+const zonedFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+function createZonedFormatter(timeZone: string): Intl.DateTimeFormat {
+  const cached = zonedFormatterCache.get(timeZone);
+  if (cached) return cached;
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    zonedFormatterCache.set(timeZone, formatter);
+    return formatter;
+  } catch (error) {
+    throw new Error(`gdprResponseDueAt: invalid IANA time zone "${timeZone}"`, { cause: error });
+  }
+}
+
+function readZonedParts(formatter: Intl.DateTimeFormat, instant: Date): ZonedParts {
+  const values: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {};
+  for (const part of formatter.formatToParts(instant)) {
+    values[part.type] = part.value;
+  }
+  return {
+    year: Number(values.year),
+    month: Number(values.month) - 1,
+    day: Number(values.day),
+    hour: Number(values.hour) % 24,
+    minute: Number(values.minute),
+    second: Number(values.second),
+  };
+}
+
+function zoneOffsetMs(formatter: Intl.DateTimeFormat, instant: Date): number {
+  const parts = readZonedParts(formatter, instant);
+  const asUtc = Date.UTC(
+    parts.year,
+    parts.month,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+    instant.getUTCMilliseconds(),
+  );
+  return asUtc - instant.getTime();
+}
+
+// `nominal` is not a real instant: it is the target local wall-clock date/time
+// encoded with Date.UTC, i.e. the number the zone's clock should read. The
+// zone's offsets a day either side bound any DST transition near it. Each
+// offset that round-trips back to the same wall time gives a real instant; in
+// a fall-back overlap both do and the earlier one is taken. In a spring-forward
+// gap neither does, and the larger offset shifts the target back by the gap's
+// length (02:30 in a one-hour 02:00-03:00 gap becomes 01:30). Either way the
+// deadline errs early, never late.
+function zonedWallTimeToUtc(nominal: number, formatter: Intl.DateTimeFormat): number {
+  const offsets = [nominal - DAY_MS, nominal + DAY_MS].map((sample) =>
+    zoneOffsetMs(formatter, new Date(sample)),
+  );
+  const instants = offsets
+    .map((offset) => nominal - offset)
+    .filter((instant) => instant + zoneOffsetMs(formatter, new Date(instant)) === nominal);
+  if (instants.length > 0) {
+    return Math.min(...instants);
+  }
+  return nominal - Math.max(...offsets);
+}
+
+// One calendar month from `requestedAt`, computed twice: once in UTC and once
+// in the requester's local wall-clock time (`timeZone`), each clamped to the
+// last day of the target month. The earlier of the two is returned so the
+// deadline shown is never later than the legal one under either reading
+// (docs/steps/377-gdpr-due-date-timezone.md).
+export function gdprResponseDueAt(requestedAt: Date, timeZone: string): Date {
+  const utcResult = addResponsePeriodUtc(requestedAt);
+  const formatter = createZonedFormatter(timeZone);
+  const local = readZonedParts(formatter, requestedAt);
+  const targetMonth = local.month + GDPR_RESPONSE_PERIOD_MONTHS;
+  const lastDayOfTargetMonth = new Date(Date.UTC(local.year, targetMonth + 1, 0)).getUTCDate();
+  const day = Math.min(local.day, lastDayOfTargetMonth);
+  const nominal = Date.UTC(
+    local.year,
+    targetMonth,
+    day,
+    local.hour,
+    local.minute,
+    local.second,
+    requestedAt.getUTCMilliseconds(),
+  );
+  const zonedResult = new Date(zonedWallTimeToUtc(nominal, formatter));
+  return zonedResult < utcResult ? zonedResult : utcResult;
+}
+
 // `exportKey` is the private S3 object key and is never returned to a
 // client: `GET .../download` issues a short-lived presigned URL from it
 // instead (docs/steps/1A.12-gdpr.md "The export is a zip..."). `failureReason`
@@ -176,8 +314,9 @@ registry.registerPath({
   path: apiPath('/me/data-requests/{id}/cancel'),
   summary:
     'Cancel a data request during its grace period. Only a deletion request can be cancelled, ' +
-    'and only before anonymisation runs. A soft-deleted account has no session, so `token` (the ' +
-    'single-use value mailed at deletion time) is accepted in place of one.',
+    'and only within the 30-day grace period; after it, 409 even if anonymisation has not run ' +
+    'yet. A soft-deleted account has no session, so `token` (the single-use value mailed at ' +
+    'deletion time) is accepted in place of one.',
   tags: ['gdpr'],
   security: AUTH_SECURITY,
   request: {

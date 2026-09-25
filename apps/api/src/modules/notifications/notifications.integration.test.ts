@@ -171,8 +171,12 @@ describe('notifications integration', () => {
       const user = await signUpAndSignIn();
       const other = await signUpAndSignIn();
       await createNotification(other.id);
-      const first = await createNotification(user.id);
-      const second = await createNotification(user.id);
+      const first = await createNotification(user.id, {
+        createdAt: new Date('2026-01-01T10:00:00Z'),
+      });
+      const second = await createNotification(user.id, {
+        createdAt: new Date('2026-01-01T10:00:01Z'),
+      });
 
       const response = await fastify().inject({
         method: 'GET',

@@ -12,5 +12,9 @@ export function initSentry(env: Env): void {
     tracesSampleRate: env.SENTRY_TRACES_SAMPLE_RATE,
     sendDefaultPii: false,
     beforeSend: scrubEvent,
+    // Storage keys embed owner ids (u/<ownerId>/<id>), and the default http
+    // breadcrumb records the full outgoing URL, so drop http breadcrumbs
+    // outright instead of trying to scrub them after the fact.
+    beforeBreadcrumb: (breadcrumb) => (breadcrumb.category === 'http' ? null : breadcrumb),
   });
 }

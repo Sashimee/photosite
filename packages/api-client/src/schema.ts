@@ -7105,6 +7105,525 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/data-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the current user's data requests */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The current user data requests */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRequest"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a data export or deletion request. Returns the existing row (200) if one of the same type is already pending or processing, instead of creating a second one. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        type: "export" | "delete";
+                    };
+                };
+            };
+            responses: {
+                /** @description An existing pending or processing request of the same type */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRequest"];
+                    };
+                };
+                /** @description Data request created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRequest"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/data-requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a data request */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID identifier */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The data request */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRequest"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/data-requests/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a data request during its grace period. Only a deletion request can be cancelled, and only within the 30-day grace period; after it, 409 even if anonymisation has not run yet. A soft-deleted account has no session, so `token` (the single-use value mailed at deletion time) is accepted in place of one. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID identifier */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        token?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Data request cancelled */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRequest"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/data-requests/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a 10-minute presigned download URL for a completed export. 403 for a data request that belongs to someone else, 409 while the export is not yet ready, 410 once the request's expiresAt has passed. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID identifier */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Presigned download URL issued */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DataRequestDownload"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Gone */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the current user's consent state per purpose (latest record wins) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The current consent state */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Consents"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        /** Append consent records for the purposes that changed. policyVersion is server-set. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        consents: {
+                            /**
+                             * @example analytics
+                             * @enum {string}
+                             */
+                            purpose: "analytics" | "ads" | "marketing";
+                            granted: boolean;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description The updated consent state */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Consents"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a consent decision, anonymous (keyed by anonymousId) or for the current session. policyVersion is server-set, never accepted from the client. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        anonymousId?: string;
+                        /**
+                         * @example analytics
+                         * @enum {string}
+                         */
+                        purpose: "analytics" | "ads" | "marketing";
+                        granted: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Consent recorded */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConsentRecord"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/me": {
         parameters: {
             query?: never;
@@ -7564,6 +8083,175 @@ export interface paths {
             };
         };
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/data-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row that has not produced a copy yet, or null if it does not apply. It is computed in the requesting user's country timezone, and is never later than the same deadline computed in UTC. `answeredLate` is true for an export row with status ready or completed whose completedAt is after gdprResponseDueAt(requestedAt, timezone); for a failed export it is true when the earliest completedAt among the same user's later exports is after the failed row's gdprResponseDueAt(requestedAt, timezone); false otherwise (delete rows, cancelled, not yet answered, or completedAt null). */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                    limit?: number;
+                    status?: "pending" | "processing" | "ready" | "completed" | "failed" | "cancelled";
+                    type?: "export" | "delete";
+                    /** @description UUID identifier */
+                    userId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A page of data requests */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: components["schemas"]["AdminDataRequest"][];
+                            nextCursor: string | null;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/data-requests/{id}/retry-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry a failed export as a new request
+         * @description Creates a new export DataRequest for the failed export's user and enqueues it. Bypasses the per-user GDPR rate limit, because this is a support action; still subject to the per-admin mutation rate limit (429). Returns 409 with a distinct `code`: `EXPORT_NOT_FAILED` if the source request isn't a failed export, `USER_SUSPENDED` or `USER_DELETED` if the user's account is no longer active, `EXPORT_ALREADY_RETRIED` if this source has already been retried once, `EXPORT_OPEN` if the user already has a pending or processing export, or `EXPORT_ALREADY_ANSWERED` if the user already holds an unexpired export or completed a later one that answers the source request.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID identifier */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The new export request */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminDataRequest"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -9856,525 +10544,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/me/data-requests": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List the current user's data requests */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description The current user data requests */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DataRequest"][];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /** Create a data export or deletion request. Returns the existing row (200) if one of the same type is already pending or processing, instead of creating a second one. */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": {
-                        /** @enum {string} */
-                        type: "export" | "delete";
-                    };
-                };
-            };
-            responses: {
-                /** @description An existing pending or processing request of the same type */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DataRequest"];
-                    };
-                };
-                /** @description Data request created */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DataRequest"];
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Conflict */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Unprocessable entity */
-                422: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Too many requests */
-                429: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/me/data-requests/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a data request */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description UUID identifier */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description The data request */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DataRequest"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/me/data-requests/{id}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Cancel a data request during its grace period. Only a deletion request can be cancelled, and only before anonymisation runs. A soft-deleted account has no session, so `token` (the single-use value mailed at deletion time) is accepted in place of one. */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description UUID identifier */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": {
-                        token?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Data request cancelled */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DataRequest"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Conflict */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/me/data-requests/{id}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a 10-minute presigned download URL for a completed export. 403 for a data request that belongs to someone else, 409 while the export is not yet ready, 410 once the request's expiresAt has passed. */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description UUID identifier */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Presigned download URL issued */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DataRequestDownload"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Conflict */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Gone */
-                410: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/me/consents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get the current user's consent state per purpose (latest record wins) */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description The current consent state */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Consents"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
-        /** Append consent records for the purposes that changed. policyVersion is server-set. */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": {
-                        consents: {
-                            /**
-                             * @example analytics
-                             * @enum {string}
-                             */
-                            purpose: "analytics" | "ads" | "marketing";
-                            granted: boolean;
-                        }[];
-                    };
-                };
-            };
-            responses: {
-                /** @description The updated consent state */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Consents"];
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Unprocessable entity */
-                422: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/consents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Record a consent decision, anonymous (keyed by anonymousId) or for the current session. policyVersion is server-set, never accepted from the client. */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": {
-                        anonymousId?: string;
-                        /**
-                         * @example analytics
-                         * @enum {string}
-                         */
-                        purpose: "analytics" | "ads" | "marketing";
-                        granted: boolean;
-                    };
-                };
-            };
-            responses: {
-                /** @description Consent recorded */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ConsentRecord"];
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Unprocessable entity */
-                422: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Too many requests */
-                429: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/notifications": {
         parameters: {
             query?: never;
@@ -12137,6 +12306,95 @@ export interface components {
              */
             uploadedAt: string;
         };
+        DataRequest: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /** @enum {string} */
+            type: "export" | "delete";
+            /** @enum {string} */
+            status: "pending" | "processing" | "ready" | "completed" | "failed" | "cancelled";
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            requestedAt: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            completedAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            expiresAt: string | null;
+            failureReason: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            cancelledAt: string | null;
+        };
+        DataRequestDownload: {
+            /**
+             * Format: uri
+             * @example https://storage.photoo.lu/exports/abc123?signature=xyz
+             */
+            url: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            expiresAt: string;
+        };
+        Consents: {
+            consents: components["schemas"]["ConsentStateEntry"][];
+        };
+        ConsentStateEntry: {
+            /**
+             * @example analytics
+             * @enum {string}
+             */
+            purpose: "analytics" | "ads" | "marketing";
+            granted: boolean;
+            policyVersion: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            recordedAt: string | null;
+        };
+        ConsentRecord: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /**
+             * @example analytics
+             * @enum {string}
+             */
+            purpose: "analytics" | "ads" | "marketing";
+            granted: boolean;
+            policyVersion: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            recordedAt: string;
+        };
         AdminMe: {
             permissions: ("support" | "moderation" | "verification" | "finance" | "superadmin")[];
             /**
@@ -12207,6 +12465,60 @@ export interface components {
             slug: string;
             isPublished: boolean;
         } | null;
+        AdminDataRequest: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /** @enum {string} */
+            type: "export" | "delete";
+            /** @enum {string} */
+            status: "pending" | "processing" | "ready" | "completed" | "failed" | "cancelled";
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            requestedAt: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            completedAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            expiresAt: string | null;
+            failureReason: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            cancelledAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            responseDueAt: string | null;
+            answeredLate: boolean;
+            user: {
+                /**
+                 * Format: uuid
+                 * @description UUID identifier
+                 * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                 */
+                id: string;
+                /** Format: email */
+                email: string;
+            };
+        };
         AdminVerificationCaseSummary: {
             /**
              * Format: uuid
@@ -12647,7 +12959,7 @@ export interface components {
          * @example quote_received
          * @enum {string}
          */
-        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action";
+        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "data-export-ready" | "data-export-failed" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action";
         AdminEmailTemplatePreview: {
             subject: string;
             html: string;
@@ -12670,95 +12982,6 @@ export interface components {
              */
             targetId: string;
             reason: string;
-        };
-        DataRequest: {
-            /**
-             * Format: uuid
-             * @description UUID identifier
-             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
-             */
-            id: string;
-            /** @enum {string} */
-            type: "export" | "delete";
-            /** @enum {string} */
-            status: "pending" | "processing" | "ready" | "completed" | "failed" | "cancelled";
-            /**
-             * Format: date-time
-             * @description ISO 8601 date-time
-             * @example 2026-09-16T12:00:00.000Z
-             */
-            requestedAt: string;
-            /**
-             * Format: date-time
-             * @description ISO 8601 date-time
-             * @example 2026-09-16T12:00:00.000Z
-             */
-            completedAt: string | null;
-            /**
-             * Format: date-time
-             * @description ISO 8601 date-time
-             * @example 2026-09-16T12:00:00.000Z
-             */
-            expiresAt: string | null;
-            failureReason: string | null;
-            /**
-             * Format: date-time
-             * @description ISO 8601 date-time
-             * @example 2026-09-16T12:00:00.000Z
-             */
-            cancelledAt: string | null;
-        };
-        DataRequestDownload: {
-            /**
-             * Format: uri
-             * @example https://storage.photoo.lu/exports/abc123?signature=xyz
-             */
-            url: string;
-            /**
-             * Format: date-time
-             * @description ISO 8601 date-time
-             * @example 2026-09-16T12:00:00.000Z
-             */
-            expiresAt: string;
-        };
-        Consents: {
-            consents: components["schemas"]["ConsentStateEntry"][];
-        };
-        ConsentStateEntry: {
-            /**
-             * @example analytics
-             * @enum {string}
-             */
-            purpose: "analytics" | "ads" | "marketing";
-            granted: boolean;
-            policyVersion: string | null;
-            /**
-             * Format: date-time
-             * @description ISO 8601 date-time
-             * @example 2026-09-16T12:00:00.000Z
-             */
-            recordedAt: string | null;
-        };
-        ConsentRecord: {
-            /**
-             * Format: uuid
-             * @description UUID identifier
-             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
-             */
-            id: string;
-            /**
-             * @example analytics
-             * @enum {string}
-             */
-            purpose: "analytics" | "ads" | "marketing";
-            granted: boolean;
-            policyVersion: string;
-            /**
-             * Format: date-time
-             * @description ISO 8601 date-time
-             * @example 2026-09-16T12:00:00.000Z
-             */
-            recordedAt: string;
         };
         Notification: {
             /**

@@ -1,6 +1,10 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@photoo/db';
-import type { CreateDataRequestRequestSchema, DataRequestSchema } from '@photoo/shared';
+import {
+  GDPR_DELETION_GRACE_PERIOD_MS,
+  type CreateDataRequestRequestSchema,
+  type DataRequestSchema,
+} from '@photoo/shared';
 import type { z } from 'zod';
 import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -125,11 +129,15 @@ export class DataRequestsService {
     }
 
     const cancelled = await this.prisma.client.$transaction(async (tx) => {
+      const cutoff = new Date(Date.now() - GDPR_DELETION_GRACE_PERIOD_MS);
       const guarded = await tx.dataRequest.updateMany({
-        where: { id, status: 'pending' },
+        where: { id, status: 'pending', requestedAt: { gt: cutoff } },
         data: { status: 'cancelled', cancelledAt: new Date() },
       });
       if (guarded.count === 0) {
+        if (row.status === 'pending' && row.requestedAt.getTime() <= cutoff.getTime()) {
+          throw conflict('Deletion grace period has ended; the request can no longer be cancelled');
+        }
         throw conflict('Data request is no longer pending');
       }
 

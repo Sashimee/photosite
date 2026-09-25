@@ -57,6 +57,51 @@ describe('renderAuthEmail', () => {
     );
   });
 
+  it('renders a data-export-ready job with the expiry date formatted for CET (winter)', () => {
+    const message = renderAuthEmail(
+      {
+        type: 'data-export-ready',
+        to: 'jane@example.com',
+        url: 'https://photoo.lu/account',
+        expiresAt: '2026-01-08T00:00:00.000Z',
+      },
+      'jane@example.com',
+    );
+    expect(message.subject).toMatch(/data export is ready/);
+    expect(message.text).toContain('https://photoo.lu/account');
+    expect(message.text).toContain('8 January 2026 at 01:00 CET');
+    expect(message.html).toContain('<a href="https://photoo.lu/account">');
+    expect(message.html).toContain('8 January 2026 at 01:00 CET');
+  });
+
+  it('renders a data-export-ready job with the expiry date formatted for CEST (summer)', () => {
+    const message = renderAuthEmail(
+      {
+        type: 'data-export-ready',
+        to: 'jane@example.com',
+        url: 'https://photoo.lu/account',
+        expiresAt: '2026-07-08T00:00:00.000Z',
+      },
+      'jane@example.com',
+    );
+    expect(message.text).toContain('8 July 2026 at 02:00 CEST');
+    expect(message.html).toContain('8 July 2026 at 02:00 CEST');
+  });
+
+  it('renders a data-export-failed job with the retry link', () => {
+    const message = renderAuthEmail(
+      {
+        type: 'data-export-failed',
+        to: 'jane@example.com',
+        url: 'https://photoo.lu/account',
+      },
+      'jane@example.com',
+    );
+    expect(message.subject).toMatch(/data export failed/);
+    expect(message.text).toContain('https://photoo.lu/account');
+    expect(message.html).toContain('<a href="https://photoo.lu/account">');
+  });
+
   it('HTML-escapes a url containing an ampersand', () => {
     const message = renderAuthEmail(
       {

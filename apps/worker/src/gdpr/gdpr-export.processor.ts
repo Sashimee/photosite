@@ -1,24 +1,33 @@
 import type { PrismaClient } from '@photoo/db';
-import { GdprExportJobSchema, type GdprExportJob } from '@photoo/shared';
+import { EmailJobSchema, GdprExportJobSchema, type GdprExportJob } from '@photoo/shared';
 import type { Job, Processor } from 'bullmq';
 import type { Logger } from 'nestjs-pino';
 import type { RecordAuditLogInput } from '../common/audit-log.service.js';
+import type { JobQueueLike } from '../queues/processors/types.js';
 import type { ArchiveStorage } from './export/archive.js';
 import { writeZipArchive } from './export/archive.js';
 import { collectExportData } from './export/collect.js';
 import { buildManifest } from './export/manifest.js';
 import { readPolicyVersion } from './export/policy-version.js';
 import { buildReadmeText } from './export/readme.js';
+import {
+  EMAIL_JOB_FAILED_RETENTION_SECONDS,
+  findNotifiableUserEmail,
+  notifyExportFailed,
+} from './notify-export-failed.js';
 
 export interface GdprExportDeps {
   prisma: { client: PrismaClient };
   storage: ArchiveStorage & { config: { privateBucket: string } };
   auditLog: { record(input: RecordAuditLogInput): Promise<void> };
   logger: Logger;
+  emailQueue: JobQueueLike;
+  webAppUrl: string;
 }
 
 const EXPORT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const EXPORT_FAILURE_REASON = 'export_failed';
+const USER_INACTIVE_REASON = 'user_inactive';
 
 function isFinalAttempt(job: Job): boolean {
   const attempts = job.opts.attempts ?? 1;
@@ -27,6 +36,30 @@ function isFinalAttempt(job: Job): boolean {
 
 function exportKeyFor(dataRequestId: string): string {
   return `gdpr-exports/${dataRequestId}.zip`;
+}
+
+async function notifyExportReady(
+  deps: GdprExportDeps,
+  dataRequestId: string,
+  userId: string,
+  expiresAt: Date,
+): Promise<void> {
+  const email = await findNotifiableUserEmail(deps, userId);
+  if (!email) {
+    return;
+  }
+
+  const job = EmailJobSchema.parse({
+    type: 'data-export-ready' as const,
+    to: email,
+    url: `${deps.webAppUrl}/account`,
+    expiresAt: expiresAt.toISOString(),
+  });
+  await deps.emailQueue.add(job.type, job, {
+    jobId: `${job.type}-${dataRequestId}`,
+    removeOnComplete: true,
+    removeOnFail: { age: EMAIL_JOB_FAILED_RETENTION_SECONDS },
+  });
 }
 
 export function createGdprExportProcessor(deps: GdprExportDeps): Processor<GdprExportJob> {
@@ -49,7 +82,13 @@ export function createGdprExportProcessor(deps: GdprExportDeps): Processor<GdprE
       );
       return;
     }
-    if (dataRequest.status === 'ready' || dataRequest.status === 'cancelled') {
+    if (dataRequest.status === 'cancelled') {
+      return;
+    }
+    if (dataRequest.status === 'ready') {
+      if (dataRequest.expiresAt) {
+        await notifyExportReady(deps, dataRequest.id, dataRequest.userId, dataRequest.expiresAt);
+      }
       return;
     }
 
@@ -57,6 +96,30 @@ export function createGdprExportProcessor(deps: GdprExportDeps): Processor<GdprE
       where: { id: dataRequest.id },
       data: { status: 'processing' },
     });
+
+    const user = await deps.prisma.client.user.findUnique({
+      where: { id: dataRequest.userId },
+      select: { status: true },
+    });
+    if (user?.status !== 'active') {
+      const inactiveUpdate = await deps.prisma.client.dataRequest.updateMany({
+        where: { id: dataRequest.id, status: 'processing' },
+        data: { status: 'failed', failureReason: USER_INACTIVE_REASON },
+      });
+      if (inactiveUpdate.count === 1) {
+        await deps.auditLog.record({
+          actorType: 'system',
+          actorId: null,
+          action: 'data_request.export_failed',
+          targetType: 'DataRequest',
+          targetId: dataRequest.id,
+          after: { status: 'failed', failureReason: USER_INACTIVE_REASON },
+        });
+      }
+      return;
+    }
+
+    let readyExpiresAt: Date;
 
     try {
       const data = await collectExportData(deps.prisma.client, dataRequest.userId);
@@ -94,10 +157,13 @@ export function createGdprExportProcessor(deps: GdprExportDeps): Processor<GdprE
 
       const completedAt = new Date();
       const expiresAt = new Date(completedAt.getTime() + EXPORT_RETENTION_MS);
-      await deps.prisma.client.dataRequest.update({
-        where: { id: dataRequest.id },
+      const readyUpdate = await deps.prisma.client.dataRequest.updateMany({
+        where: { id: dataRequest.id, status: 'processing' },
         data: { status: 'ready', completedAt, exportKey: key, expiresAt },
       });
+      if (readyUpdate.count !== 1) {
+        return;
+      }
       await deps.auditLog.record({
         actorType: 'system',
         actorId: null,
@@ -106,22 +172,35 @@ export function createGdprExportProcessor(deps: GdprExportDeps): Processor<GdprE
         targetId: dataRequest.id,
         after: { status: 'ready', rowCounts: manifest.files },
       });
+      readyExpiresAt = expiresAt;
     } catch (error) {
       if (isFinalAttempt(job)) {
-        await deps.prisma.client.dataRequest.update({
-          where: { id: dataRequest.id },
-          data: { status: 'failed', failureReason: EXPORT_FAILURE_REASON },
-        });
-        await deps.auditLog.record({
-          actorType: 'system',
-          actorId: null,
-          action: 'data_request.export_failed',
-          targetType: 'DataRequest',
-          targetId: dataRequest.id,
-          after: { status: 'failed', failureReason: EXPORT_FAILURE_REASON },
-        });
+        try {
+          const failedUpdate = await deps.prisma.client.dataRequest.updateMany({
+            where: { id: dataRequest.id, status: 'processing' },
+            data: { status: 'failed', failureReason: EXPORT_FAILURE_REASON },
+          });
+          if (failedUpdate.count === 1) {
+            await deps.auditLog.record({
+              actorType: 'system',
+              actorId: null,
+              action: 'data_request.export_failed',
+              targetType: 'DataRequest',
+              targetId: dataRequest.id,
+              after: { status: 'failed', failureReason: EXPORT_FAILURE_REASON },
+            });
+            await notifyExportFailed(deps, dataRequest.id, dataRequest.userId);
+          }
+        } catch (followUpError) {
+          deps.logger.error(
+            { dataRequestId: dataRequest.id, err: followUpError },
+            'gdpr-export: failed to record failure audit or notify user after export failure',
+          );
+        }
       }
       throw error;
     }
+
+    await notifyExportReady(deps, dataRequest.id, dataRequest.userId, readyExpiresAt);
   };
 }

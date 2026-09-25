@@ -16,7 +16,9 @@ export interface AdminAuditLogFilters {
 // Newest first, so the cursor walks strictly backward in time.
 function cursorWhere(cursor: AdminAuditLogCursor): Prisma.AuditLogWhereInput {
   const occurredAt = new Date(cursor.occurredAt);
+  // Redundant with the OR; gives Postgres a start bound on AuditLog_occurredAt_idx.
   return {
+    occurredAt: { lte: occurredAt },
     OR: [{ occurredAt: { lt: occurredAt } }, { occurredAt, id: { lt: cursor.id } }],
   };
 }

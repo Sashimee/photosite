@@ -6,9 +6,10 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 // HMAC over the row's own identity rather than a stored secret (no schema
 // change: only the schema-migrator agent edits schema.prisma) and carries no
 // expiry of its own: `DataRequestsService.cancel` only accepts it while
-// `status = 'pending'`, so it stops working on its own once the sweep
-// anonymises the account, and using it once flips that status, making a
-// second use a no-op.
+// `status = 'pending'` and the request is inside
+// `GDPR_DELETION_GRACE_PERIOD_MS`, so it stops working once the grace period
+// ends (even if the sweep has not anonymised the account yet), and using it
+// once flips that status, making a second use a no-op.
 // The purpose label keeps this token from ever being interchangeable with
 // another HMAC over the same secret: `AUTH_SECRET` is also Better Auth's
 // signing key, and a bare pair of ids is exactly the input some future

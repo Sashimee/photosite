@@ -17,7 +17,9 @@ export interface AdminUserSearchFilters {
 
 function cursorWhere(cursor: AdminUserCursor): Prisma.UserWhereInput {
   const createdAt = new Date(cursor.createdAt);
+  // Redundant with the OR; gives Postgres a start bound on User_createdAt_id_idx.
   return {
+    createdAt: { gte: createdAt },
     OR: [{ createdAt: { gt: createdAt } }, { createdAt, id: { gt: cursor.id } }],
   };
 }

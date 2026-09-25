@@ -13,7 +13,9 @@ export interface AdminReportFilters {
 
 function cursorWhere(cursor: AdminReportCursor): Prisma.ReportWhereInput {
   const createdAt = new Date(cursor.createdAt);
+  // Redundant with the OR; gives Postgres a start bound on Report_status_createdAt_idx when filtered by status.
   return {
+    createdAt: { gte: createdAt },
     OR: [{ createdAt: { gt: createdAt } }, { createdAt, id: { gt: cursor.id } }],
   };
 }

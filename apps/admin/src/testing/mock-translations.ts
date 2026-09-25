@@ -1,15 +1,21 @@
-import type { createTranslator as CreateTranslator } from 'next-intl';
+import type {
+  createFormatter as CreateFormatter,
+  createTranslator as CreateTranslator,
+} from 'next-intl';
 import { vi } from 'vitest';
 
 import { getMessages } from '@photoo/i18n';
+
+import { ADMIN_FORMATS, ADMIN_TIME_ZONE } from '@/lib/datetime';
 
 // Component tests that need both a mocked `useTranslations` and this real
 // catalog lookup call `vi.mock('next-intl', ...)` with a factory that
 // imports this file; a plain top-level `import ... from 'next-intl'` here
 // would resolve to that same mock and recurse. `importActual` bypasses it.
-const { createTranslator } = await vi.importActual<{ createTranslator: typeof CreateTranslator }>(
-  'next-intl',
-);
+const { createTranslator, createFormatter } = await vi.importActual<{
+  createTranslator: typeof CreateTranslator;
+  createFormatter: typeof CreateFormatter;
+}>('next-intl');
 
 // Namespace and key are only known at call time (built from two separate
 // strings), unlike a real `useTranslations` call, so this can't use the
@@ -41,4 +47,15 @@ export function translate(
 
 export function mockUseTranslations(namespace: string) {
   return (key: string, values?: Record<string, unknown>) => translate(namespace, key, values);
+}
+
+// A `useFormatter` stand-in for component tests: same locale, time zone and
+// named formats as the real `NextIntlClientProvider` (apps/admin/src/app/layout.tsx),
+// so a test asserting formatted dates sees exactly what renders in production.
+export function mockUseFormatter() {
+  return createFormatter({
+    locale: 'en',
+    timeZone: ADMIN_TIME_ZONE,
+    formats: ADMIN_FORMATS,
+  });
 }

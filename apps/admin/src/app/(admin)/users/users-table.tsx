@@ -28,7 +28,7 @@ export function UsersTable({ q, role, status }: UsersFilters) {
       header: t('columns.id'),
       cell: (row) => (
         <Link
-          href={`/users/${row.id}`}
+          href={`/users/${encodeURIComponent(row.id)}`}
           className="font-mono text-xs underline-offset-4 hover:underline"
         >
           {row.id}

@@ -1,4 +1,5 @@
-import { getTranslations } from 'next-intl/server';
+import { getFormatter, getTranslations } from 'next-intl/server';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { serverApi } from '@/lib/server-api';
@@ -48,6 +49,7 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
   const t = await getTranslations('admin.users.detail');
   const tRoles = await getTranslations('admin.users.roles');
   const tStatuses = await getTranslations('admin.users.statuses');
+  const format = await getFormatter();
 
   return (
     <section className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-12">
@@ -70,10 +72,25 @@ export default async function UserDetailPage({ params }: { params: Promise<{ id:
           {user.twoFactorEnabled ? t('fields.yes') : t('fields.no')}
         </dd>
         <dt className="text-muted-foreground">{t('fields.emailVerifiedAt')}</dt>
-        <dd className="text-foreground">{user.emailVerifiedAt ?? t('fields.never')}</dd>
+        <dd className="text-foreground">
+          {user.emailVerifiedAt
+            ? format.dateTime(new Date(user.emailVerifiedAt), 'medium')
+            : t('fields.never')}
+        </dd>
         <dt className="text-muted-foreground">{t('fields.lastLoginAt')}</dt>
-        <dd className="text-foreground">{user.lastLoginAt ?? t('fields.never')}</dd>
+        <dd className="text-foreground">
+          {user.lastLoginAt
+            ? format.dateTime(new Date(user.lastLoginAt), 'medium')
+            : t('fields.never')}
+        </dd>
       </dl>
+
+      <Link
+        href={`/data-requests?${new URLSearchParams({ userId: id }).toString()}`}
+        className="text-sm underline-offset-4 hover:underline"
+      >
+        {t('dataRequestsLink')}
+      </Link>
 
       <UserActions user={user} canManageRoles={allowRoles} />
 

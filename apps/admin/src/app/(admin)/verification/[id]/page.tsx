@@ -1,4 +1,4 @@
-import { getTranslations } from 'next-intl/server';
+import { getFormatter, getTranslations } from 'next-intl/server';
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 
@@ -75,6 +75,7 @@ export default async function VerificationCaseDetailPage({
 
   const t = await getTranslations('admin.verification.detail');
   const tStatuses = await getTranslations('admin.verification.statuses');
+  const format = await getFormatter();
 
   // Never forwards `downloadUrl`: this endpoint presigns and returns one for
   // every scanned-clean document (apps/api's AdminVerificationService.get),
@@ -103,7 +104,11 @@ export default async function VerificationCaseDetailPage({
         <dt className="text-muted-foreground">{t('fields.status')}</dt>
         <dd className="text-foreground">{tStatuses(caseDetail.status)}</dd>
         <dt className="text-muted-foreground">{t('fields.submittedAt')}</dt>
-        <dd className="text-foreground">{caseDetail.submittedAt ?? t('fields.notSubmitted')}</dd>
+        <dd className="text-foreground">
+          {caseDetail.submittedAt
+            ? format.dateTime(new Date(caseDetail.submittedAt), 'medium')
+            : t('fields.notSubmitted')}
+        </dd>
         <dt className="text-muted-foreground">{t('fields.businessName')}</dt>
         <dd className="text-foreground">{caseDetail.businessName ?? t('fields.notProvided')}</dd>
         <dt className="text-muted-foreground">{t('fields.vatNumber')}</dt>
@@ -134,7 +139,9 @@ export default async function VerificationCaseDetailPage({
                 <div className="flex flex-col gap-0.5 text-sm">
                   <span className="font-medium text-foreground">{document.documentKey}</span>
                   <span className="text-xs text-muted-foreground">
-                    {t('documents.uploadedAt', { date: document.uploadedAt })}
+                    {t('documents.uploadedAt', {
+                      date: format.dateTime(new Date(document.uploadedAt), 'medium'),
+                    })}
                   </span>
                 </div>
                 <DocumentViewer caseId={caseDetail.id} document={document} />

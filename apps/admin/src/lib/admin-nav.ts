@@ -43,6 +43,7 @@ const ADMIN_NAV_SECTIONS: readonly AdminNavSection[] = [
     blockedBy: { kind: 'api', step: '1A.8' },
   },
   { id: 'moderation', href: '/moderation', labelKey: 'moderation' },
+  { id: 'data-requests', href: '/data-requests', labelKey: 'dataRequests' },
   { id: 'settings', href: '/settings', labelKey: 'settings' },
 ];
 
