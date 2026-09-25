@@ -36,9 +36,26 @@ function cursorWhere(cursor: AdminDataRequestCursor): Prisma.DataRequestWhereInp
   };
 }
 
+export interface SuccessfulExport {
+  userId: string;
+  requestedAt: Date;
+}
+
 @Injectable()
 export class AdminDataRequestsRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+
+  // Batched over every user on the page, so working out whether a retry already
+  // answered a failed export costs one query per page, not one per row.
+  async listSuccessfulExports(userIds: string[]): Promise<SuccessfulExport[]> {
+    if (userIds.length === 0) {
+      return [];
+    }
+    return this.prisma.client.dataRequest.findMany({
+      where: { userId: { in: userIds }, type: 'export', status: { in: ['ready', 'completed'] } },
+      select: { userId: true, requestedAt: true },
+    });
+  }
 
   async list(filters: AdminDataRequestFilters): Promise<AdminDataRequestRow[]> {
     const and: Prisma.DataRequestWhereInput[] = [];

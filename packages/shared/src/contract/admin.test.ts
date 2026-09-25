@@ -465,11 +465,28 @@ describe('AdminDataRequestSchema', () => {
     expiresAt: null,
     failureReason: null,
     cancelledAt: null,
+    responseDueAt: null,
     user: { id, email: 'user@example.com' },
   };
 
   it('accepts a well-formed data request', () => {
     expect(AdminDataRequestSchema.safeParse(validRequest).success).toBe(true);
+  });
+
+  it('accepts an export with a responseDueAt', () => {
+    expect(
+      AdminDataRequestSchema.safeParse({
+        ...validRequest,
+        type: 'export',
+        responseDueAt: '2026-09-01T10:00:00.000Z',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a missing responseDueAt', () => {
+    const withoutResponseDueAt: Partial<typeof validRequest> = { ...validRequest };
+    delete withoutResponseDueAt.responseDueAt;
+    expect(AdminDataRequestSchema.safeParse(withoutResponseDueAt).success).toBe(false);
   });
 
   it('rejects an exportKey field', () => {

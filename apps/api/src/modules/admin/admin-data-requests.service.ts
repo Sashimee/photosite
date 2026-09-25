@@ -1,17 +1,61 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { AdminDataRequestSchema, AdminDataRequestsQuerySchema } from '@photoo/shared';
+import {
+  type AdminDataRequestSchema,
+  type AdminDataRequestsQuerySchema,
+  gdprResponseDueAt,
+} from '@photoo/shared';
 import type { z } from 'zod';
 import {
   decodeAdminDataRequestCursor,
   encodeAdminDataRequestCursor,
 } from './admin-data-request-cursor.js';
-import { AdminDataRequestsRepository } from './admin-data-requests.repository.js';
-import type { AdminDataRequestRow } from './admin-data-requests.repository.js';
+import {
+  type AdminDataRequestRow,
+  AdminDataRequestsRepository,
+  type SuccessfulExport,
+} from './admin-data-requests.repository.js';
 
 type Query = z.infer<typeof AdminDataRequestsQuerySchema>;
 type DataRequestDto = z.infer<typeof AdminDataRequestSchema>;
 
-function mapDataRequest(row: AdminDataRequestRow): DataRequestDto {
+// A `ready` export answered the request even once its download link has
+// expired, so only exports that never produced a copy are still awaiting one.
+function isAwaitingResponse(row: AdminDataRequestRow): boolean {
+  return (
+    row.type === 'export' &&
+    (row.status === 'pending' || row.status === 'processing' || row.status === 'failed')
+  );
+}
+
+function buildLatestSuccessByUser(rows: SuccessfulExport[]): Map<string, Date> {
+  const latest = new Map<string, Date>();
+  for (const row of rows) {
+    const current = latest.get(row.userId);
+    if (!current || row.requestedAt > current) {
+      latest.set(row.userId, row.requestedAt);
+    }
+  }
+  return latest;
+}
+
+function responseDueAt(
+  row: AdminDataRequestRow,
+  latestSuccessByUser: Map<string, Date>,
+): Date | null {
+  if (!isAwaitingResponse(row)) {
+    return null;
+  }
+  const latestSuccess = latestSuccessByUser.get(row.user.id);
+  if (latestSuccess && latestSuccess > row.requestedAt) {
+    return null;
+  }
+  return gdprResponseDueAt(row.requestedAt);
+}
+
+function mapDataRequest(
+  row: AdminDataRequestRow,
+  latestSuccessByUser: Map<string, Date>,
+): DataRequestDto {
   return {
     id: row.id,
     type: row.type,
@@ -21,6 +65,7 @@ function mapDataRequest(row: AdminDataRequestRow): DataRequestDto {
     expiresAt: row.expiresAt?.toISOString() ?? null,
     failureReason: row.failureReason,
     cancelledAt: row.cancelledAt?.toISOString() ?? null,
+    responseDueAt: responseDueAt(row, latestSuccessByUser)?.toISOString() ?? null,
     user: row.user,
   };
 }
@@ -47,6 +92,15 @@ export class AdminDataRequestsService {
     const nextCursor =
       hasMore && last ? encodeAdminDataRequestCursor(last.requestedAt, last.id) : null;
 
-    return { items: page.map(mapDataRequest), nextCursor };
+    const awaitingUserIds = [
+      ...new Set(page.filter((row) => isAwaitingResponse(row)).map((row) => row.user.id)),
+    ];
+    const successfulExports = await this.repository.listSuccessfulExports(awaitingUserIds);
+    const latestSuccessByUser = buildLatestSuccessByUser(successfulExports);
+
+    return {
+      items: page.map((row) => mapDataRequest(row, latestSuccessByUser)),
+      nextCursor,
+    };
   }
 }

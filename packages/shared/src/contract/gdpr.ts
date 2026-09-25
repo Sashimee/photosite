@@ -7,6 +7,31 @@ import { z } from './zod.js';
 // the grace-period countdown shown on the admin data-requests list.
 export const GDPR_DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 
+// GDPR Art. 12(3): one calendar month from `requestedAt` to respond to a
+// data subject request.
+export const GDPR_RESPONSE_PERIOD_MONTHS = 1;
+
+// Calendar-month arithmetic in UTC, clamped to the last day of the target
+// month (e.g. Jan 31 -> Feb 28, or Feb 29 on a leap year).
+export function gdprResponseDueAt(requestedAt: Date): Date {
+  const year = requestedAt.getUTCFullYear();
+  const month = requestedAt.getUTCMonth();
+  const targetMonth = month + GDPR_RESPONSE_PERIOD_MONTHS;
+  const lastDayOfTargetMonth = new Date(Date.UTC(year, targetMonth + 1, 0)).getUTCDate();
+  const day = Math.min(requestedAt.getUTCDate(), lastDayOfTargetMonth);
+  return new Date(
+    Date.UTC(
+      year,
+      targetMonth,
+      day,
+      requestedAt.getUTCHours(),
+      requestedAt.getUTCMinutes(),
+      requestedAt.getUTCSeconds(),
+      requestedAt.getUTCMilliseconds(),
+    ),
+  );
+}
+
 // `exportKey` is the private S3 object key and is never returned to a
 // client: `GET .../download` issues a short-lived presigned URL from it
 // instead (docs/steps/1A.12-gdpr.md "The export is a zip..."). `failureReason`

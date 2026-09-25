@@ -14,6 +14,7 @@ import { api } from '@/lib/api';
 import { maskEmail } from '@/lib/user-mask';
 
 import type { DataRequestsFilters } from './data-requests-search-params';
+import { hasPassed } from './date-status';
 import { graceDaysRemaining, isOverdueDeletion } from './grace-period';
 
 type AdminDataRequest = components['schemas']['AdminDataRequest'];
@@ -22,11 +23,16 @@ function isPendingDeletion(row: AdminDataRequest): boolean {
   return row.type === 'delete' && row.status === 'pending';
 }
 
+function isExpiredReady(row: AdminDataRequest): boolean {
+  return row.status === 'ready' && row.expiresAt !== null && hasPassed(row.expiresAt);
+}
+
 export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataRequestsFilters) {
   const t = useTranslations('admin.dataRequests.list');
   const tTypes = useTranslations('admin.dataRequests.types');
   const tStatuses = useTranslations('admin.dataRequests.statuses');
   const tGracePeriod = useTranslations('admin.dataRequests.list.gracePeriod');
+  const tResponseDue = useTranslations('admin.dataRequests.list.responseDue');
 
   if (userIdInvalid) {
     return null;
@@ -53,7 +59,7 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
     {
       id: 'status',
       header: t('columns.status'),
-      cell: (row) => tStatuses(row.status),
+      cell: (row) => (isExpiredReady(row) ? tStatuses('expired') : tStatuses(row.status)),
     },
     {
       id: 'requestedAt',
@@ -74,6 +80,23 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
       id: 'failureReason',
       header: t('columns.failureReason'),
       cell: (row) => row.failureReason ?? t('placeholders.none'),
+    },
+    {
+      id: 'responseDueAt',
+      header: t('columns.responseDueAt'),
+      cell: (row) => {
+        if (row.responseDueAt === null) {
+          return t('placeholders.notApplicable');
+        }
+        if (hasPassed(row.responseDueAt)) {
+          return (
+            <span className="font-medium text-destructive">
+              {row.responseDueAt} ({tResponseDue('overdue')})
+            </span>
+          );
+        }
+        return row.responseDueAt;
+      },
     },
     {
       id: 'gracePeriod',
