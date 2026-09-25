@@ -324,6 +324,7 @@ model User {
   @@index([countryCode])
   @@index([status])
   @@index([deletedAt])
+  @@index([createdAt, id])
 }
 
 // Better Auth "account" table: OAuth links and the credential (email+password)
