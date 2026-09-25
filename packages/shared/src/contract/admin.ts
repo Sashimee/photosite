@@ -1124,6 +1124,6 @@ registry.registerPath({
       description: 'The rendered subject, HTML body and text body',
       content: { 'application/json': { schema: AdminEmailTemplatePreviewSchema } },
     },
-    ...errorResponses([400, 401, 403, 404]),
+    ...errorResponses([400, 401, 403]),
   },
 });
