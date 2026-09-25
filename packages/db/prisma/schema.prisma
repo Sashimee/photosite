@@ -167,6 +167,12 @@ enum DataRequestType {
   delete
 }
 
+enum DataRequestChannel {
+  in_app
+  email
+  support
+}
+
 // `ready`/`cancelled` are required by docs/steps/1A.12-gdpr.md's "Export job
 // shape" and "Deletion is immediate" decisions: a finished export sits at
 // `ready` until downloaded or swept, and a deletion cancelled during its
@@ -552,19 +558,20 @@ model NotificationPreference {
 // per `(userId, type)`, so a second export or delete call while one is
 // already in flight returns the existing row instead of racing a new one.
 model DataRequest {
-  id            String            @id @default(uuid(7))
+  id            String             @id @default(uuid(7))
   userId        String
-  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   type          DataRequestType
-  status        DataRequestStatus @default(pending)
-  requestedAt   DateTime          @default(now())
+  status        DataRequestStatus  @default(pending)
+  channel       DataRequestChannel @default(in_app)
+  requestedAt   DateTime           @default(now())
   completedAt   DateTime?
   exportKey     String?
   expiresAt     DateTime?
   failureReason String?
   cancelledAt   DateTime?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
   @@index([userId])
   @@index([status, requestedAt])
