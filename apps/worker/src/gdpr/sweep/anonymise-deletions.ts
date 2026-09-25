@@ -19,6 +19,7 @@ export interface AnonymiseDeletionsDeps {
 export interface AnonymiseDeletionsResult {
   usersAnonymised: number;
   usersFailed: number;
+  usersSkipped: number;
 }
 
 // `en` is the source-of-truth locale (CLAUDE.md), not a nullable field.
@@ -45,10 +46,20 @@ async function anonymiseOne(
   deps: AnonymiseDeletionsDeps,
   dataRequestId: string,
   userId: string,
-): Promise<void> {
+  cutoff: Date,
+): Promise<'anonymised' | 'skipped'> {
   const objectsToDelete: { bucket: string; key: string }[] = [];
 
   const counts = await deps.prisma.client.$transaction(async (tx) => {
+    // Claimed first so a cancel racing the sweep's findMany loses the row.
+    const claim = await tx.dataRequest.updateMany({
+      where: { id: dataRequestId, status: 'pending', requestedAt: { lte: cutoff } },
+      data: { status: 'completed', completedAt: new Date(), failureReason: null },
+    });
+    if (claim.count === 0) {
+      return 'skipped' as const;
+    }
+
     const profile = await tx.photographerProfile.findUnique({
       where: { userId },
       select: { id: true, avatarUploadId: true, coverUploadId: true },
@@ -138,11 +149,6 @@ async function anonymiseOne(
       },
     });
 
-    await tx.dataRequest.update({
-      where: { id: dataRequestId },
-      data: { status: 'completed', completedAt: new Date(), failureReason: null },
-    });
-
     const result: AnonymisationCounts = {
       sessions: sessions.count,
       devices: devices.count,
@@ -158,6 +164,10 @@ async function anonymiseOne(
     };
     return result;
   });
+
+  if (counts === 'skipped') {
+    return 'skipped';
+  }
 
   for (const object of objectsToDelete) {
     try {
@@ -178,6 +188,8 @@ async function anonymiseOne(
     targetId: userId,
     after: counts,
   });
+
+  return 'anonymised';
 }
 
 export async function anonymiseDeletions(
@@ -191,10 +203,15 @@ export async function anonymiseDeletions(
 
   let usersAnonymised = 0;
   let usersFailed = 0;
+  let usersSkipped = 0;
   for (const request of due) {
     try {
-      await anonymiseOne(deps, request.id, request.userId);
-      usersAnonymised += 1;
+      const outcome = await anonymiseOne(deps, request.id, request.userId, cutoff);
+      if (outcome === 'skipped') {
+        usersSkipped += 1;
+      } else {
+        usersAnonymised += 1;
+      }
     } catch (error) {
       usersFailed += 1;
       deps.logger.error(
@@ -218,8 +235,8 @@ export async function anonymiseDeletions(
   }
 
   deps.logger.log(
-    { usersAnonymised, usersFailed },
+    { usersAnonymised, usersFailed, usersSkipped },
     'gdpr-sweep: anonymise-deletions phase complete',
   );
-  return { usersAnonymised, usersFailed };
+  return { usersAnonymised, usersFailed, usersSkipped };
 }
