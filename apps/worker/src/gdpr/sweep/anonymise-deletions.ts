@@ -51,9 +51,14 @@ async function anonymiseOne(
   const objectsToDelete: { bucket: string; key: string }[] = [];
 
   const counts = await deps.prisma.client.$transaction(async (tx) => {
-    // Claimed first so a cancel racing the sweep's findMany loses the row.
+    // Claimed first so exactly one of this sweep and a concurrent cancel wins the row.
     const claim = await tx.dataRequest.updateMany({
-      where: { id: dataRequestId, status: 'pending', requestedAt: { lte: cutoff } },
+      where: {
+        id: dataRequestId,
+        type: 'delete',
+        status: 'pending',
+        requestedAt: { lte: cutoff },
+      },
       data: { status: 'completed', completedAt: new Date(), failureReason: null },
     });
     if (claim.count === 0) {
@@ -166,6 +171,10 @@ async function anonymiseOne(
   });
 
   if (counts === 'skipped') {
+    deps.logger.log(
+      { dataRequestId },
+      'gdpr-sweep: deletion request no longer pending at claim time, skipped',
+    );
     return 'skipped';
   }
 

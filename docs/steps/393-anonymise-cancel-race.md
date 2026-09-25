@@ -13,7 +13,7 @@ Issue: #393. Agent: api-developer (worker), then test-writer. Reviews: code-revi
 - `cutoff` is computed once in `anonymiseDeletions` and passed in.
 - The trailing unconditional `update` goes away.
 - A skipped request counts as neither anonymised nor failed. It gets a separate `usersSkipped` count in the sweep result, if the result shape allows it.
-- Postgres row locks plus the re-check under READ COMMITTED serialise this against the API cancel, which uses the mirror guard `requestedAt > cutoff`.
+- Postgres row locks plus the `status = 'pending'` re-check under READ COMMITTED serialise this against the API cancel, which guards on the same status. The time cutoffs are computed on different hosts and don't make the two exclusive on their own.
 
 ## Tests
 

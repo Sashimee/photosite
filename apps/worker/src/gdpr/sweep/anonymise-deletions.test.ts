@@ -106,10 +106,46 @@ describe('anonymiseDeletions', () => {
     expect(client.user.update).not.toHaveBeenCalled();
     expect(deleteObject).not.toHaveBeenCalled();
     expect(auditRecord).not.toHaveBeenCalled();
+    expect(loggerLog).toHaveBeenCalledWith({ dataRequestId: 'req-cancelled' }, expect.any(String));
     expect(loggerLog).toHaveBeenCalledWith(
       { usersAnonymised: 0, usersFailed: 0, usersSkipped: 1 },
       expect.any(String),
     );
+  });
+
+  it('keeps sweeping after a skipped request and claims with the same cutoff it selected with', async () => {
+    const { client } = fakePrisma({
+      due: [
+        { id: 'req-cancelled', userId: 'user-cancelled' },
+        { id: 'req-ok', userId: 'user-ok' },
+      ],
+      skipRequestId: 'req-cancelled',
+    });
+    const auditRecord = vi.fn(() => Promise.resolve());
+
+    const result = await anonymiseDeletions({
+      prisma: { client } as never,
+      storage: {
+        config: { privateBucket: 'private', publicBucket: 'public' },
+        deleteObject: vi.fn(() => Promise.resolve()),
+      },
+      auditLog: { record: auditRecord },
+      logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+    });
+
+    expect(result).toEqual({ usersAnonymised: 1, usersFailed: 0, usersSkipped: 1 });
+    expect(auditRecord).toHaveBeenCalledTimes(1);
+    expect(auditRecord).toHaveBeenCalledWith(expect.objectContaining({ targetId: 'user-ok' }));
+
+    const selectCutoff = (
+      client.dataRequest.findMany.mock.calls[0] as unknown as [
+        { where: { requestedAt: { lte: Date } } },
+      ]
+    )[0].where.requestedAt.lte;
+    const claimCutoffs = client.dataRequest.updateMany.mock.calls
+      .map(([args]) => args.where.requestedAt?.lte)
+      .filter((cutoff): cutoff is Date => cutoff !== undefined);
+    expect(claimCutoffs).toEqual([selectCutoff, selectCutoff]);
   });
 
   it('logs and continues when a stray upload object cannot be deleted', async () => {
@@ -181,7 +217,12 @@ describe('anonymiseDeletions', () => {
     expect(result.usersAnonymised).toBe(1);
     expect(result.usersFailed).toBe(1);
     expect(dataRequestUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'req-ok', status: 'pending', requestedAt: { lte: expect.any(Date) as Date } },
+      where: {
+        id: 'req-ok',
+        type: 'delete',
+        status: 'pending',
+        requestedAt: { lte: expect.any(Date) as Date },
+      },
       data: { status: 'completed', completedAt: expect.any(Date) as Date, failureReason: null },
     });
     expect(auditRecord).toHaveBeenCalledTimes(1);
@@ -260,7 +301,12 @@ describe('anonymiseDeletions', () => {
     expect(result.usersAnonymised).toBe(1);
     expect(result.usersFailed).toBe(1);
     expect(dataRequestUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'req-ok', status: 'pending', requestedAt: { lte: expect.any(Date) as Date } },
+      where: {
+        id: 'req-ok',
+        type: 'delete',
+        status: 'pending',
+        requestedAt: { lte: expect.any(Date) as Date },
+      },
       data: { status: 'completed', completedAt: expect.any(Date) as Date, failureReason: null },
     });
     expect(loggerError).toHaveBeenCalledWith(
