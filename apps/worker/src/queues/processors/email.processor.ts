@@ -1,8 +1,8 @@
+import { renderAuthEmail } from '@photoo/email';
 import { EmailJobSchema, type EmailJob } from '@photoo/shared';
 import type { Processor } from 'bullmq';
 import type { Logger } from 'nestjs-pino';
 import type { MailTransport } from '../../email/mail-transport.js';
-import { renderAuthEmail } from '../../email/templates/auth-email.js';
 
 export interface EmailProcessorDeps {
   mailTransport: MailTransport;

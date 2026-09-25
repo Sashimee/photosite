@@ -2,7 +2,7 @@ import { getMessages } from '@photoo/i18n';
 import type { NotificationPayload, NotificationType } from '@photoo/shared';
 import { formatHtml, formatText } from '../format-message.js';
 import { escapeHtml } from '../html.js';
-import type { MailMessage } from '../mail-transport.js';
+import type { MailMessage } from '../mail-message.js';
 
 // Links are built only from webAppUrl plus ids, never from user input
 // (docs/steps/1A.7-notifications.md).

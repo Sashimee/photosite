@@ -1,6 +1,7 @@
 import {
   ADMIN_PERMISSIONS,
   FEATURE_FLAG_KEYS,
+  NOTIFICATION_TYPES,
   PORTFOLIO_IMAGE_STATUSES,
   PROVENANCE_VERDICTS,
   REPORT_STATUSES,
@@ -10,6 +11,8 @@ import {
   type AdminPermission,
   type FeatureFlagKey,
 } from '../enums.js';
+import { isChannelAvailable } from '../notification-channels.js';
+import type { EmailJob } from '../queues.js';
 import { UserSchema } from './auth.js';
 import { BookingBaseSchema } from './bookings.js';
 import {
@@ -1047,5 +1050,80 @@ registry.registerPath({
       },
     },
     ...errorResponses([400, 401, 403, 422]),
+  },
+});
+
+export const AUTH_EMAIL_TEMPLATE_NAMES = [
+  'verify-email',
+  'reset-password',
+  'account-exists',
+  'account-deletion-requested',
+] as const;
+
+type IsExact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+type Expect<T extends true> = T;
+export type AuthEmailTemplateNamesCoverEmailJobTypes = Expect<
+  IsExact<(typeof AUTH_EMAIL_TEMPLATE_NAMES)[number], EmailJob['type']>
+>;
+
+export const NOTIFY_EMAIL_TEMPLATE_NAMES = NOTIFICATION_TYPES.filter((type) =>
+  isChannelAvailable(type, 'email'),
+);
+
+export const EMAIL_TEMPLATE_NAMES = [
+  ...AUTH_EMAIL_TEMPLATE_NAMES,
+  ...NOTIFY_EMAIL_TEMPLATE_NAMES,
+] as const;
+
+export type EmailTemplateName = (typeof EMAIL_TEMPLATE_NAMES)[number];
+
+export const EmailTemplateNameSchema = z
+  .enum(EMAIL_TEMPLATE_NAMES)
+  .openapi('EmailTemplateName', { example: 'quote_received' });
+
+export const AdminEmailTemplatePreviewQuerySchema = z.object({ locale: LocaleSchema }).strict();
+
+export const AdminEmailTemplatePreviewSchema = z
+  .object({
+    subject: z.string().min(1),
+    html: z.string().min(1),
+    text: z.string().min(1),
+  })
+  .strict()
+  .openapi('AdminEmailTemplatePreview');
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/email-templates'),
+  summary: 'List the email templates that can be previewed',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('superadmin'),
+  responses: {
+    '200': {
+      description: 'Every previewable template name',
+      content: { 'application/json': { schema: z.array(EmailTemplateNameSchema) } },
+    },
+    ...errorResponses([401, 403]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/email-templates/{template}/preview'),
+  summary: 'Render an email template with fake sample data',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('superadmin'),
+  request: {
+    params: z.object({ template: EmailTemplateNameSchema }).strict(),
+    query: AdminEmailTemplatePreviewQuerySchema,
+  },
+  responses: {
+    '200': {
+      description: 'The rendered subject, HTML body and text body',
+      content: { 'application/json': { schema: AdminEmailTemplatePreviewSchema } },
+    },
+    ...errorResponses([400, 401, 403]),
   },
 });

@@ -2,7 +2,7 @@ import { DEFAULT_LOCALE, getMessages } from '@photoo/i18n';
 import type { EmailJob } from '@photoo/shared';
 import { formatHtml, formatText } from '../format-message.js';
 import { escapeHtml } from '../html.js';
-import type { MailMessage } from '../mail-transport.js';
+import type { MailMessage } from '../mail-message.js';
 
 // Not a real character any auth email url contains, so it survives
 // formatHtml's escaping untouched and can be swapped for a real <a> tag

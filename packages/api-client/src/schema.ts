@@ -9655,6 +9655,128 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/email-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the email templates that can be previewed */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Every previewable template name */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EmailTemplateName"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/email-templates/{template}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Render an email template with fake sample data */
+        get: {
+            parameters: {
+                query: {
+                    /** @description BCP 47 locale */
+                    locale: "en" | "fr" | "de" | "pt" | "es";
+                };
+                header?: never;
+                path: {
+                    template: components["schemas"]["EmailTemplateName"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The rendered subject, HTML body and text body */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminEmailTemplatePreview"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reports": {
         parameters: {
             query?: never;
@@ -12520,6 +12642,16 @@ export interface components {
              * @example 2026-09-16T12:00:00.000Z
              */
             occurredAt: string;
+        };
+        /**
+         * @example quote_received
+         * @enum {string}
+         */
+        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action";
+        AdminEmailTemplatePreview: {
+            subject: string;
+            html: string;
+            text: string;
         };
         CreateReportResponse: {
             /** @enum {string} */

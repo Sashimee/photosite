@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
 import { serverApi } from '@/lib/server-api';
@@ -68,6 +69,19 @@ export default async function SettingsPage() {
           {t('countries.title')}
         </h2>
         <CountriesTable countries={countries} headingId="settings-countries-heading" />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <h2 className="text-lg font-medium text-foreground">{t('emailPreview.title')}</h2>
+        <p className="text-sm text-muted-foreground">{t('emailPreview.description')}</p>
+        <div>
+          <Link
+            href="/settings/email-preview"
+            className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            {t('emailPreview.manageLink')}
+          </Link>
+        </div>
       </div>
     </section>
   );

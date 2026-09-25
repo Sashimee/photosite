@@ -3,6 +3,7 @@ import {
   AdminBookingSchema,
   AdminCountryLegalTextsResponseSchema,
   AdminCountrySchema,
+  AdminEmailTemplatePreviewQuerySchema,
   AdminLegalTextVersionSchema,
   AdminProvenanceCheckSchema,
   AdminReportSchema,
@@ -10,6 +11,7 @@ import {
   AdminUserSearchQuerySchema,
   AdminVerificationCasesQuerySchema,
   DirectTakedownRequestSchema,
+  EmailTemplateNameSchema,
   PlatformSettingsSchema,
   PublishLegalTextRequestSchema,
   RefundBookingRequestSchema,
@@ -448,5 +450,49 @@ describe('AdminVerificationCasesQuerySchema', () => {
 
   it('rejects an unknown status', () => {
     expect(AdminVerificationCasesQuerySchema.safeParse({ status: 'archived' }).success).toBe(false);
+  });
+});
+
+describe('EmailTemplateNameSchema', () => {
+  it('accepts a known template name', () => {
+    expect(EmailTemplateNameSchema.safeParse('verify-email').success).toBe(true);
+  });
+
+  it('rejects an unknown template name', () => {
+    expect(EmailTemplateNameSchema.safeParse('not_a_template').success).toBe(false);
+  });
+
+  it('rejects a path-traversal-ish template value', () => {
+    expect(EmailTemplateNameSchema.safeParse('../../etc/passwd').success).toBe(false);
+  });
+
+  it('rejects an empty template value', () => {
+    expect(EmailTemplateNameSchema.safeParse('').success).toBe(false);
+  });
+});
+
+describe('AdminEmailTemplatePreviewQuerySchema', () => {
+  it('accepts a supported locale', () => {
+    expect(AdminEmailTemplatePreviewQuerySchema.safeParse({ locale: 'fr' }).success).toBe(true);
+  });
+
+  it('rejects a missing locale', () => {
+    expect(AdminEmailTemplatePreviewQuerySchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects an unsupported locale', () => {
+    expect(AdminEmailTemplatePreviewQuerySchema.safeParse({ locale: 'xx' }).success).toBe(false);
+  });
+
+  it('rejects a garbage locale value', () => {
+    expect(AdminEmailTemplatePreviewQuerySchema.safeParse({ locale: '<script>' }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects unknown query keys', () => {
+    expect(
+      AdminEmailTemplatePreviewQuerySchema.safeParse({ locale: 'en', extra: 'x' }).success,
+    ).toBe(false);
   });
 });

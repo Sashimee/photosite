@@ -27,6 +27,7 @@ photosite/
     shared/     zod schemas, DTO types, enums, constants, fee maths, country config types
     api-client/ typed client generated from the API's OpenAPI document (used by web, admin, mobile)
     i18n/       ICU message catalogs per locale + tooling to detect missing keys
+    email/      email templates and render helpers (no I/O), used by worker to send and api to preview
     config/     shared eslint, prettier, tsconfig
   infra/
     docker/     Dockerfiles per app, compose for local dev (postgres, redis, minio, mailpit)
@@ -122,7 +123,7 @@ Vitest everywhere except `apps/mobile` (Jest via `jest-expo`, since Vitest doesn
 - Never `TRUNCATE`, reset, or drop the shared `photoo_test`/`photoo_shadow` databases from a test; migrations and seed run once per CI job (or once per `pnpm stack:up` locally) against the literal `photoo_test`/`photoo_shadow` names, which stay the template every scoped clone above is cloned from, and tests must be safe to run repeatedly against the same, growing scoped database.
 - Rate-limit and lockout state lives in Redis, not Postgres, and isn't cleaned up by deleting rows: `auth.integration.test.ts` clears `rate-limit:auth:*` and `lockout:auth:*` keys in `beforeAll` and `afterEach` so one test's lockout never bleeds into the next. `RedisRateLimiter` (`apps/api/src/common/rate-limit/redis-rate-limiter.ts`) is shared by every module that needs rate limiting; each caller namespaces its own scope (`auth:...`, `uploads:...`) so keys never collide within one run.
 
-**Coverage.** `@vitest/coverage-v8` (pinned to the same version as `vitest`, currently `5.0.1`) is enabled in-config (`test.coverage.enabled: true`) for `packages/shared`, `packages/i18n`, `packages/db`, `packages/api-client`, `apps/api` and `apps/web`; `apps/mobile` uses Jest's built-in coverage (`collectCoverage: true` in `apps/mobile/jest.config.js`). Coverage runs as part of the existing `pnpm test` (turbo `test` task) rather than a separate `test:coverage` step, so CI pays the cost of instrumentation once, not a second full test run. Coverage output (`coverage/`) is gitignored and not declared as a turbo cache output — it's a side effect of `test`, not an artifact anything downstream reads.
+**Coverage.** `@vitest/coverage-v8` (pinned to the same version as `vitest`, currently `5.0.1`) is enabled in-config (`test.coverage.enabled: true`) for `packages/shared`, `packages/i18n`, `packages/db`, `packages/api-client`, `packages/email`, `apps/api` and `apps/web`; `apps/mobile` uses Jest's built-in coverage (`collectCoverage: true` in `apps/mobile/jest.config.js`). Coverage runs as part of the existing `pnpm test` (turbo `test` task) rather than a separate `test:coverage` step, so CI pays the cost of instrumentation once, not a second full test run. Coverage output (`coverage/`) is gitignored and not declared as a turbo cache output — it's a side effect of `test`, not an artifact anything downstream reads.
 
 Each workspace's `vitest.config.ts` (or `jest.config.js`) scopes `coverage.include`/`collectCoverageFrom` to its own `src/`(and `apps/mobile`'s `app/`) so files never touched by any test count as 0% rather than being silently dropped from the denominator, then excludes:
 
@@ -139,6 +140,7 @@ Thresholds are set to the coverage measured with the local stack running (`pnpm 
 | `packages/i18n` | 93 | 89 | 99 | 93 |
 | `packages/db` | 75 | 66 (CI runs the seed on a fresh database, so fewer seed branches execute than locally) | 82 | 75 |
 | `packages/api-client` | 99 | 99 | 99 | 99 |
+| `packages/email` | 95 | 90 | 95 | 95 |
 | `apps/api` | 85 | 67 | 90 | 86 |
 | `apps/worker` | 92 | 83 | 89 | 92 |
 | `apps/web` | 48 | 60 | 55 | 48 |

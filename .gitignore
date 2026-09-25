@@ -8,6 +8,7 @@ dist/
 .turbo/
 packages/db/src/generated/
 coverage/
+.vitest/
 .next/
 .expo/
 *.tsbuildinfo
