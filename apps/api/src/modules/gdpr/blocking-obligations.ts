@@ -1,5 +1,7 @@
 import { HttpException } from '@nestjs/common';
-import type { PrismaClient } from '@photoo/db';
+import type { Prisma, PrismaClient } from '@photoo/db';
+
+type ReadClient = PrismaClient | Prisma.TransactionClient;
 
 // EU distance-selling right of withdrawal (Directive 2011/83/EU), referenced
 // generically in docs/COMPLIANCE.md ("right of withdrawal rules for
@@ -24,7 +26,7 @@ function blocked(reason: BlockingObligationReason, message: string): HttpExcepti
 // payments, undelivered bookings, pending payouts and open disputes
 // (docs/steps/1A.12-gdpr.md "Notes for later steps").
 export async function assertNoBlockingObligations(
-  prisma: PrismaClient,
+  prisma: ReadClient,
   userId: string,
 ): Promise<void> {
   const inReviewCase = await prisma.verificationCase.findFirst({

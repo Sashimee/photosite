@@ -7,6 +7,7 @@ import {
   type AdminLogDataRequestBodySchema,
   gdprResponseDueAt,
 } from '@photoo/shared';
+import { Logger } from 'nestjs-pino';
 import type { z } from 'zod';
 import { applyAccountDeletion } from '../gdpr/apply-account-deletion.js';
 import { assertNoBlockingObligations } from '../gdpr/blocking-obligations.js';
@@ -79,20 +80,34 @@ function assertReceivedAtInRange(receivedAt: Date): void {
   }
 }
 
+function httpExceptionCode(error: unknown): unknown {
+  if (!(error instanceof HttpException)) {
+    return undefined;
+  }
+  const response = error.getResponse();
+  return typeof response === 'object' ? (response as { code?: unknown }).code : undefined;
+}
+
+function isLostDeletionRace(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    return true;
+  }
+  return httpExceptionCode(error) === 'CONFLICT';
+}
+
 async function assertNoBlockingObligationsForAdmin(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   userId: string,
 ): Promise<void> {
   try {
     await assertNoBlockingObligations(prisma, userId);
   } catch (error) {
-    if (error instanceof HttpException) {
-      const response = error.getResponse();
-      const code = typeof response === 'object' ? (response as { code?: unknown }).code : undefined;
-      if (code === 'CONFLICT') {
-        const { message, details } = response as { message?: string; details?: unknown };
-        throw new HttpException({ code: 'BLOCKING_OBLIGATIONS', message, details }, 409);
-      }
+    if (httpExceptionCode(error) === 'CONFLICT') {
+      const { message, details } = (error as HttpException).getResponse() as {
+        message?: string;
+        details?: unknown;
+      };
+      throw new HttpException({ code: 'BLOCKING_OBLIGATIONS', message, details }, 409);
     }
     throw error;
   }
@@ -230,6 +245,7 @@ export class AdminDataRequestsService {
     @Inject(GdprExportQueueService) private readonly exportQueue: GdprExportQueueService,
     @Inject(DataRequestsService) private readonly dataRequestsService: DataRequestsService,
     @Inject(AdminAccessService) private readonly adminAccess: AdminAccessService,
+    @Inject(Logger) private readonly logger: Logger,
   ) {}
 
   async list(query: Query): Promise<{ items: DataRequestDto[]; nextCursor: string | null }> {
@@ -322,24 +338,32 @@ export class AdminDataRequestsService {
     try {
       await this.exportQueue.enqueue(created.id);
     } catch (error) {
-      const failedUpdate = await this.prisma.client.dataRequest.updateMany({
-        where: { id: created.id, status: 'pending' },
-        data: { status: 'failed', failureReason: 'enqueue_failed' },
-      });
-      if (failedUpdate.count === 1) {
-        await this.auditService.record(this.prisma.client, {
-          actorId: admin.id,
-          action: 'data_request.export_failed',
-          targetType: 'DataRequest',
-          targetId: created.id,
-          after: { status: 'failed', reason: 'enqueue_failed' },
-          ip: ip ?? null,
-        });
-      }
+      await this.markEnqueueFailed(created.id, admin.id, ip);
       throw error;
     }
 
     return mapDataRequest(created, new Map(), new Map());
+  }
+
+  private async markEnqueueFailed(
+    dataRequestId: string,
+    adminId: string,
+    ip: string | undefined,
+  ): Promise<void> {
+    const failedUpdate = await this.prisma.client.dataRequest.updateMany({
+      where: { id: dataRequestId, status: 'pending' },
+      data: { status: 'failed', failureReason: 'enqueue_failed' },
+    });
+    if (failedUpdate.count === 1) {
+      await this.auditService.record(this.prisma.client, {
+        actorId: adminId,
+        action: 'data_request.export_failed',
+        targetType: 'DataRequest',
+        targetId: dataRequestId,
+        after: { status: 'failed', reason: 'enqueue_failed' },
+        ip: ip ?? null,
+      });
+    }
   }
 
   async logOffline(
@@ -370,7 +394,7 @@ export class AdminDataRequestsService {
     return this.logOfflineDeletion(admin, user, body.channel, receivedAt, ip);
   }
 
-  // #417: an admin can't self-target or reach into another admin's account
+  // An admin can't self-target or reach into another admin's account
   // through the offline logging endpoint, unless they're a superadmin acting
   // with a fresh second factor (AdminAccessService.isSuperadminWithFreshTwoFactor).
   private async assertTargetNotProtected(
@@ -430,20 +454,7 @@ export class AdminDataRequestsService {
     try {
       await this.exportQueue.enqueue(created.id);
     } catch (error) {
-      const failedUpdate = await this.prisma.client.dataRequest.updateMany({
-        where: { id: created.id, status: 'pending' },
-        data: { status: 'failed', failureReason: 'enqueue_failed' },
-      });
-      if (failedUpdate.count === 1) {
-        await this.auditService.record(this.prisma.client, {
-          actorId: admin.id,
-          action: 'data_request.export_failed',
-          targetType: 'DataRequest',
-          targetId: created.id,
-          after: { status: 'failed', reason: 'enqueue_failed' },
-          ip: ip ?? null,
-        });
-      }
+      await this.markEnqueueFailed(created.id, admin.id, ip);
       throw error;
     }
 
@@ -457,11 +468,10 @@ export class AdminDataRequestsService {
     receivedAt: Date,
     ip: string | undefined,
   ): Promise<DataRequestDto> {
-    await assertNoBlockingObligationsForAdmin(this.prisma.client, user.id);
-
     let created: AdminDataRequestRow | null;
     try {
       created = await this.prisma.client.$transaction(async (tx) => {
+        await assertNoBlockingObligationsForAdmin(tx, user.id);
         const row = await applyAccountDeletion(tx, {
           userId: user.id,
           receivedAt,
@@ -477,7 +487,11 @@ export class AdminDataRequestsService {
         return this.repository.findByIdInTx(tx, row.id);
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isLostDeletionRace(error)) {
+        const status = await this.repository.findUserStatus(user.id);
+        if (status !== 'active') {
+          throw conflictForUserStatus(status);
+        }
         throw conflictForOpenType('delete');
       }
       throw error;
@@ -486,7 +500,14 @@ export class AdminDataRequestsService {
       throw notFound();
     }
 
-    await this.dataRequestsService.runPostDeletionSideEffects(user, created.id);
+    try {
+      await this.dataRequestsService.runPostDeletionSideEffects(user, created.id);
+    } catch (error) {
+      this.logger.warn(
+        { err: error, userId: user.id, dataRequestId: created.id },
+        'admin-data-requests: post-commit deletion side effects failed',
+      );
+    }
 
     return mapDataRequest(created, new Map(), new Map());
   }

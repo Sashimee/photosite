@@ -6,11 +6,10 @@ import { ConsentsRateLimitService } from './consents-rate-limit.service.js';
 import { ConsentsController } from './consents.controller.js';
 import { ConsentsService } from './consents.service.js';
 import { DataRequestsModule } from './data-requests.module.js';
-import { GdprExportQueueModule } from './gdpr-export-queue.module.js';
 import { PublicConsentsController } from './public-consents.controller.js';
 
 @Module({
-  imports: [AuthModule, CountriesModule, GdprExportQueueModule, DataRequestsModule],
+  imports: [AuthModule, CountriesModule, DataRequestsModule],
   controllers: [ConsentsController, PublicConsentsController],
   providers: [ConsentsService, ConsentsRateLimitService, OriginGuard],
 })

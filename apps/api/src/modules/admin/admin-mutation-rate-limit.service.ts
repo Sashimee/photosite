@@ -10,7 +10,7 @@ import {
 const ADMIN_MUTATION_RULE: RateLimitRule = { windowSeconds: 60, max: 30 };
 
 // Deletions are irreversible, so they get a tighter budget than other admin
-// mutations (docs/steps/378-offline-data-requests.md #417).
+// mutations.
 const ADMIN_DELETE_MUTATION_RULE: RateLimitRule = { windowSeconds: 60, max: 5 };
 
 @Injectable()

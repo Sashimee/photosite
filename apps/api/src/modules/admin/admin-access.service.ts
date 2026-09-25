@@ -72,9 +72,9 @@ export class AdminAccessService {
     return grant !== null;
   }
 
-  // The bypass for admin-protected targets (docs/steps/378-offline-data-requests.md
-  // #417): a superadmin acting with a second factor verified in the last 15
-  // minutes, same window `x-requires-2fa` routes enforce.
+  // The bypass for admin-protected targets: a superadmin acting with a
+  // second factor verified in the last 15 minutes, same window
+  // `x-requires-2fa` routes enforce.
   async isSuperadminWithFreshTwoFactor(session: SessionContext): Promise<boolean> {
     if (!this.hasFreshTwoFactor(session)) {
       return false;
