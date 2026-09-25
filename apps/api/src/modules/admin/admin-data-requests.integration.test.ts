@@ -49,15 +49,23 @@ describe('admin data requests integration', () => {
   let exportQueue: Queue;
   const createdUserIds: string[] = [];
 
-  // Country.code requires exactly two uppercase letters, so RUN_ID's hex
-  // digits are mapped into that range to avoid collisions with other
-  // integration suites running in parallel against the same database.
-  const RUN_ID = randomUUID().replaceAll('-', '').slice(0, 8);
-  function hexDigitToLetter(hexDigit: string): string {
-    return String.fromCharCode(65 + Number.parseInt(hexDigit, 16));
+  // Country.code requires exactly two uppercase letters; draw a fresh random
+  // one per attempt and retry on collision (mirrors countries.integration
+  // .test.ts's createTestCountry) rather than upserting into a row another
+  // suite may have created, which would hijack and then delete it out from
+  // under that suite.
+  function randomCountryCode(): string {
+    const pick = () => String.fromCharCode(65 + Math.floor(Math.random() * 16));
+    return `${pick()}${pick()}`;
   }
-  const FIXTURE_COUNTRY_CODE = `${hexDigitToLetter(RUN_ID[2] ?? '0')}${hexDigitToLetter(RUN_ID[3] ?? '1')}`;
   const FIXTURE_COUNTRY_TIMEZONE = 'Asia/Tokyo';
+  let fixtureCountryCode: string | undefined;
+  function requireFixtureCountryCode(): string {
+    if (!fixtureCountryCode) {
+      throw new Error('fixtureCountryCode is not set: beforeAll must run first');
+    }
+    return fixtureCountryCode;
+  }
 
   function fastify() {
     return app.getHttpAdapter().getInstance();
@@ -234,21 +242,31 @@ describe('admin data requests integration', () => {
     exportQueueConnection = new Redis(testEnv.REDIS_URL, { maxRetriesPerRequest: null });
     exportQueue = new Queue(GDPR_EXPORT_QUEUE_NAME, { connection: exportQueueConnection });
     await clearRateLimitKeys();
-    await prisma.country.upsert({
-      where: { code: FIXTURE_COUNTRY_CODE },
-      create: {
-        code: FIXTURE_COUNTRY_CODE,
-        name: 'Fixture Non-Luxembourg Country',
-        enabled: true,
-        currency: 'JPY',
-        vatRate: 0,
-        requiredDocuments: [],
-        legalTexts: {},
-        defaultLocale: 'en',
-        timezone: FIXTURE_COUNTRY_TIMEZONE,
-      },
-      update: { timezone: FIXTURE_COUNTRY_TIMEZONE },
-    });
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const code = randomCountryCode();
+      try {
+        await prisma.country.create({
+          data: {
+            code,
+            name: 'Fixture Non-Luxembourg Country',
+            enabled: false,
+            currency: 'JPY',
+            vatRate: 0,
+            requiredDocuments: [],
+            legalTexts: {},
+            defaultLocale: 'en',
+            timezone: FIXTURE_COUNTRY_TIMEZONE,
+          },
+        });
+        fixtureCountryCode = code;
+        break;
+      } catch {
+        continue;
+      }
+    }
+    if (!fixtureCountryCode) {
+      throw new Error('could not create fixture country: no unused code found');
+    }
   });
 
   afterEach(async () => {
@@ -260,7 +278,9 @@ describe('admin data requests integration', () => {
       await prisma.dataRequest.deleteMany({ where: { userId: { in: createdUserIds } } });
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
-    await prisma.country.deleteMany({ where: { code: FIXTURE_COUNTRY_CODE } });
+    if (fixtureCountryCode) {
+      await prisma.country.deleteMany({ where: { code: fixtureCountryCode } });
+    }
     await prisma.$disconnect();
     await exportQueue.close();
     exportQueueConnection.disconnect();
@@ -767,7 +787,11 @@ describe('admin data requests integration', () => {
 
       it('is computed in the subject user country timezone, not always Europe/Luxembourg', async () => {
         const admin = await makeAdmin('due-country-tz', ['support']);
-        const subject = await createSubjectUser('due-country-tz', 'active', FIXTURE_COUNTRY_CODE);
+        const subject = await createSubjectUser(
+          'due-country-tz',
+          'active',
+          requireFixtureCountryCode(),
+        );
         const requestedAt = new Date('2026-01-29T15:30:00.000Z');
         const failed = await createDataRequest({
           userId: subject.id,
@@ -1018,7 +1042,11 @@ describe('admin data requests integration', () => {
 
       it('is computed against the due date in the subject user country timezone', async () => {
         const admin = await makeAdmin('late-country-tz', ['support']);
-        const subject = await createSubjectUser('late-country-tz', 'active', FIXTURE_COUNTRY_CODE);
+        const subject = await createSubjectUser(
+          'late-country-tz',
+          'active',
+          requireFixtureCountryCode(),
+        );
         const requestedAt = new Date('2026-01-29T15:30:00.000Z');
         const dueInFixtureCountry = gdprResponseDueAt(requestedAt, FIXTURE_COUNTRY_TIMEZONE);
         const dueInLuxembourg = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
