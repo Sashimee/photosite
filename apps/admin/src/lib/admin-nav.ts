@@ -43,12 +43,7 @@ const ADMIN_NAV_SECTIONS: readonly AdminNavSection[] = [
     blockedBy: { kind: 'api', step: '1A.8' },
   },
   { id: 'moderation', href: '/moderation', labelKey: 'moderation' },
-  {
-    id: 'settings',
-    href: '/settings',
-    labelKey: 'settings',
-    blockedBy: { kind: 'ui', step: '1D.7' },
-  },
+  { id: 'settings', href: '/settings', labelKey: 'settings' },
 ];
 
 export function resolveNavSections(t: TranslateFn): ResolvedNavSection[] {

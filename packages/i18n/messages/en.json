@@ -489,6 +489,115 @@
           "description": "No published content matches that slug. If it was already taken down, find it in the moderation queue with the resolved status and the moderator-initiated filter."
         }
       }
+    },
+    "settings": {
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "forbidden": "You don't have permission to do this.",
+        "notFound": "This couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "conflict": "That couldn't be completed because something changed. Please retry."
+      },
+      "title": "Platform settings",
+      "lastChanged": {
+        "label": "Last changed",
+        "by": "By {actorId} on {date}",
+        "bySystem": "By the system on {date}",
+        "never": "No changes recorded yet."
+      },
+      "fee": {
+        "title": "Marketplace fee",
+        "currentLabel": "Current fee",
+        "notConfigured": "Not configured",
+        "percent": "{value}%",
+        "editTrigger": "Change fee",
+        "dialog": {
+          "title": "Change the marketplace fee?",
+          "newFeeLabel": "New fee (%)",
+          "consequences": "This changes the marketplace fee from {old} to {value}%. Bookings already quoted keep the fee they were quoted at; only quotes created after this change use the new fee.",
+          "confirmLabel": "Type {value} to confirm",
+          "confirmHint": "Re-enter the new fee above to confirm this change.",
+          "confirmMismatch": "Doesn't match the new fee above.",
+          "confirm": "Change fee",
+          "unchanged": "That's already the current fee."
+        }
+      },
+      "autoRelease": {
+        "title": "Auto-release",
+        "description": "Days after delivery before a booking's payout releases automatically.",
+        "daysLabel": "Auto-release days"
+      },
+      "flags": {
+        "title": "Feature flags",
+        "maintenanceMode": "Maintenance mode",
+        "newSignupsPaused": "New sign-ups paused",
+        "descriptions": {
+          "maintenanceMode": "Shows a maintenance banner on the public site.",
+          "newSignupsPaused": "Pauses new account sign-ups platform-wide, independent of any single country."
+        }
+      },
+      "countries": {
+        "title": "Countries",
+        "columns": {
+          "code": "Code",
+          "name": "Name",
+          "currency": "Currency",
+          "enabled": "Enabled",
+          "vatRate": "VAT rate",
+          "defaultLocale": "Default locale",
+          "accounts": "Accounts"
+        },
+        "yes": "Yes",
+        "no": "No",
+        "manageLink": "Manage",
+        "vatRateValue": "{rate} %",
+        "toggle": {
+          "enableTrigger": "Enable",
+          "disableTrigger": "Disable",
+          "enableTitle": "Enable {name}?",
+          "disableTitle": "Disable {name}?",
+          "enableConsequences": "This lets new sign-ups, profiles and requests in {name} start again, and affects the {count, plural, one {# existing account} other {# existing accounts}} already there.",
+          "disableConsequences": "This stops new sign-ups, profiles and requests in {name}. It does not delete or hide the {count, plural, one {# existing account} other {# existing accounts}} already there, and it doesn't affect their bookings.",
+          "enableConfirm": "Enable country",
+          "disableConfirm": "Disable country"
+        }
+      },
+      "detail": {
+        "back": "Back to countries",
+        "edit": {
+          "title": "Edit country",
+          "vatRateLabel": "VAT rate (%)",
+          "defaultLocaleLabel": "Default locale"
+        },
+        "legalTexts": {
+          "title": "Legal text versions",
+          "history": {
+            "title": "Version history",
+            "caption": "Published versions for this country, oldest first",
+            "empty": "No legal text has been published for this country yet.",
+            "columns": {
+              "version": "Version",
+              "kind": "Kind",
+              "locale": "Locale",
+              "publishedAt": "Published",
+              "publishedBy": "Published by"
+            }
+          },
+          "publish": {
+            "title": "Publish a new version",
+            "kindLabel": "Kind",
+            "kindPlaceholder": "terms",
+            "localeLabel": "Locale",
+            "contentLabel": "Content",
+            "submit": "Publish",
+            "confirm": {
+              "title": "Publish {kind}?",
+              "description": "This publishes a new {locale} version of {kind} for {country}. It becomes what every user in {country} sees, and can't be edited once published.",
+              "confirm": "Publish version"
+            }
+          }
+        }
+      }
     }
   },
   "common": {
