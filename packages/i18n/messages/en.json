@@ -562,7 +562,16 @@
           "trigger": "Retry export",
           "title": "Retry this export?",
           "consequences": "This creates a new export request for the user and starts it right away. It doesn't change the failed request itself.",
-          "confirm": "Confirm retry"
+          "confirm": "Confirm retry",
+          "errors": {
+            "exportNotFailed": "This request is no longer a failed export, so it can't be retried. The list has been refreshed.",
+            "userSuspended": "This user's account is suspended, so their export can't be retried.",
+            "userDeleted": "This user's account has been deleted, so their export can't be retried.",
+            "exportAlreadyRetried": "This export was already retried once — check the newer request in the list. The list has been refreshed.",
+            "exportOpen": "An export for this user is already in progress. The list has been refreshed.",
+            "exportAlreadyAnswered": "The user already has a newer export, so no retry is needed. The list has been refreshed.",
+            "tooManyRequests": "You're doing that too fast. Slow down and try again."
+          }
         }
       }
     },

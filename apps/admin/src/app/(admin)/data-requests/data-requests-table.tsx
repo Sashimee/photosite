@@ -163,7 +163,7 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
 
   return (
     <DataTable
-      key={refreshToken}
+      refreshSignal={refreshToken}
       columns={columns}
       fetchPage={fetchPage}
       getRowId={(row) => row.id}

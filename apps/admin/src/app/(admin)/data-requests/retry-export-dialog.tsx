@@ -20,6 +20,26 @@ import { apiErrorMessage } from '@/lib/api-errors';
 
 type AdminDataRequest = components['schemas']['AdminDataRequest'];
 
+const RETRY_EXPORT_ERROR_KEYS: Record<string, string> = {
+  EXPORT_NOT_FAILED: 'exportNotFailed',
+  USER_SUSPENDED: 'userSuspended',
+  USER_DELETED: 'userDeleted',
+  EXPORT_ALREADY_RETRIED: 'exportAlreadyRetried',
+  EXPORT_OPEN: 'exportOpen',
+  EXPORT_ALREADY_ANSWERED: 'exportAlreadyAnswered',
+  TOO_MANY_REQUESTS: 'tooManyRequests',
+};
+
+// A stale-list code means someone else already changed this request or the
+// user's export state since the row was loaded, so the list is re-fetched
+// alongside showing the message.
+const STALE_LIST_CODES = new Set([
+  'EXPORT_NOT_FAILED',
+  'EXPORT_ALREADY_RETRIED',
+  'EXPORT_OPEN',
+  'EXPORT_ALREADY_ANSWERED',
+]);
+
 export function RetryExportDialog({
   request,
   onRetried,
@@ -49,8 +69,15 @@ export function RetryExportDialog({
     });
     setSubmitting(false);
     if (error) {
-      if (error.code !== 'TWO_FACTOR_REQUIRED') {
-        setSubmitError(apiErrorMessage(tErrors, tErrors('errors.generic'), error));
+      if (error.code === 'TWO_FACTOR_REQUIRED') {
+        return;
+      }
+      const key = error.code ? RETRY_EXPORT_ERROR_KEYS[error.code] : undefined;
+      setSubmitError(
+        key ? t(`errors.${key}`) : apiErrorMessage(tErrors, tErrors('errors.generic'), error),
+      );
+      if (error.code && STALE_LIST_CODES.has(error.code)) {
+        onRetried();
       }
       return;
     }
