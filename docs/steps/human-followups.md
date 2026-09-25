@@ -2,7 +2,7 @@
 
 Work in `docs/PLAN.md` that needs Alex. The /loop run skips these and keeps building around them. Each entry says what is needed, what it unblocks and what happens meanwhile.
 
-Last updated: 2026-09-17.
+Last updated: 2026-09-24.
 
 ## Open decisions (`docs/DECISIONS.md`)
 
@@ -34,6 +34,7 @@ Last updated: 2026-09-17.
 | The Dokploy API token was printed once in a tool output | Rotate it in Dokploy and replace `~/.config/dokploy/seil.token` | – | – |
 | `~/.config/ghcr/read.token` is root-owned and world-readable (644), and belongs to the personal account | `chmod 600` plus chown to your user; ideally replace it with a read:packages token from a machine user and update the `ghcr-sashimee-read` registry in Dokploy | – | Works as is |
 | The post-deploy browser smoke job (`deploy-preview.yml`, docs/steps/1E.9-browser-smoke.md) signs in as `client@photoo.test` against the real footoo.bas.lu, so it needs the preview's own generated `SEED_USER_PASSWORD` as the repository secret `PREVIEW_SEED_USER_PASSWORD`. Without it the **signed-out** pages are still checked on every deploy; the signed-in half is skipped with a warning annotation naming the pages it did not exercise. Set it after rotating the seed password (#54) so the account pages are covered too |
+| #326: MinIO Inc. archived `github.com/minio/{minio,mc}` and cut off anonymous pulls of `quay.io/minio/{minio,mc}` and `dl.min.io` binaries, which blocked every CI job. `.github/workflows/mirror-minio.yml` now builds both from the pinned tagged source and pushes `ghcr.io/sashimee/{minio,mc}`, digest-pinned everywhere they're consumed. Confirmed after the first push (`curl` a fresh anonymous token from `ghcr.io/token`, no `docker login`, no stored credential): both `ghcr.io/sashimee/minio` and `ghcr.io/sashimee/mc` pull anonymously today - GHCR inherited this public repo's visibility by default, so `pnpm stack:up` and the Dokploy preview compose need no registry credential for them, same as the old `quay.io` images. CI's own jobs additionally log in with their `GITHUB_TOKEN` regardless (`packages: read`), so a run never depends on that default holding | Nothing blocking. If a future GHCR default or an accidental "make private" click ever breaks anonymous pulls of these two packages, re-set them to Public under repo → Packages in the GitHub UI (container package visibility can't be changed via the API/gh CLI) - they ship no proprietary code, only rebuilt open-source MinIO/mc binaries | – | – |
 
 ## Provenance vendors (1A.10)
 
@@ -58,6 +59,11 @@ Last updated: 2026-09-17.
 | Must a job offer carry a compensation range to be published? Pay-transparency rules are moving, and Luxembourg's position should be checked before the board is public | Confirm with the lawyer | Making the field required (a one-line contract change) | `compensation` is optional in Phase 1 |
 | Job board terms: what a professional warrants when posting, and the takedown process | Folded into the Phase 2 ToS work already listed | Public launch of the board | Offers are reportable by id; moderation queue is 1A.11 |
 | The `listing-expiry` sweep (1A.13b) flips a lapsed offer to `expired` but sends no notification: `NOTIFICATION_TYPES` only has `job_application_received`/`job_application_status_changed` from 1A.13a, and the worker's `notify-email.ts`/`notify-push.ts` templates are a `Record<NotificationType, ...>` keyed exhaustively over that enum, so nothing safe to add without a `packages/shared` contract change (issue #264) | A schema-migrator/api-developer pass adding a `job_offer_expired` notification type (enum, payload fields, email/push copy) | The professional getting told their listing lapsed | The sweep still flips the status and is fully idempotent; 1B.9's dashboard reads the true `status` from the database either way |
+| Privacy policy: add the job board as a processing activity. Cover what a public offer publishes (company name, logo, city, **coarsened** location, compensation), that applications go to the professional, and that listings last 60 days | Lawyer drafting | Public launch of the board | None, the board is not public yet |
+| Job-board terms: what the professional warrants about the address they post, and that an offer's location is published coarsened | Lawyer drafting, folded into the ToS row above | Public launch of the board | None |
+| Photographer agreement: state that the application message and portfolio link go to a third-party professional | Lawyer drafting | Public launch of the board | None |
+| `JobApplication` retention split: the applicant's text is erased, but the row is kept under the professional's legitimate interest. This needs a balancing test in the LIA, next to the provenance one | Lawyer sign-off | Nothing in code, the split already ships | None |
+| Sole-trader `vatNumber`: does it count as personal data? If the lawyer says it does, it has no Phase 1 purpose and should be **dropped** rather than defended | Lawyer's answer | A schema-migrator pass to drop the field, if the answer is yes | The field stays, is optional, and is not published |
 
 ## Professional area (1B.9)
 
@@ -65,6 +71,12 @@ Last updated: 2026-09-17.
 |-------|------------------|--------|----------------------|
 | `seedProfessionalJobOffer` (`packages/db/src/seed.ts`) creates exactly one professional profile with exactly one *published* offer and zero `JobApplication` rows — every other state 1B.9 has to render (draft, closed, expired, an inbox with at least one application) has nothing to click through locally without creating it by hand first | A schema-migrator follow-up to extend the seed with a draft offer, a closed offer, an offer near `expiresAt`, and at least one seeded application (ideally one `submitted`, one `shortlisted`/`rejected`) from an already-seeded photographer | Manual verification of 1B.9's non-happy-path states on the local stack and preview | 1B.9 ships its own component/page tests for these states regardless; only the "does it look right against real data" manual check is affected |
 | `1B.5` (request form) and `1B.8d` (send-quote) were built before the `EMAIL_NOT_VERIFIED` guard (#273) shipped and don't special-case that error code — a real (if narrow, OAuth-sign-up-only) user hits a generic error toast there today, the same dead end #290 was filed to fix elsewhere | A follow-up ticket to reuse 1B.9's `EmailVerificationRequired` component in those two already-merged flows | Nothing new — this is an existing, live gap, not something 1B.9 introduces | Users with a verified email (the large majority — see #290's own analysis of how an unverified session even happens) never see it |
+
+## Web e2e (1B.12)
+
+| Issue | Needed from Alex | Blocks | Workaround meanwhile |
+|-------|------------------|--------|----------------------|
+| The new `e2e` CI job ships non-blocking (report-only) for an initial burn-in period, by design — a flaky e2e suite that gates merges is worse than none | Promote it to a required branch-protection status check once it has passed repeatedly across real PRs with no harness-attributable failure; this is a repo-admin setting, not something a PR can flip on its own | Merges are never blocked by a genuinely flaky e2e run in the meantime | The job still reports its result on every PR, so its trend is visible before it gates anything |
 
 ## Payments (1A.8) — the biggest schedule risk
 
@@ -86,6 +98,7 @@ Last updated: 2026-09-17.
 | Issue | Needed from Alex | Why deferred |
 |-------|------------------|--------------|
 | #91: before the fix, `image-process` wrote resized variants for every image upload (including `chat_attachment`/`verification_document`) to the public bucket. Local dev/test MinIO and the `photoo`/`photoo_test` Postgres databases were checked on 2026-09-17: no `Upload` row for a private purpose has a non-null `variants` column, and `photoo-public` only holds seed `avatar`/`cover`/`portfolio` keys, so nothing to clean there. `main`/`footoo.bas.lu` preview is far behind `dev` (chat API isn't deployed there yet) and its seed script never creates `chat_attachment`/`verification_document` uploads, so it almost certainly has none either — but nobody has shell/S3 access to footoo.bas.lu's MinIO to confirm | Once dev merges to main and preview redeploys with chat/verification live, spot-check the preview `photoo-public` bucket (`mc ls --recursive`) for any `chat_attachment`/`verification_document` upload's variants before real users start attaching files, and delete any found | Not exploitable today: no such uploads exist pre-fix, and the fix stops new ones |
+| #342: step-up 2FA (re-enter TOTP) before changing the platform fee or publishing a legal text in admin. Today, holding a superadmin session is enough | Decide whether these actions need a fresh TOTP, and for how long a step-up stays valid | Not exploitable without a stolen superadmin session. Meanwhile the fee dialog requires the new fee to be typed again, publishing asks for confirmation, and both are audited |
 
 ## Credentials pending (0.6) and their placeholders
 

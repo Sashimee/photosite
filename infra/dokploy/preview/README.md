@@ -271,12 +271,17 @@ sudo docker exec dokploy-traefik wget -qO- \
 Traefik v3 matchers take exactly one parameter each, so `Method` needs
 `(Method(`GET`) || Method(`HEAD`))` rather than a two-verb list.
 
-**Browser uploads still don't work.** Presigned PUT URLs are signed against
-`S3_ENDPOINT=http://minio:9000` (the internal address, used for both
-buckets), which a browser can't resolve. Fixing this needs MinIO to be
+**Browser uploads still don't work.** Presigned PUT/GET URLs are signed
+against `S3_ENDPOINT=http://minio:9000` (the internal address, used for
+both buckets), which a browser can't resolve. Fixing this needs MinIO to be
 reachable at a stable public hostname whose signature matches - e.g. DNS
 for `s3.footoo.bas.lu` routed to `minio:9000` and `S3_ENDPOINT` pointed at
-it - not just the read-only path this compose file adds.
+it - not just the read-only path this compose file adds. `web`'s CSP
+`connect-src`/`img-src` (`apps/web/src/proxy.ts`, #322) already allow
+whatever `NEXT_PUBLIC_STORAGE_ORIGIN` is set to; once that public hostname
+exists, set `S3_ENDPOINT` and `NEXT_PUBLIC_STORAGE_ORIGIN` to it (build arg
+and runtime env, like `NEXT_PUBLIC_MEDIA_BASE_URL` - see #310 and #303 for
+the general build-arg/cache gaps in this deploy path).
 
 ## Object storage users
 
@@ -340,7 +345,7 @@ prefix in the same or a different bucket and can never collide.
 ```bash
 docker run --rm --network <project>_internal \
   -e MC_HOST_local=http://<MINIO_BACKUP_ACCESS_KEY>:<MINIO_BACKUP_SECRET_KEY>@minio:9000 \
-  quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z \
+  ghcr.io/sashimee/mc:RELEASE.2025-08-13T08-35-41Z \
   find local/photoo-backups/photoo/preview/ --name '*.dump.age'
 ```
 

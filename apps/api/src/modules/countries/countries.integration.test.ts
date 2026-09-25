@@ -403,6 +403,15 @@ describe('countries integration', () => {
       expect(auditRow).not.toBeNull();
       expect((auditRow?.before as { enabled?: boolean } | null)?.enabled).toBe(true);
       expect((auditRow?.after as { enabled?: boolean } | null)?.enabled).toBe(false);
+
+      const auditLogResponse = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/audit-log?entityType=Country&targetId=${code}`,
+        headers: admin.headers,
+      });
+      expect(auditLogResponse.statusCode).toBe(200);
+      const auditLogBody = auditLogResponse.json<{ items: { targetId: string | null }[] }>();
+      expect(auditLogBody.items.some((entry) => entry.targetId === code)).toBe(true);
     });
 
     // docs/steps/1D.7-settings.md: disabling a country gates new sign-ups,

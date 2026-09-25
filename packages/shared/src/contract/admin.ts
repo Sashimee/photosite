@@ -1,6 +1,8 @@
 import {
   ADMIN_PERMISSIONS,
   FEATURE_FLAG_KEYS,
+  NOTIFICATION_TYPES,
+  PORTFOLIO_IMAGE_STATUSES,
   PROVENANCE_VERDICTS,
   REPORT_STATUSES,
   USER_ROLES,
@@ -9,6 +11,8 @@ import {
   type AdminPermission,
   type FeatureFlagKey,
 } from '../enums.js';
+import { isChannelAvailable } from '../notification-channels.js';
+import type { EmailJob } from '../queues.js';
 import { UserSchema } from './auth.js';
 import { BookingBaseSchema } from './bookings.js';
 import {
@@ -95,6 +99,78 @@ export const SetUserRolesRequestSchema = z
   })
   .strict();
 
+// Each variant carries only what a moderator needs to decide, never the
+// reporting user's data or the target owner's email (docs/steps/1D.6-moderation.md).
+// `deletedAt` says whether the target is currently taken down, so the UI can
+// tell a live report from one whose target a moderator already removed.
+export const PhotographerProfileReportTargetSchema = z
+  .object({
+    targetType: z.literal('photographer_profile'),
+    displayName: z.string().max(120),
+    slug: SlugSchema,
+    isPublished: z.boolean(),
+    deletedAt: IsoDateTimeSchema.nullable(),
+  })
+  .strict()
+  .openapi('PhotographerProfileReportTarget');
+
+export const PortfolioImageReportTargetSchema = z
+  .object({
+    targetType: z.literal('portfolio_image'),
+    url: z.url().nullable(),
+    width: z.int().positive().nullable(),
+    height: z.int().positive().nullable(),
+    status: z.enum(PORTFOLIO_IMAGE_STATUSES),
+    deletedAt: IsoDateTimeSchema.nullable(),
+  })
+  .strict()
+  .openapi('PortfolioImageReportTarget');
+
+export const RequestReportTargetSchema = z
+  .object({
+    targetType: z.literal('request'),
+    title: z.string().max(150),
+    description: z.string().max(4000),
+    deletedAt: IsoDateTimeSchema.nullable(),
+  })
+  .strict()
+  .openapi('RequestReportTarget');
+
+export const JobOfferReportTargetSchema = z
+  .object({
+    targetType: z.literal('job_offer'),
+    title: z.string().max(150),
+    description: z.string().max(4000),
+    companyName: z.string().max(120),
+    deletedAt: IsoDateTimeSchema.nullable(),
+  })
+  .strict()
+  .openapi('JobOfferReportTarget');
+
+// `message` has no `.min(1)`: an applicant's account being GDPR-erased
+// blanks it to '' (apps/worker/src/gdpr/sweep/anonymise-deletions.ts)
+// without removing the application row, and this summary must still parse
+// afterwards. `jobOfferTitle` is the professional's own public listing
+// content, not the applicant's data, so it is safe context for deciding
+// whether the message fits that listing.
+export const JobApplicationReportTargetSchema = z
+  .object({
+    targetType: z.literal('job_application'),
+    message: z.string().max(2000),
+    jobOfferTitle: z.string().max(150),
+    deletedAt: IsoDateTimeSchema.nullable(),
+  })
+  .strict()
+  .openapi('JobApplicationReportTarget');
+
+export const AdminReportTargetSchema = z.discriminatedUnion('targetType', [
+  PhotographerProfileReportTargetSchema,
+  PortfolioImageReportTargetSchema,
+  RequestReportTargetSchema,
+  JobOfferReportTargetSchema,
+  JobApplicationReportTargetSchema,
+]);
+
 export const AdminReportSchema = z
   .object({
     id: IdSchema,
@@ -105,6 +181,13 @@ export const AdminReportSchema = z
     status: z.enum(REPORT_STATUSES),
     adminId: IdSchema.nullable(),
     resolution: z.string().max(2000).nullable(),
+    createdAt: IsoDateTimeSchema,
+    // Derived from `Report.updatedAt`: null while `status` is `open`, since
+    // resolve/takedown are the only writes that ever touch an existing
+    // report row and `restore` deliberately does not (docs/steps/1D.6-moderation.md
+    // "restore ... does not reopen the report").
+    resolvedAt: IsoDateTimeSchema.nullable(),
+    target: AdminReportTargetSchema.nullable(),
   })
   .strict()
   .openapi('AdminReport');
@@ -127,6 +210,40 @@ export const TakedownReportRequestSchema = z
     resolution: z.string().min(1).max(2000),
   })
   .strict();
+
+// Same shape and weight as `TakedownReportRequestSchema`: a reversal is a
+// moderation decision in its own right and gets its own statement of
+// reasons, not a bare status flip (docs/steps/1D.6-moderation.md).
+export const RestoreReportRequestSchema = z
+  .object({
+    resolution: z.string().min(1).max(2000),
+  })
+  .strict();
+
+// Content a moderator found themselves, with no `Report` row to hang the
+// audit trail and the notice on (D25, docs/steps/1D.6-moderation.md). The
+// API synthesises one: `reporterId: null`, `reason` set to
+// `MODERATOR_INITIATED_REPORT_REASON`, `status: 'resolved'` from the start.
+// Restricted to the two entry points the plan names; widen this enum, not
+// the underlying takedown/restore machinery, if a third one is ever needed.
+export const DIRECT_TAKEDOWN_TARGET_TYPES = ['photographer_profile', 'job_offer'] as const;
+
+export const DirectTakedownTargetTypeSchema = z
+  .enum(DIRECT_TAKEDOWN_TARGET_TYPES)
+  .openapi({ example: 'photographer_profile' });
+
+export const DirectTakedownRequestSchema = z
+  .object({
+    targetType: DirectTakedownTargetTypeSchema,
+    targetId: IdSchema,
+    resolution: z.string().min(1).max(2000),
+  })
+  .strict();
+
+// The `Report.reason` value for a synthesised report (D25): explains itself
+// to a moderator reading the queue, and lets a later UI tell a
+// moderator-initiated entry apart from a public one without a schema change.
+export const MODERATOR_INITIATED_REPORT_REASON = 'Found by a moderator; no report was filed.';
 
 export const AdminProvenanceCheckSchema = z
   .object({
@@ -284,7 +401,7 @@ export const AdminAuditLogQuerySchema = z
   .object({
     actorId: IdSchema.optional(),
     entityType: z.string().min(1).max(60).optional(),
-    targetId: IdSchema.optional(),
+    targetId: IdSchema.or(CountryCodeSchema).optional(),
     from: IsoDateTimeSchema.optional(),
     to: IsoDateTimeSchema.optional(),
     cursor: z.string().min(1).optional(),
@@ -298,7 +415,7 @@ export const AdminAuditLogEntrySchema = z
     actorId: IdSchema.nullable(),
     action: z.string().min(1).max(100),
     targetType: z.string().min(1).max(60),
-    targetId: IdSchema.nullable(),
+    targetId: IdSchema.or(CountryCodeSchema).nullable(),
     before: z.unknown().nullable(),
     after: z.unknown().nullable(),
     ip: z.string().min(1).max(64).nullable(),
@@ -706,6 +823,46 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/reports/{id}'),
+  summary: 'Get a report, including a summary of its target',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('moderation'),
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+  },
+  responses: {
+    '200': {
+      description: 'The report',
+      content: { 'application/json': { schema: AdminReportSchema } },
+    },
+    ...errorResponses([401, 403, 404]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/admin/reports/direct-takedown'),
+  summary: 'Take down a profile or job offer a moderator found without a prior report',
+  description:
+    'Synthesises a Report with reporterId: null, already resolved, so the takedown gets the same audit trail, statement of reasons and restore path as a reported one.',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('moderation'),
+  request: {
+    body: { content: { 'application/json': { schema: DirectTakedownRequestSchema } } },
+  },
+  responses: {
+    '201': {
+      description: 'A report was synthesised and its target taken down',
+      content: { 'application/json': { schema: AdminReportSchema } },
+    },
+    ...errorResponses([400, 401, 403, 404, 409, 422]),
+  },
+});
+
+registry.registerPath({
   method: 'post',
   path: apiPath('/admin/reports/{id}/resolve'),
   summary: 'Resolve a report',
@@ -739,6 +896,26 @@ registry.registerPath({
   responses: {
     '200': {
       description: 'Report resolved and its target taken down',
+      content: { 'application/json': { schema: AdminReportSchema } },
+    },
+    ...errorResponses([400, 401, 403, 404, 409, 422]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/admin/reports/{id}/restore'),
+  summary: "Reverse a takedown, restoring the report's target",
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('moderation'),
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+    body: { content: { 'application/json': { schema: RestoreReportRequestSchema } } },
+  },
+  responses: {
+    '200': {
+      description: 'Target restored',
       content: { 'application/json': { schema: AdminReportSchema } },
     },
     ...errorResponses([400, 401, 403, 404, 409, 422]),
@@ -873,5 +1050,80 @@ registry.registerPath({
       },
     },
     ...errorResponses([400, 401, 403, 422]),
+  },
+});
+
+export const AUTH_EMAIL_TEMPLATE_NAMES = [
+  'verify-email',
+  'reset-password',
+  'account-exists',
+  'account-deletion-requested',
+] as const;
+
+type IsExact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+type Expect<T extends true> = T;
+export type AuthEmailTemplateNamesCoverEmailJobTypes = Expect<
+  IsExact<(typeof AUTH_EMAIL_TEMPLATE_NAMES)[number], EmailJob['type']>
+>;
+
+export const NOTIFY_EMAIL_TEMPLATE_NAMES = NOTIFICATION_TYPES.filter((type) =>
+  isChannelAvailable(type, 'email'),
+);
+
+export const EMAIL_TEMPLATE_NAMES = [
+  ...AUTH_EMAIL_TEMPLATE_NAMES,
+  ...NOTIFY_EMAIL_TEMPLATE_NAMES,
+] as const;
+
+export type EmailTemplateName = (typeof EMAIL_TEMPLATE_NAMES)[number];
+
+export const EmailTemplateNameSchema = z
+  .enum(EMAIL_TEMPLATE_NAMES)
+  .openapi('EmailTemplateName', { example: 'quote_received' });
+
+export const AdminEmailTemplatePreviewQuerySchema = z.object({ locale: LocaleSchema }).strict();
+
+export const AdminEmailTemplatePreviewSchema = z
+  .object({
+    subject: z.string().min(1),
+    html: z.string().min(1),
+    text: z.string().min(1),
+  })
+  .strict()
+  .openapi('AdminEmailTemplatePreview');
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/email-templates'),
+  summary: 'List the email templates that can be previewed',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('superadmin'),
+  responses: {
+    '200': {
+      description: 'Every previewable template name',
+      content: { 'application/json': { schema: z.array(EmailTemplateNameSchema) } },
+    },
+    ...errorResponses([401, 403]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/email-templates/{template}/preview'),
+  summary: 'Render an email template with fake sample data',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('superadmin'),
+  request: {
+    params: z.object({ template: EmailTemplateNameSchema }).strict(),
+    query: AdminEmailTemplatePreviewQuerySchema,
+  },
+  responses: {
+    '200': {
+      description: 'The rendered subject, HTML body and text body',
+      content: { 'application/json': { schema: AdminEmailTemplatePreviewSchema } },
+    },
+    ...errorResponses([400, 401, 403]),
   },
 });

@@ -7,7 +7,7 @@ RUN corepack enable && corepack prepare pnpm@12.4.2 --activate
 WORKDIR /app
 
 # turbo prune trims the workspace to @photoo/api and the packages it depends
-# on (db, shared, config) before anything is installed.
+# on (db, email, shared, config) before anything is installed.
 FROM base AS pruner
 RUN npm install --global turbo@2.10.13
 COPY . .
@@ -73,6 +73,13 @@ COPY --from=trimmed --chown=app:app /app/apps/api/dist ./apps/api/dist
 COPY --from=trimmed --chown=app:app /app/packages/db/package.json ./packages/db/package.json
 COPY --from=trimmed --chown=app:app /app/packages/db/node_modules ./packages/db/node_modules
 COPY --from=trimmed --chown=app:app /app/packages/db/dist ./packages/db/dist
+COPY --from=trimmed --chown=app:app /app/packages/email/package.json ./packages/email/package.json
+COPY --from=trimmed --chown=app:app /app/packages/email/node_modules ./packages/email/node_modules
+COPY --from=trimmed --chown=app:app /app/packages/email/dist ./packages/email/dist
+COPY --from=trimmed --chown=app:app /app/packages/i18n/package.json ./packages/i18n/package.json
+COPY --from=trimmed --chown=app:app /app/packages/i18n/node_modules ./packages/i18n/node_modules
+COPY --from=trimmed --chown=app:app /app/packages/i18n/dist ./packages/i18n/dist
+COPY --from=trimmed --chown=app:app /app/packages/i18n/messages ./packages/i18n/messages
 COPY --from=trimmed --chown=app:app /app/packages/shared/package.json ./packages/shared/package.json
 COPY --from=trimmed --chown=app:app /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=trimmed --chown=app:app /app/packages/shared/dist ./packages/shared/dist

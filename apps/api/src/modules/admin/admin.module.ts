@@ -3,11 +3,14 @@ import { PlatformSettingsModule } from '../../common/platform-settings/platform-
 import { AuthModule } from '../auth/auth.module.js';
 import { OriginGuard } from '../auth/origin-guard.js';
 import { ChatSocketBridgeModule } from '../chat/chat-socket-bridge.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 import { AdminAccessService } from './admin-access.service.js';
 import { AdminAuditLogController } from './admin-audit-log.controller.js';
 import { AdminAuditLogRepository } from './admin-audit-log.repository.js';
 import { AdminAuditLogService } from './admin-audit-log.service.js';
 import { AdminAuditService } from './admin-audit.service.js';
+import { AdminEmailTemplatesController } from './admin-email-templates.controller.js';
+import { AdminEmailTemplatesService } from './admin-email-templates.service.js';
 import { AdminMeController } from './admin-me.controller.js';
 import { AdminMeService } from './admin-me.service.js';
 import { AdminMutationRateLimitService } from './admin-mutation-rate-limit.service.js';
@@ -22,13 +25,14 @@ import { AdminUsersRepository } from './admin-users.repository.js';
 import { AdminUsersService } from './admin-users.service.js';
 
 @Module({
-  imports: [AuthModule, ChatSocketBridgeModule, PlatformSettingsModule],
+  imports: [AuthModule, ChatSocketBridgeModule, PlatformSettingsModule, NotificationsModule],
   controllers: [
     AdminMeController,
     AdminUsersController,
     AdminSettingsController,
     AdminAuditLogController,
     AdminReportsController,
+    AdminEmailTemplatesController,
   ],
   providers: [
     AdminAccessService,
@@ -43,6 +47,7 @@ import { AdminUsersService } from './admin-users.service.js';
     AdminAuditLogRepository,
     AdminReportsService,
     AdminReportsRepository,
+    AdminEmailTemplatesService,
     OriginGuard,
   ],
   exports: [

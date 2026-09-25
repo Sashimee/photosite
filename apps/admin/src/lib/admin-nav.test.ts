@@ -16,6 +16,8 @@ describe('resolveNavSections', () => {
     const health = sections.find((section) => section.id === 'health');
     const users = sections.find((section) => section.id === 'users');
     const verification = sections.find((section) => section.id === 'verification');
+    const moderation = sections.find((section) => section.id === 'moderation');
+    const settings = sections.find((section) => section.id === 'settings');
 
     expect(dashboard).toMatchObject({ href: '/', label: 'nav.dashboard', available: true });
     expect(dashboard?.note).toBeUndefined();
@@ -29,15 +31,18 @@ describe('resolveNavSections', () => {
       available: true,
     });
     expect(verification?.note).toBeUndefined();
-  });
-
-  it('labels a section blocked on our own UI work as coming soon, not API-unavailable', () => {
-    const sections = resolveNavSections(fakeT());
-
-    const settings = sections.find((section) => section.id === 'settings');
-
-    expect(settings?.available).toBe(false);
-    expect(settings?.note).toBe('nav.comingSoon:{"step":"1D.7"}');
+    expect(moderation).toMatchObject({
+      href: '/moderation',
+      label: 'nav.moderation',
+      available: true,
+    });
+    expect(moderation?.note).toBeUndefined();
+    expect(settings).toMatchObject({
+      href: '/settings',
+      label: 'nav.settings',
+      available: true,
+    });
+    expect(settings?.note).toBeUndefined();
   });
 
   it('labels a section blocked on a missing endpoint as available after that step', () => {

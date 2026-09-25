@@ -16,9 +16,9 @@ import type { SearchResultRow } from './profiles.repository.js';
 // webp (docs/steps/1A.3-uploads.md), format negotiation is not implemented.
 const AVATAR_VARIANT_KEY = 'thumb_jpeg';
 const COVER_VARIANT_KEY = 'large_jpeg';
-const PORTFOLIO_VARIANT_KEY = 'medium_jpeg';
+export const PORTFOLIO_VARIANT_KEY = 'medium_jpeg';
 
-function uploadVariants(upload: Upload | null | undefined): Record<string, string> | null {
+export function uploadVariants(upload: Upload | null | undefined): Record<string, string> | null {
   return (upload?.variants as Record<string, string> | null | undefined) ?? null;
 }
 

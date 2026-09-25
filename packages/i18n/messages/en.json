@@ -318,6 +318,299 @@
           }
         }
       }
+    },
+    "moderation": {
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "forbidden": "You don't have permission to do this.",
+        "notFound": "This couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "conflict": "That couldn't be completed because something changed. Please retry."
+      },
+      "statuses": {
+        "open": "Open",
+        "resolved": "Resolved",
+        "dismissed": "Dismissed"
+      },
+      "targetTypes": {
+        "photographer_profile": "Photographer profile",
+        "portfolio_image": "Portfolio image",
+        "request": "Request",
+        "job_offer": "Job offer",
+        "job_application": "Job application"
+      },
+      "portfolioImageStatuses": {
+        "processing": "Processing",
+        "pending_review": "Pending review",
+        "approved": "Approved",
+        "flagged": "Flagged",
+        "rejected": "Rejected"
+      },
+      "list": {
+        "title": "Moderation queue",
+        "caption": "Reports awaiting moderation, oldest first",
+        "directTakedownLink": "Take down without a report",
+        "moderatorInitiated": "Taken down directly by a moderator (no report filed)",
+        "columns": {
+          "reason": "Reason",
+          "targetType": "Target type",
+          "age": "Age",
+          "reporter": "Reporter",
+          "status": "Status"
+        },
+        "reporterPresent": "Reporter present",
+        "reporterAnonymous": "Anonymous",
+        "age": {
+          "today": "Today",
+          "days": "{days, plural, one {# day ago} other {# days ago}}"
+        },
+        "empty": {
+          "title": "No reports match this filter.",
+          "hint": "The queue defaults to open reports, oldest first."
+        },
+        "filters": {
+          "formLabel": "Moderation filters",
+          "statusLabel": "Status",
+          "targetTypeLabel": "Target type",
+          "allTargetTypes": "All types",
+          "moderatorInitiatedLabel": "Only content a moderator took down directly, with no report",
+          "submit": "Filter"
+        }
+      },
+      "detail": {
+        "title": "Report",
+        "fields": {
+          "status": "Status",
+          "createdAt": "Reported",
+          "resolvedAt": "Decided",
+          "reporter": "Reporter",
+          "reporterPresent": "Present",
+          "reporterAnonymous": "Anonymous",
+          "resolution": "Statement of reasons"
+        },
+        "reason": {
+          "title": "Reason given by the reporter",
+          "moderatorInitiated": {
+            "title": "Found by a moderator",
+            "description": "No public report was filed. A moderator identified this content directly."
+          }
+        },
+        "target": {
+          "title": "Reported content",
+          "removed": {
+            "title": "This content is gone",
+            "description": "It no longer exists. It may have been deleted or removed as part of an account closure."
+          },
+          "alreadyTakenDown": "Taken down on {date}.",
+          "photographerProfile": {
+            "displayName": "Display name",
+            "slug": "Profile slug",
+            "isPublished": "Published",
+            "published": "Yes",
+            "unpublished": "No"
+          },
+          "portfolioImage": {
+            "alt": "Reported portfolio image",
+            "noPreview": "This image has no preview available.",
+            "dimensions": "Dimensions",
+            "dimensionsValue": "{width} × {height}px",
+            "dimensionsUnknown": "Unknown",
+            "status": "Status",
+            "label": "this portfolio image"
+          },
+          "jobOffer": {
+            "companyName": "Posted by {companyName}"
+          },
+          "jobApplication": {
+            "jobOfferTitle": "Application to {jobOfferTitle}",
+            "emptyMessage": "This applicant's message was removed as part of account deletion.",
+            "label": "the application to “{jobOfferTitle}”"
+          }
+        },
+        "history": {
+          "title": "Decision history",
+          "caption": "Audit log entries for this report",
+          "empty": "No audit log entries for this report.",
+          "systemActor": "System",
+          "columns": {
+            "occurredAt": "When",
+            "action": "Action",
+            "actor": "Actor"
+          }
+        },
+        "actions": {
+          "noticeLabel": "Statement of reasons (sent to the reporter and the content owner)",
+          "noticeHint": "This explanation is sent to both the person who reported this and the content's owner. Write it for them, not for another moderator.",
+          "noActions": "This report is closed and its target isn't taken down. There is nothing left to do here.",
+          "conflict": {
+            "alreadyResolved": "This report was already resolved by {adminId}.",
+            "alreadyResolvedUnknown": "This report was already resolved by another admin.",
+            "notTakenDown": "This target is no longer taken down; there is nothing to restore."
+          },
+          "resolve": {
+            "trigger": "Resolve",
+            "title": "Resolve this report?",
+            "consequences": "This closes the report without removing anything. Your explanation is sent to the reporter and the content's owner.",
+            "confirm": "Resolve report"
+          },
+          "dismiss": {
+            "trigger": "Dismiss",
+            "title": "Dismiss this report?",
+            "consequences": "This closes the report as without merit. Your explanation is sent to the reporter and the content's owner.",
+            "confirm": "Dismiss report"
+          },
+          "takedown": {
+            "trigger": "Take down",
+            "title": "Take down this content?",
+            "consequences": "This removes {targetLabel} and notifies its owner that it was taken down. You can reverse this later from this page.",
+            "confirm": "Take down content"
+          },
+          "restore": {
+            "trigger": "Restore",
+            "title": "Restore this content?",
+            "consequences": "This restores {targetLabel} and notifies its owner. It does not reopen the report.",
+            "confirm": "Restore content"
+          }
+        }
+      },
+      "directTakedown": {
+        "title": "Take down without a report",
+        "description": "Remove a photographer profile or job offer a moderator found directly, with no public report filed. Only a published profile or an open job offer can be looked up here; something already taken down is found from the moderation queue instead.",
+        "form": {
+          "formLabel": "Look up content to take down",
+          "targetTypeLabel": "Content type",
+          "slugLabel": "Slug",
+          "slugPlaceholder": "jane-doe-photography",
+          "slugHint": "The URL slug from the public page, for example photoo.lu/en/photographers/jane-doe-photography.",
+          "submit": "Look up"
+        },
+        "notFound": {
+          "title": "Nothing found",
+          "description": "No published content matches that slug. If it was already taken down, find it in the moderation queue with the resolved status and the moderator-initiated filter."
+        }
+      }
+    },
+    "settings": {
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "forbidden": "You don't have permission to do this.",
+        "notFound": "This couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "conflict": "That couldn't be completed because something changed. Please retry."
+      },
+      "title": "Platform settings",
+      "lastChanged": {
+        "label": "Last changed",
+        "by": "By {actorId} on {date}",
+        "bySystem": "By the system on {date}",
+        "never": "No changes recorded yet."
+      },
+      "fee": {
+        "title": "Marketplace fee",
+        "currentLabel": "Current fee",
+        "notConfigured": "Not configured",
+        "percent": "{value}%",
+        "editTrigger": "Change fee",
+        "dialog": {
+          "title": "Change the marketplace fee?",
+          "newFeeLabel": "New fee (%)",
+          "consequences": "This changes the marketplace fee from {old} to {value}%. Bookings already quoted keep the fee they were quoted at; only quotes created after this change use the new fee.",
+          "confirmLabel": "Type {value} to confirm",
+          "confirmHint": "Re-enter the new fee above to confirm this change.",
+          "confirmMismatch": "Doesn't match the new fee above.",
+          "confirm": "Change fee",
+          "unchanged": "That's already the current fee."
+        }
+      },
+      "autoRelease": {
+        "title": "Auto-release",
+        "description": "Days after delivery before a booking's payout releases automatically.",
+        "daysLabel": "Auto-release days"
+      },
+      "flags": {
+        "title": "Feature flags",
+        "maintenanceMode": "Maintenance mode",
+        "newSignupsPaused": "New sign-ups paused",
+        "descriptions": {
+          "maintenanceMode": "Shows a maintenance banner on the public site.",
+          "newSignupsPaused": "Pauses new account sign-ups platform-wide, independent of any single country."
+        }
+      },
+      "countries": {
+        "title": "Countries",
+        "columns": {
+          "code": "Code",
+          "name": "Name",
+          "currency": "Currency",
+          "enabled": "Enabled",
+          "vatRate": "VAT rate",
+          "defaultLocale": "Default locale",
+          "accounts": "Accounts"
+        },
+        "yes": "Yes",
+        "no": "No",
+        "manageLink": "Manage",
+        "vatRateValue": "{rate} %",
+        "toggle": {
+          "enableTrigger": "Enable",
+          "disableTrigger": "Disable",
+          "enableTitle": "Enable {name}?",
+          "disableTitle": "Disable {name}?",
+          "enableConsequences": "This lets new sign-ups, profiles and requests in {name} start again, and affects the {count, plural, one {# existing account} other {# existing accounts}} already there.",
+          "disableConsequences": "This stops new sign-ups, profiles and requests in {name}. It does not delete or hide the {count, plural, one {# existing account} other {# existing accounts}} already there, and it doesn't affect their bookings.",
+          "enableConfirm": "Enable country",
+          "disableConfirm": "Disable country"
+        }
+      },
+      "detail": {
+        "back": "Back to countries",
+        "edit": {
+          "title": "Edit country",
+          "vatRateLabel": "VAT rate (%)",
+          "defaultLocaleLabel": "Default locale"
+        },
+        "legalTexts": {
+          "title": "Legal text versions",
+          "history": {
+            "title": "Version history",
+            "caption": "Published versions for this country, oldest first",
+            "empty": "No legal text has been published for this country yet.",
+            "columns": {
+              "version": "Version",
+              "kind": "Kind",
+              "locale": "Locale",
+              "publishedAt": "Published",
+              "publishedBy": "Published by"
+            }
+          },
+          "publish": {
+            "title": "Publish a new version",
+            "kindLabel": "Kind",
+            "kindPlaceholder": "terms",
+            "localeLabel": "Locale",
+            "contentLabel": "Content",
+            "submit": "Publish",
+            "confirm": {
+              "title": "Publish {kind}?",
+              "description": "This publishes a new {locale} version of {kind} for {country}. It becomes what every user in {country} sees, and can't be edited once published.",
+              "confirm": "Publish version"
+            }
+          }
+        }
+      },
+      "emailPreview": {
+        "title": "Email templates",
+        "description": "Preview a rendered email template with sample data. This never sends mail.",
+        "manageLink": "Preview templates",
+        "back": "Back to settings",
+        "empty": "No email templates are available to preview.",
+        "templateLabel": "Template",
+        "localeLabel": "Locale",
+        "authLocaleNote": "Account emails are always sent in English",
+        "subjectLabel": "Subject",
+        "htmlLabel": "HTML",
+        "textLabel": "Text"
+      }
     }
   },
   "common": {
@@ -416,6 +709,42 @@
       "jobApplicationStatusChanged": {
         "subject": "Your application status has changed",
         "body": "{counterpartName} updated your application for {jobOfferTitle}. View it here: {url}"
+      },
+      "reportDecision": {
+        "resolved": {
+          "subject": "Your report was reviewed",
+          "body": "We reviewed the report you filed and took no further action. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        },
+        "dismissed": {
+          "subject": "Your report was reviewed",
+          "body": "We reviewed the report you filed and dismissed it. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        },
+        "takedown": {
+          "subject": "Content you reported was removed",
+          "body": "We reviewed the report you filed and removed the content. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        },
+        "restored": {
+          "subject": "A removal you reported on was reversed",
+          "body": "Content you reported, which had been removed, was restored after further review. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        }
+      },
+      "moderationAction": {
+        "resolved": {
+          "subject": "A report about your content was reviewed",
+          "body": "A report was filed about your content. We reviewed it and took no further action. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        },
+        "dismissed": {
+          "subject": "A report about your content was dismissed",
+          "body": "A report was filed about your content and dismissed. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        },
+        "takedown": {
+          "subject": "Your content was removed",
+          "body": "Your content was removed after a report. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        },
+        "restored": {
+          "subject": "Your content was restored",
+          "body": "Content of yours that had been removed was restored after further review. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        }
       }
     }
   },
@@ -600,6 +929,30 @@
       "jobApplicationStatusChanged": {
         "title": "Application status changed",
         "body": "Your application for {jobOfferTitle} was updated"
+      },
+      "reportDecision": {
+        "resolved": { "title": "Your report was reviewed", "body": "See the outcome by email" },
+        "dismissed": { "title": "Your report was reviewed", "body": "See the outcome by email" },
+        "takedown": {
+          "title": "Content you reported was removed",
+          "body": "See the details by email"
+        },
+        "restored": {
+          "title": "A removal you reported on was reversed",
+          "body": "See the details by email"
+        }
+      },
+      "moderationAction": {
+        "resolved": {
+          "title": "A report about your content was reviewed",
+          "body": "See the outcome by email"
+        },
+        "dismissed": {
+          "title": "A report about your content was dismissed",
+          "body": "See the outcome by email"
+        },
+        "takedown": { "title": "Your content was removed", "body": "See the details by email" },
+        "restored": { "title": "Your content was restored", "body": "See the details by email" }
       }
     }
   },
@@ -1135,6 +1488,7 @@
         "profile": "Profile",
         "portfolio": "Portfolio",
         "products": "Packages",
+        "verification": "Verification",
         "requests": "Requests",
         "quotes": "Quotes"
       },
@@ -1182,8 +1536,9 @@
             "unverified": "Not submitted yet.",
             "pending": "Submitted, waiting for review.",
             "verified": "Verified.",
-            "rejected": "Rejected. You'll be able to see why and resubmit here soon.",
-            "comingSoon": "Document upload is coming soon."
+            "rejected": "Rejected. See why and start again.",
+            "cta": "Manage verification",
+            "startCta": "Start verification"
           },
           "payouts": {
             "title": "Payouts",
@@ -1278,6 +1633,82 @@
           "invalid": "That couldn't be completed. Try again.",
           "forbidden": "You don't have access to this portfolio.",
           "notFound": "This photo could not be found.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "verification": {
+        "metaTitle": "Verification",
+        "title": "Verification",
+        "backToOverview": "Back to overview",
+        "intro": "We verify your identity and business details before your profile can be published. Documents are reviewed by our team and never shown publicly.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Verification is tied to your photographer profile, so set that up before starting it.",
+        "needsProfileCta": "Create your profile",
+        "countryUnavailableDescription": "Verification isn't set up for your profile's country yet. Check back later.",
+        "statusHeading": "Status",
+        "status": {
+          "draft": "Draft, not submitted",
+          "submitted": "Submitted, waiting for review",
+          "in_review": "Under review",
+          "approved": "Verified",
+          "rejected": "Rejected",
+          "expired": "Expired"
+        },
+        "submittedAtLabel": "Submitted",
+        "decidedAtLabel": "Decided",
+        "rejectionReasonHeading": "Why it was rejected",
+        "startNewCaseCta": "Start a new verification case",
+        "startNewCaseConfirmTitle": "Start a new verification case?",
+        "startNewCaseConfirmDescription": "This starts a fresh case with new documents. Your previous case and its outcome are kept for our records.",
+        "startNewCaseConfirmCta": "Yes, start again",
+        "startNewCasePending": "Starting…",
+        "startNewCaseCancelCta": "Cancel",
+        "businessHeading": "Business details",
+        "businessNameLabel": "Business name",
+        "businessNameRequiredHint": "Required before you can submit.",
+        "vatNumberLabel": "VAT number (optional)",
+        "businessRegistrationNumberLabel": "Business registration number (optional)",
+        "saveDetailsCta": "Save details",
+        "startCaseCta": "Start verification",
+        "saving": "Saving…",
+        "detailsSaved": "Details saved.",
+        "caseStarted": "Verification started. Upload your documents below.",
+        "documentsHeading": "Required documents",
+        "documentsHint": "Which documents are required depends on your country. Accepted file types vary by document.",
+        "documentsNeedCaseNotice": "Start verification above to upload your documents.",
+        "documentStatus": {
+          "missing": "Not uploaded",
+          "clean": "Uploaded",
+          "pending": "Scanning…",
+          "infected": "Failed the virus scan",
+          "failed": "Scan failed"
+        },
+        "uploadCta": "Upload",
+        "replaceCta": "Replace",
+        "uploading": "Uploading… {percent}%",
+        "scanning": "Scanning for viruses…",
+        "attaching": "Saving…",
+        "unsupportedType": "This file type isn't accepted for this document.",
+        "uploadErrors": {
+          "infected": "This file failed a virus scan and wasn't added.",
+          "scanFailed": "The scan couldn't complete. Try again.",
+          "scanTimeout": "The scan is taking longer than expected. Try again shortly."
+        },
+        "submitHeading": "Submit for review",
+        "submitRequirementsHint": "Add a business name and upload every required document before submitting.",
+        "submitCta": "Submit for review",
+        "submitConfirmTitle": "Submit for review?",
+        "submitConfirmDescription": "Once submitted, your details and documents are locked until our team reviews them.",
+        "submitConfirmCta": "Yes, submit",
+        "submitPending": "Submitting…",
+        "submitCancelCta": "Cancel",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "Your verification case changed elsewhere. Reload and try again.",
+          "invalid": "That couldn't be completed. Check your details and try again.",
+          "forbidden": "You don't have access to this verification case.",
+          "notFound": "This verification case could not be found.",
           "tooManyRequests": "You're doing that too fast. Slow down and try again.",
           "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
         }

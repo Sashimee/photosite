@@ -31,6 +31,12 @@ function uniqueEmail(label: string): string {
   return `reports-${label}-${randomUUID()}@photoo.test`;
 }
 
+interface ReportTargetBody {
+  targetType: string;
+  deletedAt: string | null;
+  [key: string]: unknown;
+}
+
 interface ReportBody {
   id: string;
   reporterId: string | null;
@@ -40,6 +46,9 @@ interface ReportBody {
   status: string;
   adminId: string | null;
   resolution: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  target: ReportTargetBody | null;
 }
 
 interface ReportsPage {
@@ -312,6 +321,21 @@ describe('reports integration', () => {
     });
     createdJobApplicationIds.push(application.id);
     return application;
+  }
+
+  async function fileReport(targetType: string, targetId: string, reason: string, token?: string) {
+    const response = await fastify().inject({
+      method: 'POST',
+      url: '/v1/reports',
+      remoteAddress: FAKE_IP,
+      ...(token ? { headers: authHeaders(token) } : {}),
+      payload: { targetType, targetId, reason },
+    });
+    expect(response.statusCode).toBe(201);
+    return prisma.report.findFirstOrThrow({
+      where: { targetId, targetType },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   async function clearRateLimitKeys(): Promise<void> {
@@ -1101,6 +1125,709 @@ describe('reports integration', () => {
         payload: { resolution: 'Fixture' },
       });
       expect(response.statusCode).toBe(404);
+    });
+  });
+
+  describe('GET /v1/admin/reports/:id', () => {
+    it('requires the moderation permission', async () => {
+      const profile = await createPublishedProfile(`detail-matrix-${randomUUID().slice(0, 6)}`);
+      const report = await fileReport('photographer_profile', profile.id, 'Matrix fixture');
+      for (const permission of ADMIN_PERMISSIONS) {
+        await clearRateLimitKeys();
+        const admin = await makeAdmin(`detail-matrix-${permission}-${randomUUID().slice(0, 6)}`, [
+          permission,
+        ]);
+        const response = await fastify().inject({
+          method: 'GET',
+          url: `/v1/admin/reports/${report.id}`,
+          headers: admin.headers,
+        });
+        if (permission === 'moderation') {
+          expect(response.statusCode).toBe(200);
+        } else {
+          expect(response.statusCode).toBe(403);
+        }
+      }
+    });
+
+    it('returns 401 without a session', async () => {
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/reports/${randomUUID()}`,
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('returns 404 for an unknown report', async () => {
+      const admin = await makeAdmin(`detail-404-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/reports/${randomUUID()}`,
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('includes createdAt, a null resolvedAt while open, and a photographer_profile target summary', async () => {
+      const admin = await makeAdmin(`detail-profile-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const profile = await createPublishedProfile(`detail-profile-${randomUUID().slice(0, 6)}`);
+      const report = await fileReport('photographer_profile', profile.id, 'Impersonation');
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/reports/${report.id}`,
+        headers: admin.headers,
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<ReportBody>();
+      expect(body.createdAt).toBeTruthy();
+      expect(body.resolvedAt).toBeNull();
+      expect(body.target).toEqual({
+        targetType: 'photographer_profile',
+        displayName: profile.displayName,
+        slug: profile.slug,
+        isPublished: true,
+        deletedAt: null,
+      });
+    });
+
+    it('sets resolvedAt once the report is resolved', async () => {
+      const admin = await makeAdmin(`detail-resolved-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const profile = await createPublishedProfile(`detail-resolved-${randomUUID().slice(0, 6)}`);
+      const report = await fileReport('photographer_profile', profile.id, 'Fixture');
+
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${report.id}/resolve`,
+        headers: admin.headers,
+        payload: { status: 'dismissed', resolution: 'No violation found' },
+      });
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/reports/${report.id}`,
+        headers: admin.headers,
+      });
+      expect(response.json<ReportBody>().resolvedAt).toBeTruthy();
+    });
+
+    it('returns the target summary for a portfolio_image', async () => {
+      const admin = await makeAdmin(`detail-image-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const profile = await createPublishedProfile(`detail-image-${randomUUID().slice(0, 6)}`);
+      const image = await createApprovedPortfolioImage(
+        profile.id,
+        profile.ownerId,
+        `detail-image-${randomUUID().slice(0, 6)}`,
+      );
+      const imageReport = await fileReport('portfolio_image', image.id, 'AI-generated');
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/reports/${imageReport.id}`,
+        headers: admin.headers,
+      });
+      const target = response.json<ReportBody>().target;
+      expect(target?.targetType).toBe('portfolio_image');
+      expect(typeof target?.url).toBe('string');
+      expect(target?.status).toBe('approved');
+      expect(target?.deletedAt).toBeNull();
+    });
+
+    it('returns the target summary for a request', async () => {
+      await clearRateLimitKeys();
+      const admin = await makeAdmin(`detail-request-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const client = await signUpVerifyAndSignIn(
+        ['client'],
+        `detail-request-${randomUUID().slice(0, 6)}`,
+      );
+      const request = await createOpenRequest(
+        client.id,
+        `detail-request-${randomUUID().slice(0, 6)}`,
+      );
+      const requestReport = await fileReport('request', request.id, 'Spam');
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/reports/${requestReport.id}`,
+        headers: admin.headers,
+      });
+      expect(response.json<ReportBody>().target).toEqual({
+        targetType: 'request',
+        title: request.title,
+        description: request.description,
+        deletedAt: null,
+      });
+    });
+
+    it('returns the target summary for a job_offer', async () => {
+      await clearRateLimitKeys();
+      const admin = await makeAdmin(`detail-offer-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const offer = await createPublishedJobOffer(`detail-offer-${randomUUID().slice(0, 6)}`);
+      const offerReport = await fileReport('job_offer', offer.id, 'Fraud');
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/reports/${offerReport.id}`,
+        headers: admin.headers,
+      });
+      const professional = await prisma.professionalProfile.findUniqueOrThrow({
+        where: { id: offer.professionalId },
+      });
+      expect(response.json<ReportBody>().target).toEqual({
+        targetType: 'job_offer',
+        title: offer.title,
+        description: offer.description,
+        companyName: professional.companyName,
+        deletedAt: null,
+      });
+    });
+
+    it('returns the target summary for a job_application', async () => {
+      await clearRateLimitKeys();
+      const admin = await makeAdmin(`detail-app-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const offer = await createPublishedJobOffer(`detail-app-${randomUUID().slice(0, 6)}`);
+      await clearRateLimitKeys();
+      const application = await createJobApplication(
+        offer.id,
+        `detail-app-${randomUUID().slice(0, 6)}`,
+      );
+      const applicationReport = await fileReport('job_application', application.id, 'Abusive');
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/reports/${applicationReport.id}`,
+        headers: admin.headers,
+      });
+      expect(response.json<ReportBody>().target).toEqual({
+        targetType: 'job_application',
+        message: application.message,
+        jobOfferTitle: offer.title,
+        deletedAt: null,
+      });
+    });
+
+    it('returns a null target, not an error, when the target row is gone', async () => {
+      const admin = await makeAdmin(`detail-gone-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const profile = await createPublishedProfile(`detail-gone-${randomUUID().slice(0, 6)}`);
+      const image = await createApprovedPortfolioImage(
+        profile.id,
+        profile.ownerId,
+        `detail-gone-${randomUUID().slice(0, 6)}`,
+      );
+      const report = await fileReport('portfolio_image', image.id, 'Fixture');
+
+      await prisma.portfolioImage.delete({ where: { id: image.id } });
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/reports/${report.id}`,
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json<ReportBody>().target).toBeNull();
+    });
+
+    it('never includes the target owner email in the target summary', async () => {
+      const admin = await makeAdmin(`detail-no-email-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const profile = await createPublishedProfile(`detail-no-email-${randomUUID().slice(0, 6)}`);
+      const owner = await prisma.user.findUniqueOrThrow({ where: { id: profile.ownerId } });
+      const report = await fileReport('photographer_profile', profile.id, 'Fixture');
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/reports/${report.id}`,
+        headers: admin.headers,
+      });
+      expect(JSON.stringify(response.json())).not.toContain(owner.email);
+    });
+  });
+
+  describe('POST /v1/admin/reports/:id/restore', () => {
+    it('requires the moderation permission', async () => {
+      for (const permission of ADMIN_PERMISSIONS) {
+        await clearRateLimitKeys();
+        const profile = await createPublishedProfile(
+          `restore-matrix-${permission}-${randomUUID().slice(0, 6)}`,
+        );
+        const report = await fileReport('photographer_profile', profile.id, 'Fixture');
+        const takedownAdmin = await makeAdmin(
+          `restore-matrix-td-${permission}-${randomUUID().slice(0, 6)}`,
+          ['moderation'],
+        );
+        await fastify().inject({
+          method: 'POST',
+          url: `/v1/admin/reports/${report.id}/takedown`,
+          headers: takedownAdmin.headers,
+          payload: { resolution: 'Fixture takedown' },
+        });
+        await clearRateLimitKeys();
+
+        const admin = await makeAdmin(`restore-matrix-${permission}-${randomUUID().slice(0, 6)}`, [
+          permission,
+        ]);
+        const response = await fastify().inject({
+          method: 'POST',
+          url: `/v1/admin/reports/${report.id}/restore`,
+          headers: admin.headers,
+          payload: { resolution: 'Fixture restore' },
+        });
+        if (permission === 'moderation') {
+          expect(response.statusCode).toBe(200);
+        } else {
+          expect(response.statusCode).toBe(403);
+        }
+      }
+    });
+
+    it('requires a statement of reasons', async () => {
+      const admin = await makeAdmin(`restore-empty-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const profile = await createPublishedProfile(`restore-empty-${randomUUID().slice(0, 6)}`);
+      const report = await fileReport('photographer_profile', profile.id, 'Fixture');
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${report.id}/takedown`,
+        headers: admin.headers,
+        payload: { resolution: 'Fixture takedown' },
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${report.id}/restore`,
+        headers: admin.headers,
+        payload: { resolution: '' },
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('round-trips a takedown: restores the target, audits report.restored, and does not reopen the report', async () => {
+      const admin = await makeAdmin(`restore-roundtrip-${randomUUID().slice(0, 6)}`, [
+        'moderation',
+      ]);
+      const profile = await createPublishedProfile(`restore-roundtrip-${randomUUID().slice(0, 6)}`);
+      const report = await fileReport('photographer_profile', profile.id, 'Impersonation');
+
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${report.id}/takedown`,
+        headers: admin.headers,
+        payload: { resolution: 'Confirmed impersonation, profile removed' },
+      });
+      const takenDown = await prisma.photographerProfile.findUniqueOrThrow({
+        where: { id: profile.id },
+      });
+      expect(takenDown.deletedAt).not.toBeNull();
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${report.id}/restore`,
+        headers: admin.headers,
+        payload: { resolution: 'Reviewed again, not actually impersonation' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<ReportBody>();
+      expect(body.status).toBe('resolved');
+      expect(body.target?.deletedAt).toBeNull();
+
+      const restored = await prisma.photographerProfile.findUniqueOrThrow({
+        where: { id: profile.id },
+      });
+      expect(restored.deletedAt).toBeNull();
+
+      const auditRow = await prisma.auditLog.findFirst({
+        where: { action: 'report.restored', targetType: 'Report', targetId: report.id },
+      });
+      expect(auditRow).not.toBeNull();
+      expect(auditRow?.actorId).toBe(admin.id);
+
+      const stillResolved = await prisma.report.findUniqueOrThrow({ where: { id: report.id } });
+      expect(stillResolved.status).toBe('resolved');
+    });
+
+    it('returns 409 when the target was never taken down', async () => {
+      const admin = await makeAdmin(`restore-409-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const profile = await createPublishedProfile(`restore-409-${randomUUID().slice(0, 6)}`);
+      const report = await fileReport('photographer_profile', profile.id, 'Fixture');
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${report.id}/restore`,
+        headers: admin.headers,
+        payload: { resolution: 'Attempted restore' },
+      });
+      expect(response.statusCode).toBe(409);
+    });
+
+    it('returns 404 for an unknown report', async () => {
+      const admin = await makeAdmin(`restore-404-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${randomUUID()}/restore`,
+        headers: admin.headers,
+        payload: { resolution: 'Fixture' },
+      });
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('returns 422 for a report whose targetType is no longer supported', async () => {
+      const admin = await makeAdmin(`restore-422-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const reporter = await signUpVerifyAndSignIn(
+        ['client'],
+        `restore-422-${randomUUID().slice(0, 6)}`,
+      );
+      const legacyReport = await prisma.report.create({
+        data: {
+          reporterId: reporter.id,
+          targetType: 'user',
+          targetId: randomUUID(),
+          reason: 'Legacy target type fixture',
+        },
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${legacyReport.id}/restore`,
+        headers: admin.headers,
+        payload: { resolution: 'Fixture' },
+      });
+      expect(response.statusCode).toBe(422);
+
+      await prisma.report.delete({ where: { id: legacyReport.id } });
+    });
+  });
+
+  describe('POST /v1/admin/reports/direct-takedown', () => {
+    it('requires the moderation permission', async () => {
+      for (const permission of ADMIN_PERMISSIONS) {
+        await clearRateLimitKeys();
+        const profile = await createPublishedProfile(
+          `direct-matrix-${permission}-${randomUUID().slice(0, 6)}`,
+        );
+        const admin = await makeAdmin(`direct-matrix-${permission}-${randomUUID().slice(0, 6)}`, [
+          permission,
+        ]);
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/admin/reports/direct-takedown',
+          headers: admin.headers,
+          payload: {
+            targetType: 'photographer_profile',
+            targetId: profile.id,
+            resolution: 'Fixture direct takedown',
+          },
+        });
+        if (permission === 'moderation') {
+          expect(response.statusCode).toBe(201);
+        } else {
+          expect(response.statusCode).toBe(403);
+        }
+      }
+    });
+
+    it('returns 401 without a session', async () => {
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/reports/direct-takedown',
+        payload: {
+          targetType: 'photographer_profile',
+          targetId: randomUUID(),
+          resolution: 'Fixture',
+        },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('requires a statement of reasons', async () => {
+      const admin = await makeAdmin(`direct-empty-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const profile = await createPublishedProfile(`direct-empty-${randomUUID().slice(0, 6)}`);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/reports/direct-takedown',
+        headers: admin.headers,
+        payload: { targetType: 'photographer_profile', targetId: profile.id, resolution: '' },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('rejects a target type outside the two named entry points', async () => {
+      const admin = await makeAdmin(`direct-target-type-${randomUUID().slice(0, 6)}`, [
+        'moderation',
+      ]);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/reports/direct-takedown',
+        headers: admin.headers,
+        payload: {
+          targetType: 'portfolio_image',
+          targetId: randomUUID(),
+          resolution: 'Fixture',
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('returns 404 for a target that does not exist', async () => {
+      const admin = await makeAdmin(`direct-404-${randomUUID().slice(0, 6)}`, ['moderation']);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/reports/direct-takedown',
+        headers: admin.headers,
+        payload: {
+          targetType: 'photographer_profile',
+          targetId: randomUUID(),
+          resolution: 'Fixture',
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('takes down a photographer profile, synthesising a resolved report with no reporter', async () => {
+      const admin = await makeAdmin(`direct-profile-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const profile = await createPublishedProfile(`direct-profile-${randomUUID().slice(0, 6)}`);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/reports/direct-takedown',
+        headers: admin.headers,
+        payload: {
+          targetType: 'photographer_profile',
+          targetId: profile.id,
+          resolution: 'Confirmed impersonation, profile removed on sight',
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json<ReportBody>();
+      expect(body.reporterId).toBeNull();
+      expect(body.status).toBe('resolved');
+      expect(body.adminId).toBe(admin.id);
+      expect(body.resolution).toBe('Confirmed impersonation, profile removed on sight');
+      expect(body.resolvedAt).toBeTruthy();
+
+      const publicRead = await fetchPublicProfile(profile.slug);
+      expect(publicRead.statusCode).toBe(404);
+
+      const dbRow = await prisma.photographerProfile.findUniqueOrThrow({
+        where: { id: profile.id },
+      });
+      expect(dbRow.deletedAt).not.toBeNull();
+
+      const reportRow = await prisma.report.findUniqueOrThrow({ where: { id: body.id } });
+      expect(reportRow.reporterId).toBeNull();
+      expect(reportRow.reason).toBe('Found by a moderator; no report was filed.');
+
+      const auditRow = await prisma.auditLog.findFirst({
+        where: { action: 'report.direct_takedown', targetType: 'Report', targetId: body.id },
+      });
+      expect(auditRow).not.toBeNull();
+      expect(auditRow?.actorId).toBe(admin.id);
+      expect(auditRow?.before).toBeNull();
+      expect((auditRow?.after as { targetRemoved?: boolean } | null)?.targetRemoved).toBe(true);
+
+      const ownerNotice = await prisma.notification.findFirst({
+        where: { userId: profile.ownerId, type: 'moderation_action' },
+      });
+      expect(ownerNotice).not.toBeNull();
+      const reportDecisionCount = await prisma.notification.count({
+        where: { type: 'report_decision', userId: profile.ownerId },
+      });
+      expect(reportDecisionCount).toBe(0);
+    });
+
+    it('takes down a job offer, appears in the queue, and is restorable through the shared restore path', async () => {
+      const admin = await makeAdmin(`direct-offer-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const offer = await createPublishedJobOffer(`direct-offer-${randomUUID().slice(0, 6)}`);
+
+      const takedownResponse = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/reports/direct-takedown',
+        headers: admin.headers,
+        payload: {
+          targetType: 'job_offer',
+          targetId: offer.id,
+          resolution: 'Confirmed fraud, offer removed on sight',
+        },
+      });
+      expect(takedownResponse.statusCode).toBe(201);
+      const report = takedownResponse.json<ReportBody>();
+
+      const publicRead = await fastify().inject({
+        method: 'GET',
+        url: `/v1/job-offers/${offer.slug}`,
+      });
+      expect(publicRead.statusCode).toBe(404);
+
+      const queue = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/reports?targetId=${offer.id}`,
+        headers: admin.headers,
+      });
+      expect(queue.statusCode).toBe(200);
+      expect(queue.json<ReportsPage>().items.map((item) => item.id)).toContain(report.id);
+
+      const professional = await prisma.professionalProfile.findUniqueOrThrow({
+        where: { id: offer.professionalId },
+      });
+      const detail = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/reports/${report.id}`,
+        headers: admin.headers,
+      });
+      expect(detail.statusCode).toBe(200);
+      const target = detail.json<ReportBody>().target;
+      expect(target?.targetType).toBe('job_offer');
+      expect(target?.title).toBe(offer.title);
+      expect(target?.description).toBe(offer.description);
+      expect(target?.companyName).toBe(professional.companyName);
+      expect(target?.deletedAt).toBeTruthy();
+
+      const restoreResponse = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${report.id}/restore`,
+        headers: admin.headers,
+        payload: { resolution: 'Reviewed again, not actually fraud' },
+      });
+
+      expect(restoreResponse.statusCode).toBe(200);
+      expect(restoreResponse.json<ReportBody>().target?.deletedAt).toBeNull();
+
+      const restoredOffer = await prisma.jobOffer.findUniqueOrThrow({ where: { id: offer.id } });
+      expect(restoredOffer.deletedAt).toBeNull();
+
+      const restoreAuditRow = await prisma.auditLog.findFirst({
+        where: { action: 'report.restored', targetType: 'Report', targetId: report.id },
+      });
+      expect(restoreAuditRow).not.toBeNull();
+    });
+  });
+
+  describe('decision notices', () => {
+    it('notifies the reporter and the target owner when a report is resolved', async () => {
+      const admin = await makeAdmin(`notice-resolve-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const reporter = await signUpVerifyAndSignIn(
+        ['client'],
+        `notice-resolve-${randomUUID().slice(0, 6)}`,
+      );
+      const profile = await createPublishedProfile(`notice-resolve-${randomUUID().slice(0, 6)}`);
+      const report = await fileReport(
+        'photographer_profile',
+        profile.id,
+        'Fixture',
+        reporter.token,
+      );
+
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${report.id}/resolve`,
+        headers: admin.headers,
+        payload: { status: 'dismissed', resolution: 'No violation found' },
+      });
+
+      const reporterNotice = await prisma.notification.findFirst({
+        where: { userId: reporter.id, type: 'report_decision' },
+      });
+      expect(reporterNotice).not.toBeNull();
+      const reporterPayload = reporterNotice?.payload as {
+        reason?: string;
+        moderationOutcome?: string;
+      };
+      expect(reporterPayload.moderationOutcome).toBe('dismissed');
+      expect(reporterPayload.reason).toBe('No violation found');
+
+      const ownerNotice = await prisma.notification.findFirst({
+        where: { userId: profile.ownerId, type: 'moderation_action' },
+      });
+      expect(ownerNotice).not.toBeNull();
+      expect((ownerNotice?.payload as { moderationOutcome?: string }).moderationOutcome).toBe(
+        'dismissed',
+      );
+    });
+
+    it('notifies both parties on takedown and again on restore', async () => {
+      const admin = await makeAdmin(`notice-takedown-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const reporter = await signUpVerifyAndSignIn(
+        ['client'],
+        `notice-takedown-${randomUUID().slice(0, 6)}`,
+      );
+      const profile = await createPublishedProfile(`notice-takedown-${randomUUID().slice(0, 6)}`);
+      const report = await fileReport(
+        'photographer_profile',
+        profile.id,
+        'Fixture',
+        reporter.token,
+      );
+
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${report.id}/takedown`,
+        headers: admin.headers,
+        payload: { resolution: 'Confirmed, profile removed' },
+      });
+      expect(
+        await prisma.notification.findFirst({
+          where: { userId: reporter.id, type: 'report_decision' },
+        }),
+      ).not.toBeNull();
+      expect(
+        await prisma.notification.findFirst({
+          where: { userId: profile.ownerId, type: 'moderation_action' },
+        }),
+      ).not.toBeNull();
+
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${report.id}/restore`,
+        headers: admin.headers,
+        payload: { resolution: 'Reviewed again, restored' },
+      });
+
+      const reporterNotices = await prisma.notification.findMany({
+        where: { userId: reporter.id, type: 'report_decision' },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(
+        (reporterNotices[0]?.payload as { moderationOutcome?: string } | undefined)
+          ?.moderationOutcome,
+      ).toBe('restored');
+
+      const ownerNotices = await prisma.notification.findMany({
+        where: { userId: profile.ownerId, type: 'moderation_action' },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(
+        (ownerNotices[0]?.payload as { moderationOutcome?: string } | undefined)?.moderationOutcome,
+      ).toBe('restored');
+    });
+
+    it('notifies only the owner for an anonymous report', async () => {
+      const admin = await makeAdmin(`notice-anon-${randomUUID().slice(0, 6)}`, ['moderation']);
+      const profile = await createPublishedProfile(`notice-anon-${randomUUID().slice(0, 6)}`);
+      const report = await fileReport('photographer_profile', profile.id, 'Fixture');
+      expect(report.reporterId).toBeNull();
+
+      await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/reports/${report.id}/resolve`,
+        headers: admin.headers,
+        payload: { status: 'dismissed', resolution: 'No violation found, anonymous fixture' },
+      });
+
+      const ownerNotice = await prisma.notification.findFirst({
+        where: { userId: profile.ownerId, type: 'moderation_action' },
+      });
+      expect(ownerNotice).not.toBeNull();
+
+      const reportDecisionCount = await prisma.notification.count({
+        where: { type: 'report_decision', userId: profile.ownerId },
+      });
+      expect(reportDecisionCount).toBe(0);
     });
   });
 });

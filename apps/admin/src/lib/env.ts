@@ -21,6 +21,12 @@ const EnvSchema = z.object({
   // verification-document URL into a revocable object URL. Unset locally,
   // where the API origin already covers it through a reverse proxy.
   NEXT_PUBLIC_STORAGE_ORIGIN: optional(z.url()),
+  // Origin (+ optional path prefix) that portfolio images are served from
+  // (apps/api's S3_PUBLIC_BASE_URL, same variable apps/web reads as
+  // NEXT_PUBLIC_MEDIA_BASE_URL). Needed in the CSP's img-src so the
+  // moderation queue's portfolio-image target can render an <img> pointed
+  // at it; unset blocks that preview rather than silently allowing any origin.
+  NEXT_PUBLIC_MEDIA_BASE_URL: optional(z.url()),
 });
 
 // Every key the schema declares must also appear as a literal
@@ -43,6 +49,7 @@ function loadEnv() {
     NEXT_PUBLIC_BUILD_SHA: process.env.NEXT_PUBLIC_BUILD_SHA,
     NEXT_PUBLIC_BUILD_TIME: process.env.NEXT_PUBLIC_BUILD_TIME,
     NEXT_PUBLIC_STORAGE_ORIGIN: process.env.NEXT_PUBLIC_STORAGE_ORIGIN,
+    NEXT_PUBLIC_MEDIA_BASE_URL: process.env.NEXT_PUBLIC_MEDIA_BASE_URL,
   });
   if (!parsed.success) {
     const details = parsed.error.issues

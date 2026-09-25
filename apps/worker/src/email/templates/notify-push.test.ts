@@ -112,4 +112,40 @@ describe('renderNotifyPush', () => {
   it('throws when a job application notification has no jobOfferId', () => {
     expect(() => renderNotifyPush('job_application_received', {}, 'en')).toThrow(/jobOfferId/);
   });
+
+  it('renders report_decision and moderation_action with a notifications deep link and no reason text', () => {
+    const reportPush = renderNotifyPush(
+      'report_decision',
+      { reason: 'Confirmed AI-generated, image removed', moderationOutcome: 'takedown' },
+      'en',
+    );
+    expect(reportPush.title).toContain('removed');
+    expect(reportPush.body).not.toContain('AI-generated');
+    expect(reportPush.url).toBe('/en/account/notifications');
+
+    const ownerPush = renderNotifyPush(
+      'moderation_action',
+      { reason: 'Confirmed AI-generated, image removed', moderationOutcome: 'takedown' },
+      'en',
+    );
+    expect(ownerPush.title).toBe('Your content was removed');
+    expect(ownerPush.url).toBe('/en/account/notifications');
+  });
+
+  it('renders every moderation outcome without throwing', () => {
+    const outcomes = ['resolved', 'dismissed', 'takedown', 'restored'] as const;
+    for (const type of ['report_decision', 'moderation_action'] as const) {
+      for (const moderationOutcome of outcomes) {
+        expect(() =>
+          renderNotifyPush(type, { reason: 'Reviewed', moderationOutcome }, 'en'),
+        ).not.toThrow();
+      }
+    }
+  });
+
+  it('throws when a moderation notice payload has no moderationOutcome', () => {
+    expect(() => renderNotifyPush('report_decision', { reason: 'Reviewed' }, 'en')).toThrow(
+      /moderationOutcome/,
+    );
+  });
 });

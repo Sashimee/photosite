@@ -4132,6 +4132,43 @@
               "null"
             ],
             "maxLength": 2000
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "resolvedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "target": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PhotographerProfileReportTarget"
+              },
+              {
+                "$ref": "#/components/schemas/PortfolioImageReportTarget"
+              },
+              {
+                "$ref": "#/components/schemas/RequestReportTarget"
+              },
+              {
+                "$ref": "#/components/schemas/JobOfferReportTarget"
+              },
+              {
+                "$ref": "#/components/schemas/JobApplicationReportTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -4142,7 +4179,223 @@
           "reason",
           "status",
           "adminId",
-          "resolution"
+          "resolution",
+          "createdAt",
+          "resolvedAt",
+          "target"
+        ],
+        "additionalProperties": false
+      },
+      "PhotographerProfileReportTarget": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "photographer_profile"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 60,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "URL-safe profile slug",
+            "example": "jane-doe-photography"
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "targetType",
+          "displayName",
+          "slug",
+          "isPublished",
+          "deletedAt"
+        ],
+        "additionalProperties": false
+      },
+      "PortfolioImageReportTarget": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "portfolio_image"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "pending_review",
+              "approved",
+              "flagged",
+              "rejected"
+            ]
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "targetType",
+          "url",
+          "width",
+          "height",
+          "status",
+          "deletedAt"
+        ],
+        "additionalProperties": false
+      },
+      "RequestReportTarget": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "request"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "targetType",
+          "title",
+          "description",
+          "deletedAt"
+        ],
+        "additionalProperties": false
+      },
+      "JobOfferReportTarget": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "job_offer"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "companyName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "targetType",
+          "title",
+          "description",
+          "companyName",
+          "deletedAt"
+        ],
+        "additionalProperties": false
+      },
+      "JobApplicationReportTarget": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "job_application"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "jobOfferTitle": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "deletedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "targetType",
+          "message",
+          "jobOfferTitle",
+          "deletedAt"
         ],
         "additionalProperties": false
       },
@@ -4363,13 +4616,23 @@
             "maxLength": 60
           },
           "targetId": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid",
-            "description": "UUID identifier",
-            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "description": "UUID identifier",
+                "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$",
+                "description": "ISO 3166-1 alpha-2 country code",
+                "example": "LU"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "before": {},
           "after": {},
@@ -4396,6 +4659,50 @@
           "targetId",
           "ip",
           "occurredAt"
+        ],
+        "additionalProperties": false
+      },
+      "EmailTemplateName": {
+        "type": "string",
+        "enum": [
+          "verify-email",
+          "reset-password",
+          "account-exists",
+          "account-deletion-requested",
+          "quote_received",
+          "quote_accepted",
+          "quote_declined",
+          "quote_withdrawn",
+          "quote_expired",
+          "verification_approved",
+          "verification_rejected",
+          "job_application_received",
+          "job_application_status_changed",
+          "report_decision",
+          "moderation_action"
+        ],
+        "example": "quote_received"
+      },
+      "AdminEmailTemplatePreview": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "html": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "subject",
+          "html",
+          "text"
         ],
         "additionalProperties": false
       },
@@ -4668,7 +4975,9 @@
               "verification_approved",
               "verification_rejected",
               "job_application_received",
-              "job_application_status_changed"
+              "job_application_status_changed",
+              "report_decision",
+              "moderation_action"
             ],
             "example": "quote_received"
           },
@@ -4751,7 +5060,7 @@
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 1000
+            "maxLength": 2000
           },
           "jobOfferId": {
             "type": "string",
@@ -4769,6 +5078,15 @@
             "format": "uuid",
             "description": "UUID identifier",
             "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "moderationOutcome": {
+            "type": "string",
+            "enum": [
+              "resolved",
+              "dismissed",
+              "takedown",
+              "restored"
+            ]
           }
         },
         "additionalProperties": false
@@ -4829,7 +5147,9 @@
               "verification_approved",
               "verification_rejected",
               "job_application_received",
-              "job_application_status_changed"
+              "job_application_status_changed",
+              "report_decision",
+              "moderation_action"
             ],
             "example": "quote_received"
           },
@@ -15841,6 +16161,199 @@
         }
       }
     },
+    "/v1/admin/reports/{id}": {
+      "get": {
+        "summary": "Get a report, including a summary of its target",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "moderation",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/reports/direct-takedown": {
+      "post": {
+        "summary": "Take down a profile or job offer a moderator found without a prior report",
+        "description": "Synthesises a Report with reporterId: null, already resolved, so the takedown gets the same audit trail, statement of reasons and restore path as a reported one.",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "moderation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targetType": {
+                    "type": "string",
+                    "enum": [
+                      "photographer_profile",
+                      "job_offer"
+                    ],
+                    "example": "photographer_profile"
+                  },
+                  "targetId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "UUID identifier",
+                    "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                  },
+                  "resolution": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "targetType",
+                  "targetId",
+                  "resolution"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "A report was synthesised and its target taken down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/admin/reports/{id}/resolve": {
       "post": {
         "summary": "Resolve a report",
@@ -16018,6 +16531,126 @@
         "responses": {
           "200": {
             "description": "Report resolved and its target taken down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/reports/{id}/restore": {
+      "post": {
+        "summary": "Reverse a takedown, restoring the report's target",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "moderation",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resolution": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "resolution"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Target restored",
             "content": {
               "application/json": {
                 "schema": {
@@ -16652,13 +17285,22 @@
           },
           {
             "schema": {
-              "type": "string",
-              "format": "uuid",
-              "description": "UUID identifier",
-              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "UUID identifier",
+                  "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{2}$",
+                  "description": "ISO 3166-1 alpha-2 country code",
+                  "example": "LU"
+                }
+              ]
             },
             "required": false,
-            "description": "UUID identifier",
             "name": "targetId",
             "in": "query"
           },
@@ -16770,6 +17412,139 @@
           },
           "422": {
             "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/email-templates": {
+      "get": {
+        "summary": "List the email templates that can be previewed",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "superadmin",
+        "responses": {
+          "200": {
+            "description": "Every previewable template name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EmailTemplateName"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/email-templates/{template}/preview": {
+      "get": {
+        "summary": "Render an email template with fake sample data",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "superadmin",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/EmailTemplateName"
+            },
+            "required": true,
+            "name": "template",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en",
+                "fr",
+                "de",
+                "pt",
+                "es"
+              ],
+              "description": "BCP 47 locale",
+              "example": "en"
+            },
+            "required": true,
+            "description": "BCP 47 locale",
+            "name": "locale",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rendered subject, HTML body and text body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminEmailTemplatePreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {

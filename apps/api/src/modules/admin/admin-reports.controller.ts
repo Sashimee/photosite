@@ -12,8 +12,10 @@ import {
 } from '@nestjs/common';
 import {
   AdminReportsQuerySchema,
+  DirectTakedownRequestSchema,
   IdSchema,
   ResolveReportRequestSchema,
+  RestoreReportRequestSchema,
   TakedownReportRequestSchema,
 } from '@photoo/shared';
 import type { FastifyRequest } from 'fastify';
@@ -43,6 +45,33 @@ export class AdminReportsController {
     return this.adminReports.list(query);
   }
 
+  @HttpCode(201)
+  @Post('direct-takedown')
+  async directTakedown(
+    @Body(new ZodValidationPipe(DirectTakedownRequestSchema))
+    body: ReturnType<(typeof DirectTakedownRequestSchema)['parse']>,
+    @Req() request: FastifyRequest,
+  ) {
+    const { user } = await this.adminAccess.requirePermission(request, 'moderation');
+    await this.rateLimit.enforce(user.id);
+    return this.adminReports.directTakedown(
+      user,
+      body.targetType,
+      body.targetId,
+      body.resolution,
+      request.ip,
+    );
+  }
+
+  @Get(':id')
+  async getById(
+    @Param('id', new ZodValidationPipe(IdSchema)) id: string,
+    @Req() request: FastifyRequest,
+  ) {
+    await this.adminAccess.requirePermission(request, 'moderation');
+    return this.adminReports.getById(id);
+  }
+
   @HttpCode(200)
   @Post(':id/resolve')
   async resolve(
@@ -67,5 +96,18 @@ export class AdminReportsController {
     const { user } = await this.adminAccess.requirePermission(request, 'moderation');
     await this.rateLimit.enforce(user.id);
     return this.adminReports.takedown(user, id, body.resolution, request.ip);
+  }
+
+  @HttpCode(200)
+  @Post(':id/restore')
+  async restore(
+    @Param('id', new ZodValidationPipe(IdSchema)) id: string,
+    @Body(new ZodValidationPipe(RestoreReportRequestSchema))
+    body: ReturnType<(typeof RestoreReportRequestSchema)['parse']>,
+    @Req() request: FastifyRequest,
+  ) {
+    const { user } = await this.adminAccess.requirePermission(request, 'moderation');
+    await this.rateLimit.enforce(user.id);
+    return this.adminReports.restore(user, id, body.resolution, request.ip);
   }
 }

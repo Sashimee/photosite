@@ -1,16 +1,18 @@
-import { getMessages } from '@photoo/i18n';
-import type { NotificationPayload, NotificationType } from '@photoo/shared';
-import { formatText } from '../format-message.js';
 import {
   buildConversationPath,
   buildJobApplicationsPath,
   buildJobOfferApplicationsPath,
+  buildModerationNoticePath,
   buildNotificationPath,
   buildVerificationCasePath,
+  formatText,
   requireConversationId,
   requireJobOfferId,
+  requireModerationOutcome,
   requireQuoteId,
-} from './notify-email.js';
+} from '@photoo/email';
+import { getMessages } from '@photoo/i18n';
+import type { NotificationPayload, NotificationType } from '@photoo/shared';
 
 export interface RenderedPush {
   title: string;
@@ -34,7 +36,18 @@ export function renderNotifyPush(
 ): RenderedPush {
   const messages = getMessages(locale);
   const t = messages.push.notifications;
-  const templates: Record<NotificationType, { title: string; body: string }> = {
+
+  if (type === 'report_decision' || type === 'moderation_action') {
+    const outcome = requireModerationOutcome(type, payload);
+    const table = type === 'report_decision' ? t.reportDecision : t.moderationAction;
+    const template = table[outcome];
+    return { title: template.title, body: template.body, url: buildModerationNoticePath(locale) };
+  }
+
+  const templates: Record<
+    Exclude<NotificationType, 'report_decision' | 'moderation_action'>,
+    { title: string; body: string }
+  > = {
     quote_received: t.quoteReceived,
     quote_accepted: t.quoteAccepted,
     quote_declined: t.quoteDeclined,

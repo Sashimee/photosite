@@ -8673,6 +8673,182 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/reports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a report, including a summary of its target */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID identifier */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The report */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminReport"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/reports/direct-takedown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take down a profile or job offer a moderator found without a prior report
+         * @description Synthesises a Report with reporterId: null, already resolved, so the takedown gets the same audit trail, statement of reasons and restore path as a reported one.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @example photographer_profile
+                         * @enum {string}
+                         */
+                        targetType: "photographer_profile" | "job_offer";
+                        /**
+                         * Format: uuid
+                         * @description UUID identifier
+                         * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                         */
+                        targetId: string;
+                        resolution: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description A report was synthesised and its target taken down */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminReport"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/reports/{id}/resolve": {
         parameters: {
             query?: never;
@@ -8803,6 +8979,105 @@ export interface paths {
             };
             responses: {
                 /** @description Report resolved and its target taken down */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminReport"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/reports/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reverse a takedown, restoring the report's target */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID identifier */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        resolution: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Target restored */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9308,7 +9583,6 @@ export interface paths {
                     /** @description UUID identifier */
                     actorId?: string;
                     entityType?: string;
-                    /** @description UUID identifier */
                     targetId?: string;
                     /** @description ISO 8601 date-time */
                     from?: string;
@@ -9364,6 +9638,128 @@ export interface paths {
                 };
                 /** @description Unprocessable entity */
                 422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/email-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the email templates that can be previewed */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Every previewable template name */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EmailTemplateName"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/email-templates/{template}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Render an email template with fake sample data */
+        get: {
+            parameters: {
+                query: {
+                    /** @description BCP 47 locale */
+                    locale: "en" | "fr" | "de" | "pt" | "es";
+                };
+                header?: never;
+                path: {
+                    template: components["schemas"]["EmailTemplateName"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The rendered subject, HTML body and text body */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminEmailTemplatePreview"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -12072,6 +12468,89 @@ export interface components {
              */
             adminId: string | null;
             resolution: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            resolvedAt: string | null;
+            target: components["schemas"]["PhotographerProfileReportTarget"] | components["schemas"]["PortfolioImageReportTarget"] | components["schemas"]["RequestReportTarget"] | components["schemas"]["JobOfferReportTarget"] | components["schemas"]["JobApplicationReportTarget"] | null;
+        };
+        PhotographerProfileReportTarget: {
+            /** @enum {string} */
+            targetType: "photographer_profile";
+            displayName: string;
+            /**
+             * @description URL-safe profile slug
+             * @example jane-doe-photography
+             */
+            slug: string;
+            isPublished: boolean;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            deletedAt: string | null;
+        };
+        PortfolioImageReportTarget: {
+            /** @enum {string} */
+            targetType: "portfolio_image";
+            /** Format: uri */
+            url: string | null;
+            width: number | null;
+            height: number | null;
+            /** @enum {string} */
+            status: "processing" | "pending_review" | "approved" | "flagged" | "rejected";
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            deletedAt: string | null;
+        };
+        RequestReportTarget: {
+            /** @enum {string} */
+            targetType: "request";
+            title: string;
+            description: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            deletedAt: string | null;
+        };
+        JobOfferReportTarget: {
+            /** @enum {string} */
+            targetType: "job_offer";
+            title: string;
+            description: string;
+            companyName: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            deletedAt: string | null;
+        };
+        JobApplicationReportTarget: {
+            /** @enum {string} */
+            targetType: "job_application";
+            message: string;
+            jobOfferTitle: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            deletedAt: string | null;
         };
         PlatformSettings: {
             feePercent: number | null;
@@ -12153,11 +12632,6 @@ export interface components {
             actorId: string | null;
             action: string;
             targetType: string;
-            /**
-             * Format: uuid
-             * @description UUID identifier
-             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
-             */
             targetId: string | null;
             before?: unknown;
             after?: unknown;
@@ -12168,6 +12642,16 @@ export interface components {
              * @example 2026-09-16T12:00:00.000Z
              */
             occurredAt: string;
+        };
+        /**
+         * @example quote_received
+         * @enum {string}
+         */
+        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action";
+        AdminEmailTemplatePreview: {
+            subject: string;
+            html: string;
+            text: string;
         };
         CreateReportResponse: {
             /** @enum {string} */
@@ -12287,7 +12771,7 @@ export interface components {
              * @example quote_received
              * @enum {string}
              */
-            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed";
+            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action";
             payload: components["schemas"]["NotificationPayload"];
             channels: ("email" | "push" | "in_app")[];
             /**
@@ -12339,6 +12823,8 @@ export interface components {
              * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
              */
             jobApplicationId?: string;
+            /** @enum {string} */
+            moderationOutcome?: "resolved" | "dismissed" | "takedown" | "restored";
         };
         UnreadCount: {
             count: number;
@@ -12354,7 +12840,7 @@ export interface components {
              * @example quote_received
              * @enum {string}
              */
-            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed";
+            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action";
             /**
              * @example email
              * @enum {string}

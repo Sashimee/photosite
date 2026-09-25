@@ -1,4 +1,7 @@
+import type { MailMessage } from '@photoo/email';
 import nodemailer, { type Transporter } from 'nodemailer';
+
+export type { MailMessage } from '@photoo/email';
 
 export interface MailTransportConfig {
   NODE_ENV: 'development' | 'production' | 'test';
@@ -9,14 +12,6 @@ export interface MailTransportConfig {
   SMTP_PASSWORD?: string | undefined;
   SMTP_FROM: string;
   SMTP_INSECURE_INTERNAL_RELAY?: boolean | undefined;
-}
-
-export interface MailMessage {
-  to: string;
-  subject: string;
-  text: string;
-  html: string;
-  headers?: Record<string, string>;
 }
 
 export interface MailTransport {
