@@ -10,6 +10,7 @@ import { collectExportData } from './export/collect.js';
 import { buildManifest } from './export/manifest.js';
 import { readPolicyVersion } from './export/policy-version.js';
 import { buildReadmeText } from './export/readme.js';
+import { findNotifiableUserEmail, notifyExportFailed } from './notify-export-failed.js';
 
 export interface GdprExportDeps {
   prisma: { client: PrismaClient };
@@ -33,17 +34,6 @@ function exportKeyFor(dataRequestId: string): string {
   return `gdpr-exports/${dataRequestId}.zip`;
 }
 
-async function findNotifiableUserEmail(
-  deps: GdprExportDeps,
-  userId: string,
-): Promise<string | null> {
-  const user = await deps.prisma.client.user.findUnique({
-    where: { id: userId },
-    select: { email: true, deletedAt: true },
-  });
-  return !user || user.deletedAt ? null : user.email;
-}
-
 async function notifyExportReady(
   deps: GdprExportDeps,
   dataRequestId: string,
@@ -60,28 +50,6 @@ async function notifyExportReady(
     to: email,
     url: `${deps.webAppUrl}/account`,
     expiresAt: expiresAt.toISOString(),
-  });
-  await deps.emailQueue.add(job.type, job, {
-    jobId: `${job.type}-${dataRequestId}`,
-    removeOnComplete: true,
-    removeOnFail: { age: EMAIL_JOB_FAILED_RETENTION_SECONDS },
-  });
-}
-
-async function notifyExportFailed(
-  deps: GdprExportDeps,
-  dataRequestId: string,
-  userId: string,
-): Promise<void> {
-  const email = await findNotifiableUserEmail(deps, userId);
-  if (!email) {
-    return;
-  }
-
-  const job = EmailJobSchema.parse({
-    type: 'data-export-failed' as const,
-    to: email,
-    url: `${deps.webAppUrl}/account`,
   });
   await deps.emailQueue.add(job.type, job, {
     jobId: `${job.type}-${dataRequestId}`,

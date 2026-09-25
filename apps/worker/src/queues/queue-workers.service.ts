@@ -363,6 +363,8 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
         logger: this.logger,
         monitorSlug: GDPR_SWEEP_SCHEDULER_ID,
         monitorIntervalMs: this.config.GDPR_SWEEP_INTERVAL_MS,
+        emailQueue,
+        webAppUrl: this.config.WEB_APP_URL,
       }),
       {
         connection: this.newConnection(),
