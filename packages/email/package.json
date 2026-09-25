@@ -1,0 +1,30 @@
+{
+  "name": "@photoo/email",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@photoo/i18n": "workspace:*",
+    "@photoo/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@photoo/config": "workspace:*",
+    "@types/node": "26.6.2",
+    "@vitest/coverage-v8": "5.0.1",
+    "eslint": "9.39.5",
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  }
+}

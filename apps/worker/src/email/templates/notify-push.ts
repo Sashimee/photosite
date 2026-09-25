@@ -1,6 +1,3 @@
-import { getMessages } from '@photoo/i18n';
-import type { NotificationPayload, NotificationType } from '@photoo/shared';
-import { formatText } from '../format-message.js';
 import {
   buildConversationPath,
   buildJobApplicationsPath,
@@ -8,11 +5,14 @@ import {
   buildModerationNoticePath,
   buildNotificationPath,
   buildVerificationCasePath,
+  formatText,
   requireConversationId,
   requireJobOfferId,
   requireModerationOutcome,
   requireQuoteId,
-} from './notify-email.js';
+} from '@photoo/email';
+import { getMessages } from '@photoo/i18n';
+import type { NotificationPayload, NotificationType } from '@photoo/shared';
 
 export interface RenderedPush {
   title: string;

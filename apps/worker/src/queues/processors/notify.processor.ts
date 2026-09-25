@@ -1,3 +1,4 @@
+import { renderNotifyEmail } from '@photoo/email';
 import {
   NotifyJobSchema,
   type NotificationPayload,
@@ -7,7 +8,6 @@ import {
 import type { Processor } from 'bullmq';
 import type { Logger } from 'nestjs-pino';
 import type { MailTransport } from '../../email/mail-transport.js';
-import { renderNotifyEmail } from '../../email/templates/notify-email.js';
 import { renderNotifyPush } from '../../email/templates/notify-push.js';
 import {
   deleteDeviceIfPresent,
