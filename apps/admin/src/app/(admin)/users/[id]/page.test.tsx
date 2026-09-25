@@ -9,10 +9,11 @@ const notFoundMock = vi.fn(() => {
 vi.mock('@/lib/server-api', () => ({ serverApi: serverApiMock }));
 vi.mock('next/navigation', () => ({ notFound: notFoundMock }));
 vi.mock('next-intl/server', async () => {
-  const { translate } = await import('@/testing/mock-translations');
+  const { mockUseFormatter, translate } = await import('@/testing/mock-translations');
   return {
     getTranslations: (namespace: string) => (key: string, values?: Record<string, unknown>) =>
       translate(namespace, key, values),
+    getFormatter: () => mockUseFormatter(),
   };
 });
 
@@ -43,6 +44,29 @@ const user = {
 };
 
 describe('UserDetailPage', () => {
+  it('formats emailVerifiedAt and lastLoginAt in Luxembourg local time', async () => {
+    const verifiedUser = {
+      ...user,
+      emailVerifiedAt: '2026-01-15T23:30:00.000Z',
+      lastLoginAt: '2026-07-15T23:30:00.000Z',
+    };
+    serverApiMock.mockResolvedValue({
+      GET: vi
+        .fn()
+        .mockResolvedValueOnce({ data: verifiedUser, response: { status: 200 } })
+        .mockResolvedValueOnce({
+          data: { items: [], nextCursor: null },
+          response: { status: 200 },
+        }),
+    });
+    const UserDetailPage = await loadPage();
+
+    render(await UserDetailPage({ params: Promise.resolve({ id: 'user-1' }) }));
+
+    expect(screen.getByText('Jan 16, 2026, 12:30 AM GMT+1')).toBeInTheDocument();
+    expect(screen.getByText('Jul 16, 2026, 1:30 AM GMT+2')).toBeInTheDocument();
+  });
+
   it('shows the full email, unlike the masked list view', async () => {
     serverApiMock.mockResolvedValue({
       GET: vi

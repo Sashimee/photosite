@@ -1,4 +1,4 @@
-import { getTranslations } from 'next-intl/server';
+import { getFormatter, getTranslations } from 'next-intl/server';
 
 import type { components } from '@photoo/api-client';
 import { REPORT_TARGET_TYPES } from '@photoo/shared';
@@ -23,6 +23,7 @@ export async function ReportTargetSummary({
   target: AdminReportTarget | null;
 }) {
   const t = await getTranslations('admin.moderation.detail.target');
+  const format = await getFormatter();
   const tTargetTypes = await getTranslations('admin.moderation.targetTypes');
   const tImageStatuses = await getTranslations('admin.moderation.portfolioImageStatuses');
   const targetTypeLabel = isKnownTargetType(targetType) ? tTargetTypes(targetType) : targetType;
@@ -43,7 +44,9 @@ export async function ReportTargetSummary({
     <div className="flex flex-col gap-4 rounded-md border border-border p-4">
       {target.deletedAt ? (
         <p className="text-sm text-muted-foreground" role="status">
-          {t('alreadyTakenDown', { date: target.deletedAt })}
+          {t('alreadyTakenDown', {
+            date: format.dateTime(new Date(target.deletedAt), 'medium'),
+          })}
         </p>
       ) : null}
 

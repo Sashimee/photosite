@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 
 import { DEFAULT_LOCALE } from '@photoo/shared';
 
+import { ADMIN_FORMATS, ADMIN_TIME_ZONE } from '@/lib/datetime';
 import '@/styles/globals.css';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +24,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang={DEFAULT_LOCALE}>
       <body>
-        <NextIntlClientProvider locale={DEFAULT_LOCALE} messages={messages}>
+        <NextIntlClientProvider
+          locale={DEFAULT_LOCALE}
+          messages={messages}
+          timeZone={ADMIN_TIME_ZONE}
+          formats={ADMIN_FORMATS}
+        >
           {children}
         </NextIntlClientProvider>
       </body>

@@ -2,13 +2,22 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
+import { ADMIN_FORMATS, ADMIN_TIME_ZONE } from '@/lib/datetime';
+
 vi.mock('next-intl', async () => {
-  const { mockUseTranslations } = await import('@/testing/mock-translations');
-  return { useTranslations: mockUseTranslations };
+  const { mockUseFormatter, mockUseTranslations } = await import('@/testing/mock-translations');
+  return { useTranslations: mockUseTranslations, useFormatter: mockUseFormatter };
 });
 
 const getMock = vi.fn();
 vi.mock('@/lib/api', () => ({ api: { GET: getMock } }));
+
+function formatExpected(iso: string) {
+  return new Intl.DateTimeFormat('en', {
+    ...ADMIN_FORMATS.dateTime.medium,
+    timeZone: ADMIN_TIME_ZONE,
+  }).format(new Date(iso));
+}
 
 // See suspend-dialog.test.tsx: a static import of the component under test
 // would resolve '@/lib/api' - and read `getMock` - before the `const
@@ -94,7 +103,7 @@ describe('DataRequestsTable', () => {
 
     render(<DataRequestsTable />);
 
-    expect(await screen.findByText(baseRequest.expiresAt)).toBeInTheDocument();
+    expect(await screen.findByText(formatExpected(baseRequest.expiresAt))).toBeInTheDocument();
   });
 
   it('shows a dash for a null expiresAt', async () => {
@@ -164,7 +173,7 @@ describe('DataRequestsTable', () => {
 
     render(<DataRequestsTable />);
 
-    expect(await screen.findByText(dueSoon.responseDueAt)).toBeInTheDocument();
+    expect(await screen.findByText(formatExpected(dueSoon.responseDueAt))).toBeInTheDocument();
     expect(screen.queryByText('Overdue')).not.toBeInTheDocument();
   });
 
@@ -179,7 +188,29 @@ describe('DataRequestsTable', () => {
 
     render(<DataRequestsTable />);
 
-    expect(await screen.findByText(`${overdueExport.responseDueAt} (Overdue)`)).toBeInTheDocument();
+    expect(
+      await screen.findByText(`${formatExpected(overdueExport.responseDueAt)} (Overdue)`),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the overdue response due date alongside null completedAt and expiresAt placeholders', async () => {
+    const overdueWithNulls = {
+      ...baseRequest,
+      status: 'failed' as const,
+      completedAt: null,
+      expiresAt: null,
+      responseDueAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    };
+    getMock.mockResolvedValueOnce({ data: { items: [overdueWithNulls], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(
+      await screen.findByText(`${formatExpected(overdueWithNulls.responseDueAt)} (Overdue)`),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('None')).toHaveLength(2);
+    expect(screen.getByText('–')).toBeInTheDocument();
   });
 
   it('shows the grace period countdown only for a pending deletion', async () => {

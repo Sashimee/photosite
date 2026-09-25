@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 
 import type { components } from '@photoo/api-client';
 
@@ -15,9 +15,14 @@ type AuditLogEntry = components['schemas']['AdminAuditLogEntry'];
 
 export function AuditTrail({ targetId }: { targetId: string }) {
   const t = useTranslations('admin.users.detail.auditTrail');
+  const format = useFormatter();
 
   const columns: DataTableColumn<AuditLogEntry>[] = [
-    { id: 'occurredAt', header: t('columns.occurredAt'), cell: (row) => row.occurredAt },
+    {
+      id: 'occurredAt',
+      header: t('columns.occurredAt'),
+      cell: (row) => format.dateTime(new Date(row.occurredAt), 'medium'),
+    },
     { id: 'action', header: t('columns.action'), cell: (row) => row.action },
     {
       id: 'actorId',

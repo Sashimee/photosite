@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
 
 import type { components } from '@photoo/api-client';
@@ -24,6 +24,7 @@ export function VerificationTable({
   const t = useTranslations('admin.verification.list');
   const tStatuses = useTranslations('admin.verification.statuses');
   const tClaim = useTranslations('admin.verification.list.claim');
+  const format = useFormatter();
 
   const columns: DataTableColumn<AdminVerificationCaseSummary>[] = [
     {
@@ -41,7 +42,7 @@ export function VerificationTable({
     {
       id: 'submittedAt',
       header: t('columns.submittedAt'),
-      cell: (row) => row.submittedAt ?? '',
+      cell: (row) => (row.submittedAt ? format.dateTime(new Date(row.submittedAt), 'medium') : ''),
     },
     {
       id: 'reviewer',
