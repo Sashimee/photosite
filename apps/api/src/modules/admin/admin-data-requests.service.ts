@@ -45,7 +45,7 @@ export class AdminDataRequestsService {
     const page = hasMore ? rows.slice(0, query.limit) : rows;
     const last = page[page.length - 1];
     const nextCursor =
-      hasMore && last ? encodeAdminDataRequestCursor(new Date(last.requestedAt), last.id) : null;
+      hasMore && last ? encodeAdminDataRequestCursor(last.requestedAt, last.id) : null;
 
     return { items: page.map(mapDataRequest), nextCursor };
   }
