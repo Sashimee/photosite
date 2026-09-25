@@ -601,7 +601,9 @@ registry.registerPath({
   summary: 'Retry a failed export as a new request',
   description:
     "Creates a new export DataRequest for the failed export's user and enqueues it. Bypasses the " +
-    'per-user GDPR rate limit, because this is a support action.',
+    'per-user GDPR rate limit, because this is a support action. Returns 409 if the source ' +
+    "request isn't a failed export, if the user already has an open export, or if the user's " +
+    'account is no longer active (soft-deleted or anonymised).',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('support'),

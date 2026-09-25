@@ -186,6 +186,10 @@ export class AdminDataRequestsService {
     if (source.type !== 'export' || source.status !== 'failed') {
       throw conflict('Source request is not a failed export');
     }
+    const userStatus = await this.repository.findUserStatus(source.user.id);
+    if (userStatus !== 'active') {
+      throw conflict('User account is deleted or anonymised');
+    }
     const openExport = await this.repository.findOpenExportForUser(source.user.id);
     if (openExport) {
       throw conflict('User already has a pending or processing export');

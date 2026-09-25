@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { DataRequestStatus, DataRequestType, Prisma } from '@photoo/db';
+import type { DataRequestStatus, DataRequestType, Prisma, UserStatus } from '@photoo/db';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AdminDataRequestCursor } from './admin-data-request-cursor.js';
 
@@ -62,6 +62,14 @@ export class AdminDataRequestsRepository {
 
   async findById(id: string): Promise<AdminDataRequestRow | null> {
     return this.prisma.client.dataRequest.findUnique({ where: { id }, select: dataRequestSelect });
+  }
+
+  async findUserStatus(userId: string): Promise<UserStatus | null> {
+    const user = await this.prisma.client.user.findUnique({
+      where: { id: userId },
+      select: { status: true },
+    });
+    return user?.status ?? null;
   }
 
   async findOpenExportForUser(userId: string): Promise<{ id: string } | null> {

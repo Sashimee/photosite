@@ -145,7 +145,10 @@ describe('admin data requests integration', () => {
     };
   }
 
-  async function createSubjectUser(label: string): Promise<{ id: string; email: string }> {
+  async function createSubjectUser(
+    label: string,
+    status: 'active' | 'suspended' | 'deleted' = 'active',
+  ): Promise<{ id: string; email: string }> {
     const email = uniqueEmail(`subject-${label}`);
     const user = await prisma.user.create({
       data: {
@@ -154,7 +157,8 @@ describe('admin data requests integration', () => {
         locale: 'en',
         countryCode: 'LU',
         roles: ['client'],
-        status: 'active',
+        status,
+        ...(status === 'deleted' ? { deletedAt: new Date() } : {}),
       },
     });
     createdUserIds.push(user.id);
@@ -1287,6 +1291,58 @@ describe('admin data requests integration', () => {
         headers: admin.headers,
       });
       expect(response.statusCode).toBe(409);
+    });
+
+    it('returns 409 when the user is soft-deleted and still in the grace period', async () => {
+      const admin = await makeAdmin('retry-soft-deleted', ['support']);
+      const subject = await createSubjectUser('retry-soft-deleted', 'deleted');
+      const failed = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'failed',
+        requestedAt: new Date(),
+        failureReason: 'export_failed',
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/data-requests/${failed.id}/retry-export`,
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(409);
+
+      const createdRows = await prisma.dataRequest.findMany({
+        where: { userId: subject.id, id: { not: failed.id } },
+      });
+      expect(createdRows).toHaveLength(0);
+    });
+
+    it('returns 409 when the user has already been anonymised', async () => {
+      const admin = await makeAdmin('retry-anonymised', ['support']);
+      const subject = await createSubjectUser('retry-anonymised', 'deleted');
+      await prisma.user.update({
+        where: { id: subject.id },
+        data: { email: `deleted-${subject.id}@deleted.invalid`, name: null, locale: 'en' },
+      });
+      const failed = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'failed',
+        requestedAt: new Date(),
+        failureReason: 'export_failed',
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/data-requests/${failed.id}/retry-export`,
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(409);
+
+      const createdRows = await prisma.dataRequest.findMany({
+        where: { userId: subject.id, id: { not: failed.id } },
+      });
+      expect(createdRows).toHaveLength(0);
     });
 
     it('creates a new pending export, enqueues it, and writes an audit row', async () => {
