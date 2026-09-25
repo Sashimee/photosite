@@ -281,7 +281,7 @@ export class DataRequestsService {
       created = await this.prisma.client.$transaction((tx) =>
         applyAccountDeletion(tx, {
           userId: user.id,
-          requestedAt: new Date(),
+          receivedAt: new Date(),
           channel: 'in_app',
           audit: {
             actorType: 'user',

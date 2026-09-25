@@ -134,7 +134,7 @@ function responseDueAt(
   if (latestSuccess && latestSuccess > row.requestedAt) {
     return null;
   }
-  return gdprResponseDueAt(row.requestedAt, row.user.country.timezone);
+  return gdprResponseDueAt(row.receivedAt, row.user.country.timezone);
 }
 
 // The Art. 12(3) clock for a failed export still runs from that row's own
@@ -151,7 +151,7 @@ function isFailedAnsweredLate(
     return false;
   }
   const earliest = laterCompletions.reduce((min, date) => (date < min ? date : min));
-  return earliest > gdprResponseDueAt(row.requestedAt, row.user.country.timezone);
+  return earliest > gdprResponseDueAt(row.receivedAt, row.user.country.timezone);
 }
 
 function isAnsweredLate(
@@ -164,7 +164,7 @@ function isAnsweredLate(
   if (row.status === 'ready' || row.status === 'completed') {
     return (
       row.completedAt !== null &&
-      row.completedAt > gdprResponseDueAt(row.requestedAt, row.user.country.timezone)
+      row.completedAt > gdprResponseDueAt(row.receivedAt, row.user.country.timezone)
     );
   }
   if (row.status === 'failed') {
@@ -198,6 +198,7 @@ function mapDataRequest(
     status: row.status,
     channel: row.channel,
     requestedAt: row.requestedAt.toISOString(),
+    receivedAt: row.receivedAt.toISOString(),
     completedAt: row.completedAt?.toISOString() ?? null,
     expiresAt: row.expiresAt?.toISOString() ?? null,
     failureReason: row.failureReason,
@@ -428,7 +429,7 @@ export class AdminDataRequestsService {
       created = await this.prisma.client.$transaction(async (tx) => {
         const row = await applyAccountDeletion(tx, {
           userId: user.id,
-          requestedAt: receivedAt,
+          receivedAt,
           channel,
           audit: {
             actorType: 'admin',

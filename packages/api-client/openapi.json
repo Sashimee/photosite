@@ -3393,6 +3393,12 @@
             "description": "ISO 8601 date-time",
             "example": "2026-09-16T12:00:00.000Z"
           },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
           "completedAt": {
             "type": [
               "string",
@@ -3435,6 +3441,7 @@
           "status",
           "channel",
           "requestedAt",
+          "receivedAt",
           "completedAt",
           "expiresAt",
           "failureReason",
@@ -3772,6 +3779,12 @@
             "description": "ISO 8601 date-time",
             "example": "2026-09-16T12:00:00.000Z"
           },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
           "completedAt": {
             "type": [
               "string",
@@ -3846,6 +3859,7 @@
           "status",
           "channel",
           "requestedAt",
+          "receivedAt",
           "completedAt",
           "expiresAt",
           "failureReason",
@@ -15516,7 +15530,7 @@
     },
     "/v1/admin/data-requests": {
       "get": {
-        "summary": "List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row that has not produced a copy yet, or null if it does not apply. It is computed in the requesting user's country timezone, and is never later than the same deadline computed in UTC. `answeredLate` is true for an export row with status ready or completed whose completedAt is after gdprResponseDueAt(requestedAt, timezone); for a failed export it is true when the earliest completedAt among the same user's later exports is after the failed row's gdprResponseDueAt(requestedAt, timezone); false otherwise (delete rows, cancelled, not yet answered, or completedAt null).",
+        "summary": "List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row that has not produced a copy yet, or null if it does not apply. It is computed in the requesting user's country timezone, and is never later than the same deadline computed in UTC. `answeredLate` is true for an export row with status ready or completed whose completedAt is after gdprResponseDueAt(receivedAt, timezone); for a failed export it is true when the earliest completedAt among the same user's later exports is after the failed row's gdprResponseDueAt(receivedAt, timezone); false otherwise (delete rows, cancelled, not yet answered, or completedAt null).",
         "tags": [
           "admin"
         ],
@@ -15666,7 +15680,7 @@
       },
       "post": {
         "summary": "Log a GDPR request received off-platform",
-        "description": "Records a data subject request that reached the user by email or through support, so it meets the same Art. 12(3) deadline as an in-app request. `requestedAt` is set to `receivedAt`, so `responseDueAt` counts from when the request was received, not from when it was logged. `400` if `receivedAt` is more than 1 minute in the future or more than 30 days in the past. Returns 409 with a distinct `code`: `EXPORT_OPEN` or `DELETE_OPEN` if the user already has an open request of that type, `USER_SUSPENDED` or `USER_DELETED` if the user's account is no longer active, or `BLOCKING_OBLIGATIONS` if a delete is blocked by the same obligations as self-service deletion.",
+        "description": "Records a data subject request that reached the user by email or through support, so it meets the same Art. 12(3) deadline as an in-app request. `requestedAt` is always the server time the row is logged; `responseDueAt` is computed from `receivedAt`, so the deadline counts from when the request was received, not from when it was logged. `400` if `receivedAt` is more than 1 minute in the future or more than 30 days in the past. Returns 409 with a distinct `code`: `EXPORT_OPEN` or `DELETE_OPEN` if the user already has an open request of that type, `USER_SUSPENDED` or `USER_DELETED` if the user's account is no longer active, or `BLOCKING_OBLIGATIONS` if a delete is blocked by the same obligations as self-service deletion.",
         "tags": [
           "admin"
         ],

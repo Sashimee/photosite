@@ -463,6 +463,7 @@ describe('AdminDataRequestSchema', () => {
     status: 'pending',
     channel: 'in_app',
     requestedAt: '2026-08-01T10:00:00.000Z',
+    receivedAt: '2026-08-01T10:00:00.000Z',
     completedAt: null,
     expiresAt: null,
     failureReason: null,
@@ -565,7 +566,7 @@ describe('AdminLogDataRequestBodySchema', () => {
     userId: id,
     type: 'export',
     channel: 'support',
-    receivedAt: '2026-08-01T10:00:00.000Z',
+    receivedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
   };
 
   it('accepts a well-formed body', () => {

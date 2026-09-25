@@ -9,6 +9,7 @@ export function mapDataRequest(row: DataRequest): z.infer<typeof DataRequestSche
     status: row.status,
     channel: row.channel,
     requestedAt: row.requestedAt.toISOString(),
+    receivedAt: row.receivedAt.toISOString(),
     completedAt: row.completedAt?.toISOString() ?? null,
     expiresAt: row.expiresAt?.toISOString() ?? null,
     failureReason: row.failureReason,

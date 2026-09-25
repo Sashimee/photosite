@@ -26,6 +26,7 @@ const dataRequestSelect = {
   status: true,
   channel: true,
   requestedAt: true,
+  receivedAt: true,
   completedAt: true,
   expiresAt: true,
   failureReason: true,
@@ -149,10 +150,10 @@ export class AdminDataRequestsRepository {
     tx: Prisma.TransactionClient,
     userId: string,
     channel: DataRequestChannel,
-    requestedAt: Date,
+    receivedAt: Date,
   ): Promise<AdminDataRequestRow> {
     return tx.dataRequest.create({
-      data: { userId, type: 'export', status: 'pending', channel, requestedAt },
+      data: { userId, type: 'export', status: 'pending', channel, receivedAt },
       select: dataRequestSelect,
     });
   }

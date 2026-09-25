@@ -18,6 +18,7 @@ const request: components['schemas']['AdminDataRequest'] = {
   status: 'failed',
   channel: 'in_app',
   requestedAt: '2026-09-01T12:00:00.000Z',
+  receivedAt: '2026-09-01T12:00:00.000Z',
   completedAt: null,
   expiresAt: null,
   failureReason: 'export_failed',

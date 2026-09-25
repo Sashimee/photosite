@@ -29,7 +29,12 @@ import {
   errorResponses,
   paginatedResponseSchema,
 } from './common.js';
-import { DataRequestSchema } from './gdpr.js';
+import {
+  DataRequestSchema,
+  LOGGABLE_DATA_REQUEST_CHANNELS,
+  RECEIVED_AT_MAX_AGE_MS,
+  RECEIVED_AT_MAX_FUTURE_SKEW_MS,
+} from './gdpr.js';
 import { ADMIN_SECURITY, apiPath, registry } from './registry.js';
 import { AdminVerificationCaseSchema, AdminVerificationCaseSummarySchema } from './verification.js';
 import { z } from './zod.js';
@@ -547,9 +552,9 @@ registry.registerPath({
 // already reached ready/completed. Null for delete rows and for ready, completed
 // or cancelled exports; a ready export past its expiresAt was still answered (#358).
 // `answeredLate` is true for an export row with status ready or completed whose
-// completedAt is after gdprResponseDueAt(requestedAt, timezone). For a failed export it is
+// completedAt is after gdprResponseDueAt(receivedAt, timezone). For a failed export it is
 // true when the earliest completedAt among the same user's later exports is after
-// the failed row's gdprResponseDueAt(requestedAt, timezone); false otherwise (delete
+// the failed row's gdprResponseDueAt(receivedAt, timezone); false otherwise (delete
 // rows, cancelled, not yet answered, or completedAt null). `timezone` is the
 // requesting user's country's IANA zone (Country.timezone).
 export const AdminDataRequestSchema = DataRequestSchema.extend({
@@ -581,9 +586,9 @@ registry.registerPath({
     "in the requesting user's country timezone, and is never later than the same deadline " +
     'computed in UTC. ' +
     '`answeredLate` is true for an export row with status ready or completed whose completedAt ' +
-    'is after gdprResponseDueAt(requestedAt, timezone); for a failed export it is true when the ' +
+    'is after gdprResponseDueAt(receivedAt, timezone); for a failed export it is true when the ' +
     "earliest completedAt among the same user's later exports is after the failed row's " +
-    'gdprResponseDueAt(requestedAt, timezone); false otherwise (delete rows, cancelled, not yet ' +
+    'gdprResponseDueAt(receivedAt, timezone); false otherwise (delete rows, cancelled, not yet ' +
     'answered, or completedAt null).',
   tags: ['admin'],
   security: ADMIN_SECURITY,
@@ -632,10 +637,18 @@ export const AdminLogDataRequestBodySchema = z
   .object({
     userId: IdSchema,
     type: z.enum(DATA_REQUEST_TYPES),
-    channel: z.enum(['email', 'support']),
+    channel: z.enum(LOGGABLE_DATA_REQUEST_CHANNELS),
     receivedAt: IsoDateTimeSchema,
   })
-  .strict();
+  .strict()
+  .refine(
+    (body) => new Date(body.receivedAt).getTime() <= Date.now() + RECEIVED_AT_MAX_FUTURE_SKEW_MS,
+    { message: 'receivedAt cannot be in the future', path: ['receivedAt'] },
+  )
+  .refine((body) => new Date(body.receivedAt).getTime() >= Date.now() - RECEIVED_AT_MAX_AGE_MS, {
+    message: 'receivedAt is more than 30 days in the past',
+    path: ['receivedAt'],
+  });
 
 registry.registerPath({
   method: 'post',
@@ -643,8 +656,9 @@ registry.registerPath({
   summary: 'Log a GDPR request received off-platform',
   description:
     'Records a data subject request that reached the user by email or through support, so it ' +
-    'meets the same Art. 12(3) deadline as an in-app request. `requestedAt` is set to `receivedAt`, ' +
-    'so `responseDueAt` counts from when the request was received, not from when it was logged. ' +
+    'meets the same Art. 12(3) deadline as an in-app request. `requestedAt` is always the server ' +
+    'time the row is logged; `responseDueAt` is computed from `receivedAt`, so the deadline counts ' +
+    'from when the request was received, not from when it was logged. ' +
     '`400` if `receivedAt` is more than 1 minute in the future or more than 30 days in the past. ' +
     'Returns 409 with a distinct `code`: `EXPORT_OPEN` or `DELETE_OPEN` if the user already has an ' +
     "open request of that type, `USER_SUSPENDED` or `USER_DELETED` if the user's account is no " +

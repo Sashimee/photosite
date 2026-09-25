@@ -31,6 +31,7 @@ describe('DataRequestSchema', () => {
     status: 'pending',
     channel: 'in_app',
     requestedAt: '2026-09-16T12:00:00.000Z',
+    receivedAt: '2026-09-16T12:00:00.000Z',
     completedAt: null,
     expiresAt: null,
     failureReason: null,

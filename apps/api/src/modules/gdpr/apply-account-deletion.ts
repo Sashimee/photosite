@@ -17,7 +17,7 @@ export interface AccountDeletionAuditEntry {
 
 export interface ApplyAccountDeletionParams {
   userId: string;
-  requestedAt: Date;
+  receivedAt: Date;
   channel: DataRequestChannel;
   audit: AccountDeletionAuditEntry;
 }
@@ -29,7 +29,7 @@ export interface ApplyAccountDeletionParams {
 // regardless of who created it.
 export async function applyAccountDeletion(
   tx: Prisma.TransactionClient,
-  { userId, requestedAt, channel, audit }: ApplyAccountDeletionParams,
+  { userId, receivedAt, channel, audit }: ApplyAccountDeletionParams,
 ): Promise<DataRequest> {
   const profile = await tx.photographerProfile.findUnique({
     where: { userId },
@@ -65,7 +65,7 @@ export async function applyAccountDeletion(
   const withdrawnJobApplicationIds = await withdrawOwnJobApplications(tx, profile?.id);
 
   const row = await tx.dataRequest.create({
-    data: { userId, type: 'delete', status: 'pending', channel, requestedAt },
+    data: { userId, type: 'delete', status: 'pending', channel, receivedAt },
   });
 
   await tx.auditLog.create({
