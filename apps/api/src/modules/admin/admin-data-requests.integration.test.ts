@@ -547,7 +547,7 @@ describe('admin data requests integration', () => {
         expect(item?.responseDueAt).toBeNull();
       });
 
-      it('is set on a ready export past its expiresAt', async () => {
+      it('is null on a ready export past its expiresAt: the download link answered the request', async () => {
         const admin = await makeAdmin('due-expired', ['support']);
         const subject = await createSubjectUser('due-expired');
         const requestedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
@@ -561,7 +561,142 @@ describe('admin data requests integration', () => {
 
         const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
         const item = body.items.find((candidate) => candidate.id === expired.id);
-        expect(item?.responseDueAt).toBe(gdprResponseDueAt(requestedAt).toISOString());
+        expect(item?.responseDueAt).toBeNull();
+      });
+
+      it('is null on an earlier failed export superseded by a later ready export that has since expired', async () => {
+        const admin = await makeAdmin('due-superseded-expired', ['support']);
+        const subject = await createSubjectUser('due-superseded-expired');
+        const base = Date.now();
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt: new Date(base - 2000),
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(base - 1000),
+          expiresAt: new Date(base - 500),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.responseDueAt).toBeNull();
+      });
+
+      it('is set on a failed export superseded by an earlier successful export', async () => {
+        const admin = await makeAdmin('due-earlier-success', ['support']);
+        const subject = await createSubjectUser('due-earlier-success');
+        const base = Date.now();
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(base - 2000),
+          expiresAt: new Date(base + 7 * 24 * 60 * 60 * 1000),
+        });
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt: new Date(base - 1000),
+          failureReason: 'export_failed',
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.responseDueAt).toBe(gdprResponseDueAt(new Date(base - 1000)).toISOString());
+      });
+
+      it('is not cleared by a later export that is itself still pending', async () => {
+        const admin = await makeAdmin('due-later-pending', ['support']);
+        const subject = await createSubjectUser('due-later-pending');
+        const base = Date.now();
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt: new Date(base - 2000),
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'pending',
+          requestedAt: new Date(base - 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.responseDueAt).toBe(gdprResponseDueAt(new Date(base - 2000)).toISOString());
+      });
+
+      it('is null on a completed export', async () => {
+        const admin = await makeAdmin('due-completed', ['support']);
+        const subject = await createSubjectUser('due-completed');
+        const completed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'completed',
+          requestedAt: new Date(),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === completed.id);
+        expect(item?.responseDueAt).toBeNull();
+      });
+
+      it('is null on a cancelled export', async () => {
+        const admin = await makeAdmin('due-cancelled', ['support']);
+        const subject = await createSubjectUser('due-cancelled');
+        const cancelled = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'cancelled',
+          requestedAt: new Date(),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === cancelled.id);
+        expect(item?.responseDueAt).toBeNull();
+      });
+
+      it('is computed independently for several awaiting users on the same page', async () => {
+        const admin = await makeAdmin('due-multi-user', ['support']);
+        const subjectA = await createSubjectUser('due-multi-user-a');
+        const subjectB = await createSubjectUser('due-multi-user-b');
+        const base = Date.now();
+        const failedA = await createDataRequest({
+          userId: subjectA.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt: new Date(base - 3000),
+          failureReason: 'export_failed',
+        });
+        const failedB = await createDataRequest({
+          userId: subjectB.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt: new Date(base - 2000),
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subjectB.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(base - 1000),
+          expiresAt: new Date(base + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`status=failed&type=export&limit=100`, null, admin.headers);
+        const itemA = body.items.find((candidate) => candidate.id === failedA.id);
+        const itemB = body.items.find((candidate) => candidate.id === failedB.id);
+        expect(itemA?.responseDueAt).toBe(gdprResponseDueAt(new Date(base - 3000)).toISOString());
+        expect(itemB?.responseDueAt).toBeNull();
       });
 
       it('is null on a ready export still downloadable', async () => {

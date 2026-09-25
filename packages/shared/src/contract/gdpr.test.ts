@@ -110,6 +110,18 @@ describe('gdprResponseDueAt', () => {
       '2027-01-15T08:30:00.000Z',
     );
   });
+
+  it('clamps to the last day of a target month with 30 days', () => {
+    expect(gdprResponseDueAt(new Date('2026-08-31T00:00:00.000Z')).toISOString()).toBe(
+      '2026-09-30T00:00:00.000Z',
+    );
+  });
+
+  it('preserves the time of day, including milliseconds, when clamping', () => {
+    expect(gdprResponseDueAt(new Date('2026-01-31T14:23:05.123Z')).toISOString()).toBe(
+      '2026-02-28T14:23:05.123Z',
+    );
+  });
 });
 
 describe('CancelDataRequestRequestSchema', () => {
