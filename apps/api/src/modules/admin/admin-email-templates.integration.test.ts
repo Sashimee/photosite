@@ -204,6 +204,15 @@ describe('admin email templates integration', () => {
   });
 
   describe('GET /v1/admin/email-templates/:template/preview', () => {
+    it('returns 401 when unauthenticated', async () => {
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/email-templates/quote_received/preview?locale=en',
+        headers: { origin: 'http://localhost:3000' },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
     it('returns 403 for an admin without the superadmin permission', async () => {
       const admin = await makeAdmin('preview-no-permission', ['support']);
       const response = await fastify().inject({
@@ -229,6 +238,26 @@ describe('admin email templates integration', () => {
       const response = await fastify().inject({
         method: 'GET',
         url: '/v1/admin/email-templates/quote_received/preview?locale=xx',
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('returns 400 when the locale query param is missing', async () => {
+      const admin = await makeAdmin('preview-missing-locale', ['superadmin']);
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/email-templates/quote_received/preview',
+        headers: admin.headers,
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('returns 400 for a path-traversal-ish template value', async () => {
+      const admin = await makeAdmin('preview-path-traversal', ['superadmin']);
+      const response = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/email-templates/..%2f..%2fetc%2fpasswd/preview?locale=en',
         headers: admin.headers,
       });
       expect(response.statusCode).toBe(400);
