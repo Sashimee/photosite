@@ -59,6 +59,11 @@ export function DataRequestsTable({ status, type, userId }: DataRequestsFilters)
       cell: (row) => row.completedAt ?? t('placeholders.none'),
     },
     {
+      id: 'expiresAt',
+      header: t('columns.expiresAt'),
+      cell: (row) => row.expiresAt ?? t('placeholders.unset'),
+    },
+    {
       id: 'failureReason',
       header: t('columns.failureReason'),
       cell: (row) => row.failureReason ?? t('placeholders.none'),

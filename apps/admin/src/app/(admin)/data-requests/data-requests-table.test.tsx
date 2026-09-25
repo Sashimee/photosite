@@ -70,6 +70,26 @@ describe('DataRequestsTable', () => {
     expect(screen.getAllByText('None').length).toBeGreaterThanOrEqual(1);
   });
 
+  it('shows the export expiry date', async () => {
+    getMock.mockResolvedValueOnce({ data: { items: [baseRequest], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(await screen.findByText(baseRequest.expiresAt)).toBeInTheDocument();
+  });
+
+  it('shows a dash for a null expiresAt', async () => {
+    const noExpiry = { ...baseRequest, expiresAt: null };
+    getMock.mockResolvedValueOnce({ data: { items: [noExpiry], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    await screen.findByText('a***@example.com');
+    expect(screen.getByText('–')).toBeInTheDocument();
+  });
+
   it('shows the grace period countdown only for a pending deletion', async () => {
     const pendingDeletion = {
       ...baseRequest,
