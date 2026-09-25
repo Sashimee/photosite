@@ -3,7 +3,7 @@ import { PlatformSettingsModule } from '../../common/platform-settings/platform-
 import { AuthModule } from '../auth/auth.module.js';
 import { OriginGuard } from '../auth/origin-guard.js';
 import { ChatSocketBridgeModule } from '../chat/chat-socket-bridge.module.js';
-import { GdprExportQueueService } from '../gdpr/gdpr-export-queue.service.js';
+import { GdprExportQueueModule } from '../gdpr/gdpr-export-queue.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { AdminAccessService } from './admin-access.service.js';
 import { AdminAuditLogController } from './admin-audit-log.controller.js';
@@ -29,7 +29,13 @@ import { AdminUsersRepository } from './admin-users.repository.js';
 import { AdminUsersService } from './admin-users.service.js';
 
 @Module({
-  imports: [AuthModule, ChatSocketBridgeModule, PlatformSettingsModule, NotificationsModule],
+  imports: [
+    AuthModule,
+    ChatSocketBridgeModule,
+    PlatformSettingsModule,
+    NotificationsModule,
+    GdprExportQueueModule,
+  ],
   controllers: [
     AdminMeController,
     AdminUsersController,
@@ -55,7 +61,6 @@ import { AdminUsersService } from './admin-users.service.js';
     AdminEmailTemplatesService,
     AdminDataRequestsService,
     AdminDataRequestsRepository,
-    GdprExportQueueService,
     OriginGuard,
   ],
   exports: [
