@@ -27,8 +27,15 @@ function notFound(): HttpException {
   return new HttpException({ code: 'NOT_FOUND', message: 'Data request not found' }, 404);
 }
 
-function conflict(message: string): HttpException {
-  return new HttpException({ code: 'CONFLICT', message }, 409);
+function conflict(code: string, message: string): HttpException {
+  return new HttpException({ code, message }, 409);
+}
+
+function conflictForUserStatus(status: string | null): HttpException {
+  if (status === 'suspended') {
+    return conflict('USER_SUSPENDED', 'User account is suspended');
+  }
+  return conflict('USER_DELETED', 'User account is deleted or anonymised');
 }
 
 type Query = z.infer<typeof AdminDataRequestsQuerySchema>;
@@ -114,6 +121,20 @@ function isAnsweredLate(
   return false;
 }
 
+// A retry is redundant once the user already holds a copy of the data.
+function hasAlreadyAnsweredExport(
+  source: AdminDataRequestRow,
+  exports: SuccessfulExport[],
+  now: Date,
+): boolean {
+  return exports.some((row) => {
+    if (row.status === 'ready' && row.expiresAt && row.expiresAt > now) {
+      return true;
+    }
+    return row.completedAt !== null && row.completedAt > source.requestedAt;
+  });
+}
+
 function mapDataRequest(
   row: AdminDataRequestRow,
   latestSuccessByUser: Map<string, Date>,
@@ -184,20 +205,32 @@ export class AdminDataRequestsService {
       throw notFound();
     }
     if (source.type !== 'export' || source.status !== 'failed') {
-      throw conflict('Only a failed export can be retried');
+      throw conflict('EXPORT_NOT_FAILED', 'Only a failed export can be retried');
     }
     const userStatus = await this.repository.findUserStatus(source.user.id);
     if (userStatus !== 'active') {
-      throw conflict('User account is deleted or anonymised');
+      throw conflictForUserStatus(userStatus);
+    }
+    const alreadyRetried = await this.repository.findRetryAuditForSource(id);
+    if (alreadyRetried) {
+      throw conflict('EXPORT_ALREADY_RETRIED', 'This export has already been retried');
     }
     const openExport = await this.repository.findOpenExportForUser(source.user.id);
     if (openExport) {
-      throw conflict('User already has a pending or processing export');
+      throw conflict('EXPORT_OPEN', 'User already has a pending or processing export');
+    }
+    const successfulExports = await this.repository.listSuccessfulExports([source.user.id]);
+    if (hasAlreadyAnsweredExport(source, successfulExports, new Date())) {
+      throw conflict('EXPORT_ALREADY_ANSWERED', 'User has already received a later export');
     }
 
     let created: AdminDataRequestRow;
     try {
       created = await this.prisma.client.$transaction(async (tx) => {
+        const txUserStatus = await this.repository.findUserStatusInTx(tx, source.user.id);
+        if (txUserStatus !== 'active') {
+          throw conflictForUserStatus(txUserStatus);
+        }
         const row = await this.repository.createExport(tx, source.user.id);
         await this.auditService.record(tx, {
           actorId: admin.id,
@@ -205,14 +238,14 @@ export class AdminDataRequestsService {
           targetType: 'DataRequest',
           targetId: row.id,
           before: { sourceId: id },
-          after: { status: 'pending' },
+          after: { status: 'pending', userId: source.user.id },
           ip: ip ?? null,
         });
         return row;
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw conflict('User already has a pending or processing export');
+        throw conflict('EXPORT_OPEN', 'User already has a pending or processing export');
       }
       throw error;
     }
@@ -220,10 +253,20 @@ export class AdminDataRequestsService {
     try {
       await this.exportQueue.enqueue(created.id);
     } catch (error) {
-      await this.prisma.client.dataRequest.updateMany({
+      const failedUpdate = await this.prisma.client.dataRequest.updateMany({
         where: { id: created.id, status: 'pending' },
         data: { status: 'failed', failureReason: 'enqueue_failed' },
       });
+      if (failedUpdate.count === 1) {
+        await this.auditService.record(this.prisma.client, {
+          actorId: admin.id,
+          action: 'data_request.export_failed',
+          targetType: 'DataRequest',
+          targetId: created.id,
+          after: { status: 'failed', reason: 'enqueue_failed' },
+          ip: ip ?? null,
+        });
+      }
       throw error;
     }
 
