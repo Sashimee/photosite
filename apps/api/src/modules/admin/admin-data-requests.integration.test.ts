@@ -49,6 +49,16 @@ describe('admin data requests integration', () => {
   let exportQueue: Queue;
   const createdUserIds: string[] = [];
 
+  // Country.code requires exactly two uppercase letters, so RUN_ID's hex
+  // digits are mapped into that range to avoid collisions with other
+  // integration suites running in parallel against the same database.
+  const RUN_ID = randomUUID().replaceAll('-', '').slice(0, 8);
+  function hexDigitToLetter(hexDigit: string): string {
+    return String.fromCharCode(65 + Number.parseInt(hexDigit, 16));
+  }
+  const FIXTURE_COUNTRY_CODE = `${hexDigitToLetter(RUN_ID[2] ?? '0')}${hexDigitToLetter(RUN_ID[3] ?? '1')}`;
+  const FIXTURE_COUNTRY_TIMEZONE = 'Asia/Tokyo';
+
   function fastify() {
     return app.getHttpAdapter().getInstance();
   }
@@ -148,6 +158,7 @@ describe('admin data requests integration', () => {
   async function createSubjectUser(
     label: string,
     status: 'active' | 'suspended' | 'deleted' = 'active',
+    countryCode = 'LU',
   ): Promise<{ id: string; email: string }> {
     const email = uniqueEmail(`subject-${label}`);
     const user = await prisma.user.create({
@@ -155,7 +166,7 @@ describe('admin data requests integration', () => {
         email,
         emailVerifiedAt: new Date(),
         locale: 'en',
-        countryCode: 'LU',
+        countryCode,
         roles: ['client'],
         status,
         ...(status === 'deleted' ? { deletedAt: new Date() } : {}),
@@ -223,6 +234,21 @@ describe('admin data requests integration', () => {
     exportQueueConnection = new Redis(testEnv.REDIS_URL, { maxRetriesPerRequest: null });
     exportQueue = new Queue(GDPR_EXPORT_QUEUE_NAME, { connection: exportQueueConnection });
     await clearRateLimitKeys();
+    await prisma.country.upsert({
+      where: { code: FIXTURE_COUNTRY_CODE },
+      create: {
+        code: FIXTURE_COUNTRY_CODE,
+        name: 'Fixture Non-Luxembourg Country',
+        enabled: true,
+        currency: 'JPY',
+        vatRate: 0,
+        requiredDocuments: [],
+        legalTexts: {},
+        defaultLocale: 'en',
+        timezone: FIXTURE_COUNTRY_TIMEZONE,
+      },
+      update: { timezone: FIXTURE_COUNTRY_TIMEZONE },
+    });
   });
 
   afterEach(async () => {
@@ -234,6 +260,7 @@ describe('admin data requests integration', () => {
       await prisma.dataRequest.deleteMany({ where: { userId: { in: createdUserIds } } });
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
+    await prisma.country.deleteMany({ where: { code: FIXTURE_COUNTRY_CODE } });
     await prisma.$disconnect();
     await exportQueue.close();
     exportQueueConnection.disconnect();
@@ -738,6 +765,27 @@ describe('admin data requests integration', () => {
         expect(item?.responseDueAt).toBeNull();
       });
 
+      it('is computed in the subject user country timezone, not always Europe/Luxembourg', async () => {
+        const admin = await makeAdmin('due-country-tz', ['support']);
+        const subject = await createSubjectUser('due-country-tz', 'active', FIXTURE_COUNTRY_CODE);
+        const requestedAt = new Date('2026-01-29T15:30:00.000Z');
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt,
+          failureReason: 'export_failed',
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        const expected = gdprResponseDueAt(requestedAt, FIXTURE_COUNTRY_TIMEZONE).toISOString();
+        expect(expected).not.toBe(
+          gdprResponseDueAt(requestedAt, 'Europe/Luxembourg').toISOString(),
+        );
+        expect(item?.responseDueAt).toBe(expected);
+      });
+
       it('is null on a delete row', async () => {
         const admin = await makeAdmin('due-delete', ['support']);
         const subject = await createSubjectUser('due-delete');
@@ -967,6 +1015,27 @@ describe('admin data requests integration', () => {
           expect(item?.answeredLate).toBe(false);
         },
       );
+
+      it('is computed against the due date in the subject user country timezone', async () => {
+        const admin = await makeAdmin('late-country-tz', ['support']);
+        const subject = await createSubjectUser('late-country-tz', 'active', FIXTURE_COUNTRY_CODE);
+        const requestedAt = new Date('2026-01-29T15:30:00.000Z');
+        const dueInFixtureCountry = gdprResponseDueAt(requestedAt, FIXTURE_COUNTRY_TIMEZONE);
+        const dueInLuxembourg = gdprResponseDueAt(requestedAt, 'Europe/Luxembourg');
+        expect(dueInFixtureCountry.getTime()).toBeLessThan(dueInLuxembourg.getTime());
+        const completedAt = new Date(dueInFixtureCountry.getTime() + 1);
+        const completed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'completed',
+          requestedAt,
+          completedAt,
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === completed.id);
+        expect(item?.answeredLate).toBe(true);
+      });
     });
 
     describe('answeredLate for a failed export later answered by a newer export', () => {
