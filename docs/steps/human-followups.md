@@ -2,7 +2,7 @@
 
 Work in `docs/PLAN.md` that needs Alex. The /loop run skips these and keeps building around them. Each entry says what is needed, what it unblocks and what happens meanwhile.
 
-Last updated: 2026-09-24.
+Last updated: 2026-09-25.
 
 ## Open decisions (`docs/DECISIONS.md`)
 
@@ -89,12 +89,6 @@ Last updated: 2026-09-24.
 | Once test-mode keys exist, a short live checklist has to be run | Connect Express onboarding with a test account; `stripe listen` webhook replay against a real signature; a 3-D Secure test card through the Payment Element; a partial refund; a transfer reversal | Confidence that the fake matched reality | The checklist is written down in the step plan so it is a scheduled verification, not an unknown |
 | Accountant: VAT on the platform fee for Luxembourg photographers (17 %), whether the platform issues the fee invoice itself, and DAC7 applicability plus the exact seller fields to collect | Answers from the accountant | Correct invoicing and the yearly DAC7 export (Phase 3) | The shared fee helper takes a VAT-on-fee flag driven by `Country.vatRate`, defaulting to off |
 | Stripe Radar rules, and whether 3-D Secure is forced on every payment | A decision once the account exists | Fraud posture at launch | Automatic payment methods decide, which is Stripe's default |
-
-## Local environment
-
-| Issue | Needed from Alex | Why deferred |
-|-------|------------------|--------------|
-| The `postgis/postgis` image installs `postgis_tiger_geocoder`, `postgis_topology` and `fuzzystrmatch` into the dev database, so `prisma migrate dev` reports drift and asks for a reset | Consent to (a) override the image's init so only `postgis` is enabled and (b) run `pnpm stack:reset` to recreate the local volumes | Destroys local data; Prisma refuses a reset from an AI agent without consent. Meanwhile migrations are generated with `prisma migrate diff` and applied with `prisma migrate deploy` |
 
 ## Security follow-ups
 
