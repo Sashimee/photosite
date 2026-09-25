@@ -31,6 +31,7 @@ const baseRequest = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   type: 'export' as const,
   status: 'ready' as const,
+  channel: 'in_app' as const,
   requestedAt: '2026-09-01T12:00:00.000Z',
   completedAt: '2026-09-02T12:00:00.000Z',
   expiresAt: '2026-09-09T12:00:00.000Z',
@@ -314,6 +315,34 @@ describe('DataRequestsTable', () => {
     render(<DataRequestsTable />);
 
     expect(await screen.findByText('Overdue')).toBeInTheDocument();
+  });
+
+  it('shows the channel for each row', async () => {
+    const emailRequest = {
+      ...baseRequest,
+      id: '3fa85f64-5717-4562-b3fc-2c963f66afad',
+      channel: 'email' as const,
+    };
+    const supportRequest = {
+      ...baseRequest,
+      id: '3fa85f64-5717-4562-b3fc-2c963f66afae',
+      channel: 'support' as const,
+    };
+    const inAppRequest = {
+      ...baseRequest,
+      id: '3fa85f64-5717-4562-b3fc-2c963f66afaf',
+      channel: 'in_app' as const,
+    };
+    getMock.mockResolvedValueOnce({
+      data: { items: [emailRequest, supportRequest, inAppRequest], nextCursor: null },
+    });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(await screen.findByText('Email')).toBeInTheDocument();
+    expect(screen.getByText('Support')).toBeInTheDocument();
+    expect(screen.getByText('In app')).toBeInTheDocument();
   });
 
   it('explains the match rules in the empty state', async () => {
