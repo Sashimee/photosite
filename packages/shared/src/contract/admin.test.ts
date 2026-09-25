@@ -7,6 +7,7 @@ import {
   AdminDataRequestsQuerySchema,
   AdminEmailTemplatePreviewQuerySchema,
   AdminLegalTextVersionSchema,
+  AdminLogDataRequestBodySchema,
   AdminProvenanceCheckSchema,
   AdminReportSchema,
   AdminReportsQuerySchema,
@@ -549,6 +550,85 @@ describe('AdminDataRequestsQuerySchema', () => {
   it('rejects an unknown type', () => {
     expect(AdminDataRequestsQuerySchema.safeParse({ type: 'wipe' }).success).toBe(false);
   });
+
+  it('accepts a channel filter', () => {
+    expect(AdminDataRequestsQuerySchema.safeParse({ channel: 'support' }).success).toBe(true);
+  });
+
+  it('rejects an unknown channel', () => {
+    expect(AdminDataRequestsQuerySchema.safeParse({ channel: 'phone' }).success).toBe(false);
+  });
+});
+
+describe('AdminLogDataRequestBodySchema', () => {
+  const validBody = {
+    userId: id,
+    type: 'export',
+    channel: 'support',
+    receivedAt: '2026-08-01T10:00:00.000Z',
+  };
+
+  it('accepts a well-formed body', () => {
+    expect(AdminLogDataRequestBodySchema.safeParse(validBody).success).toBe(true);
+  });
+
+  it('accepts the email channel', () => {
+    expect(
+      AdminLogDataRequestBodySchema.safeParse({ ...validBody, channel: 'email' }).success,
+    ).toBe(true);
+  });
+
+  it('accepts the support channel', () => {
+    expect(
+      AdminLogDataRequestBodySchema.safeParse({ ...validBody, channel: 'support' }).success,
+    ).toBe(true);
+  });
+
+  it('rejects the in_app channel', () => {
+    expect(
+      AdminLogDataRequestBodySchema.safeParse({ ...validBody, channel: 'in_app' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an unknown channel', () => {
+    expect(
+      AdminLogDataRequestBodySchema.safeParse({ ...validBody, channel: 'phone' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an unknown type', () => {
+    expect(AdminLogDataRequestBodySchema.safeParse({ ...validBody, type: 'wipe' }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects a non-uuid userId', () => {
+    expect(
+      AdminLogDataRequestBodySchema.safeParse({ ...validBody, userId: 'not-a-uuid' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a non-ISO receivedAt', () => {
+    expect(
+      AdminLogDataRequestBodySchema.safeParse({ ...validBody, receivedAt: '2026-08-01' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a missing receivedAt', () => {
+    const withoutReceivedAt: Partial<typeof validBody> = { ...validBody };
+    delete withoutReceivedAt.receivedAt;
+    expect(AdminLogDataRequestBodySchema.safeParse(withoutReceivedAt).success).toBe(false);
+  });
+
+  it('rejects unknown fields', () => {
+    expect(AdminLogDataRequestBodySchema.safeParse({ ...validBody, ip: '127.0.0.1' }).success).toBe(
+      false,
+    );
+  });
+
+  // The 1-minute future skew and 30-day past bounds are enforced in
+  // AdminDataRequestsService.logOffline (apps/api/src/modules/admin/admin-data-requests.service.ts),
+  // not by this schema, so they are covered by the API integration suite instead.
 });
 
 describe('EmailTemplateNameSchema', () => {
