@@ -10,7 +10,11 @@ import { collectExportData } from './export/collect.js';
 import { buildManifest } from './export/manifest.js';
 import { readPolicyVersion } from './export/policy-version.js';
 import { buildReadmeText } from './export/readme.js';
-import { findNotifiableUserEmail, notifyExportFailed } from './notify-export-failed.js';
+import {
+  EMAIL_JOB_FAILED_RETENTION_SECONDS,
+  findNotifiableUserEmail,
+  notifyExportFailed,
+} from './notify-export-failed.js';
 
 export interface GdprExportDeps {
   prisma: { client: PrismaClient };
@@ -23,7 +27,7 @@ export interface GdprExportDeps {
 
 const EXPORT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const EXPORT_FAILURE_REASON = 'export_failed';
-const EMAIL_JOB_FAILED_RETENTION_SECONDS = 24 * 60 * 60;
+const USER_INACTIVE_REASON = 'user_inactive';
 
 function isFinalAttempt(job: Job): boolean {
   const attempts = job.opts.attempts ?? 1;
@@ -93,6 +97,28 @@ export function createGdprExportProcessor(deps: GdprExportDeps): Processor<GdprE
       data: { status: 'processing' },
     });
 
+    const user = await deps.prisma.client.user.findUnique({
+      where: { id: dataRequest.userId },
+      select: { status: true },
+    });
+    if (user?.status !== 'active') {
+      const inactiveUpdate = await deps.prisma.client.dataRequest.updateMany({
+        where: { id: dataRequest.id, status: 'processing' },
+        data: { status: 'failed', failureReason: USER_INACTIVE_REASON },
+      });
+      if (inactiveUpdate.count === 1) {
+        await deps.auditLog.record({
+          actorType: 'system',
+          actorId: null,
+          action: 'data_request.export_failed',
+          targetType: 'DataRequest',
+          targetId: dataRequest.id,
+          after: { status: 'failed', failureReason: USER_INACTIVE_REASON },
+        });
+      }
+      return;
+    }
+
     let readyExpiresAt: Date;
 
     try {
@@ -131,10 +157,13 @@ export function createGdprExportProcessor(deps: GdprExportDeps): Processor<GdprE
 
       const completedAt = new Date();
       const expiresAt = new Date(completedAt.getTime() + EXPORT_RETENTION_MS);
-      await deps.prisma.client.dataRequest.update({
-        where: { id: dataRequest.id },
+      const readyUpdate = await deps.prisma.client.dataRequest.updateMany({
+        where: { id: dataRequest.id, status: 'processing' },
         data: { status: 'ready', completedAt, exportKey: key, expiresAt },
       });
+      if (readyUpdate.count !== 1) {
+        return;
+      }
       await deps.auditLog.record({
         actorType: 'system',
         actorId: null,
@@ -146,20 +175,27 @@ export function createGdprExportProcessor(deps: GdprExportDeps): Processor<GdprE
       readyExpiresAt = expiresAt;
     } catch (error) {
       if (isFinalAttempt(job)) {
-        const failedUpdate = await deps.prisma.client.dataRequest.updateMany({
-          where: { id: dataRequest.id, status: 'processing' },
-          data: { status: 'failed', failureReason: EXPORT_FAILURE_REASON },
-        });
-        if (failedUpdate.count === 1) {
-          await deps.auditLog.record({
-            actorType: 'system',
-            actorId: null,
-            action: 'data_request.export_failed',
-            targetType: 'DataRequest',
-            targetId: dataRequest.id,
-            after: { status: 'failed', failureReason: EXPORT_FAILURE_REASON },
+        try {
+          const failedUpdate = await deps.prisma.client.dataRequest.updateMany({
+            where: { id: dataRequest.id, status: 'processing' },
+            data: { status: 'failed', failureReason: EXPORT_FAILURE_REASON },
           });
-          await notifyExportFailed(deps, dataRequest.id, dataRequest.userId);
+          if (failedUpdate.count === 1) {
+            await deps.auditLog.record({
+              actorType: 'system',
+              actorId: null,
+              action: 'data_request.export_failed',
+              targetType: 'DataRequest',
+              targetId: dataRequest.id,
+              after: { status: 'failed', failureReason: EXPORT_FAILURE_REASON },
+            });
+            await notifyExportFailed(deps, dataRequest.id, dataRequest.userId);
+          }
+        } catch (followUpError) {
+          deps.logger.error(
+            { dataRequestId: dataRequest.id, err: followUpError },
+            'gdpr-export: failed to record failure audit or notify user after export failure',
+          );
         }
       }
       throw error;

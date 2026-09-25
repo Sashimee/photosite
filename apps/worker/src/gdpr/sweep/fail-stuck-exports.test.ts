@@ -15,11 +15,13 @@ function fakeDeps(options: {
   const userFindUnique =
     options.userFindUnique ??
     vi.fn(() => Promise.resolve({ email: 'user@example.test', deletedAt: null }));
+  const logger = fakeLogger();
 
   return {
     auditRecord,
     emailQueueAdd,
     userFindUnique,
+    loggerError: logger.error,
     deps: {
       prisma: {
         client: {
@@ -28,7 +30,7 @@ function fakeDeps(options: {
         },
       } as never,
       auditLog: { record: auditRecord },
-      logger: fakeLogger() as never,
+      logger: logger as never,
       emailQueue: { add: emailQueueAdd },
       webAppUrl: 'https://example.test',
     },
@@ -75,7 +77,7 @@ describe('failStuckExports', () => {
     expect(auditRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'gdpr_sweep.exports_failed_stuck',
-        after: { exportsFailed: 2 },
+        after: { exportsFailed: 2, dataRequestIds: ['data-request-1', 'data-request-2'] },
       }),
     );
   });
@@ -92,7 +94,7 @@ describe('failStuckExports', () => {
     expect(auditRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'gdpr_sweep.exports_failed_stuck',
-        after: { exportsFailed: 0 },
+        after: { exportsFailed: 0, dataRequestIds: [] },
       }),
     );
   });
@@ -109,5 +111,32 @@ describe('failStuckExports', () => {
 
     expect(result.exportsFailed).toBe(1);
     expect(emailQueueAdd).not.toHaveBeenCalled();
+  });
+
+  it('continues failing and auditing the rest of the rows when one email send throws', async () => {
+    const findMany = vi.fn(() =>
+      Promise.resolve([
+        { id: 'data-request-1', userId: 'user-1' },
+        { id: 'data-request-2', userId: 'user-2' },
+      ]),
+    );
+    const updateMany = vi.fn(() => Promise.resolve({ count: 1 }));
+    const { auditRecord, emailQueueAdd, deps, loggerError } = fakeDeps({ findMany, updateMany });
+    emailQueueAdd.mockRejectedValueOnce(new Error('smtp down'));
+
+    const result = await failStuckExports(deps);
+
+    expect(result.exportsFailed).toBe(2);
+    expect(emailQueueAdd).toHaveBeenCalledTimes(2);
+    expect(loggerError).toHaveBeenCalledWith(
+      expect.objectContaining({ dataRequestId: 'data-request-1' }),
+      'gdpr-sweep: failed to notify user of stuck export failure',
+    );
+    expect(auditRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'gdpr_sweep.exports_failed_stuck',
+        after: { exportsFailed: 2, dataRequestIds: ['data-request-1', 'data-request-2'] },
+      }),
+    );
   });
 });

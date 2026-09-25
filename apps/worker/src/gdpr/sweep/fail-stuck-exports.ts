@@ -30,28 +30,40 @@ export async function failStuckExports(
     select: { id: true, userId: true },
   });
 
-  let exportsFailed = 0;
-  for (const row of stuckRows) {
-    const updated = await deps.prisma.client.dataRequest.updateMany({
-      where: { id: row.id, status: 'processing' },
-      data: { status: 'failed', failureReason: STUCK_PROCESSING_REASON },
-    });
-    if (updated.count !== 1) {
-      continue;
+  const failedIds: string[] = [];
+  try {
+    for (const row of stuckRows) {
+      const updated = await deps.prisma.client.dataRequest.updateMany({
+        where: { id: row.id, status: 'processing' },
+        data: { status: 'failed', failureReason: STUCK_PROCESSING_REASON },
+      });
+      if (updated.count !== 1) {
+        continue;
+      }
+      failedIds.push(row.id);
+      try {
+        await notifyExportFailed(deps, row.id, row.userId);
+      } catch (error) {
+        deps.logger.error(
+          { dataRequestId: row.id, err: error },
+          'gdpr-sweep: failed to notify user of stuck export failure',
+        );
+      }
     }
-    exportsFailed += 1;
-    await notifyExportFailed(deps, row.id, row.userId);
+  } finally {
+    await deps.auditLog.record({
+      actorType: 'system',
+      actorId: null,
+      action: 'gdpr_sweep.exports_failed_stuck',
+      targetType: 'DataRequest',
+      targetId: null,
+      after: { exportsFailed: failedIds.length, dataRequestIds: failedIds },
+    });
   }
 
-  await deps.auditLog.record({
-    actorType: 'system',
-    actorId: null,
-    action: 'gdpr_sweep.exports_failed_stuck',
-    targetType: 'DataRequest',
-    targetId: null,
-    after: { exportsFailed },
-  });
-
-  deps.logger.log({ exportsFailed }, 'gdpr-sweep: fail-stuck-exports phase complete');
-  return { exportsFailed };
+  deps.logger.log(
+    { exportsFailed: failedIds.length },
+    'gdpr-sweep: fail-stuck-exports phase complete',
+  );
+  return { exportsFailed: failedIds.length };
 }

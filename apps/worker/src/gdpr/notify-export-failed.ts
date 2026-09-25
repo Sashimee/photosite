@@ -8,7 +8,7 @@ export interface NotifyExportFailedDeps {
   webAppUrl: string;
 }
 
-const EMAIL_JOB_FAILED_RETENTION_SECONDS = 24 * 60 * 60;
+export const EMAIL_JOB_FAILED_RETENTION_SECONDS = 24 * 60 * 60;
 
 export async function findNotifiableUserEmail(
   deps: { prisma: { client: PrismaClient } },
