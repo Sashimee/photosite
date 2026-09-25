@@ -354,6 +354,9 @@ importers:
       '@photoo/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@photoo/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       '@photoo/shared':
         specifier: workspace:*
         version: link:../../packages/shared

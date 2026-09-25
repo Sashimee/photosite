@@ -21,5 +21,6 @@ export {
   EMAIL_TEMPLATE_NAMES,
   NOTIFY_EMAIL_TEMPLATE_NAMES,
   renderPreview,
+  type EmailPreview,
   type EmailTemplateName,
 } from './preview.js';

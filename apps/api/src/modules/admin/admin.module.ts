@@ -9,6 +9,8 @@ import { AdminAuditLogController } from './admin-audit-log.controller.js';
 import { AdminAuditLogRepository } from './admin-audit-log.repository.js';
 import { AdminAuditLogService } from './admin-audit-log.service.js';
 import { AdminAuditService } from './admin-audit.service.js';
+import { AdminEmailTemplatesController } from './admin-email-templates.controller.js';
+import { AdminEmailTemplatesService } from './admin-email-templates.service.js';
 import { AdminMeController } from './admin-me.controller.js';
 import { AdminMeService } from './admin-me.service.js';
 import { AdminMutationRateLimitService } from './admin-mutation-rate-limit.service.js';
@@ -30,6 +32,7 @@ import { AdminUsersService } from './admin-users.service.js';
     AdminSettingsController,
     AdminAuditLogController,
     AdminReportsController,
+    AdminEmailTemplatesController,
   ],
   providers: [
     AdminAccessService,
@@ -44,6 +47,7 @@ import { AdminUsersService } from './admin-users.service.js';
     AdminAuditLogRepository,
     AdminReportsService,
     AdminReportsRepository,
+    AdminEmailTemplatesService,
     OriginGuard,
   ],
   exports: [
