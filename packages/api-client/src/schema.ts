@@ -8173,7 +8173,7 @@ export interface paths {
         put?: never;
         /**
          * Retry a failed export as a new request
-         * @description Creates a new export DataRequest for the failed export's user and enqueues it. Bypasses the per-user GDPR rate limit, because this is a support action. Returns 409 if the source request isn't a failed export, if the user already has an open export, or if the user's account is no longer active (soft-deleted or anonymised).
+         * @description Creates a new export DataRequest for the failed export's user and enqueues it. Bypasses the per-user GDPR rate limit, because this is a support action; still subject to the per-admin mutation rate limit (429). Returns 409 with a distinct `code`: `EXPORT_NOT_FAILED` if the source request isn't a failed export, `USER_SUSPENDED` or `USER_DELETED` if the user's account is no longer active, `EXPORT_ALREADY_RETRIED` if this source has already been retried once, `EXPORT_OPEN` if the user already has a pending or processing export, or `EXPORT_ALREADY_ANSWERED` if the user already holds an unexpired export or completed a later one that answers the source request.
          */
         post: {
             parameters: {
@@ -8194,6 +8194,15 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["AdminDataRequest"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
                     };
                 };
                 /** @description Unauthorized */
@@ -8225,6 +8234,15 @@ export interface paths {
                 };
                 /** @description Conflict */
                 409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
