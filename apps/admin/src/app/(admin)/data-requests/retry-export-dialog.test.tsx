@@ -16,6 +16,7 @@ const request: components['schemas']['AdminDataRequest'] = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   type: 'export',
   status: 'failed',
+  channel: 'in_app',
   requestedAt: '2026-09-01T12:00:00.000Z',
   completedAt: null,
   expiresAt: null,
