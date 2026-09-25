@@ -1,6 +1,7 @@
 import {
   DATA_REQUEST_STATUSES,
   DATA_REQUEST_TYPES,
+  IdSchema,
   type DataRequestStatus,
   type DataRequestType,
 } from '@photoo/shared';
@@ -35,7 +36,7 @@ export function parseDataRequestsSearchParams(
   return {
     ...(status && isDataRequestStatus(status) ? { status } : {}),
     ...(type && isDataRequestType(type) ? { type } : {}),
-    ...(userId ? { userId } : {}),
+    ...(userId && IdSchema.safeParse(userId).success ? { userId } : {}),
   };
 }
 

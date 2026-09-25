@@ -34,7 +34,7 @@ describe('DataRequestsPage', () => {
         searchParams: Promise.resolve({
           status: 'pending',
           type: 'delete',
-          userId: '11111111-1111-1111-1111-111111111111',
+          userId: '11111111-1111-4111-8111-111111111111',
         }),
       }),
     );
@@ -50,12 +50,12 @@ describe('DataRequestsPage', () => {
     expect(firstCallProps(dataRequestsFiltersMock)).toEqual({
       status: 'pending',
       type: 'delete',
-      userId: '11111111-1111-1111-1111-111111111111',
+      userId: '11111111-1111-4111-8111-111111111111',
     });
     expect(firstCallProps(dataRequestsTableMock)).toMatchObject({
       status: 'pending',
       type: 'delete',
-      userId: '11111111-1111-1111-1111-111111111111',
+      userId: '11111111-1111-4111-8111-111111111111',
     });
   });
 

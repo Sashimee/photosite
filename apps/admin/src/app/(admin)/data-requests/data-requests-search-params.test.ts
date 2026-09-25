@@ -11,18 +11,25 @@ describe('parseDataRequestsSearchParams', () => {
       parseDataRequestsSearchParams({
         status: 'pending',
         type: 'delete',
-        userId: '11111111-1111-1111-1111-111111111111',
+        userId: '11111111-1111-4111-8111-111111111111',
       }),
     ).toEqual({
       status: 'pending',
       type: 'delete',
-      userId: '11111111-1111-1111-1111-111111111111',
+      userId: '11111111-1111-4111-8111-111111111111',
     });
   });
 
   it('trims whitespace and drops an empty userId', () => {
     expect(parseDataRequestsSearchParams({ userId: '  ' })).toEqual({});
-    expect(parseDataRequestsSearchParams({ userId: '  abc  ' })).toEqual({ userId: 'abc' });
+    expect(
+      parseDataRequestsSearchParams({ userId: '  11111111-1111-4111-8111-111111111111  ' }),
+    ).toEqual({ userId: '11111111-1111-4111-8111-111111111111' });
+  });
+
+  it('drops a userId that is not a UUID', () => {
+    expect(parseDataRequestsSearchParams({ userId: 'abc' })).toEqual({});
+    expect(parseDataRequestsSearchParams({ userId: "' OR 1=1 --" })).toEqual({});
   });
 
   it('drops a status or type outside the known enum', () => {
