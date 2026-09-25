@@ -48,6 +48,7 @@ export class PortfolioService {
         deletedAt: null,
         ...(cursor
           ? {
+              order: { gte: cursor.order },
               OR: [{ order: { gt: cursor.order } }, { order: cursor.order, id: { gt: cursor.id } }],
             }
           : {}),
