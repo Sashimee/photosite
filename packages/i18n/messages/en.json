@@ -724,6 +724,14 @@
       "subject": "Your {appName} account deletion request",
       "body": "We've received your request to delete your account. Your account is deactivated immediately. If you change your mind, you have 30 days to cancel by opening this link: {url}"
     },
+    "dataExportReady": {
+      "subject": "Your data export is ready",
+      "body": "Your data export is ready to download until {expiresAt}. Open this link to get it: {url}"
+    },
+    "dataExportFailed": {
+      "subject": "Your data export failed",
+      "body": "We couldn't prepare your data export. Open this link to try again: {url}"
+    },
     "footer": {
       "preferences": "Manage your notification preferences: {url}"
     },
