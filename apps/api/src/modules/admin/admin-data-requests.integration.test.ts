@@ -432,5 +432,72 @@ describe('admin data requests integration', () => {
       expect(new Set(ids).size).toBe(ids.length);
       expect(ids).toEqual(created);
     });
+
+    it('breaks requestedAt ties by id when a tie spans a page boundary', async () => {
+      const admin = await makeAdmin('pagination-ties', ['support']);
+      const subject = await createSubjectUser('pagination-ties');
+      const base = Date.now();
+      const tieAt = new Date(base - 1000);
+
+      const newer = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'completed',
+        requestedAt: new Date(base),
+      });
+      const tied: string[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        const row = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'completed',
+          requestedAt: tieAt,
+        });
+        tied.push(row.id);
+      }
+      const older = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'completed',
+        requestedAt: new Date(base - 2000),
+      });
+
+      const pages: DataRequestBody[][] = [];
+      let cursor: string | null = null;
+      const query = `userId=${subject.id}&limit=2`;
+      for (let page = 0; page < 40; page += 1) {
+        const body = await fetchPage(query, cursor, admin.headers);
+        expect(body.items.length).toBeLessThanOrEqual(2);
+        pages.push(body.items);
+        cursor = body.nextCursor;
+        if (!cursor) break;
+      }
+
+      const items = pages.flat();
+      expect(items.length).toBe(5);
+      const ids = items.map((item) => item.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(new Set(ids)).toEqual(new Set([newer.id, ...tied, older.id]));
+
+      for (const [i, curr] of items.entries()) {
+        if (i === 0) continue;
+        const prev = items[i - 1];
+        if (!prev) throw new Error(`missing item before index ${String(i)}`);
+        const prevRequestedAt = new Date(prev.requestedAt).getTime();
+        const currRequestedAt = new Date(curr.requestedAt).getTime();
+        if (prevRequestedAt === currRequestedAt) {
+          expect(prev.id > curr.id).toBe(true);
+        } else {
+          expect(prevRequestedAt).toBeGreaterThan(currRequestedAt);
+        }
+      }
+
+      const tiedPageIndexes = new Set(
+        pages.flatMap((pageItems, pageIndex) =>
+          pageItems.filter((item) => tied.includes(item.id)).map(() => pageIndex),
+        ),
+      );
+      expect(tiedPageIndexes.size).toBeGreaterThan(1);
+    });
   });
 });
