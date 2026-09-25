@@ -983,14 +983,8 @@
         "body": "Your application for {jobOfferTitle} was updated"
       },
       "reportDecision": {
-        "resolved": {
-          "title": "Your report was reviewed",
-          "body": "See the outcome by email"
-        },
-        "dismissed": {
-          "title": "Your report was reviewed",
-          "body": "See the outcome by email"
-        },
+        "resolved": { "title": "Your report was reviewed", "body": "See the outcome by email" },
+        "dismissed": { "title": "Your report was reviewed", "body": "See the outcome by email" },
         "takedown": {
           "title": "Content you reported was removed",
           "body": "See the details by email"
@@ -1009,14 +1003,8 @@
           "title": "A report about your content was dismissed",
           "body": "See the outcome by email"
         },
-        "takedown": {
-          "title": "Your content was removed",
-          "body": "See the details by email"
-        },
-        "restored": {
-          "title": "Your content was restored",
-          "body": "See the details by email"
-        }
+        "takedown": { "title": "Your content was removed", "body": "See the details by email" },
+        "restored": { "title": "Your content was restored", "body": "See the details by email" }
       }
     }
   },
