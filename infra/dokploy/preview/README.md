@@ -301,6 +301,11 @@ itself and by `minio-init` to create the buckets, the anonymous read policy
 on `photoo-public`, and these four users - never by `api`, `worker` or
 `backup`.
 
+The `minio-perms` one-shot service runs as root and `chown -R 1001:1001`s the
+`minio-data` volume before `minio` starts, because the `ghcr.io/sashimee/minio`
+mirror image runs as uid 1001 and an existing volume (created by the old
+root-user quay image) is otherwise unreadable to it (#355).
+
 ## Backups
 
 Background and decisions: `docs/steps/1E.3-backups.md`. This section is the

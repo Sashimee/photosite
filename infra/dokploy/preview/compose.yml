@@ -267,6 +267,18 @@ services:
       timeout: 5s
       retries: 10
 
+  # One-shot: the `minio` mirror image below runs as uid 1001, but
+  # `minio-data` may still be root-owned from before #326 switched off the
+  # old root-user quay image, which then fails minio with "file access
+  # denied" (#355) - this fixes ownership before minio starts.
+  minio-perms:
+    image: alpine:3.22@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8
+    user: '0:0'
+    restart: 'no'
+    volumes:
+      - minio-data:/data
+    entrypoint: ['chown', '-R', '1001:1001', '/data']
+
   minio:
     # Built from source and mirrored to GHCR (#326): MinIO Inc. archived
     # github.com/minio/{minio,mc} and cut off anonymous pulls of their own
@@ -274,6 +286,9 @@ services:
     image: ghcr.io/sashimee/minio:RELEASE.2025-09-07T16-13-09Z@sha256:321a615934fc2e251df8155f378a99b4b89caec2e3488a99ccd97d1f9b6135be
     restart: unless-stopped
     command: server /data --console-address ":9001"
+    depends_on:
+      minio-perms:
+        condition: service_completed_successfully
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set in .env}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env}
