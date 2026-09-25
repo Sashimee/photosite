@@ -25,6 +25,7 @@ export interface AnonymiseDeletionsResult {
 const ANONYMISED_LOCALE = 'en';
 const ANONYMISED_DISPLAY_NAME = 'Deleted user';
 const ANONYMISED_COMPANY_NAME = 'Deleted company';
+export const ANONYMISATION_FAILURE_REASON = 'anonymisation_failed';
 
 interface AnonymisationCounts {
   sessions: number;
@@ -203,9 +204,9 @@ export async function anonymiseDeletions(
       reportSweepFailure('anonymise-deletions', error, { dataRequestId: request.id });
 
       try {
-        await deps.prisma.client.dataRequest.update({
-          where: { id: request.id },
-          data: { failureReason: 'anonymisation_failed' },
+        await deps.prisma.client.dataRequest.updateMany({
+          where: { id: request.id, status: 'pending' },
+          data: { failureReason: ANONYMISATION_FAILURE_REASON },
         });
       } catch (updateError) {
         deps.logger.error(

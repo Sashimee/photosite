@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { anonymiseDeletions } from './anonymise-deletions.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ANONYMISATION_FAILURE_REASON, anonymiseDeletions } from './anonymise-deletions.js';
 
 vi.mock('@sentry/node', () => ({
   isInitialized: vi.fn(() => true),
@@ -21,18 +21,13 @@ function fakePrisma(options: {
   photographerProfile?: { id: string } | null;
   professionalProfile?: { id: string } | null;
 }) {
-  const dataRequestUpdate = vi.fn(
-    (args: { where: { id: string }; data: Record<string, unknown> }) => {
-      if (
-        options.failFailureReasonWriteForRequestId === args.where.id &&
-        'failureReason' in args.data &&
-        !('status' in args.data)
-      ) {
-        return Promise.reject(new Error('db unavailable'));
-      }
-      return Promise.resolve();
-    },
-  );
+  const dataRequestUpdate = vi.fn(() => Promise.resolve());
+  const dataRequestUpdateMany = vi.fn((args: { where: { id: string; status: string } }) => {
+    if (options.failFailureReasonWriteForRequestId === args.where.id) {
+      return Promise.reject(new Error('db unavailable'));
+    }
+    return Promise.resolve();
+  });
   const userUpdate = vi.fn((args: { where: { id: string } }) => {
     if (args.where.id === options.failUserId) {
       return Promise.reject(new Error('user row vanished'));
@@ -45,7 +40,11 @@ function fakePrisma(options: {
   const jobApplicationUpdateMany = vi.fn(() => Promise.resolve({ count: 2 }));
 
   const client = {
-    dataRequest: { findMany: vi.fn(() => Promise.resolve(options.due)), update: dataRequestUpdate },
+    dataRequest: {
+      findMany: vi.fn(() => Promise.resolve(options.due)),
+      update: dataRequestUpdate,
+      updateMany: dataRequestUpdateMany,
+    },
     photographerProfile: {
       findUnique: vi.fn(() => Promise.resolve(options.photographerProfile ?? null)),
       update: photographerProfileUpdate,
@@ -71,6 +70,7 @@ function fakePrisma(options: {
   return {
     client,
     dataRequestUpdate,
+    dataRequestUpdateMany,
     userUpdate,
     photographerProfileUpdate,
     professionalProfileUpdate,
@@ -79,6 +79,10 @@ function fakePrisma(options: {
 }
 
 describe('anonymiseDeletions', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('logs and continues when a stray upload object cannot be deleted', async () => {
     const { client } = fakePrisma({
       due: [{ id: 'req-ok', userId: 'user-ok' }],
@@ -165,7 +169,7 @@ describe('anonymiseDeletions', () => {
   });
 
   it('records a stable failureReason and keeps the request pending when anonymiseOne fails', async () => {
-    const { client, dataRequestUpdate } = fakePrisma({
+    const { client, dataRequestUpdateMany } = fakePrisma({
       due: [{ id: 'req-fail', userId: 'user-fail' }],
       failUserId: 'user-fail',
     });
@@ -180,9 +184,32 @@ describe('anonymiseDeletions', () => {
       logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
     });
 
-    expect(dataRequestUpdate).toHaveBeenCalledWith({
-      where: { id: 'req-fail' },
-      data: { failureReason: 'anonymisation_failed' },
+    expect(dataRequestUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'req-fail', status: 'pending' },
+      data: { failureReason: ANONYMISATION_FAILURE_REASON },
+    });
+  });
+
+  it('only flags the request as failed if it is still pending, so an audit-log throw after a successful commit cannot overwrite a completed row', async () => {
+    const { client, dataRequestUpdateMany } = fakePrisma({
+      due: [{ id: 'req-ok', userId: 'user-ok' }],
+    });
+    const auditRecord = vi.fn(() => Promise.reject(new Error('audit log unavailable')));
+
+    const result = await anonymiseDeletions({
+      prisma: { client } as never,
+      storage: {
+        config: { privateBucket: 'private', publicBucket: 'public' },
+        deleteObject: vi.fn(() => Promise.resolve()),
+      },
+      auditLog: { record: auditRecord },
+      logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+    });
+
+    expect(result.usersFailed).toBe(1);
+    expect(dataRequestUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'req-ok', status: 'pending' },
+      data: { failureReason: ANONYMISATION_FAILURE_REASON },
     });
   });
 
