@@ -99,7 +99,7 @@ describe('createGdprExportProcessor', () => {
 
   it('skips an already-ready or cancelled request instead of rebuilding', async () => {
     for (const status of ['ready', 'cancelled']) {
-      const { deps, update } = fakeDeps({
+      const { deps, update, emailAdd } = fakeDeps({
         id: DATA_REQUEST_ID,
         userId: 'user-1',
         type: 'export',
@@ -110,6 +110,7 @@ describe('createGdprExportProcessor', () => {
       await processor(fakeJob());
 
       expect(update).not.toHaveBeenCalled();
+      expect(emailAdd).not.toHaveBeenCalled();
     }
   });
 

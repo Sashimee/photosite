@@ -511,6 +511,7 @@ describe('createGdprExportProcessor against a real database and MinIO', () => {
         url: 'https://example.test/account',
         expiresAt: row.expiresAt?.toISOString(),
       },
+      opts: { jobId: `data-export-ready:${dataRequestId}` },
     });
 
     const zipBuffer = await storage.getObjectBuffer(
