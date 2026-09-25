@@ -27,6 +27,7 @@ photosite/
     shared/     zod schemas, DTO types, enums, constants, fee maths, country config types
     api-client/ typed client generated from the API's OpenAPI document (used by web, admin, mobile)
     i18n/       ICU message catalogs per locale + tooling to detect missing keys
+    email/      email templates and render helpers (no I/O), used by worker to send and api to preview
     config/     shared eslint, prettier, tsconfig
   infra/
     docker/     Dockerfiles per app, compose for local dev (postgres, redis, minio, mailpit)
