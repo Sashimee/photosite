@@ -360,6 +360,7 @@ export {
   AdminEmailTemplatePreviewQuerySchema,
   AdminEmailTemplatePreviewSchema,
   AdminLegalTextVersionSchema,
+  AdminLogDataRequestBodySchema,
   AdminMeSchema,
   AdminProvenanceCheckSchema,
   AdminReportSchema,

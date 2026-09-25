@@ -74,12 +74,38 @@ export class AdminDataRequestsRepository {
     return this.prisma.client.dataRequest.findUnique({ where: { id }, select: dataRequestSelect });
   }
 
+  async findByIdInTx(
+    tx: Prisma.TransactionClient,
+    id: string,
+  ): Promise<AdminDataRequestRow | null> {
+    return tx.dataRequest.findUnique({ where: { id }, select: dataRequestSelect });
+  }
+
   async findUserStatus(userId: string): Promise<UserStatus | null> {
     const user = await this.prisma.client.user.findUnique({
       where: { id: userId },
       select: { status: true },
     });
     return user?.status ?? null;
+  }
+
+  async findUserForOffline(
+    userId: string,
+  ): Promise<{ id: string; email: string; status: UserStatus } | null> {
+    return this.prisma.client.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, status: true },
+    });
+  }
+
+  async findOpenRequestForUser(
+    userId: string,
+    type: DataRequestType,
+  ): Promise<{ id: string } | null> {
+    return this.prisma.client.dataRequest.findFirst({
+      where: { userId, type, status: { in: ['pending', 'processing'] } },
+      select: { id: true },
+    });
   }
 
   // Re-read inside the transaction that creates the retry row, so a status
@@ -115,6 +141,18 @@ export class AdminDataRequestsRepository {
   async createExport(tx: Prisma.TransactionClient, userId: string): Promise<AdminDataRequestRow> {
     return tx.dataRequest.create({
       data: { userId, type: 'export', status: 'pending' },
+      select: dataRequestSelect,
+    });
+  }
+
+  async createOfflineExport(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    channel: DataRequestChannel,
+    requestedAt: Date,
+  ): Promise<AdminDataRequestRow> {
+    return tx.dataRequest.create({
+      data: { userId, type: 'export', status: 'pending', channel, requestedAt },
       select: dataRequestSelect,
     });
   }

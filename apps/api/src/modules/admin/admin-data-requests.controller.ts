@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -9,7 +10,11 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { AdminDataRequestsQuerySchema, IdSchema } from '@photoo/shared';
+import {
+  AdminDataRequestsQuerySchema,
+  AdminLogDataRequestBodySchema,
+  IdSchema,
+} from '@photoo/shared';
 import type { FastifyRequest } from 'fastify';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe.js';
 import { OriginGuard } from '../auth/origin-guard.js';
@@ -46,5 +51,17 @@ export class AdminDataRequestsController {
     const { user } = await this.adminAccess.requirePermission(request, 'support');
     await this.rateLimit.enforce(user.id);
     return this.adminDataRequests.retryExport(user, id, request.ip);
+  }
+
+  @HttpCode(201)
+  @Post()
+  async logOffline(
+    @Body(new ZodValidationPipe(AdminLogDataRequestBodySchema))
+    body: ReturnType<(typeof AdminLogDataRequestBodySchema)['parse']>,
+    @Req() request: FastifyRequest,
+  ) {
+    const { user } = await this.adminAccess.requirePermission(request, 'support');
+    await this.rateLimit.enforce(user.id);
+    return this.adminDataRequests.logOffline(user, body, request.ip);
   }
 }
