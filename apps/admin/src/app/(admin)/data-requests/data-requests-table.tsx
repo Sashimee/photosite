@@ -2,6 +2,7 @@
 
 import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
+import { useState } from 'react';
 
 import type { components } from '@photoo/api-client';
 
@@ -16,6 +17,7 @@ import { maskEmail } from '@/lib/user-mask';
 import type { DataRequestsFilters } from './data-requests-search-params';
 import { hasPassed } from './date-status';
 import { graceDaysRemaining, isOverdueDeletion } from './grace-period';
+import { RetryExportDialog } from './retry-export-dialog';
 
 type AdminDataRequest = components['schemas']['AdminDataRequest'];
 
@@ -27,6 +29,10 @@ function isExpiredReady(row: AdminDataRequest): boolean {
   return row.status === 'ready' && row.expiresAt !== null && hasPassed(row.expiresAt);
 }
 
+function isRetryableExport(row: AdminDataRequest): boolean {
+  return row.type === 'export' && row.status === 'failed';
+}
+
 export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataRequestsFilters) {
   const t = useTranslations('admin.dataRequests.list');
   const tTypes = useTranslations('admin.dataRequests.types');
@@ -34,6 +40,7 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
   const tGracePeriod = useTranslations('admin.dataRequests.list.gracePeriod');
   const tResponseDue = useTranslations('admin.dataRequests.list.responseDue');
   const format = useFormatter();
+  const [refreshToken, setRefreshToken] = useState(0);
 
   if (userIdInvalid) {
     return null;
@@ -124,6 +131,19 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
         return days === 0 ? tGracePeriod('dueNow') : tGracePeriod('remaining', { days });
       },
     },
+    {
+      id: 'actions',
+      header: t('columns.actions'),
+      cell: (row) =>
+        isRetryableExport(row) ? (
+          <RetryExportDialog
+            request={row}
+            onRetried={() => {
+              setRefreshToken((value) => value + 1);
+            }}
+          />
+        ) : null,
+    },
   ];
 
   async function fetchPage(
@@ -143,6 +163,7 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
 
   return (
     <DataTable
+      refreshSignal={refreshToken}
       columns={columns}
       fetchPage={fetchPage}
       getRowId={(row) => row.id}

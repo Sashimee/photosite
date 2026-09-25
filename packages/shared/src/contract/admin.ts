@@ -595,6 +595,34 @@ registry.registerPath({
   },
 });
 
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/admin/data-requests/{id}/retry-export'),
+  summary: 'Retry a failed export as a new request',
+  description:
+    "Creates a new export DataRequest for the failed export's user and enqueues it. Bypasses the " +
+    'per-user GDPR rate limit, because this is a support action; still subject to the per-admin ' +
+    'mutation rate limit (429). Returns 409 with a distinct `code`: `EXPORT_NOT_FAILED` if the ' +
+    "source request isn't a failed export, `USER_SUSPENDED` or `USER_DELETED` if the user's " +
+    'account is no longer active, `EXPORT_ALREADY_RETRIED` if this source has already been ' +
+    'retried once, `EXPORT_OPEN` if the user already has a pending or processing export, or ' +
+    '`EXPORT_ALREADY_ANSWERED` if the user already holds an unexpired export or completed a ' +
+    'later one that answers the source request.',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation('support'),
+  request: {
+    params: z.object({ id: IdSchema }).strict(),
+  },
+  responses: {
+    '201': {
+      description: 'The new export request',
+      content: { 'application/json': { schema: AdminDataRequestSchema } },
+    },
+    ...errorResponses([400, 401, 403, 404, 409, 429]),
+  },
+});
+
 export const AdminVerificationCasesQuerySchema = CursorPaginationQuerySchema.extend({
   status: z.enum(VERIFICATION_CASE_STATUSES).optional(),
   countryCode: CountryCodeSchema.optional(),
@@ -1116,6 +1144,8 @@ export const AUTH_EMAIL_TEMPLATE_NAMES = [
   'reset-password',
   'account-exists',
   'account-deletion-requested',
+  'data-export-ready',
+  'data-export-failed',
 ] as const;
 
 type IsExact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { DataRequestStatus, DataRequestType, Prisma } from '@photoo/db';
+import type { DataRequestStatus, DataRequestType, Prisma, UserStatus } from '@photoo/db';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AdminDataRequestCursor } from './admin-data-request-cursor.js';
 
@@ -42,6 +42,8 @@ export interface SuccessfulExport {
   userId: string;
   requestedAt: Date;
   completedAt: Date | null;
+  status: DataRequestStatus;
+  expiresAt: Date | null;
 }
 
 @Injectable()
@@ -56,7 +58,56 @@ export class AdminDataRequestsRepository {
     }
     return this.prisma.client.dataRequest.findMany({
       where: { userId: { in: userIds }, type: 'export', status: { in: ['ready', 'completed'] } },
-      select: { userId: true, requestedAt: true, completedAt: true },
+      select: { userId: true, requestedAt: true, completedAt: true, status: true, expiresAt: true },
+    });
+  }
+
+  async findById(id: string): Promise<AdminDataRequestRow | null> {
+    return this.prisma.client.dataRequest.findUnique({ where: { id }, select: dataRequestSelect });
+  }
+
+  async findUserStatus(userId: string): Promise<UserStatus | null> {
+    const user = await this.prisma.client.user.findUnique({
+      where: { id: userId },
+      select: { status: true },
+    });
+    return user?.status ?? null;
+  }
+
+  // Re-read inside the transaction that creates the retry row, so a status
+  // change that lands between the pre-check and the write can't slip through.
+  async findUserStatusInTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<UserStatus | null> {
+    const user = await tx.user.findUnique({ where: { id: userId }, select: { status: true } });
+    return user?.status ?? null;
+  }
+
+  async findOpenExportForUser(userId: string): Promise<{ id: string } | null> {
+    return this.prisma.client.dataRequest.findFirst({
+      where: { userId, type: 'export', status: { in: ['pending', 'processing'] } },
+      select: { id: true },
+    });
+  }
+
+  // `before.sourceId` is set by AdminDataRequestsService.retryExport on every
+  // retry audit row, so this is the source of truth for "has this exact
+  // failed export already been retried".
+  async findRetryAuditForSource(sourceId: string): Promise<{ id: string } | null> {
+    return this.prisma.client.auditLog.findFirst({
+      where: {
+        action: 'data_request.export_retried',
+        before: { path: ['sourceId'], equals: sourceId },
+      },
+      select: { id: true },
+    });
+  }
+
+  async createExport(tx: Prisma.TransactionClient, userId: string): Promise<AdminDataRequestRow> {
+    return tx.dataRequest.create({
+      data: { userId, type: 'export', status: 'pending' },
+      select: dataRequestSelect,
     });
   }
 

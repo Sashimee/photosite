@@ -11,13 +11,31 @@ import type { MailMessage } from '../mail-message.js';
 // binary and diffs unreviewable (#262).
 const URL_TOKEN = '\u0001AUTH_URL\u0001';
 
+const expiresAtFormatter = new Intl.DateTimeFormat('en-GB', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'Europe/Luxembourg',
+  timeZoneName: 'short',
+});
+
+function formatExpiresAt(expiresAt: string): string {
+  return expiresAtFormatter.format(new Date(expiresAt));
+}
+
 function link(url: string): string {
   const escaped = escapeHtml(url);
   return `<a href="${escaped}">${escaped}</a>`;
 }
 
-function renderHtmlWithLink(template: string, url: string): string {
-  return formatHtml(template, { url: URL_TOKEN }).replaceAll(URL_TOKEN, link(url));
+function renderHtmlWithLink(
+  template: string,
+  url: string,
+  values: Record<string, string> = {},
+): string {
+  return formatHtml(template, { ...values, url: URL_TOKEN }).replaceAll(URL_TOKEN, link(url));
 }
 
 // The auth jobs (verify-email, reset-password, account-exists,
@@ -57,6 +75,24 @@ export function renderAuthEmail(job: EmailJob, to: string): MailMessage {
         subject: formatText(t.accountDeletionRequested.subject, { appName }),
         text: formatText(t.accountDeletionRequested.body, { url: job.url }),
         html: `<p>${renderHtmlWithLink(t.accountDeletionRequested.body, job.url)}</p>`,
+      };
+    case 'data-export-ready': {
+      const expiresAt = formatExpiresAt(job.expiresAt);
+      return {
+        to,
+        subject: formatText(t.dataExportReady.subject, { appName }),
+        text: formatText(t.dataExportReady.body, { url: job.url, expiresAt }),
+        html: `<p>${renderHtmlWithLink(t.dataExportReady.body, job.url, {
+          expiresAt,
+        })}</p>`,
+      };
+    }
+    case 'data-export-failed':
+      return {
+        to,
+        subject: formatText(t.dataExportFailed.subject, { appName }),
+        text: formatText(t.dataExportFailed.body, { url: job.url }),
+        html: `<p>${renderHtmlWithLink(t.dataExportFailed.body, job.url)}</p>`,
       };
   }
 }

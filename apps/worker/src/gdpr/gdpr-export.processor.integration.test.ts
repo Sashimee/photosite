@@ -14,6 +14,17 @@ function fakeLogger() {
   return { log: () => undefined, warn: () => undefined, error: () => undefined };
 }
 
+function fakeEmailQueue() {
+  const jobs: { name: string; data: unknown; opts: unknown }[] = [];
+  return {
+    jobs,
+    add: (name: string, data: unknown, opts: unknown) => {
+      jobs.push({ name, data, opts });
+      return Promise.resolve();
+    },
+  };
+}
+
 function fakeJob(dataRequestId: string) {
   return {
     data: { dataRequestId },
@@ -472,11 +483,14 @@ describe('createGdprExportProcessor against a real database and MinIO', () => {
   });
 
   it('builds a zip that never leaks the counterpart email and excludes verification document bytes', async () => {
+    const emailQueue = fakeEmailQueue();
     const processor = createGdprExportProcessor({
       prisma: { client: prisma },
       storage,
       auditLog,
       logger: fakeLogger() as never,
+      emailQueue,
+      webAppUrl: 'https://example.test',
     });
 
     await processor(fakeJob(dataRequestId));
@@ -487,6 +501,18 @@ describe('createGdprExportProcessor against a real database and MinIO', () => {
     expect(row.exportKey).toBe(expectedExportKey);
     expect(row.completedAt).not.toBeNull();
     expect(row.expiresAt).not.toBeNull();
+
+    expect(emailQueue.jobs).toHaveLength(1);
+    expect(emailQueue.jobs[0]).toMatchObject({
+      name: 'data-export-ready',
+      data: {
+        type: 'data-export-ready',
+        to: `gdpr-export-subject-${runId}@photoo.test`,
+        url: 'https://example.test/account',
+        expiresAt: row.expiresAt?.toISOString(),
+      },
+      opts: { jobId: `data-export-ready-${dataRequestId}` },
+    });
 
     const zipBuffer = await storage.getObjectBuffer(
       storage.config.privateBucket,
@@ -641,6 +667,8 @@ describe('createGdprExportProcessor against a real database and MinIO', () => {
         storage,
         auditLog,
         logger: fakeLogger() as never,
+        emailQueue: fakeEmailQueue(),
+        webAppUrl: 'https://example.test',
       });
 
       await processor(fakeJob(clientDataRequest.id));
@@ -691,6 +719,96 @@ describe('createGdprExportProcessor against a real database and MinIO', () => {
       await prisma.request.deleteMany({ where: { id: ownRequest.id } });
       await prisma.professionalProfile.deleteMany({ where: { userId: clientSubject.id } });
       await prisma.user.deleteMany({ where: { id: clientSubject.id } });
+    }
+  });
+
+  it('keeps a completed export ready and lets a retry re-enqueue the ready email when the enqueue fails', async () => {
+    const raceRunId = `${runId}-race`;
+    const raceSubject = await prisma.user.create({
+      data: {
+        email: `gdpr-export-race-${raceRunId}@photoo.test`,
+        name: 'Fx Export Race Subject',
+        locale: 'en',
+        countryCode: 'LU',
+        roles: ['client'],
+        status: 'active',
+      },
+    });
+
+    const raceDataRequest = await prisma.dataRequest.create({
+      data: { userId: raceSubject.id, type: 'export', status: 'pending' },
+    });
+
+    try {
+      const failingEmailQueue = { add: () => Promise.reject(new Error('email queue down')) };
+      const failingProcessor = createGdprExportProcessor({
+        prisma: { client: prisma },
+        storage,
+        auditLog,
+        logger: fakeLogger() as never,
+        emailQueue: failingEmailQueue,
+        webAppUrl: 'https://example.test',
+      });
+
+      await expect(failingProcessor(fakeJob(raceDataRequest.id))).rejects.toThrow(
+        'email queue down',
+      );
+
+      const rowAfterFailedEnqueue = await prisma.dataRequest.findUniqueOrThrow({
+        where: { id: raceDataRequest.id },
+      });
+      expect(rowAfterFailedEnqueue.status).toBe('ready');
+      expect(rowAfterFailedEnqueue.exportKey).not.toBeNull();
+
+      const failedAudit = await prisma.auditLog.findFirst({
+        where: {
+          targetType: 'DataRequest',
+          targetId: raceDataRequest.id,
+          action: 'data_request.export_failed',
+        },
+      });
+      expect(failedAudit).toBeNull();
+
+      const retryEmailQueue = fakeEmailQueue();
+      const retryProcessor = createGdprExportProcessor({
+        prisma: { client: prisma },
+        storage,
+        auditLog,
+        logger: fakeLogger() as never,
+        emailQueue: retryEmailQueue,
+        webAppUrl: 'https://example.test',
+      });
+
+      await retryProcessor(fakeJob(raceDataRequest.id));
+
+      expect(retryEmailQueue.jobs).toHaveLength(1);
+      expect(retryEmailQueue.jobs[0]).toMatchObject({
+        name: 'data-export-ready',
+        data: {
+          type: 'data-export-ready',
+          to: raceSubject.email,
+          url: 'https://example.test/account',
+          expiresAt: rowAfterFailedEnqueue.expiresAt?.toISOString(),
+        },
+        opts: { jobId: `data-export-ready-${raceDataRequest.id}` },
+      });
+
+      const rowAfterRetry = await prisma.dataRequest.findUniqueOrThrow({
+        where: { id: raceDataRequest.id },
+      });
+      expect(rowAfterRetry.status).toBe('ready');
+    } finally {
+      const row = await prisma.dataRequest.findUnique({ where: { id: raceDataRequest.id } });
+      if (row?.exportKey) {
+        await storage
+          .deleteObject(storage.config.privateBucket, row.exportKey)
+          .catch(() => undefined);
+      }
+      await prisma.auditLog.deleteMany({
+        where: { targetType: 'DataRequest', targetId: raceDataRequest.id },
+      });
+      await prisma.dataRequest.deleteMany({ where: { id: raceDataRequest.id } });
+      await prisma.user.deleteMany({ where: { id: raceSubject.id } });
     }
   });
 });

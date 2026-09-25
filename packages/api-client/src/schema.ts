@@ -8162,6 +8162,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/data-requests/{id}/retry-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry a failed export as a new request
+         * @description Creates a new export DataRequest for the failed export's user and enqueues it. Bypasses the per-user GDPR rate limit, because this is a support action; still subject to the per-admin mutation rate limit (429). Returns 409 with a distinct `code`: `EXPORT_NOT_FAILED` if the source request isn't a failed export, `USER_SUSPENDED` or `USER_DELETED` if the user's account is no longer active, `EXPORT_ALREADY_RETRIED` if this source has already been retried once, `EXPORT_OPEN` if the user already has a pending or processing export, or `EXPORT_ALREADY_ANSWERED` if the user already holds an unexpired export or completed a later one that answers the source request.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID identifier */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The new export request */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminDataRequest"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/verification-cases": {
         parameters: {
             query?: never;
@@ -12863,7 +12959,7 @@ export interface components {
          * @example quote_received
          * @enum {string}
          */
-        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action";
+        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "data-export-ready" | "data-export-failed" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action";
         AdminEmailTemplatePreview: {
             subject: string;
             html: string;

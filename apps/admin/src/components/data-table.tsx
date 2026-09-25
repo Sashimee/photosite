@@ -45,6 +45,7 @@ export interface DataTableProps<T> {
   getRowId: (row: T) => string;
   caption: string;
   emptyState: ReactNode;
+  refreshSignal?: number;
 }
 
 interface LoadedPage<T> {
@@ -72,6 +73,7 @@ export function DataTable<T>({
   getRowId,
   caption,
   emptyState,
+  refreshSignal,
 }: DataTableProps<T>) {
   const t = useTranslations('admin.dataTable');
   const tCommon = useTranslations('common');
@@ -85,6 +87,8 @@ export function DataTable<T>({
   const [status, setStatus] = useState<Status>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pending, setPending] = useState<LoadTarget>({ cursor: undefined, index: 0 });
+  const pendingRef = useRef(pending);
+  pendingRef.current = pending;
 
   // Reads `fetchPage` and the translators through refs so this callback's
   // identity never changes and the mount effect below never re-fires. To
@@ -122,6 +126,18 @@ export function DataTable<T>({
   useEffect(() => {
     void load({ cursor: undefined, index: 0 });
   }, [load]);
+
+  // `refreshSignal` re-fetches the current page in place, unlike the caller
+  // remounting via `key` for filter changes: skip the value it mounts with
+  // so this doesn't double-fetch alongside the effect above.
+  const isInitialRefresh = useRef(true);
+  useEffect(() => {
+    if (isInitialRefresh.current) {
+      isInitialRefresh.current = false;
+      return;
+    }
+    void load(pendingRef.current);
+  }, [refreshSignal, load]);
 
   const currentPage = pages[pageIndex];
 

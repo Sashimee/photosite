@@ -31,6 +31,7 @@ function fakeDeps(
   const auditRecord = vi.fn(() => Promise.resolve());
   const logError = vi.fn();
   const logger = { log: vi.fn(), warn: vi.fn(), error: logError };
+  const emailQueueAdd = vi.fn(() => Promise.resolve());
 
   return {
     dataRequestFindMany,
@@ -40,6 +41,7 @@ function fakeDeps(
     auditRecord,
     logError,
     logger,
+    emailQueueAdd,
     deps: {
       prisma: {
         client: {
@@ -56,6 +58,8 @@ function fakeDeps(
       logger: logger as never,
       monitorSlug: 'gdpr-sweep',
       monitorIntervalMs: 60 * 60 * 1000,
+      emailQueue: { add: emailQueueAdd },
+      webAppUrl: 'https://example.test',
     },
   };
 }
@@ -88,10 +92,10 @@ describe('createGdprSweepProcessor', () => {
     const processor = createGdprSweepProcessor(deps);
     await processor(undefined as never);
 
-    expect(dataRequestFindMany).toHaveBeenCalledTimes(2);
+    expect(dataRequestFindMany).toHaveBeenCalledTimes(3);
     expect(userFindMany).toHaveBeenCalledTimes(1);
     expect(messageFindMany).toHaveBeenCalledTimes(1);
-    expect(dataRequestUpdateMany).toHaveBeenCalledTimes(1);
+    expect(dataRequestUpdateMany).toHaveBeenCalledTimes(0);
     expect(logError).toHaveBeenCalledWith(
       expect.objectContaining({ phase: 'anonymise-deletions' }),
       expect.any(String),

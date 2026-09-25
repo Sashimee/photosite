@@ -4,6 +4,7 @@ import type { Processor } from 'bullmq';
 import type { Logger } from 'nestjs-pino';
 import type { RecordAuditLogInput } from '../common/audit-log.service.js';
 import { reportSweepFailure } from '../common/monitoring/report-sweep-failure.js';
+import type { JobQueueLike } from '../queues/processors/types.js';
 import { anonymiseDeletions, type AnonymiseStorage } from './sweep/anonymise-deletions.js';
 import { expireExports, type ExpireExportsStorage } from './sweep/expire-exports.js';
 import { failStuckExports } from './sweep/fail-stuck-exports.js';
@@ -16,6 +17,8 @@ export interface GdprSweepDeps {
   logger: Logger;
   monitorSlug: string;
   monitorIntervalMs: number;
+  emailQueue: JobQueueLike;
+  webAppUrl: string;
 }
 
 // Four independent phases behind one queue rather than three near-identical

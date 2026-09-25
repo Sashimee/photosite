@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -10,7 +10,8 @@ vi.mock('next-intl', async () => {
 });
 
 const getMock = vi.fn();
-vi.mock('@/lib/api', () => ({ api: { GET: getMock } }));
+const postMock = vi.fn();
+vi.mock('@/lib/api', () => ({ api: { GET: getMock, POST: postMock } }));
 
 function formatExpected(iso: string) {
   return new Intl.DateTimeFormat('en', {
@@ -362,5 +363,112 @@ describe('DataRequestsTable', () => {
         },
       },
     });
+  });
+
+  it('shows a Retry export button only for a failed export', async () => {
+    const failedExport = { ...baseRequest, status: 'failed' as const };
+    getMock.mockResolvedValueOnce({ data: { items: [failedExport], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(await screen.findByRole('button', { name: 'Retry export' })).toBeInTheDocument();
+  });
+
+  it('does not show a Retry export button for a failed deletion', async () => {
+    const failedDeletion = {
+      ...baseRequest,
+      type: 'delete' as const,
+      status: 'failed' as const,
+    };
+    getMock.mockResolvedValueOnce({ data: { items: [failedDeletion], nextCursor: null } });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    await screen.findByText('a***@example.com');
+    expect(screen.queryByRole('button', { name: 'Retry export' })).not.toBeInTheDocument();
+  });
+
+  it('does not show a Retry export button for a pending or ready export', async () => {
+    const pendingExport = { ...baseRequest, status: 'pending' as const };
+    const readyExport = {
+      ...baseRequest,
+      id: '3fa85f64-5717-4562-b3fc-2c963f66afac',
+      status: 'ready' as const,
+    };
+    getMock.mockResolvedValueOnce({
+      data: { items: [pendingExport, readyExport], nextCursor: null },
+    });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    await screen.findAllByText('a***@example.com');
+    expect(screen.queryByRole('button', { name: 'Retry export' })).not.toBeInTheDocument();
+  });
+
+  it('requires an explicit confirm click before retrying', async () => {
+    const failedExport = { ...baseRequest, status: 'failed' as const };
+    getMock.mockResolvedValueOnce({ data: { items: [failedExport], nextCursor: null } });
+    getMock.mockResolvedValueOnce({ data: { items: [], nextCursor: null } });
+    postMock.mockResolvedValueOnce({
+      data: { ...failedExport, id: 'new-id', status: 'processing' },
+    });
+    const DataRequestsTable = await loadDataRequestsTable();
+    const events = userEvent.setup();
+
+    render(<DataRequestsTable />);
+    await events.click(await screen.findByRole('button', { name: 'Retry export' }));
+
+    expect(postMock).not.toHaveBeenCalled();
+
+    await events.click(screen.getByRole('button', { name: 'Confirm retry' }));
+
+    await waitFor(() => {
+      expect(postMock).toHaveBeenCalledWith('/v1/admin/data-requests/{id}/retry-export', {
+        params: { path: { id: failedExport.id } },
+      });
+    });
+  });
+
+  it('refreshes the list after a successful retry', async () => {
+    const failedExport = { ...baseRequest, status: 'failed' as const };
+    getMock.mockResolvedValueOnce({ data: { items: [failedExport], nextCursor: null } });
+    getMock.mockResolvedValueOnce({ data: { items: [], nextCursor: null } });
+    postMock.mockResolvedValueOnce({
+      data: { ...failedExport, id: 'new-id', status: 'processing' },
+    });
+    const DataRequestsTable = await loadDataRequestsTable();
+    const events = userEvent.setup();
+
+    render(<DataRequestsTable />);
+    await events.click(await screen.findByRole('button', { name: 'Retry export' }));
+    await events.click(screen.getByRole('button', { name: 'Confirm retry' }));
+
+    await waitFor(() => {
+      expect(getMock).toHaveBeenCalledTimes(2);
+    });
+    expect(await screen.findByText('No data requests match your filters.')).toBeInTheDocument();
+  });
+
+  it('shows the conflict message inline for a 409 without navigating away', async () => {
+    const failedExport = { ...baseRequest, status: 'failed' as const };
+    getMock.mockResolvedValueOnce({ data: { items: [failedExport], nextCursor: null } });
+    postMock.mockResolvedValueOnce({ error: { code: 'CONFLICT' } });
+    const DataRequestsTable = await loadDataRequestsTable();
+    const events = userEvent.setup();
+
+    render(<DataRequestsTable />);
+    await events.click(await screen.findByRole('button', { name: 'Retry export' }));
+    await events.click(screen.getByRole('button', { name: 'Confirm retry' }));
+
+    expect(
+      await screen.findByText(
+        "That couldn't be completed because something changed. Please retry.",
+      ),
+    ).toBeInTheDocument();
+    expect(getMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('a***@example.com')).toBeInTheDocument();
   });
 });

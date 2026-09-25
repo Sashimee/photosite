@@ -493,6 +493,13 @@
       }
     },
     "dataRequests": {
+      "errors": {
+        "generic": "Something went wrong. Please try again.",
+        "forbidden": "You don't have permission to do this.",
+        "notFound": "This couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "conflict": "That couldn't be completed because something changed. Please retry."
+      },
       "types": {
         "export": "Export",
         "delete": "Deletion"
@@ -519,7 +526,8 @@
           "expiresAt": "Expires",
           "failureReason": "Failure reason",
           "responseDueAt": "Response due",
-          "gracePeriod": "Grace period"
+          "gracePeriod": "Grace period",
+          "actions": "Actions"
         },
         "placeholders": {
           "none": "None",
@@ -549,6 +557,21 @@
           "statusLabel": "Status",
           "allStatuses": "All statuses",
           "submit": "Search"
+        },
+        "retryExport": {
+          "trigger": "Retry export",
+          "title": "Retry this export?",
+          "consequences": "This creates a new export request for the user and starts it right away. It doesn't change the failed request itself.",
+          "confirm": "Confirm retry",
+          "errors": {
+            "exportNotFailed": "This request is no longer a failed export, so it can't be retried. The list has been refreshed.",
+            "userSuspended": "This user's account is suspended, so their export can't be retried.",
+            "userDeleted": "This user's account has been deleted, so their export can't be retried.",
+            "exportAlreadyRetried": "This export was already retried once — check the newer request in the list. The list has been refreshed.",
+            "exportOpen": "An export for this user is already in progress. The list has been refreshed.",
+            "exportAlreadyAnswered": "The user already has a newer export, so no retry is needed. The list has been refreshed.",
+            "tooManyRequests": "You're doing that too fast. Slow down and try again."
+          }
         }
       }
     },
@@ -723,6 +746,14 @@
     "accountDeletionRequested": {
       "subject": "Your {appName} account deletion request",
       "body": "We've received your request to delete your account. Your account is deactivated immediately. If you change your mind, you have 30 days to cancel by opening this link: {url}"
+    },
+    "dataExportReady": {
+      "subject": "Your {appName} data export is ready",
+      "body": "Your data export is ready to download until {expiresAt}. Open this link to get it: {url}"
+    },
+    "dataExportFailed": {
+      "subject": "Your {appName} data export failed",
+      "body": "We couldn't prepare your data export. Please contact support so we can look into it and retry it for you. You can check its status here: {url}"
     },
     "footer": {
       "preferences": "Manage your notification preferences: {url}"

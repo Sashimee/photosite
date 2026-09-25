@@ -15,6 +15,8 @@ export const SAMPLE_WEB_APP_URL = 'https://example.test';
 const SAMPLE_VERIFY_URL = 'https://example.test/verify-email?token=preview-token';
 const SAMPLE_RESET_URL = 'https://example.test/reset-password?token=preview-token';
 const SAMPLE_DELETION_URL = 'https://example.test/account/deletion/cancel?token=preview-token';
+const SAMPLE_ACCOUNT_URL = 'https://example.test/account';
+const SAMPLE_EXPORT_EXPIRES_AT = '2026-01-08T00:00:00.000Z';
 
 const AUTH_EMAIL_SAMPLE_JOBS: Record<EmailJob['type'], EmailJob> = {
   'verify-email': { type: 'verify-email', to: SAMPLE_RECIPIENT_EMAIL, url: SAMPLE_VERIFY_URL },
@@ -24,6 +26,17 @@ const AUTH_EMAIL_SAMPLE_JOBS: Record<EmailJob['type'], EmailJob> = {
     type: 'account-deletion-requested',
     to: SAMPLE_RECIPIENT_EMAIL,
     url: SAMPLE_DELETION_URL,
+  },
+  'data-export-ready': {
+    type: 'data-export-ready',
+    to: SAMPLE_RECIPIENT_EMAIL,
+    url: SAMPLE_ACCOUNT_URL,
+    expiresAt: SAMPLE_EXPORT_EXPIRES_AT,
+  },
+  'data-export-failed': {
+    type: 'data-export-failed',
+    to: SAMPLE_RECIPIENT_EMAIL,
+    url: SAMPLE_ACCOUNT_URL,
   },
 };
 

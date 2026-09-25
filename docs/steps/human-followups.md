@@ -53,6 +53,10 @@ Last updated: 2026-09-25.
 | A subject who insists on copies of their verification documents needs a manual process (identity check before release) | Define the support process | – | Nothing is built for this in Phase 1; the export README points at support |
 | `DataRequest` rows have no retention period (#354). They record that a request was made and honoured, but they reference a user and must not live forever | Confirm a period with the lawyer (proposal: 5 years after completion) | A purge job, once the figure is set | Rows are kept; nothing purges them |
 | Support staff see a masked email and the request history on `/admin/data-requests` (1D.2b) | Confirm the privacy policy covers staff access to request records | Public launch | None, the admin app is internal |
+| Export-failed email wording (#375, #368). It says the team will retry the export and doesn't mention the Art. 12(3) deadline or its extension, or the right to complain to the CNPD (Art. 12(4)) | Approve the wording, and confirm the team is committed to retrying | Real user-facing copy | Placeholder English copy in `packages/i18n` (`email.dataExportFailed`) |
+| An admin **Retry export** (#375) creates a new `DataRequest` row. Is it the same Art. 15 request (the clock runs from the original date) or a new one? #406 tracks linking the rows | The lawyer's answer | #406's design | The admin list keeps the failed row's own due date and marks it answered late if the retry completes after it |
+| Suspended users can't sign in, so they can't exercise Art. 15 themselves (#378), and the retry refuses anyone who isn't `active` | Define the support route for a suspended user's access request | #378 | None; support handles it by hand |
+| Privacy policy: the export-ready and export-failed emails, and Brevo as the processor that sends them | Lawyer drafting | Public launch | None |
 
 ## Job board (1A.13)
 
