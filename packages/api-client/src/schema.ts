@@ -8096,7 +8096,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List GDPR data requests, newest first */
+        /** List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row still unanswered, or null if it does not apply. */
         get: {
             parameters: {
                 query?: {
@@ -12405,6 +12405,12 @@ export interface components {
              * @example 2026-09-16T12:00:00.000Z
              */
             cancelledAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            responseDueAt: string | null;
             user: {
                 /**
                  * Format: uuid
