@@ -174,7 +174,7 @@ function isFailedAnsweredLate(
   successesByUser: Map<string, SuccessfulExport[]>,
 ): boolean {
   const laterCompletions = (successesByUser.get(row.user.id) ?? [])
-    .filter((success) => success.requestedAt > row.requestedAt)
+    .filter((success) => success.requestedAt > row.receivedAt)
     .map((success) => success.completedAt)
     .filter((completedAt): completedAt is Date => completedAt !== null);
   if (laterCompletions.length === 0) {
