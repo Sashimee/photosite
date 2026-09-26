@@ -114,6 +114,12 @@ enum PortfolioImageStatus {
   rejected
 }
 
+enum ProvenanceVerdict {
+  pass
+  review
+  fail
+}
+
 enum LicenceUsage {
   personal
   commercial
@@ -327,6 +333,7 @@ model User {
   disputesOpened            Dispute[]                 @relation("DisputeOpenedBy")
   resolvedDisputes          Dispute[]                 @relation("DisputeAdmin")
   dataRequests              DataRequest[]
+  reviewedProvenanceChecks  ProvenanceCheck[]         @relation("ProvenanceCheckReviewedByAdmin")
 
   @@index([countryCode])
   @@index([status])
@@ -682,8 +689,40 @@ model PortfolioImage {
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
 
+  provenanceCheck ProvenanceCheck?
+
   @@index([profileId])
   @@index([status])
+}
+
+// One check row per `PortfolioImage`, written by the `provenance-check` worker
+// queue (docs/steps/1A.10-provenance.md). `aiScore`/`aiVendor`/`reverseMatches`
+// and `c2paValid` are individually nullable because a null vendor/reader
+// records "no signal" rather than a clean result; `score`/`verdict` are always
+// computed by `computeProvenanceScore` from whatever signals are available.
+// `raw` holds the vendor payload and is cleared by the retention sweep after
+// 90 days for a passed check, so it stays nullable even after being set.
+model ProvenanceCheck {
+  id                String            @id @default(uuid(7))
+  portfolioImageId  String            @unique
+  portfolioImage    PortfolioImage    @relation(fields: [portfolioImageId], references: [id], onDelete: Cascade)
+  aiScore           Decimal?          @db.Decimal(4, 3)
+  aiVendor          String
+  reverseMatches    Json
+  c2paValid         Boolean?
+  exifCamera        String?
+  exifCapturedAt    DateTime?
+  score             Decimal           @db.Decimal(4, 3)
+  verdict           ProvenanceVerdict
+  reviewedByAdminId String?
+  reviewedByAdmin   User?             @relation("ProvenanceCheckReviewedByAdmin", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  reviewedAt        DateTime?
+  note              String?
+  raw               Json?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([verdict, createdAt])
 }
 
 model Product {
