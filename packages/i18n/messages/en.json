@@ -1333,7 +1333,7 @@
         "exportComingSoon": "Data export is coming soon.",
         "deleteAccount": "Delete account",
         "deleteConfirmTitle": "Delete your account?",
-        "deleteConfirmDescription": "Your account is deactivated immediately and permanently deleted after a 30-day grace period. We'll email you a link to cancel the deletion at any time before then.",
+        "deleteConfirmDescription": "Your account is deactivated immediately. Your data is deleted or anonymised after a 30-day grace period, except records we must keep by law (e.g. invoices). We'll email you a link to cancel the deletion at any time before then.",
         "deleteConfirmCta": "Yes, delete my account",
         "deletePending": "Deleting…",
         "deleteDismissCta": "Cancel",
@@ -1364,7 +1364,7 @@
       },
       "deletionRequested": {
         "title": "Account deletion requested",
-        "description": "We've deactivated your account and sent you an email with a link to cancel the deletion within the next 30 days. After that, your account and data are permanently deleted.",
+        "description": "We've deactivated your account and sent you an email with a link to cancel the deletion within the next 30 days. After that, your data is deleted or anonymised, except records we must keep by law (e.g. invoices).",
         "homeLink": "Back to home"
       }
     },

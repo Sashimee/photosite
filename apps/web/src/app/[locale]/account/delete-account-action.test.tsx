@@ -35,7 +35,7 @@ describe('DeleteAccountAction', () => {
 
     expect(
       screen.getByText(
-        "Your account is deactivated immediately and permanently deleted after a 30-day grace period. We'll email you a link to cancel the deletion at any time before then.",
+        "Your account is deactivated immediately. Your data is deleted or anonymised after a 30-day grace period, except records we must keep by law (e.g. invoices). We'll email you a link to cancel the deletion at any time before then.",
       ),
     ).toBeInTheDocument();
   });
