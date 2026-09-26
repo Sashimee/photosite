@@ -42,15 +42,8 @@ export class AdminAccessService {
   ): Promise<SessionContext> {
     const session = await requireAdminSession(this.auth, request);
 
-    if (options?.requires2fa) {
-      const verifiedAt = session.session.twoFactorVerifiedAt;
-      const verifiedAtMs = verifiedAt ? new Date(verifiedAt).getTime() : Number.NaN;
-      if (
-        !Number.isFinite(verifiedAtMs) ||
-        Date.now() - verifiedAtMs > TWO_FACTOR_FRESH_VERIFICATION_WINDOW_MS
-      ) {
-        throw twoFactorRequired('This action requires a freshly verified second factor');
-      }
+    if (options?.requires2fa && !this.hasFreshTwoFactor(session)) {
+      throw twoFactorRequired('This action requires a freshly verified second factor');
     }
 
     const grant = await this.prisma.client.adminPermissionGrant.findUnique({
@@ -61,5 +54,31 @@ export class AdminAccessService {
     }
 
     return session;
+  }
+
+  hasFreshTwoFactor(session: SessionContext): boolean {
+    const verifiedAt = session.session.twoFactorVerifiedAt;
+    const verifiedAtMs = verifiedAt ? new Date(verifiedAt).getTime() : Number.NaN;
+    return (
+      Number.isFinite(verifiedAtMs) &&
+      Date.now() - verifiedAtMs <= TWO_FACTOR_FRESH_VERIFICATION_WINDOW_MS
+    );
+  }
+
+  async hasPermission(userId: string, permission: AdminPermission): Promise<boolean> {
+    const grant = await this.prisma.client.adminPermissionGrant.findUnique({
+      where: { userId_permission: { userId, permission } },
+    });
+    return grant !== null;
+  }
+
+  // The bypass for admin-protected targets: a superadmin acting with a
+  // second factor verified in the last 15 minutes, same window
+  // `x-requires-2fa` routes enforce.
+  async isSuperadminWithFreshTwoFactor(session: SessionContext): Promise<boolean> {
+    if (!this.hasFreshTwoFactor(session)) {
+      return false;
+    }
+    return this.hasPermission(session.user.id, 'superadmin');
   }
 }

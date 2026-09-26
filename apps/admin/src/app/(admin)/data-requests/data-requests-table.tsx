@@ -17,6 +17,7 @@ import { maskEmail } from '@/lib/user-mask';
 import type { DataRequestsFilters } from './data-requests-search-params';
 import { hasPassed } from './date-status';
 import { graceDaysRemaining, isOverdueDeletion } from './grace-period';
+import { LogRequestDialog } from './log-request-dialog';
 import { RetryExportDialog } from './retry-export-dialog';
 
 type AdminDataRequest = components['schemas']['AdminDataRequest'];
@@ -33,9 +34,16 @@ function isRetryableExport(row: AdminDataRequest): boolean {
   return row.type === 'export' && row.status === 'failed';
 }
 
-export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataRequestsFilters) {
+export function DataRequestsTable({
+  status,
+  type,
+  channel,
+  userId,
+  userIdInvalid,
+}: DataRequestsFilters) {
   const t = useTranslations('admin.dataRequests.list');
   const tTypes = useTranslations('admin.dataRequests.types');
+  const tChannels = useTranslations('admin.dataRequests.channels');
   const tStatuses = useTranslations('admin.dataRequests.statuses');
   const tGracePeriod = useTranslations('admin.dataRequests.list.gracePeriod');
   const tResponseDue = useTranslations('admin.dataRequests.list.responseDue');
@@ -63,6 +71,11 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
       id: 'type',
       header: t('columns.type'),
       cell: (row) => tTypes(row.type),
+    },
+    {
+      id: 'channel',
+      header: t('columns.channel'),
+      cell: (row) => tChannels(row.channel),
     },
     {
       id: 'status',
@@ -154,6 +167,7 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
         query: {
           ...(status ? { status } : {}),
           ...(type ? { type } : {}),
+          ...(channel ? { channel } : {}),
           ...(userId ? { userId } : {}),
           ...(cursor ? { cursor } : {}),
         },
@@ -162,18 +176,27 @@ export function DataRequestsTable({ status, type, userId, userIdInvalid }: DataR
   }
 
   return (
-    <DataTable
-      refreshSignal={refreshToken}
-      columns={columns}
-      fetchPage={fetchPage}
-      getRowId={(row) => row.id}
-      caption={t('caption')}
-      emptyState={
-        <div className="flex flex-col gap-1">
-          <p>{t('empty.title')}</p>
-          <p className="text-xs">{t('empty.hint')}</p>
-        </div>
-      }
-    />
+    <div className="flex flex-col gap-4">
+      <div className="flex justify-end">
+        <LogRequestDialog
+          onLogged={() => {
+            setRefreshToken((value) => value + 1);
+          }}
+        />
+      </div>
+      <DataTable
+        refreshSignal={refreshToken}
+        columns={columns}
+        fetchPage={fetchPage}
+        getRowId={(row) => row.id}
+        caption={t('caption')}
+        emptyState={
+          <div className="flex flex-col gap-1">
+            <p>{t('empty.title')}</p>
+            <p className="text-xs">{t('empty.hint')}</p>
+          </div>
+        }
+      />
+    </div>
   );
 }

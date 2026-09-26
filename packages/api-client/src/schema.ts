@@ -8096,7 +8096,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row that has not produced a copy yet, or null if it does not apply. It is computed in the requesting user's country timezone, and is never later than the same deadline computed in UTC. `answeredLate` is true for an export row with status ready or completed whose completedAt is after gdprResponseDueAt(requestedAt, timezone); for a failed export it is true when the earliest completedAt among the same user's later exports is after the failed row's gdprResponseDueAt(requestedAt, timezone); false otherwise (delete rows, cancelled, not yet answered, or completedAt null). */
+        /** List GDPR data requests, newest first. `responseDueAt` is the Art. 12(3) deadline for an export row that has not produced a copy yet, or null if it does not apply. It is computed in the requesting user's country timezone, and is never later than the same deadline computed in UTC. `answeredLate` is true for an export row with status ready or completed whose completedAt is after gdprResponseDueAt(receivedAt, timezone); for a failed export it is true when the earliest completedAt among the same user's later exports is after the failed row's gdprResponseDueAt(receivedAt, timezone); false otherwise (delete rows, cancelled, not yet answered, or completedAt null). */
         get: {
             parameters: {
                 query?: {
@@ -8104,6 +8104,7 @@ export interface paths {
                     limit?: number;
                     status?: "pending" | "processing" | "ready" | "completed" | "failed" | "cancelled";
                     type?: "export" | "delete";
+                    channel?: "in_app" | "email" | "support";
                     /** @description UUID identifier */
                     userId?: string;
                 };
@@ -8155,7 +8156,96 @@ export interface paths {
             };
         };
         put?: never;
-        post?: never;
+        /**
+         * Log a GDPR request received off-platform
+         * @description Records a data subject request that reached the user by email or through support, so it meets the same Art. 12(3) deadline as an in-app request. `requestedAt` is always the server time the row is logged; `responseDueAt` is computed from `receivedAt`, so the deadline counts from when the request was received, not from when it was logged. `400` if `receivedAt` is more than 1 minute in the future or more than 30 days in the past. `type: "delete"` requires a second factor verified in the last 15 minutes, same as any `x-requires-2fa` route; returns `403 TWO_FACTOR_REQUIRED` otherwise. Returns `403 PROTECTED_TARGET` if `userId` is the acting admin; this has no exception, not even for a superadmin with a fresh second factor. Returns the same error if `userId` has the admin role or holds any admin permission grant, unless the actor is a superadmin with a fresh second factor. Returns 409 with a distinct `code`: `EXPORT_OPEN` or `DELETE_OPEN` if the user already has an open request of that type, `USER_SUSPENDED` or `USER_DELETED` if the user's account is no longer active, or `BLOCKING_OBLIGATIONS` if a delete is blocked by the same obligations as self-service deletion.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: uuid
+                         * @description UUID identifier
+                         * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                         */
+                        userId: string;
+                        /** @enum {string} */
+                        type: "export" | "delete";
+                        /** @enum {string} */
+                        channel: "email" | "support";
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time
+                         * @example 2026-09-16T12:00:00.000Z
+                         */
+                        receivedAt: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The logged data request */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminDataRequest"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -12317,12 +12407,20 @@ export interface components {
             type: "export" | "delete";
             /** @enum {string} */
             status: "pending" | "processing" | "ready" | "completed" | "failed" | "cancelled";
+            /** @enum {string} */
+            channel: "in_app" | "email" | "support";
             /**
              * Format: date-time
              * @description ISO 8601 date-time
              * @example 2026-09-16T12:00:00.000Z
              */
             requestedAt: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            receivedAt: string;
             /**
              * Format: date-time
              * @description ISO 8601 date-time
@@ -12476,12 +12574,20 @@ export interface components {
             type: "export" | "delete";
             /** @enum {string} */
             status: "pending" | "processing" | "ready" | "completed" | "failed" | "cancelled";
+            /** @enum {string} */
+            channel: "in_app" | "email" | "support";
             /**
              * Format: date-time
              * @description ISO 8601 date-time
              * @example 2026-09-16T12:00:00.000Z
              */
             requestedAt: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            receivedAt: string;
             /**
              * Format: date-time
              * @description ISO 8601 date-time

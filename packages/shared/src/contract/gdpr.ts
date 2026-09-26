@@ -1,4 +1,10 @@
-import { CONSENT_PURPOSES, DATA_REQUEST_STATUSES, DATA_REQUEST_TYPES } from '../enums.js';
+import {
+  CONSENT_PURPOSES,
+  DATA_REQUEST_CHANNELS,
+  DATA_REQUEST_STATUSES,
+  DATA_REQUEST_TYPES,
+  type DataRequestChannel,
+} from '../enums.js';
 import { IdSchema, IsoDateTimeSchema, errorResponses } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
@@ -12,6 +18,19 @@ export const GDPR_DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 export const GDPR_RESPONSE_PERIOD_MONTHS = 1;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// `in_app` is created by the user themselves; only these two are ever logged
+// on their behalf by an admin (docs/steps/378-offline-data-requests.md).
+export const LOGGABLE_DATA_REQUEST_CHANNELS = [
+  'email',
+  'support',
+] as const satisfies readonly DataRequestChannel[];
+
+// docs/steps/378-offline-data-requests.md "400 if receivedAt is in the future
+// (1 min clock skew allowed), or more than 30 days in the past". An older
+// request is already overdue and needs a human, not a backdated row.
+export const RECEIVED_AT_MAX_FUTURE_SKEW_MS = 60 * 1000;
+export const RECEIVED_AT_MAX_AGE_MS = 30 * DAY_MS;
 
 // Calendar-month arithmetic in UTC, clamped to the last day of the target
 // month (e.g. Jan 31 -> Feb 28, or Feb 29 on a leap year).
@@ -150,7 +169,9 @@ export const DataRequestSchema = z
     id: IdSchema,
     type: z.enum(DATA_REQUEST_TYPES),
     status: z.enum(DATA_REQUEST_STATUSES),
+    channel: z.enum(DATA_REQUEST_CHANNELS),
     requestedAt: IsoDateTimeSchema,
+    receivedAt: IsoDateTimeSchema,
     completedAt: IsoDateTimeSchema.nullable(),
     expiresAt: IsoDateTimeSchema.nullable(),
     failureReason: z.string().min(1).max(200).nullable(),

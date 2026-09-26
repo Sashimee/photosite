@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 
-import { DATA_REQUEST_STATUSES, DATA_REQUEST_TYPES } from '@photoo/shared';
+import { DATA_REQUEST_CHANNELS, DATA_REQUEST_STATUSES, DATA_REQUEST_TYPES } from '@photoo/shared';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,12 +14,14 @@ const SELECT_CLASSNAME =
 export async function DataRequestsFilters({
   status,
   type,
+  channel,
   userId,
   userIdInvalid,
 }: DataRequestsFiltersValue) {
   const t = await getTranslations('admin.dataRequests.list.filters');
   const tStatuses = await getTranslations('admin.dataRequests.statuses');
   const tTypes = await getTranslations('admin.dataRequests.types');
+  const tChannels = await getTranslations('admin.dataRequests.channels');
 
   return (
     <form
@@ -61,6 +63,23 @@ export async function DataRequestsFilters({
           {DATA_REQUEST_TYPES.map((value) => (
             <option key={value} value={value}>
               {tTypes(value)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="data-requests-search-channel">{t('channelLabel')}</Label>
+        <select
+          id="data-requests-search-channel"
+          name="channel"
+          defaultValue={channel ?? ''}
+          className={SELECT_CLASSNAME}
+        >
+          <option value="">{t('allChannels')}</option>
+          {DATA_REQUEST_CHANNELS.map((value) => (
+            <option key={value} value={value}>
+              {tChannels(value)}
             </option>
           ))}
         </select>

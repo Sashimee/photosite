@@ -11,6 +11,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { StorageService } from '../../storage/storage.service.js';
 import { ChatSocketBridge } from '../chat/chat-socket-bridge.js';
 import { EmailQueueService } from '../auth/mailer/email-queue.service.js';
+import { applyAccountDeletion } from './apply-account-deletion.js';
 import { assertNoBlockingObligations } from './blocking-obligations.js';
 import { DataRequestsRateLimitService } from './data-requests-rate-limit.service.js';
 import { mapDataRequest } from './data-request-mapper.js';
@@ -22,7 +23,6 @@ type DataRequestDto = z.infer<typeof DataRequestSchema>;
 
 const DOWNLOAD_URL_EXPIRY_SECONDS = 10 * 60;
 const OPEN_STATUSES = ['pending', 'processing'] as const;
-const CANCELLABLE_QUOTE_STATUSES = ['draft', 'sent'] as const;
 
 interface SessionUser {
   id: string;
@@ -277,67 +277,22 @@ export class DataRequestsService {
     await assertNoBlockingObligations(this.prisma.client, user.id);
 
     let created;
+    const requestedAt = new Date();
     try {
-      created = await this.prisma.client.$transaction(async (tx) => {
-        const profile = await tx.photographerProfile.findUnique({
-          where: { userId: user.id },
-          select: { id: true, isPublished: true },
-        });
-        const professional = await tx.professionalProfile.findUnique({
-          where: { userId: user.id },
-          select: { id: true },
-        });
-
-        const guarded = await tx.user.updateMany({
-          where: { id: user.id, status: 'active' },
-          data: { status: 'deleted', deletedAt: new Date() },
-        });
-        if (guarded.count === 0) {
-          throw conflict('Account is already deleted');
-        }
-
-        await tx.session.deleteMany({ where: { userId: user.id } });
-        await tx.device.deleteMany({ where: { userId: user.id } });
-
-        if (profile?.isPublished) {
-          await tx.photographerProfile.update({
-            where: { id: profile.id },
-            data: { isPublished: false },
-          });
-        }
-
-        const cancelledRequestIds = await this.cancelOwnRequests(tx, user.id);
-        const declinedQuoteIds = await this.cancelOwnQuotesAsClient(tx, user.id);
-        const withdrawnQuoteIds = await this.cancelOwnQuotesAsPhotographer(tx, profile?.id);
-        const closedJobOfferIds = await this.closeOwnJobOffers(tx, professional?.id);
-        const withdrawnJobApplicationIds = await this.withdrawOwnJobApplications(tx, profile?.id);
-
-        const row = await tx.dataRequest.create({
-          data: { userId: user.id, type: 'delete', status: 'pending' },
-        });
-
-        await tx.auditLog.create({
-          data: {
+      created = await this.prisma.client.$transaction((tx) =>
+        applyAccountDeletion(tx, {
+          userId: user.id,
+          requestedAt,
+          receivedAt: requestedAt,
+          channel: 'in_app',
+          audit: {
             actorType: 'user',
             actorId: user.id,
             action: 'data_request.deletion_requested',
-            targetType: 'DataRequest',
-            targetId: row.id,
-            before: { userStatus: 'active', profileIsPublished: profile?.isPublished ?? null },
-            after: {
-              userStatus: 'deleted',
-              cancelledRequestIds,
-              declinedQuoteIds,
-              withdrawnQuoteIds,
-              closedJobOfferIds,
-              withdrawnJobApplicationIds,
-            },
             ip: ip ?? null,
           },
-        });
-
-        return row;
-      });
+        }),
+      );
     } catch (error) {
       const raced = await this.findRacedOpenRequest(error, user.id, 'delete');
       if (raced) {
@@ -346,10 +301,14 @@ export class DataRequestsService {
       throw error;
     }
 
-    this.chatSocketBridge.disconnectUser(user.id);
-    await this.sendDeletionEmail(user.email, created.id, user.id);
+    await this.runPostDeletionSideEffects(user, created.id);
 
     return { status: 201, data: mapDataRequest(created) };
+  }
+
+  async runPostDeletionSideEffects(user: SessionUser, dataRequestId: string): Promise<void> {
+    this.chatSocketBridge.disconnectUser(user.id);
+    await this.sendDeletionEmail(user.email, dataRequestId, user.id);
   }
 
   private async findRacedOpenRequest(error: unknown, userId: string, type: 'export' | 'delete') {
@@ -359,101 +318,6 @@ export class DataRequestsService {
     return this.prisma.client.dataRequest.findFirst({
       where: { userId, type, status: { in: [...OPEN_STATUSES] } },
     });
-  }
-
-  // Mirrors requests.service.ts's own `cancel`: cancelling the request also
-  // declines its still-`sent` quotes, so the same cascading effect applies
-  // when the request's owner is the one being deleted.
-  private async cancelOwnRequests(tx: Prisma.TransactionClient, userId: string): Promise<string[]> {
-    const openRequests = await tx.request.findMany({
-      where: { clientId: userId, status: { in: ['open', 'quoted'] } },
-      select: { id: true },
-    });
-    const ids = openRequests.map((request) => request.id);
-    if (ids.length === 0) {
-      return [];
-    }
-    await tx.request.updateMany({ where: { id: { in: ids } }, data: { status: 'cancelled' } });
-    await tx.quote.updateMany({
-      where: { requestId: { in: ids }, status: 'sent' },
-      data: { status: 'declined' },
-    });
-    return ids;
-  }
-
-  private async cancelOwnQuotesAsClient(
-    tx: Prisma.TransactionClient,
-    userId: string,
-  ): Promise<string[]> {
-    const rows = await tx.quote.findMany({
-      where: { clientId: userId, status: { in: [...CANCELLABLE_QUOTE_STATUSES] } },
-      select: { id: true },
-    });
-    const ids = rows.map((row) => row.id);
-    if (ids.length > 0) {
-      await tx.quote.updateMany({ where: { id: { in: ids } }, data: { status: 'declined' } });
-    }
-    return ids;
-  }
-
-  private async cancelOwnQuotesAsPhotographer(
-    tx: Prisma.TransactionClient,
-    profileId: string | undefined,
-  ): Promise<string[]> {
-    if (!profileId) {
-      return [];
-    }
-    const rows = await tx.quote.findMany({
-      where: { photographerId: profileId, status: { in: [...CANCELLABLE_QUOTE_STATUSES] } },
-      select: { id: true },
-    });
-    const ids = rows.map((row) => row.id);
-    if (ids.length > 0) {
-      await tx.quote.updateMany({ where: { id: { in: ids } }, data: { status: 'withdrawn' } });
-    }
-    return ids;
-  }
-
-  // Mirrors `cancelOwnQuotesAsPhotographer`: nothing stays reachable on the
-  // public job board during the grace period, the same way the
-  // photographer profile is unpublished above.
-  private async closeOwnJobOffers(
-    tx: Prisma.TransactionClient,
-    professionalId: string | undefined,
-  ): Promise<string[]> {
-    if (!professionalId) {
-      return [];
-    }
-    const rows = await tx.jobOffer.findMany({
-      where: { professionalId, status: 'published' },
-      select: { id: true },
-    });
-    const ids = rows.map((row) => row.id);
-    if (ids.length > 0) {
-      await tx.jobOffer.updateMany({ where: { id: { in: ids } }, data: { status: 'closed' } });
-    }
-    return ids;
-  }
-
-  private async withdrawOwnJobApplications(
-    tx: Prisma.TransactionClient,
-    photographerProfileId: string | undefined,
-  ): Promise<string[]> {
-    if (!photographerProfileId) {
-      return [];
-    }
-    const rows = await tx.jobApplication.findMany({
-      where: { photographerId: photographerProfileId, status: 'submitted' },
-      select: { id: true },
-    });
-    const ids = rows.map((row) => row.id);
-    if (ids.length > 0) {
-      await tx.jobApplication.updateMany({
-        where: { id: { in: ids } },
-        data: { status: 'withdrawn' },
-      });
-    }
-    return ids;
   }
 
   private async sendDeletionEmail(

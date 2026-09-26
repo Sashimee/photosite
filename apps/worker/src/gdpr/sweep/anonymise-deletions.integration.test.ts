@@ -624,4 +624,58 @@ describe('anonymiseDeletions against a real database and MinIO', () => {
       await prisma.user.deleteMany({ where: { id: { in: [raceUser.id, completeUser.id] } } });
     }
   });
+
+  it('leaves a request alone when receivedAt is old but requestedAt is recent', async () => {
+    const backdatedUser = await prisma.user.create({
+      data: {
+        email: `gdpr-anon-backdated-received-${runId}@photoo.test`,
+        name: 'Fx Anon Backdated Received',
+        locale: 'en',
+        countryCode: 'LU',
+        roles: ['client'],
+        status: 'deleted',
+        deletedAt: ONE_DAY_AGO,
+      },
+    });
+    const backdatedRequest = await prisma.dataRequest.create({
+      data: {
+        userId: backdatedUser.id,
+        type: 'delete',
+        status: 'pending',
+        requestedAt: ONE_DAY_AGO,
+        receivedAt: THIRTY_ONE_DAYS_AGO,
+      },
+    });
+
+    try {
+      const result = await anonymiseDeletions({
+        prisma: { client: prisma },
+        storage,
+        auditLog,
+        logger: fakeLogger() as never,
+      });
+
+      expect(result).toEqual({ usersAnonymised: 0, usersFailed: 0, usersSkipped: 0 });
+
+      const backdatedUserRow = await prisma.user.findUniqueOrThrow({
+        where: { id: backdatedUser.id },
+      });
+      expect(backdatedUserRow.email).toBe(`gdpr-anon-backdated-received-${runId}@photoo.test`);
+      expect(backdatedUserRow.name).toBe('Fx Anon Backdated Received');
+
+      const backdatedRequestRow = await prisma.dataRequest.findUniqueOrThrow({
+        where: { id: backdatedRequest.id },
+      });
+      expect(backdatedRequestRow.status).toBe('pending');
+      expect(backdatedRequestRow.completedAt).toBeNull();
+
+      const auditRow = await prisma.auditLog.findFirst({
+        where: { targetType: 'User', targetId: backdatedUser.id, action: 'gdpr_sweep.anonymised' },
+      });
+      expect(auditRow).toBeNull();
+    } finally {
+      await prisma.dataRequest.deleteMany({ where: { id: backdatedRequest.id } });
+      await prisma.user.deleteMany({ where: { id: backdatedUser.id } });
+    }
+  });
 });

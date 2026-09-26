@@ -513,6 +513,11 @@
         "cancelled": "Cancelled",
         "expired": "Expired"
       },
+      "channels": {
+        "in_app": "In app",
+        "email": "Email",
+        "support": "Support"
+      },
       "list": {
         "title": "Data requests",
         "caption": "GDPR data requests, newest first",
@@ -520,6 +525,7 @@
         "columns": {
           "user": "User",
           "type": "Type",
+          "channel": "Channel",
           "status": "Status",
           "requestedAt": "Requested",
           "completedAt": "Completed",
@@ -554,6 +560,8 @@
           "userIdInvalid": "Enter a valid user id.",
           "typeLabel": "Type",
           "allTypes": "All types",
+          "channelLabel": "Channel",
+          "allChannels": "All channels",
           "statusLabel": "Status",
           "allStatuses": "All statuses",
           "submit": "Search"
@@ -571,6 +579,38 @@
             "exportOpen": "An export for this user is already in progress. The list has been refreshed.",
             "exportAlreadyAnswered": "The user already has a newer export, so no retry is needed. The list has been refreshed.",
             "tooManyRequests": "You're doing that too fast. Slow down and try again."
+          }
+        },
+        "logRequest": {
+          "trigger": "Log request",
+          "title": "Log an offline data request",
+          "consequences": "This records a data request that was received by email or support, outside the app. Confirming creates the request right away.",
+          "userIdLabel": "User id",
+          "userIdPlaceholder": "Paste the user id from the users page",
+          "typeLabel": "Type",
+          "typePlaceholder": "Select a type",
+          "channelLabel": "Channel",
+          "channelPlaceholder": "Select a channel",
+          "receivedAtLabel": "Received at",
+          "accountLoading": "Looking up the account…",
+          "accountNotFound": "No account found for this user id.",
+          "accountLookupError": "The account couldn't be looked up. Please try again.",
+          "accountEmailLabel": "Email",
+          "accountNameLabel": "Name",
+          "accountNameUnset": "Not provided",
+          "deleteWarning": "The account is closed immediately. The user is emailed a link to cancel the deletion, and the account is anonymised after 30 days if it isn't cancelled.",
+          "confirm": "Confirm",
+          "confirmDeletion": "Confirm deletion",
+          "errors": {
+            "exportOpen": "This user already has an open export request.",
+            "deleteOpen": "This user already has an open deletion request.",
+            "userSuspended": "This user's account is suspended, so the request can't be logged.",
+            "userDeleted": "This user's account has already been deleted.",
+            "protectedTarget": "This account can't be targeted by this action.",
+            "twoFactorRequired": "Your admin session needs to be re-verified before this can be logged. You'll be redirected to confirm your second factor.",
+            "blockingObligations": "This deletion is blocked by obligations the user still has open, such as active bookings or unresolved payouts.",
+            "blockingObligationsVerificationInReview": "This deletion is blocked because a verification case is in review and must be decided or withdrawn first.",
+            "blockingObligationsAcceptedQuoteWithdrawalWindow": "This deletion is blocked because an accepted quote is still inside the statutory withdrawal window."
           }
         }
       }

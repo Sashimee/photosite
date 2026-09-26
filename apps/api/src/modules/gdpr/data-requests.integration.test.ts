@@ -35,7 +35,9 @@ interface DataRequestBody {
   id: string;
   type: string;
   status: string;
+  channel: string;
   requestedAt: string;
+  receivedAt: string;
   completedAt: string | null;
   expiresAt: string | null;
   failureReason: string | null;
@@ -437,7 +439,27 @@ describe('data requests integration', () => {
           payload: { type: 'delete' },
         });
         expect(deleteResponse.statusCode).toBe(201);
-        expect(deleteResponse.json<DataRequestBody>().type).toBe('delete');
+        const deleteBody = deleteResponse.json<DataRequestBody>();
+        expect(deleteBody.type).toBe('delete');
+        expect(deleteBody.channel).toBe('in_app');
+        expect(deleteBody.receivedAt).toBe(deleteBody.requestedAt);
+        expect(Date.now() - new Date(deleteBody.requestedAt).getTime()).toBeLessThan(10_000);
+
+        const deleteRow = await prisma.dataRequest.findUniqueOrThrow({
+          where: { id: deleteBody.id },
+        });
+        expect(deleteRow.receivedAt.getTime()).toBe(deleteRow.requestedAt.getTime());
+
+        const deletionAuditRow = await prisma.auditLog.findFirst({
+          where: { action: 'data_request.deletion_requested', targetId: deleteBody.id },
+        });
+        expect(deletionAuditRow).not.toBeNull();
+        expect(deletionAuditRow?.targetType).toBe('DataRequest');
+        expect(
+          await prisma.auditLog.findFirst({
+            where: { action: 'data_request.logged_offline', targetId: deleteBody.id },
+          }),
+        ).toBeNull();
 
         const deletedUser = await prisma.user.findUniqueOrThrow({ where: { id: mainUser.id } });
         expect(deletedUser.status).toBe('deleted');
