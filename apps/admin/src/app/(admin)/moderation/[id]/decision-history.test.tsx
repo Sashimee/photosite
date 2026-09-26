@@ -19,9 +19,9 @@ async function loadDecisionHistory() {
 const entry = {
   id: 'entry-1',
   actorId: 'admin-1',
-  action: 'verification_case.rejected',
-  targetType: 'VerificationCase',
-  targetId: 'case-1',
+  action: 'report.resolved',
+  targetType: 'Report',
+  targetId: 'report-1',
   before: null,
   after: null,
   ip: null,
@@ -29,16 +29,16 @@ const entry = {
 };
 
 describe('DecisionHistory', () => {
-  it('shows the entries scoped to the case', async () => {
+  it('shows the entries scoped to the report', async () => {
     getMock.mockResolvedValueOnce({ data: { items: [entry], nextCursor: null } });
     const DecisionHistory = await loadDecisionHistory();
 
-    render(<DecisionHistory targetId="case-1" />);
+    render(<DecisionHistory targetId="report-1" />);
 
-    expect(await screen.findByText('verification_case.rejected')).toBeInTheDocument();
+    expect(await screen.findByText('report.resolved')).toBeInTheDocument();
     expect(screen.getByText('Sep 1, 2026, 2:00 AM GMT+2')).toBeInTheDocument();
     expect(getMock).toHaveBeenCalledWith('/v1/admin/audit-log', {
-      params: { query: { targetId: 'case-1' } },
+      params: { query: { targetId: 'report-1' } },
     });
   });
 
@@ -46,8 +46,8 @@ describe('DecisionHistory', () => {
     getMock.mockResolvedValueOnce({ data: { items: [], nextCursor: null } });
     const DecisionHistory = await loadDecisionHistory();
 
-    render(<DecisionHistory targetId="case-1" />);
+    render(<DecisionHistory targetId="report-1" />);
 
-    expect(await screen.findByText('No audit log entries for this case.')).toBeInTheDocument();
+    expect(await screen.findByText('No audit log entries for this report.')).toBeInTheDocument();
   });
 });

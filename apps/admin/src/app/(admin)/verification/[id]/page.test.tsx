@@ -56,7 +56,7 @@ const caseDetail = {
       documentKey: 'id_card',
       mimeType: 'image/jpeg',
       virusScanStatus: 'clean' as const,
-      uploadedAt: '2026-09-01T00:00:00.000Z',
+      uploadedAt: '2026-08-31T09:30:00.000Z',
       downloadUrl: 'https://storage.example.com/presigned/doc-1',
     },
   ],
@@ -112,6 +112,8 @@ describe('VerificationCaseDetailPage', () => {
     expect(screen.getByText('user-1')).toBeInTheDocument();
     expect(screen.getByText('Fixture Photography Sarl')).toBeInTheDocument();
     expect(screen.getByText('LU12345678')).toBeInTheDocument();
+    expect(screen.getByText('Sep 1, 2026, 2:00 AM GMT+2')).toBeInTheDocument();
+    expect(screen.getByText('Uploaded Aug 31, 2026, 11:30 AM GMT+2')).toBeInTheDocument();
     expect(firstCallProps(documentViewerMock)).toMatchObject({
       caseId: 'case-1',
       document: {
@@ -119,7 +121,7 @@ describe('VerificationCaseDetailPage', () => {
         documentKey: 'id_card',
         mimeType: 'image/jpeg',
         virusScanStatus: 'clean',
-        uploadedAt: '2026-09-01T00:00:00.000Z',
+        uploadedAt: '2026-08-31T09:30:00.000Z',
       },
     });
     const documentProp = firstCallProps(documentViewerMock)?.document as Record<string, unknown>;
