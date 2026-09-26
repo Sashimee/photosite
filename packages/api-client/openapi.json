@@ -872,6 +872,9 @@
               "flagged",
               "rejected"
             ]
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/PortfolioImageProvenance"
           }
         },
         "required": [
@@ -880,7 +883,49 @@
           "width",
           "height",
           "order",
-          "status"
+          "status",
+          "provenance"
+        ],
+        "additionalProperties": false
+      },
+      "PortfolioImageProvenance": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "review",
+              "fail"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "pending_review",
+              "approved",
+              "flagged",
+              "rejected"
+            ]
+          },
+          "checkedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "verdict",
+          "status",
+          "checkedAt"
         ],
         "additionalProperties": false
       },
@@ -4165,6 +4210,115 @@
         ],
         "additionalProperties": false
       },
+      "AdminProvenanceCheckSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "portfolioImageId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "portfolioImageStatus": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "pending_review",
+              "approved",
+              "flagged",
+              "rejected"
+            ]
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "photographer": {
+            "$ref": "#/components/schemas/AdminProvenancePhotographer"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "review",
+              "fail"
+            ]
+          },
+          "score": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "checkedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "reviewedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "portfolioImageId",
+          "portfolioImageStatus",
+          "thumbnailUrl",
+          "photographer",
+          "verdict",
+          "score",
+          "checkedAt",
+          "reviewedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminProvenancePhotographer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 60,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "URL-safe profile slug",
+            "example": "jane-doe-photography"
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "slug"
+        ],
+        "additionalProperties": false
+      },
       "AdminProvenanceCheck": {
         "type": "object",
         "properties": {
@@ -4179,6 +4333,57 @@
             "format": "uuid",
             "description": "UUID identifier",
             "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "portfolioImageStatus": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "pending_review",
+              "approved",
+              "flagged",
+              "rejected"
+            ]
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "photographer": {
+            "$ref": "#/components/schemas/AdminProvenancePhotographer"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "review",
+              "fail"
+            ]
+          },
+          "score": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "checkedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "reviewedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
           },
           "aiScore": {
             "type": [
@@ -4229,22 +4434,6 @@
             "description": "ISO 8601 date-time",
             "example": "2026-09-16T12:00:00.000Z"
           },
-          "score": {
-            "type": [
-              "number",
-              "null"
-            ],
-            "minimum": 0,
-            "maximum": 1
-          },
-          "verdict": {
-            "type": "string",
-            "enum": [
-              "pass",
-              "review",
-              "fail"
-            ]
-          },
           "reviewedByAdminId": {
             "type": [
               "string",
@@ -4253,15 +4442,6 @@
             "format": "uuid",
             "description": "UUID identifier",
             "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-          },
-          "reviewedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time",
-            "description": "ISO 8601 date-time",
-            "example": "2026-09-16T12:00:00.000Z"
           },
           "note": {
             "type": [
@@ -4274,16 +4454,44 @@
         "required": [
           "id",
           "portfolioImageId",
+          "portfolioImageStatus",
+          "thumbnailUrl",
+          "photographer",
+          "verdict",
+          "score",
+          "checkedAt",
+          "reviewedAt",
           "aiScore",
           "aiVendor",
           "reverseMatches",
           "c2paValid",
           "exifCamera",
           "exifCapturedAt",
-          "score",
-          "verdict",
           "reviewedByAdminId",
-          "reviewedAt",
+          "note"
+        ],
+        "additionalProperties": false
+      },
+      "ProvenanceDecisionRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "flagged",
+              "rejected"
+            ],
+            "example": "approved"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "status",
           "note"
         ],
         "additionalProperties": false
@@ -16391,7 +16599,7 @@
         }
       }
     },
-    "/v1/admin/provenance-checks": {
+    "/v1/admin/provenance": {
       "get": {
         "summary": "List the provenance review queue",
         "tags": [
@@ -16423,11 +16631,39 @@
             "required": false,
             "name": "limit",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "review",
+                "fail"
+              ]
+            },
+            "required": false,
+            "name": "verdict",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "processing",
+                "pending_review",
+                "approved",
+                "flagged",
+                "rejected"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "A page of provenance checks",
+            "description": "A page of provenance checks, oldest first",
             "content": {
               "application/json": {
                 "schema": {
@@ -16436,7 +16672,7 @@
                     "items": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/AdminProvenanceCheck"
+                        "$ref": "#/components/schemas/AdminProvenanceCheckSummary"
                       }
                     },
                     "nextCursor": {
@@ -16479,7 +16715,7 @@
         }
       }
     },
-    "/v1/admin/provenance-checks/{id}": {
+    "/v1/admin/provenance/{id}": {
       "get": {
         "summary": "Get a provenance check",
         "tags": [
@@ -16549,89 +16785,9 @@
         }
       }
     },
-    "/v1/admin/provenance-checks/{id}/approve": {
+    "/v1/admin/provenance/{id}/decision": {
       "post": {
-        "summary": "Approve a flagged portfolio image",
-        "tags": [
-          "admin"
-        ],
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "x-required-permission": "moderation",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "description": "UUID identifier",
-              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-            },
-            "required": true,
-            "description": "UUID identifier",
-            "name": "id",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Provenance check approved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminProvenanceCheck"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/admin/provenance-checks/{id}/reject": {
-      "post": {
-        "summary": "Reject a flagged portfolio image",
+        "summary": "Decide the outcome of a flagged portfolio image",
         "tags": [
           "admin"
         ],
@@ -16659,22 +16815,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "note": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 2000
-                  }
-                },
-                "additionalProperties": false
+                "$ref": "#/components/schemas/ProvenanceDecisionRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Provenance check rejected",
+            "description": "Decision recorded",
             "content": {
               "application/json": {
                 "schema": {
@@ -16735,6 +16883,86 @@
           },
           "422": {
             "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/provenance/{id}/recheck": {
+      "post": {
+        "summary": "Re-run a provenance check",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-required-permission": "moderation",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recheck queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminProvenanceCheck"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {

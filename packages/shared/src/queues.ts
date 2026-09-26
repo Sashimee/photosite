@@ -17,6 +17,7 @@ export const QUEUE_NAMES = [
   'gdpr-export',
   'gdpr-sweep',
   'listing-expiry',
+  'provenance-check',
 ] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];
@@ -38,6 +39,7 @@ export const RECEIPT_PDF_QUEUE_NAME = 'receipt-pdf' as const satisfies QueueName
 export const GDPR_EXPORT_QUEUE_NAME = 'gdpr-export' as const satisfies QueueName;
 export const GDPR_SWEEP_QUEUE_NAME = 'gdpr-sweep' as const satisfies QueueName;
 export const LISTING_EXPIRY_QUEUE_NAME = 'listing-expiry' as const satisfies QueueName;
+export const PROVENANCE_CHECK_QUEUE_NAME = 'provenance-check' as const satisfies QueueName;
 
 export const EmailJobSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('verify-email'), to: z.email(), url: z.url() }).strict(),
@@ -145,6 +147,14 @@ export const ListingExpiryJobSchema = z.object({}).strict();
 
 export type ListingExpiryJob = z.infer<typeof ListingExpiryJobSchema>;
 
+// `force` bypasses the "already checked" skip so an admin recheck always
+// re-runs the signals instead of returning the cached verdict.
+export const ProvenanceCheckJobSchema = z
+  .object({ portfolioImageId: IdSchema, force: z.boolean().optional() })
+  .strict();
+
+export type ProvenanceCheckJob = z.infer<typeof ProvenanceCheckJobSchema>;
+
 export const NOTIFY_JOB_ATTEMPTS = 5;
 export const NOTIFY_JOB_BACKOFF_DELAY_MS = 5000;
 export const NOTIFY_JOB_FAILED_RETENTION_SECONDS = 24 * 60 * 60;
@@ -191,6 +201,7 @@ export const QUEUE_JOB_SCHEMAS = {
   [GDPR_EXPORT_QUEUE_NAME]: GdprExportJobSchema,
   [GDPR_SWEEP_QUEUE_NAME]: GdprSweepJobSchema,
   [LISTING_EXPIRY_QUEUE_NAME]: ListingExpiryJobSchema,
+  [PROVENANCE_CHECK_QUEUE_NAME]: ProvenanceCheckJobSchema,
 } as const satisfies Record<QueueName, z.ZodType>;
 
 export type QueueJobPayload<Name extends QueueName> = z.infer<(typeof QUEUE_JOB_SCHEMAS)[Name]>;

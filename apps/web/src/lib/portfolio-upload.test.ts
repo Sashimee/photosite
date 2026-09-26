@@ -109,6 +109,7 @@ describe('uploadPortfolioImage', () => {
       height: 100,
       order: 1,
       status: 'processing',
+      provenance: null,
     };
     postMock.mockImplementation((url: string) => {
       if (url === '/v1/uploads') return Promise.resolve({ data: CREATE_RESPONSE });

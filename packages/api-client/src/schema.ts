@@ -8747,7 +8747,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/provenance-checks": {
+    "/v1/admin/provenance": {
         parameters: {
             query?: never;
             header?: never;
@@ -8760,6 +8760,8 @@ export interface paths {
                 query?: {
                     cursor?: string;
                     limit?: number;
+                    verdict?: "pass" | "review" | "fail";
+                    status?: "processing" | "pending_review" | "approved" | "flagged" | "rejected";
                 };
                 header?: never;
                 path?: never;
@@ -8767,14 +8769,14 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description A page of provenance checks */
+                /** @description A page of provenance checks, oldest first */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            items: components["schemas"]["AdminProvenanceCheck"][];
+                            items: components["schemas"]["AdminProvenanceCheckSummary"][];
                             nextCursor: string | null;
                         };
                     };
@@ -8807,7 +8809,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/provenance-checks/{id}": {
+    "/v1/admin/provenance/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -8873,7 +8875,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/admin/provenance-checks/{id}/approve": {
+    "/v1/admin/provenance/{id}/decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -8882,82 +8884,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Approve a flagged portfolio image */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description UUID identifier */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Provenance check approved */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["AdminProvenanceCheck"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-                /** @description Conflict */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiError"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/admin/provenance-checks/{id}/reject": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reject a flagged portfolio image */
+        /** Decide the outcome of a flagged portfolio image */
         post: {
             parameters: {
                 query?: never;
@@ -8970,13 +8897,11 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": {
-                        note?: string;
-                    };
+                    "application/json": components["schemas"]["ProvenanceDecisionRequest"];
                 };
             };
             responses: {
-                /** @description Provenance check rejected */
+                /** @description Decision recorded */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9032,6 +8957,81 @@ export interface paths {
                 };
                 /** @description Unprocessable entity */
                 422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/provenance/{id}/recheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Re-run a provenance check */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID identifier */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Recheck queued */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminProvenanceCheck"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -11375,7 +11375,20 @@ export interface components {
             order: number;
             /** @enum {string} */
             status: "processing" | "pending_review" | "approved" | "flagged" | "rejected";
+            provenance: components["schemas"]["PortfolioImageProvenance"];
         };
+        PortfolioImageProvenance: {
+            /** @enum {string} */
+            verdict: "pass" | "review" | "fail";
+            /** @enum {string} */
+            status: "processing" | "pending_review" | "approved" | "flagged" | "rejected";
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            checkedAt: string | null;
+        } | null;
         OwnProfessionalProfile: {
             /**
              * Format: uuid
@@ -12753,6 +12766,54 @@ export interface components {
             /** Format: uri */
             downloadUrl?: string;
         };
+        AdminProvenanceCheckSummary: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            portfolioImageId: string;
+            /** @enum {string} */
+            portfolioImageStatus: "processing" | "pending_review" | "approved" | "flagged" | "rejected";
+            /** Format: uri */
+            thumbnailUrl: string;
+            photographer: components["schemas"]["AdminProvenancePhotographer"];
+            /** @enum {string} */
+            verdict: "pass" | "review" | "fail";
+            score: number | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            checkedAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            reviewedAt: string | null;
+        };
+        AdminProvenancePhotographer: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            displayName: string;
+            /**
+             * @description URL-safe profile slug
+             * @example jane-doe-photography
+             */
+            slug: string;
+        };
         AdminProvenanceCheck: {
             /**
              * Format: uuid
@@ -12766,6 +12827,26 @@ export interface components {
              * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
              */
             portfolioImageId: string;
+            /** @enum {string} */
+            portfolioImageStatus: "processing" | "pending_review" | "approved" | "flagged" | "rejected";
+            /** Format: uri */
+            thumbnailUrl: string;
+            photographer: components["schemas"]["AdminProvenancePhotographer"];
+            /** @enum {string} */
+            verdict: "pass" | "review" | "fail";
+            score: number | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            checkedAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            reviewedAt: string | null;
             aiScore: number | null;
             aiVendor: string | null;
             reverseMatches: string[] | null;
@@ -12777,22 +12858,21 @@ export interface components {
              * @example 2026-09-16T12:00:00.000Z
              */
             exifCapturedAt: string | null;
-            score: number | null;
-            /** @enum {string} */
-            verdict: "pass" | "review" | "fail";
             /**
              * Format: uuid
              * @description UUID identifier
              * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
              */
             reviewedByAdminId: string | null;
-            /**
-             * Format: date-time
-             * @description ISO 8601 date-time
-             * @example 2026-09-16T12:00:00.000Z
-             */
-            reviewedAt: string | null;
             note: string | null;
+        };
+        ProvenanceDecisionRequest: {
+            /**
+             * @example approved
+             * @enum {string}
+             */
+            status: "approved" | "flagged" | "rejected";
+            note: string;
         };
         AdminBooking: {
             /**
