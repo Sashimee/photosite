@@ -45,8 +45,8 @@ The endpoint lives on `AdminDataRequestsController` and follows the `retry-expor
 
 Guards (#417, security review):
 
-- Refuse a target that is the actor, has the admin role, or holds any `AdminPermissionGrant`, with 403 `PROTECTED_TARGET`. The only exception is a superadmin actor with 2FA.
-- The delete route requires fresh 2FA (`requires2fa: true` in the controller and in the contract flag). It also uses a stricter per-admin rate limit than the other admin mutations.
+- Refuse a target that is the actor, with 403 `PROTECTED_TARGET`; this never has an exception, not even for a superadmin with 2FA. A target that has the admin role or holds any `AdminPermissionGrant` is refused the same way, but a superadmin actor with fresh 2FA may act on that target. Both checks run again inside the export/delete transaction against a fresh read of the target, so a role or grant change landing between the pre-check and the write can't slip through.
+- The delete route requires fresh 2FA, enforced in the controller as `requirePermission(request, 'support', { requires2fa: body.type === 'delete' })`. Since the requirement depends on the request body, there's no per-route `x-requires-2fa` contract flag for it — the route description in `admin.ts` documents the behaviour in prose instead. The admin API client already redirects to reverify on a 403 `TWO_FACTOR_REQUIRED`. The delete path also uses a stricter per-admin rate limit than the other admin mutations.
 - `assertNoBlockingObligations` runs inside the deletion transaction. A CONFLICT from the unique index is re-mapped to the open-request or user-status code.
 - Post-commit side effects (email, socket disconnect) are caught and logged. They don't turn a committed deletion into a 500.
 
