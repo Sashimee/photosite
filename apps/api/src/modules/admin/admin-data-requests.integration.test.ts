@@ -860,6 +860,60 @@ describe('admin data requests integration', () => {
         const item = body.items.find((candidate) => candidate.id === deletion.id);
         expect(item?.responseDueAt).toBeNull();
       });
+
+      it('is null when a later success falls after receivedAt even though it is before requestedAt', async () => {
+        const admin = await makeAdmin('due-backdated-received-nulled', ['support']);
+        const subject = await createSubjectUser('due-backdated-received-nulled');
+        const base = Date.now();
+        const receivedAt = new Date(base - 20 * 24 * 60 * 60 * 1000);
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt: new Date(base - 1000),
+          receivedAt,
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(base - 10 * 24 * 60 * 60 * 1000),
+          expiresAt: new Date(base + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.responseDueAt).toBeNull();
+      });
+
+      it('stays set when the later success is still before receivedAt', async () => {
+        const admin = await makeAdmin('due-backdated-received-kept', ['support']);
+        const subject = await createSubjectUser('due-backdated-received-kept');
+        const base = Date.now();
+        const receivedAt = new Date(base - 20 * 24 * 60 * 60 * 1000);
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt: new Date(base - 1000),
+          receivedAt,
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(base - 25 * 24 * 60 * 60 * 1000),
+          expiresAt: new Date(base + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.responseDueAt).toBe(
+          gdprResponseDueAt(receivedAt, 'Europe/Luxembourg').toISOString(),
+        );
+      });
     });
 
     describe('answeredLate', () => {
@@ -1769,6 +1823,9 @@ describe('admin data requests integration', () => {
         },
       });
       expect(response.statusCode).toBe(404);
+      const body = response.json<{ code: string; message: string }>();
+      expect(body.code).toBe('NOT_FOUND');
+      expect(body.message).toBe('User not found');
     });
 
     it('returns 400 when receivedAt is more than a minute in the future', async () => {
@@ -2067,6 +2124,46 @@ describe('admin data requests integration', () => {
 
       const rows = await prisma.dataRequest.findMany({ where: { userId: target.id } });
       expect(rows).toHaveLength(1);
+    });
+
+    it('returns 403 PROTECTED_TARGET when a superadmin with fresh 2FA logs an export for themselves', async () => {
+      const admin = await makeAdmin('protected-superadmin-self-export', ['support', 'superadmin']);
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: admin.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('PROTECTED_TARGET');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: admin.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('returns 403 PROTECTED_TARGET when a superadmin with fresh 2FA logs a delete for themselves', async () => {
+      const admin = await makeAdmin('protected-superadmin-self-delete', ['support', 'superadmin']);
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: admin.id,
+          type: 'delete',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('PROTECTED_TARGET');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: admin.id } });
+      expect(rows).toHaveLength(0);
     });
 
     it('returns 403 TWO_FACTOR_REQUIRED for a delete logged without a fresh second factor', async () => {

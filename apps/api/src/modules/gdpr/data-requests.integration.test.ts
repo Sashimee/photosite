@@ -442,12 +442,13 @@ describe('data requests integration', () => {
         const deleteBody = deleteResponse.json<DataRequestBody>();
         expect(deleteBody.type).toBe('delete');
         expect(deleteBody.channel).toBe('in_app');
-        expect(
-          Math.abs(
-            new Date(deleteBody.requestedAt).getTime() - new Date(deleteBody.receivedAt).getTime(),
-          ),
-        ).toBeLessThan(1_000);
+        expect(deleteBody.receivedAt).toBe(deleteBody.requestedAt);
         expect(Date.now() - new Date(deleteBody.requestedAt).getTime()).toBeLessThan(10_000);
+
+        const deleteRow = await prisma.dataRequest.findUniqueOrThrow({
+          where: { id: deleteBody.id },
+        });
+        expect(deleteRow.receivedAt.getTime()).toBe(deleteRow.requestedAt.getTime());
 
         const deletionAuditRow = await prisma.auditLog.findFirst({
           where: { action: 'data_request.deletion_requested', targetId: deleteBody.id },
