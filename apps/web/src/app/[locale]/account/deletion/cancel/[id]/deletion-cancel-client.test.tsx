@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StrictMode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -31,6 +31,22 @@ describe('DeletionCancelClient', () => {
 
   it('does not send a request until the confirm button is clicked', async () => {
     setHash('');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const DeletionCancelClient = await loadDeletionCancelClient();
+
+    render(<DeletionCancelClient locale="en" id="request-1" />);
+
+    expect(
+      screen.getByText(
+        "You're about to cancel your account deletion. Confirm below to keep your account.",
+      ),
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not send a request on mount even with a token in the fragment', async () => {
+    setHash('#token=a1b2c3');
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     const DeletionCancelClient = await loadDeletionCancelClient();
@@ -262,6 +278,35 @@ describe('DeletionCancelClient', () => {
       </StrictMode>,
     );
     await confirm();
+
+    expect(
+      await screen.findByText('Your account deletion has been cancelled.'),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends only one request on a double click', async () => {
+    setHash('');
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'request-1',
+          type: 'delete',
+          status: 'cancelled',
+          requestedAt: '2026-01-01T00:00:00.000Z',
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const DeletionCancelClient = await loadDeletionCancelClient();
+
+    render(<DeletionCancelClient locale="en" id="request-1" />);
+    const button = screen.getByRole('button', { name: 'Yes, cancel my account deletion' });
+    act(() => {
+      button.click();
+      button.click();
+    });
 
     expect(
       await screen.findByText('Your account deletion has been cancelled.'),
