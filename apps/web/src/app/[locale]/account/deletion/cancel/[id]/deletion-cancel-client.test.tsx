@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next-intl', async () => {
@@ -121,6 +122,54 @@ describe('DeletionCancelClient', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ code: 'SOMETHING_ELSE' }), { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const DeletionCancelClient = await loadDeletionCancelClient();
+
+    render(<DeletionCancelClient locale="en" id="request-1" />);
+
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
+  });
+
+  it('shows a generic message for an error body with no code', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const DeletionCancelClient = await loadDeletionCancelClient();
+
+    render(<DeletionCancelClient locale="en" id="request-1" />);
+
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
+  });
+
+  it('fires the cancel request exactly once under React StrictMode double-invoke', async () => {
+    setHash('');
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'request-1',
+          type: 'delete',
+          status: 'cancelled',
+          requestedAt: '2026-01-01T00:00:00.000Z',
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const DeletionCancelClient = await loadDeletionCancelClient();
+
+    render(
+      <StrictMode>
+        <DeletionCancelClient locale="en" id="request-1" />
+      </StrictMode>,
+    );
+
+    expect(
+      await screen.findByText('Your account deletion has been cancelled.'),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers from a network failure instead of hanging on pending', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
     vi.stubGlobal('fetch', fetchMock);
     const DeletionCancelClient = await loadDeletionCancelClient();
 
