@@ -10,6 +10,7 @@ import { waitForLinkInEmail } from '../../testing/mailpit.js';
 import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
 import { generateTotpCode } from '../../testing/totp.js';
 import { TEST_ENV } from '../../testing/test-env.js';
+import { ChatSocketBridge } from '../chat/chat-socket-bridge.js';
 import { GdprExportQueueService } from '../gdpr/gdpr-export-queue.service.js';
 
 const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL', 'REDIS_URL']);
@@ -2238,6 +2239,40 @@ describe('admin data requests integration', () => {
         expect(failureAuditRow).not.toBeNull();
         expect(failureAuditRow?.after).toEqual({ status: 'failed', reason: 'enqueue_failed' });
       });
+
+      it('lets only one of two concurrent offline export logs for the same user succeed', async () => {
+        const admin = await makeAdmin('log-export-concurrent', ['support']);
+        const subject = await createSubjectUser('log-export-concurrent');
+
+        const payload = {
+          userId: subject.id,
+          type: 'export' as const,
+          channel: 'email' as const,
+          receivedAt: new Date().toISOString(),
+        };
+
+        const [first, second] = await Promise.all([
+          fastify().inject({
+            method: 'POST',
+            url: '/v1/admin/data-requests',
+            headers: admin.headers,
+            payload,
+          }),
+          fastify().inject({
+            method: 'POST',
+            url: '/v1/admin/data-requests',
+            headers: admin.headers,
+            payload,
+          }),
+        ]);
+        const statusCodes = [first.statusCode, second.statusCode].sort();
+        expect(statusCodes).toEqual([201, 409]);
+        const loser = first.statusCode === 409 ? first : second;
+        expect(loser.json<{ code: string }>().code).toBe('EXPORT_OPEN');
+
+        const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+        expect(rows).toHaveLength(1);
+      });
     });
 
     describe('delete', () => {
@@ -2299,6 +2334,166 @@ describe('admin data requests integration', () => {
           receivedAt: receivedAt.toISOString(),
         });
         expect(auditRow?.ip).toBe(FAKE_IP);
+      });
+
+      it('revokes sessions and devices when logging an offline deletion', async () => {
+        const admin = await makeAdmin('log-delete-devices', ['support']);
+        const subject = await createSubjectUser('log-delete-devices');
+        await prisma.session.create({
+          data: {
+            userId: subject.id,
+            tokenHash: randomUUID(),
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          },
+        });
+        await prisma.device.create({
+          data: {
+            userId: subject.id,
+            expoPushToken: `ExponentPushToken[${randomUUID()}]`,
+            platform: 'ios',
+            lastSeenAt: new Date(),
+          },
+        });
+
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/admin/data-requests',
+          headers: admin.headers,
+          payload: {
+            userId: subject.id,
+            type: 'delete',
+            channel: 'support',
+            receivedAt: new Date().toISOString(),
+          },
+        });
+        expect(response.statusCode).toBe(201);
+
+        const sessions = await prisma.session.findMany({ where: { userId: subject.id } });
+        expect(sessions).toHaveLength(0);
+
+        const devices = await prisma.device.findMany({ where: { userId: subject.id } });
+        expect(devices).toHaveLength(0);
+      });
+
+      it('sends the deletion email and disconnects chat sockets after commit', async () => {
+        const admin = await makeAdmin('log-delete-side-effects', ['support']);
+        const subject = await createSubjectUser('log-delete-side-effects');
+
+        const chatSocketBridge = app.get(ChatSocketBridge);
+        const originalDisconnectUser = chatSocketBridge.disconnectUser.bind(chatSocketBridge);
+        const disconnectedUserIds: string[] = [];
+        chatSocketBridge.disconnectUser = (userId: string) => {
+          disconnectedUserIds.push(userId);
+          originalDisconnectUser(userId);
+        };
+
+        let response;
+        try {
+          response = await fastify().inject({
+            method: 'POST',
+            url: '/v1/admin/data-requests',
+            headers: admin.headers,
+            payload: {
+              userId: subject.id,
+              type: 'delete',
+              channel: 'support',
+              receivedAt: new Date().toISOString(),
+            },
+          });
+        } finally {
+          chatSocketBridge.disconnectUser = originalDisconnectUser;
+        }
+        expect(response.statusCode).toBe(201);
+        const body = response.json<DataRequestBody>();
+
+        expect(disconnectedUserIds).toContain(subject.id);
+
+        const link = await waitForLinkInEmail(
+          subject.email,
+          /https?:\/\/\S*account\/deletion\/cancel\/\S+#token=\S+/,
+        );
+        expect(link).toContain(body.id);
+      });
+
+      it('still commits the deletion and returns 201 when the post-commit side effects throw', async () => {
+        const admin = await makeAdmin('log-delete-side-effect-fails', ['support']);
+        const subject = await createSubjectUser('log-delete-side-effect-fails');
+
+        const chatSocketBridge = app.get(ChatSocketBridge);
+        const originalDisconnectUser = chatSocketBridge.disconnectUser.bind(chatSocketBridge);
+        chatSocketBridge.disconnectUser = () => {
+          throw new Error('simulated chat disconnect failure');
+        };
+
+        let response;
+        try {
+          response = await fastify().inject({
+            method: 'POST',
+            url: '/v1/admin/data-requests',
+            headers: admin.headers,
+            payload: {
+              userId: subject.id,
+              type: 'delete',
+              channel: 'support',
+              receivedAt: new Date().toISOString(),
+            },
+          });
+        } finally {
+          chatSocketBridge.disconnectUser = originalDisconnectUser;
+        }
+        expect(response.statusCode).toBe(201);
+        const body = response.json<DataRequestBody>();
+        expect(body.status).toBe('pending');
+
+        const user = await prisma.user.findUniqueOrThrow({ where: { id: subject.id } });
+        expect(user.status).toBe('deleted');
+        expect(user.deletedAt).not.toBeNull();
+
+        const row = await prisma.dataRequest.findUniqueOrThrow({ where: { id: body.id } });
+        expect(row.status).toBe('pending');
+      });
+
+      it('keeps requestedAt near now and responseDueAt null for a heavily backdated receivedAt, and allows cancellation via the emailed token', async () => {
+        const admin = await makeAdmin('log-delete-backdated', ['support']);
+        const subject = await createSubjectUser('log-delete-backdated');
+        const receivedAt = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000);
+
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/admin/data-requests',
+          headers: admin.headers,
+          payload: {
+            userId: subject.id,
+            type: 'delete',
+            channel: 'support',
+            receivedAt: receivedAt.toISOString(),
+          },
+        });
+        expect(response.statusCode).toBe(201);
+        const body = response.json<DataRequestBody>();
+        expect(body.receivedAt).toBe(receivedAt.toISOString());
+        expect(Date.now() - new Date(body.requestedAt).getTime()).toBeLessThan(10_000);
+        expect(body.responseDueAt).toBeNull();
+
+        const link = await waitForLinkInEmail(
+          subject.email,
+          /https?:\/\/\S*account\/deletion\/cancel\/\S+#token=\S+/,
+        );
+        const token = extractFragmentToken(link);
+        expect(token).not.toBeNull();
+
+        const cancelResponse = await fastify().inject({
+          method: 'POST',
+          url: `/v1/me/data-requests/${body.id}/cancel`,
+          headers: { origin: 'http://localhost:3000' },
+          payload: { token },
+        });
+        expect(cancelResponse.statusCode).toBe(200);
+        expect(cancelResponse.json<DataRequestBody>().status).toBe('cancelled');
+
+        const restored = await prisma.user.findUniqueOrThrow({ where: { id: subject.id } });
+        expect(restored.status).toBe('active');
+        expect(restored.deletedAt).toBeNull();
       });
     });
   });
