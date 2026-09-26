@@ -3,6 +3,7 @@ import { Prisma } from '@photoo/db';
 import {
   GDPR_DELETION_GRACE_PERIOD_MS,
   type CreateDataRequestRequestSchema,
+  type DataRequestCancelConflictCode,
   type DataRequestSchema,
 } from '@photoo/shared';
 import type { z } from 'zod';
@@ -38,7 +39,10 @@ function notFound(): HttpException {
   return new HttpException({ code: 'NOT_FOUND', message: 'Data request not found' }, 404);
 }
 
-function conflict(code: string, message: string): HttpException {
+function conflict(
+  code: DataRequestCancelConflictCode | 'CONFLICT',
+  message: string,
+): HttpException {
   return new HttpException({ code, message }, 409);
 }
 

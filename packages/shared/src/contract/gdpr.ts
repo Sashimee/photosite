@@ -199,6 +199,17 @@ export const CancelDataRequestRequestSchema = z
   .strict()
   .default({});
 
+// Returned as `code` on the 409 from `POST /me/data-requests/{id}/cancel`
+// (see the registerPath call below); the generic `CONFLICT` code is used
+// separately for cases that aren't specific to cancelling.
+export const DATA_REQUEST_CANCEL_CONFLICT_CODES = [
+  'NOT_DELETION',
+  'GRACE_PERIOD_ENDED',
+  'NOT_PENDING',
+] as const;
+
+export type DataRequestCancelConflictCode = (typeof DATA_REQUEST_CANCEL_CONFLICT_CODES)[number];
+
 export const DataRequestDownloadResponseSchema = z
   .object({
     url: z.url().openapi({ example: 'https://storage.photoo.lu/exports/abc123?signature=xyz' }),

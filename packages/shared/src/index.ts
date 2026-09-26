@@ -408,12 +408,14 @@ export {
 } from './contract/reports.js';
 
 export {
+  DATA_REQUEST_CANCEL_CONFLICT_CODES,
   GDPR_DELETION_GRACE_PERIOD_MS,
   GDPR_RESPONSE_PERIOD_MONTHS,
   gdprResponseDueAt,
   LOGGABLE_DATA_REQUEST_CHANNELS,
   RECEIVED_AT_MAX_AGE_MS,
   RECEIVED_AT_MAX_FUTURE_SKEW_MS,
+  type DataRequestCancelConflictCode,
   CancelDataRequestRequestSchema,
   ConsentPurposeSchema,
   ConsentRecordSchema,
