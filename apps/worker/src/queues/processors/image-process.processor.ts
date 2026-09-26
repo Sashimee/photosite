@@ -6,11 +6,16 @@ import {
 import type { Job, Processor } from 'bullmq';
 import type { Logger } from 'nestjs-pino';
 import { processImage } from '../../processing/image-processor.js';
-import type { ObjectStorage, PortfolioImageRepository, UploadRepository } from './types.js';
+import type { JobQueueLike, ObjectStorage, UploadRepository } from './types.js';
 
 interface ImageProcessTransactionClient {
   upload: Pick<UploadRepository, 'update'>;
-  portfolioImage: Pick<PortfolioImageRepository, 'updateMany'>;
+  portfolioImage: {
+    updateManyAndReturn(args: {
+      where: Record<string, unknown>;
+      data: Record<string, unknown>;
+    }): Promise<{ id: string }[]>;
+  };
 }
 
 export interface ImageProcessDeps {
@@ -21,6 +26,7 @@ export interface ImageProcessDeps {
     };
   };
   storage: Pick<ObjectStorage, 'config' | 'getObjectBuffer' | 'putObject'>;
+  provenanceCheckQueue: JobQueueLike;
   maxPixels: number;
   logger: Logger;
 }
@@ -78,7 +84,7 @@ export function createImageProcessProcessor(deps: ImageProcessDeps): Processor<I
       result.variants.map((variant) => [`${variant.name}_${variant.format}`, variant.key]),
     );
 
-    await deps.prisma.client.$transaction(async (tx) => {
+    const portfolioImages = await deps.prisma.client.$transaction(async (tx) => {
       await tx.upload.update({
         where: { id: upload.id },
         data: {
@@ -89,10 +95,32 @@ export function createImageProcessProcessor(deps: ImageProcessDeps): Processor<I
           height: result.height,
         },
       });
-      await tx.portfolioImage.updateMany({
+      return tx.portfolioImage.updateManyAndReturn({
         where: { uploadId: upload.id, status: 'processing' },
         data: { status: 'pending_review', width: result.width, height: result.height },
       });
     });
+
+    const portfolioImageId = portfolioImages[0]?.id;
+    if (portfolioImageId) {
+      try {
+        await deps.provenanceCheckQueue.add(
+          'check',
+          { portfolioImageId },
+          {
+            jobId: portfolioImageId,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5000 },
+            removeOnComplete: true,
+            removeOnFail: 100,
+          },
+        );
+      } catch (error) {
+        deps.logger.error(
+          { err: error, portfolioImageId },
+          'image-process: failed to enqueue a provenance check',
+        );
+      }
+    }
   };
 }
