@@ -412,6 +412,8 @@ export {
   GDPR_RESPONSE_PERIOD_MONTHS,
   gdprResponseDueAt,
   LOGGABLE_DATA_REQUEST_CHANNELS,
+  RECEIVED_AT_MAX_AGE_MS,
+  RECEIVED_AT_MAX_FUTURE_SKEW_MS,
   CancelDataRequestRequestSchema,
   ConsentPurposeSchema,
   ConsentRecordSchema,

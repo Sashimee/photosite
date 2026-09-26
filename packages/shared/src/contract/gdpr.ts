@@ -3,6 +3,7 @@ import {
   DATA_REQUEST_CHANNELS,
   DATA_REQUEST_STATUSES,
   DATA_REQUEST_TYPES,
+  type DataRequestChannel,
 } from '../enums.js';
 import { IdSchema, IsoDateTimeSchema, errorResponses } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
@@ -20,9 +21,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 // `in_app` is created by the user themselves; only these two are ever logged
 // on their behalf by an admin (docs/steps/378-offline-data-requests.md).
-export const LOGGABLE_DATA_REQUEST_CHANNELS = DATA_REQUEST_CHANNELS.filter(
-  (channel) => channel !== 'in_app',
-);
+export const LOGGABLE_DATA_REQUEST_CHANNELS = [
+  'email',
+  'support',
+] as const satisfies readonly DataRequestChannel[];
 
 // docs/steps/378-offline-data-requests.md "400 if receivedAt is in the future
 // (1 min clock skew allowed), or more than 30 days in the past". An older
