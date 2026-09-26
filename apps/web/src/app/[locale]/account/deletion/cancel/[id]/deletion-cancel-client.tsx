@@ -51,9 +51,9 @@ function resolveErrorMessage(t: TranslateFn, error: ApiErrorLike | undefined): s
   return t(ERROR_KEYS[kind]);
 }
 
-function showSignIn(error: ApiErrorLike | undefined): boolean {
+function isRetryable(error: ApiErrorLike | undefined): boolean {
   const kind = resolveErrorKind(error);
-  return kind === 'GENERIC' || kind === 'UNAUTHORIZED';
+  return kind === 'GENERIC' || kind === 'TOO_MANY_REQUESTS';
 }
 
 export function DeletionCancelClient({ locale, id }: { locale: Locale; id: string }) {
@@ -70,7 +70,7 @@ export function DeletionCancelClient({ locale, id }: { locale: Locale; id: strin
     }
     tokenizedOnce.current = true;
     tokenRef.current = parseFragmentToken(window.location.hash);
-    window.history.replaceState(null, '', window.location.pathname);
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
   }, []);
 
   function handleConfirm() {
@@ -88,6 +88,9 @@ export function DeletionCancelClient({ locale, id }: { locale: Locale; id: strin
       })
       .then(({ error }) => {
         if (error) {
+          if (isRetryable(error)) {
+            sentRef.current = false;
+          }
           setApiError(error);
           setStatus('error');
           return;
@@ -95,6 +98,7 @@ export function DeletionCancelClient({ locale, id }: { locale: Locale; id: strin
         setStatus('success');
       })
       .catch(() => {
+        sentRef.current = false;
         setApiError(undefined);
         setStatus('error');
       });
@@ -121,17 +125,14 @@ export function DeletionCancelClient({ locale, id }: { locale: Locale; id: strin
         </FormNotice>
       ) : null}
       {status === 'error' ? (
-        <FormNotice tone="error">
-          {resolveErrorMessage(t, apiError)}
-          {showSignIn(apiError) ? (
-            <>
-              {' '}
-              <Link href={`/${locale}/sign-in`} className="font-medium underline">
-                {t('signInLink')}
-              </Link>
-            </>
+        <>
+          <FormNotice tone="error">{resolveErrorMessage(t, apiError)}</FormNotice>
+          {isRetryable(apiError) ? (
+            <Button type="button" onClick={handleConfirm}>
+              {t('confirmCta')}
+            </Button>
           ) : null}
-        </FormNotice>
+        </>
       ) : null}
     </section>
   );

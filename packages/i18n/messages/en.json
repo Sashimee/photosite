@@ -1359,8 +1359,7 @@
         "tooManyRequests": "Too many attempts. Please try again later.",
         "tooManyRequestsWithRetry": "Too many attempts. Please try again in {seconds, plural, one {# second} other {# seconds}}.",
         "invalidLink": "This cancellation link is invalid.",
-        "generic": "Something went wrong. Please try again.",
-        "signInLink": "Sign in"
+        "generic": "Something went wrong. Please try again."
       },
       "deletionRequested": {
         "title": "Account deletion requested",
