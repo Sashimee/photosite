@@ -107,6 +107,10 @@ describe('AdminProvenanceQuerySchema', () => {
     expect(AdminProvenanceQuerySchema.safeParse({ verdict: 'suspicious' }).success).toBe(false);
   });
 
+  it('rejects an unknown status filter', () => {
+    expect(AdminProvenanceQuerySchema.safeParse({ status: 'archived' }).success).toBe(false);
+  });
+
   it('rejects a limit above 100', () => {
     expect(AdminProvenanceQuerySchema.safeParse({ limit: 101 }).success).toBe(false);
   });
@@ -221,5 +225,12 @@ describe('ProvenanceDecisionRequestSchema', () => {
       ProvenanceDecisionRequestSchema.safeParse({ status: 'rejected', note: 'a'.repeat(2001) })
         .success,
     ).toBe(false);
+  });
+
+  it('accepts a note at exactly 2000 characters', () => {
+    expect(
+      ProvenanceDecisionRequestSchema.safeParse({ status: 'rejected', note: 'a'.repeat(2000) })
+        .success,
+    ).toBe(true);
   });
 });

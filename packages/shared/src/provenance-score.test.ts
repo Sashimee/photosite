@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { computeProvenanceScore, type ProvenanceSignals } from './provenance-score.js';
+import {
+  AI_SCORE_FAIL_THRESHOLD,
+  AI_SCORE_REVIEW_THRESHOLD,
+  computeProvenanceScore,
+  FUTURE_CAPTURE_TOLERANCE_MS,
+  OLDEST_PLAUSIBLE_CAPTURE,
+  type ProvenanceSignals,
+} from './provenance-score.js';
 
 const noSignals: ProvenanceSignals = {
   aiScore: null,
@@ -123,6 +130,89 @@ describe('computeProvenanceScore', () => {
       aiScore: 0.05,
       exifCapturedAt: new Date(Date.now() + 60 * 60 * 1000),
     });
+    expect(result.verdict).toBe('pass');
+  });
+
+  it('fails exactly at the AI_SCORE_FAIL_THRESHOLD', () => {
+    const result = computeProvenanceScore({ ...noSignals, aiScore: AI_SCORE_FAIL_THRESHOLD });
+    expect(result.verdict).toBe('fail');
+  });
+
+  it('reviews (not fails) just below the AI_SCORE_FAIL_THRESHOLD', () => {
+    const result = computeProvenanceScore({
+      ...noSignals,
+      aiScore: AI_SCORE_FAIL_THRESHOLD - 0.01,
+    });
+    expect(result.verdict).toBe('review');
+  });
+
+  it('reviews exactly at the AI_SCORE_REVIEW_THRESHOLD', () => {
+    const result = computeProvenanceScore({ ...noSignals, aiScore: AI_SCORE_REVIEW_THRESHOLD });
+    expect(result.verdict).toBe('review');
+  });
+
+  it('treats a score just below the AI_SCORE_REVIEW_THRESHOLD as clean, passing alongside a second clean signal', () => {
+    const result = computeProvenanceScore({
+      ...noSignals,
+      aiScore: AI_SCORE_REVIEW_THRESHOLD - 0.01,
+      hasExifCamera: true,
+    });
+    expect(result.verdict).toBe('pass');
+  });
+
+  it('reviews when a dirty signal accompanies two clean ones: forceReview overrides the clean-signal count', () => {
+    const result = computeProvenanceScore({
+      ...noSignals,
+      aiScore: 0.05,
+      hasExifCamera: true,
+      c2paValid: false,
+    });
+    expect(result.verdict).toBe('review');
+  });
+
+  it('treats a capture exactly at OLDEST_PLAUSIBLE_CAPTURE as plausible, passing alongside a second clean signal', () => {
+    const result = computeProvenanceScore({
+      ...noSignals,
+      aiScore: 0.05,
+      exifCapturedAt: OLDEST_PLAUSIBLE_CAPTURE,
+    });
+    expect(result.verdict).toBe('pass');
+  });
+
+  it('reviews a capture one millisecond before OLDEST_PLAUSIBLE_CAPTURE', () => {
+    const result = computeProvenanceScore({
+      ...noSignals,
+      aiScore: 0.05,
+      exifCapturedAt: new Date(OLDEST_PLAUSIBLE_CAPTURE.getTime() - 1),
+    });
+    expect(result.verdict).toBe('review');
+  });
+
+  it('does not treat a capture exactly at the FUTURE_CAPTURE_TOLERANCE_MS boundary as future', () => {
+    const result = computeProvenanceScore({
+      ...noSignals,
+      aiScore: 0.05,
+      exifCapturedAt: new Date(Date.now() + FUTURE_CAPTURE_TOLERANCE_MS),
+    });
+    expect(result.verdict).toBe('pass');
+  });
+
+  it('reviews a capture just past the FUTURE_CAPTURE_TOLERANCE_MS boundary', () => {
+    const result = computeProvenanceScore({
+      ...noSignals,
+      aiScore: 0.05,
+      exifCapturedAt: new Date(Date.now() + FUTURE_CAPTURE_TOLERANCE_MS + 60_000),
+    });
+    expect(result.verdict).toBe('review');
+  });
+
+  it('excludes missing signals from the score rather than counting them as clean', () => {
+    const result = computeProvenanceScore({
+      ...noSignals,
+      reverseMatches: [],
+      hasExifCamera: true,
+    });
+    expect(result.score).toBe(0);
     expect(result.verdict).toBe('pass');
   });
 });

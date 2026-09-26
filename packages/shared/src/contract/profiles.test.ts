@@ -231,6 +231,20 @@ describe('PortfolioImageSchema and PublicPortfolioImageSchema', () => {
     expect(PublicPortfolioImageSchema.safeParse(validPortfolioImage).success).toBe(false);
   });
 
+  it('public schema rejects a provenance field: never exposed outside the owner view', () => {
+    const { id, url, width, height, order } = validPortfolioImage;
+    expect(
+      PublicPortfolioImageSchema.safeParse({
+        id,
+        url,
+        width,
+        height,
+        order,
+        provenance: { verdict: 'pass', status: 'approved', checkedAt: null },
+      }).success,
+    ).toBe(false);
+  });
+
   it('public schema accepts the image without status', () => {
     const { id, url, width, height, order } = validPortfolioImage;
     expect(PublicPortfolioImageSchema.safeParse({ id, url, width, height, order }).success).toBe(
