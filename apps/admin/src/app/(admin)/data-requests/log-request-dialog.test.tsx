@@ -42,7 +42,7 @@ function mockAccountFound(overrides: { email?: string; name?: string | null } = 
 
 async function fillValidForm(events: ReturnType<typeof userEvent.setup>) {
   await events.type(screen.getByLabelText('User id'), VALID_USER_ID);
-  await screen.findByText('alice@example.com');
+  await screen.findByText('a***@example.com');
   await events.selectOptions(screen.getByLabelText('Type'), 'export');
   await events.selectOptions(screen.getByLabelText('Channel'), 'email');
   fireEvent.change(screen.getByLabelText('Received at'), {
@@ -99,13 +99,14 @@ describe('LogRequestDialog', () => {
     expect(postMock).not.toHaveBeenCalled();
   });
 
-  it('shows the account email and name once the lookup resolves', async () => {
+  it('shows the masked account email and the name once the lookup resolves', async () => {
     mockAccountFound({ email: 'alice@example.com', name: 'Alice Doe' });
     const { events } = await openDialog();
 
     await events.type(screen.getByLabelText('User id'), VALID_USER_ID);
 
-    expect(await screen.findByText('alice@example.com')).toBeInTheDocument();
+    expect(await screen.findByText('a***@example.com')).toBeInTheDocument();
+    expect(screen.queryByText('alice@example.com')).not.toBeInTheDocument();
     expect(screen.getByText('Alice Doe')).toBeInTheDocument();
   });
 
@@ -115,7 +116,7 @@ describe('LogRequestDialog', () => {
 
     await events.type(screen.getByLabelText('User id'), VALID_USER_ID);
 
-    await screen.findByText('alice@example.com');
+    await screen.findByText('a***@example.com');
     expect(screen.getByText('Not provided')).toBeInTheDocument();
   });
 
@@ -356,7 +357,7 @@ describe('LogRequestDialog', () => {
     });
     const { events, onLogged } = await openDialog();
     await events.type(screen.getByLabelText('User id'), VALID_USER_ID);
-    await screen.findByText('alice@example.com');
+    await screen.findByText('a***@example.com');
     await events.selectOptions(screen.getByLabelText('Type'), 'delete');
     await events.selectOptions(screen.getByLabelText('Channel'), 'email');
     fireEvent.change(screen.getByLabelText('Received at'), {
@@ -382,7 +383,7 @@ describe('LogRequestDialog', () => {
     mockAccountFound();
     const { events } = await openDialog();
     await events.type(screen.getByLabelText('User id'), VALID_USER_ID);
-    await screen.findByText('alice@example.com');
+    await screen.findByText('a***@example.com');
     await events.selectOptions(screen.getByLabelText('Type'), 'delete');
     await events.selectOptions(screen.getByLabelText('Channel'), 'email');
     fireEvent.change(screen.getByLabelText('Received at'), {

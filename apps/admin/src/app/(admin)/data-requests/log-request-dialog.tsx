@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import { apiErrorMessage, type ApiErrorLike } from '@/lib/api-errors';
+import { maskEmail } from '@/lib/user-mask';
 
 const SELECT_CLASSNAME =
   'h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
@@ -245,7 +246,7 @@ export function LogRequestDialog({ onLogged }: { onLogged: () => void }) {
           {account.status === 'found' ? (
             <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-sm">
               <dt className="text-muted-foreground">{t('accountEmailLabel')}</dt>
-              <dd>{account.email}</dd>
+              <dd>{maskEmail(account.email)}</dd>
               <dt className="text-muted-foreground">{t('accountNameLabel')}</dt>
               <dd>{account.name ?? t('accountNameUnset')}</dd>
             </dl>
