@@ -206,6 +206,25 @@ describe('computeProvenanceScore', () => {
     expect(result.verdict).toBe('review');
   });
 
+  it('reviews on clean EXIF camera and capture time alone: both come from the same forgeable blob', () => {
+    const result = computeProvenanceScore({
+      ...noSignals,
+      hasExifCamera: true,
+      exifCapturedAt: new Date('2026-01-01'),
+    });
+    expect(result.verdict).toBe('review');
+  });
+
+  it('passes on clean EXIF (camera + capture time) alongside one other clean signal', () => {
+    const result = computeProvenanceScore({
+      ...noSignals,
+      hasExifCamera: true,
+      exifCapturedAt: new Date('2026-01-01'),
+      aiScore: 0.05,
+    });
+    expect(result.verdict).toBe('pass');
+  });
+
   it('excludes missing signals from the score rather than counting them as clean', () => {
     const result = computeProvenanceScore({
       ...noSignals,

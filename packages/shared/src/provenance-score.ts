@@ -98,17 +98,17 @@ export function computeProvenanceScore(signals: ProvenanceSignals): ProvenanceSc
     }
   }
 
+  let exifCleanCount = 0;
+
   if (signals.hasExifCamera !== null) {
-    presentSignals += 1;
     riskSum += signals.hasExifCamera ? 0 : 0.2;
     riskWeight += 1;
     if (signals.hasExifCamera) {
-      cleanSignals += 1;
+      exifCleanCount += 1;
     }
   }
 
   if (signals.exifCapturedAt !== null) {
-    presentSignals += 1;
     riskWeight += 1;
     const isFuture = signals.exifCapturedAt.getTime() - Date.now() > FUTURE_CAPTURE_TOLERANCE_MS;
     const isTooOld = signals.exifCapturedAt < OLDEST_PLAUSIBLE_CAPTURE;
@@ -116,8 +116,15 @@ export function computeProvenanceScore(signals: ProvenanceSignals): ProvenanceSc
       riskSum += 1;
       forceReview = true;
     } else {
-      cleanSignals += 1;
+      exifCleanCount += 1;
     }
+  }
+
+  // Camera model and capture time both live in the same forgeable EXIF blob,
+  // so together they count as one signal, not two, toward auto-pass.
+  if (signals.hasExifCamera !== null || signals.exifCapturedAt !== null) {
+    presentSignals += 1;
+    cleanSignals += Math.min(exifCleanCount, 1);
   }
 
   const score = riskWeight === 0 ? 0 : riskSum / riskWeight;
