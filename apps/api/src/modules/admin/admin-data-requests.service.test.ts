@@ -1,4 +1,3 @@
-import { HttpException } from '@nestjs/common';
 import type { DataRequest } from '@photoo/db';
 import type { Logger } from 'nestjs-pino';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -109,6 +108,7 @@ function buildService(protectedInTx: boolean, superadminWithFreshTwoFactor: bool
 
 describe('AdminDataRequestsService.logOffline in-transaction re-check', () => {
   beforeEach(() => {
+    vi.mocked(applyAccountDeletion).mockClear();
     vi.mocked(applyAccountDeletion).mockResolvedValue({ id: 'row-1' } as DataRequest);
   });
 
@@ -121,16 +121,10 @@ describe('AdminDataRequestsService.logOffline in-transaction re-check', () => {
       undefined,
     );
 
-    await expect(call).rejects.toBeInstanceOf(HttpException);
-    try {
-      await call;
-      throw new Error('expected logOffline to reject');
-    } catch (error) {
-      expect(error).toBeInstanceOf(HttpException);
-      const httpError = error as HttpException;
-      expect(httpError.getStatus()).toBe(403);
-      expect((httpError.getResponse() as { code: string }).code).toBe('PROTECTED_TARGET');
-    }
+    await expect(call).rejects.toMatchObject({
+      status: 403,
+      response: { code: 'PROTECTED_TARGET' },
+    });
     expect(createOfflineExport).not.toHaveBeenCalled();
     expect(record).not.toHaveBeenCalled();
   });
@@ -162,15 +156,10 @@ describe('AdminDataRequestsService.logOffline in-transaction re-check', () => {
       undefined,
     );
 
-    await expect(call).rejects.toBeInstanceOf(HttpException);
-    try {
-      await call;
-      throw new Error('expected logOffline to reject');
-    } catch (error) {
-      const httpError = error as HttpException;
-      expect(httpError.getStatus()).toBe(403);
-      expect((httpError.getResponse() as { code: string }).code).toBe('PROTECTED_TARGET');
-    }
+    await expect(call).rejects.toMatchObject({
+      status: 403,
+      response: { code: 'PROTECTED_TARGET' },
+    });
     expect(applyAccountDeletion).not.toHaveBeenCalled();
     expect(runPostDeletionSideEffects).not.toHaveBeenCalled();
   });
