@@ -1364,6 +1364,35 @@ describe('admin data requests integration', () => {
         const item = body.items.find((candidate) => candidate.id === failed.id);
         expect(item?.answeredLate).toBe(true);
       });
+
+      it('is true when the retry’s requestedAt falls after receivedAt but before the failed request’s own requestedAt', async () => {
+        const admin = await makeAdmin('late-retry-received-window', ['support']);
+        const subject = await createSubjectUser('late-retry-received-window');
+        const base = Date.now();
+        const receivedAt = new Date(base - 20 * 24 * 60 * 60 * 1000);
+        const requestedAt = new Date(base - 15 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(receivedAt, 'Europe/Luxembourg');
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt,
+          receivedAt,
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(receivedAt.getTime() + 1000),
+          completedAt: new Date(due.getTime() + 1),
+          expiresAt: new Date(base + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.answeredLate).toBe(true);
+      });
     });
   });
 
