@@ -1,11 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { DataRequestStatus, DataRequestType, Prisma, UserStatus } from '@photoo/db';
+import type {
+  DataRequestChannel,
+  DataRequestStatus,
+  DataRequestType,
+  Prisma,
+  UserRole,
+  UserStatus,
+} from '@photoo/db';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AdminDataRequestCursor } from './admin-data-request-cursor.js';
 
 export interface AdminDataRequestFilters {
   status?: DataRequestStatus;
   type?: DataRequestType;
+  channel?: DataRequestChannel;
   userId?: string;
   cursor?: AdminDataRequestCursor;
   limit: number;
@@ -17,7 +25,9 @@ const dataRequestSelect = {
   id: true,
   type: true,
   status: true,
+  channel: true,
   requestedAt: true,
+  receivedAt: true,
   completedAt: true,
   expiresAt: true,
   failureReason: true,
@@ -66,12 +76,64 @@ export class AdminDataRequestsRepository {
     return this.prisma.client.dataRequest.findUnique({ where: { id }, select: dataRequestSelect });
   }
 
+  async findByIdInTx(
+    tx: Prisma.TransactionClient,
+    id: string,
+  ): Promise<AdminDataRequestRow | null> {
+    return tx.dataRequest.findUnique({ where: { id }, select: dataRequestSelect });
+  }
+
   async findUserStatus(userId: string): Promise<UserStatus | null> {
     const user = await this.prisma.client.user.findUnique({
       where: { id: userId },
       select: { status: true },
     });
     return user?.status ?? null;
+  }
+
+  async findUserForOffline(
+    userId: string,
+  ): Promise<{ id: string; email: string; status: UserStatus; roles: UserRole[] } | null> {
+    return this.prisma.client.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, status: true, roles: true },
+    });
+  }
+
+  async hasAnyAdminPermissionGrant(userId: string): Promise<boolean> {
+    const grant = await this.prisma.client.adminPermissionGrant.findFirst({
+      where: { userId },
+      select: { id: true },
+    });
+    return grant !== null;
+  }
+
+  async findUserRolesInTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<{ roles: UserRole[] } | null> {
+    return tx.user.findUnique({ where: { id: userId }, select: { roles: true } });
+  }
+
+  async hasAnyAdminPermissionGrantInTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<boolean> {
+    const grant = await tx.adminPermissionGrant.findFirst({
+      where: { userId },
+      select: { id: true },
+    });
+    return grant !== null;
+  }
+
+  async findOpenRequestForUser(
+    userId: string,
+    type: DataRequestType,
+  ): Promise<{ id: string } | null> {
+    return this.prisma.client.dataRequest.findFirst({
+      where: { userId, type, status: { in: ['pending', 'processing'] } },
+      select: { id: true },
+    });
   }
 
   // Re-read inside the transaction that creates the retry row, so a status
@@ -111,6 +173,18 @@ export class AdminDataRequestsRepository {
     });
   }
 
+  async createOfflineExport(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    channel: DataRequestChannel,
+    receivedAt: Date,
+  ): Promise<AdminDataRequestRow> {
+    return tx.dataRequest.create({
+      data: { userId, type: 'export', status: 'pending', channel, receivedAt },
+      select: dataRequestSelect,
+    });
+  }
+
   async list(filters: AdminDataRequestFilters): Promise<AdminDataRequestRow[]> {
     const and: Prisma.DataRequestWhereInput[] = [];
     if (filters.status) {
@@ -118,6 +192,9 @@ export class AdminDataRequestsRepository {
     }
     if (filters.type) {
       and.push({ type: filters.type });
+    }
+    if (filters.channel) {
+      and.push({ channel: filters.channel });
     }
     if (filters.userId) {
       and.push({ userId: filters.userId });

@@ -35,7 +35,9 @@ interface DataRequestBody {
   id: string;
   type: string;
   status: string;
+  channel: string;
   requestedAt: string;
+  receivedAt: string;
   completedAt: string | null;
   expiresAt: string | null;
   failureReason: string | null;
@@ -437,7 +439,27 @@ describe('data requests integration', () => {
           payload: { type: 'delete' },
         });
         expect(deleteResponse.statusCode).toBe(201);
-        expect(deleteResponse.json<DataRequestBody>().type).toBe('delete');
+        const deleteBody = deleteResponse.json<DataRequestBody>();
+        expect(deleteBody.type).toBe('delete');
+        expect(deleteBody.channel).toBe('in_app');
+        expect(deleteBody.receivedAt).toBe(deleteBody.requestedAt);
+        expect(Date.now() - new Date(deleteBody.requestedAt).getTime()).toBeLessThan(10_000);
+
+        const deleteRow = await prisma.dataRequest.findUniqueOrThrow({
+          where: { id: deleteBody.id },
+        });
+        expect(deleteRow.receivedAt.getTime()).toBe(deleteRow.requestedAt.getTime());
+
+        const deletionAuditRow = await prisma.auditLog.findFirst({
+          where: { action: 'data_request.deletion_requested', targetId: deleteBody.id },
+        });
+        expect(deletionAuditRow).not.toBeNull();
+        expect(deletionAuditRow?.targetType).toBe('DataRequest');
+        expect(
+          await prisma.auditLog.findFirst({
+            where: { action: 'data_request.logged_offline', targetId: deleteBody.id },
+          }),
+        ).toBeNull();
 
         const deletedUser = await prisma.user.findUniqueOrThrow({ where: { id: mainUser.id } });
         expect(deletedUser.status).toBe('deleted');
@@ -697,6 +719,7 @@ describe('data requests integration', () => {
         payload: { token },
       });
       expect(response.statusCode).toBe(409);
+      expect(response.json<ApiErrorBody>().code).toBe('NOT_PENDING');
     });
 
     it('returns the "no longer pending" message, not the grace-period one, for an already-completed row past the grace period', async () => {
@@ -731,6 +754,7 @@ describe('data requests integration', () => {
       });
       expect(response.statusCode).toBe(409);
       const body = response.json<ApiErrorBody>();
+      expect(body.code).toBe('NOT_PENDING');
       expect(body.message).toBe('Data request is no longer pending');
       expect(body.message).not.toMatch(/grace period/i);
 
@@ -770,7 +794,9 @@ describe('data requests integration', () => {
         payload: { token },
       });
       expect(response.statusCode).toBe(409);
-      expect(response.json<ApiErrorBody>().message).toMatch(/grace period has ended/i);
+      const body = response.json<ApiErrorBody>();
+      expect(body.code).toBe('GRACE_PERIOD_ENDED');
+      expect(body.message).toMatch(/grace period has ended/i);
 
       const unchanged = await prisma.dataRequest.findUniqueOrThrow({
         where: { id: dataRequestId },

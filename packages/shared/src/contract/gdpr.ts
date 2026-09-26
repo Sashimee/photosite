@@ -1,4 +1,10 @@
-import { CONSENT_PURPOSES, DATA_REQUEST_STATUSES, DATA_REQUEST_TYPES } from '../enums.js';
+import {
+  CONSENT_PURPOSES,
+  DATA_REQUEST_CHANNELS,
+  DATA_REQUEST_STATUSES,
+  DATA_REQUEST_TYPES,
+  type DataRequestChannel,
+} from '../enums.js';
 import { IdSchema, IsoDateTimeSchema, errorResponses } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
@@ -12,6 +18,19 @@ export const GDPR_DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 export const GDPR_RESPONSE_PERIOD_MONTHS = 1;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// `in_app` is created by the user themselves; only these two are ever logged
+// on their behalf by an admin (docs/steps/378-offline-data-requests.md).
+export const LOGGABLE_DATA_REQUEST_CHANNELS = [
+  'email',
+  'support',
+] as const satisfies readonly DataRequestChannel[];
+
+// docs/steps/378-offline-data-requests.md "400 if receivedAt is in the future
+// (1 min clock skew allowed), or more than 30 days in the past". An older
+// request is already overdue and needs a human, not a backdated row.
+export const RECEIVED_AT_MAX_FUTURE_SKEW_MS = 60 * 1000;
+export const RECEIVED_AT_MAX_AGE_MS = 30 * DAY_MS;
 
 // Calendar-month arithmetic in UTC, clamped to the last day of the target
 // month (e.g. Jan 31 -> Feb 28, or Feb 29 on a leap year).
@@ -150,7 +169,9 @@ export const DataRequestSchema = z
     id: IdSchema,
     type: z.enum(DATA_REQUEST_TYPES),
     status: z.enum(DATA_REQUEST_STATUSES),
+    channel: z.enum(DATA_REQUEST_CHANNELS),
     requestedAt: IsoDateTimeSchema,
+    receivedAt: IsoDateTimeSchema,
     completedAt: IsoDateTimeSchema.nullable(),
     expiresAt: IsoDateTimeSchema.nullable(),
     failureReason: z.string().min(1).max(200).nullable(),
@@ -177,6 +198,17 @@ export const CancelDataRequestRequestSchema = z
   .object({ token: z.string().min(1).optional() })
   .strict()
   .default({});
+
+// Returned as `code` on the 409 from `POST /me/data-requests/{id}/cancel`
+// (see the registerPath call below); the generic `CONFLICT` code is used
+// separately for cases that aren't specific to cancelling.
+export const DATA_REQUEST_CANCEL_CONFLICT_CODES = [
+  'NOT_DELETION',
+  'GRACE_PERIOD_ENDED',
+  'NOT_PENDING',
+] as const;
+
+export type DataRequestCancelConflictCode = (typeof DATA_REQUEST_CANCEL_CONFLICT_CODES)[number];
 
 export const DataRequestDownloadResponseSchema = z
   .object({
@@ -317,6 +349,10 @@ registry.registerPath({
     'and only within the 30-day grace period; after it, 409 even if anonymisation has not run ' +
     'yet. A soft-deleted account has no session, so `token` (the single-use value mailed at ' +
     'deletion time) is accepted in place of one.',
+  description:
+    'Returns 409 with a distinct `code`: `NOT_DELETION` if the request is not a deletion ' +
+    'request, `GRACE_PERIOD_ENDED` if it is still pending but the 30-day grace period has ' +
+    'ended, or `NOT_PENDING` if it has already been cancelled or has moved past pending.',
   tags: ['gdpr'],
   security: AUTH_SECURITY,
   request: {

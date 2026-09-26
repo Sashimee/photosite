@@ -24,6 +24,7 @@ export {
   PROVENANCE_VERDICTS,
   DATA_REQUEST_TYPES,
   DATA_REQUEST_STATUSES,
+  DATA_REQUEST_CHANNELS,
   ADMIN_PERMISSIONS,
   REPORT_STATUSES,
   REPORT_TARGET_TYPES,
@@ -55,6 +56,7 @@ export {
   type ProvenanceVerdict,
   type DataRequestType,
   type DataRequestStatus,
+  type DataRequestChannel,
   type AdminPermission,
   type ReportStatus,
   type ReportTargetType,
@@ -358,6 +360,7 @@ export {
   AdminEmailTemplatePreviewQuerySchema,
   AdminEmailTemplatePreviewSchema,
   AdminLegalTextVersionSchema,
+  AdminLogDataRequestBodySchema,
   AdminMeSchema,
   AdminProvenanceCheckSchema,
   AdminReportSchema,
@@ -405,9 +408,14 @@ export {
 } from './contract/reports.js';
 
 export {
+  DATA_REQUEST_CANCEL_CONFLICT_CODES,
   GDPR_DELETION_GRACE_PERIOD_MS,
   GDPR_RESPONSE_PERIOD_MONTHS,
   gdprResponseDueAt,
+  LOGGABLE_DATA_REQUEST_CHANNELS,
+  RECEIVED_AT_MAX_AGE_MS,
+  RECEIVED_AT_MAX_FUTURE_SKEW_MS,
+  type DataRequestCancelConflictCode,
   CancelDataRequestRequestSchema,
   ConsentPurposeSchema,
   ConsentRecordSchema,

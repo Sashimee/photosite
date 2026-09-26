@@ -2,8 +2,6 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ADMIN_FORMATS, ADMIN_TIME_ZONE } from '@/lib/datetime';
-
 vi.mock('next-intl', async () => {
   const { mockUseFormatter, mockUseTranslations } = await import('@/testing/mock-translations');
   return { useTranslations: mockUseTranslations, useFormatter: mockUseFormatter };
@@ -11,13 +9,6 @@ vi.mock('next-intl', async () => {
 
 const getMock = vi.fn();
 vi.mock('@/lib/api', () => ({ api: { GET: getMock } }));
-
-function formatExpected(iso: string) {
-  return new Intl.DateTimeFormat('en', {
-    ...ADMIN_FORMATS.dateTime.medium,
-    timeZone: ADMIN_TIME_ZONE,
-  }).format(new Date(iso));
-}
 
 // See suspend-dialog.test.tsx: a static import of the component under test
 // would resolve '@/lib/api' - and read `getMock` - before the `const
@@ -46,7 +37,7 @@ describe('AuditTrail', () => {
     render(<AuditTrail targetId="user-1" />);
 
     expect(await screen.findByText('user.suspended')).toBeInTheDocument();
-    expect(screen.getByText(formatExpected(entry.occurredAt))).toBeInTheDocument();
+    expect(screen.getByText('Sep 1, 2026, 2:00 AM GMT+2')).toBeInTheDocument();
     expect(getMock).toHaveBeenCalledWith('/v1/admin/audit-log', {
       params: { query: { targetId: 'user-1' } },
     });

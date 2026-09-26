@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next-intl', async () => {
@@ -53,6 +53,35 @@ describe('VerificationTable', () => {
     expect(getMock).toHaveBeenCalledWith('/v1/admin/verification-cases', {
       params: { query: { status: 'in_review', countryCode: 'LU' } },
     });
+  });
+
+  it('shows the formatted submittedAt date', async () => {
+    getMock.mockResolvedValueOnce({ data: { items: [baseCase], nextCursor: null } });
+    const VerificationTable = await loadVerificationTable();
+
+    render(<VerificationTable status="submitted" currentAdminId="admin-1" />);
+
+    expect(await screen.findByText('Sep 1, 2026, 2:00 AM GMT+2')).toBeInTheDocument();
+  });
+
+  it('leaves the submittedAt cell blank when the case has not been submitted', async () => {
+    getMock.mockResolvedValueOnce({
+      data: { items: [{ ...baseCase, submittedAt: null }], nextCursor: null },
+    });
+    const VerificationTable = await loadVerificationTable();
+
+    render(<VerificationTable status="submitted" currentAdminId="admin-1" />);
+    const row = await screen.findByText('Alice Photography');
+    const tableRow = row.closest('tr');
+    if (!tableRow) {
+      throw new Error('expected the photographer link to be rendered inside a table row');
+    }
+    const cells = within(tableRow).getAllByRole('cell');
+    const headers = screen.getAllByRole('columnheader');
+    const submittedAtIndex = headers.findIndex((header) => header.textContent === 'Submitted');
+    expect(submittedAtIndex).toBeGreaterThan(-1);
+
+    expect(cells[submittedAtIndex]).toHaveTextContent('');
   });
 
   it('shows unclaimed for a case with no assigned admin', async () => {

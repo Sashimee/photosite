@@ -1,8 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-
-import { ADMIN_FORMATS, ADMIN_TIME_ZONE } from '@/lib/datetime';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next-intl', async () => {
   const { mockUseFormatter, mockUseTranslations } = await import('@/testing/mock-translations');
@@ -12,13 +10,6 @@ vi.mock('next-intl', async () => {
 const getMock = vi.fn();
 const postMock = vi.fn();
 vi.mock('@/lib/api', () => ({ api: { GET: getMock, POST: postMock } }));
-
-function formatExpected(iso: string) {
-  return new Intl.DateTimeFormat('en', {
-    ...ADMIN_FORMATS.dateTime.medium,
-    timeZone: ADMIN_TIME_ZONE,
-  }).format(new Date(iso));
-}
 
 // See suspend-dialog.test.tsx: a static import of the component under test
 // would resolve '@/lib/api' - and read `getMock` - before the `const
@@ -31,6 +22,7 @@ const baseRequest = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   type: 'export' as const,
   status: 'ready' as const,
+  channel: 'in_app' as const,
   requestedAt: '2026-09-01T12:00:00.000Z',
   completedAt: '2026-09-02T12:00:00.000Z',
   expiresAt: '2026-09-09T12:00:00.000Z',
@@ -42,6 +34,10 @@ const baseRequest = {
 };
 
 describe('DataRequestsTable', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('masks the user email and links it to the user detail page', async () => {
     getMock.mockResolvedValueOnce({ data: { items: [baseRequest], nextCursor: null } });
     const DataRequestsTable = await loadDataRequestsTable();
@@ -105,7 +101,7 @@ describe('DataRequestsTable', () => {
 
     render(<DataRequestsTable />);
 
-    expect(await screen.findByText(formatExpected(baseRequest.expiresAt))).toBeInTheDocument();
+    expect(await screen.findByText('Sep 9, 2026, 2:00 PM GMT+2')).toBeInTheDocument();
   });
 
   it('shows a dash for a null expiresAt', async () => {
@@ -179,10 +175,12 @@ describe('DataRequestsTable', () => {
   });
 
   it('prefers the response due date over the "Answered late" label when both are present', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
     const overdueAndAnsweredLate = {
       ...baseRequest,
       status: 'failed' as const,
-      responseDueAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      responseDueAt: '2026-06-14T12:00:00.000Z',
       answeredLate: true,
     };
     getMock.mockResolvedValueOnce({ data: { items: [overdueAndAnsweredLate], nextCursor: null } });
@@ -190,59 +188,59 @@ describe('DataRequestsTable', () => {
 
     render(<DataRequestsTable />);
 
-    expect(
-      await screen.findByText(`${formatExpected(overdueAndAnsweredLate.responseDueAt)} (Overdue)`),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Jun 14, 2026, 2:00 PM GMT+2 (Overdue)')).toBeInTheDocument();
     expect(screen.queryByText('Answered late')).not.toBeInTheDocument();
   });
 
   it('shows a future response due date without marking it overdue', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
     const dueSoon = {
       ...baseRequest,
       status: 'failed' as const,
-      responseDueAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      responseDueAt: '2026-06-16T12:00:00.000Z',
     };
     getMock.mockResolvedValueOnce({ data: { items: [dueSoon], nextCursor: null } });
     const DataRequestsTable = await loadDataRequestsTable();
 
     render(<DataRequestsTable />);
 
-    expect(await screen.findByText(formatExpected(dueSoon.responseDueAt))).toBeInTheDocument();
+    expect(await screen.findByText('Jun 16, 2026, 2:00 PM GMT+2')).toBeInTheDocument();
     expect(screen.queryByText('Overdue')).not.toBeInTheDocument();
   });
 
   it('marks a past response due date as overdue', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
     const overdueExport = {
       ...baseRequest,
       status: 'failed' as const,
-      responseDueAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      responseDueAt: '2026-06-14T12:00:00.000Z',
     };
     getMock.mockResolvedValueOnce({ data: { items: [overdueExport], nextCursor: null } });
     const DataRequestsTable = await loadDataRequestsTable();
 
     render(<DataRequestsTable />);
 
-    expect(
-      await screen.findByText(`${formatExpected(overdueExport.responseDueAt)} (Overdue)`),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Jun 14, 2026, 2:00 PM GMT+2 (Overdue)')).toBeInTheDocument();
   });
 
   it('shows the overdue response due date alongside null completedAt and expiresAt placeholders', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
     const overdueWithNulls = {
       ...baseRequest,
       status: 'failed' as const,
       completedAt: null,
       expiresAt: null,
-      responseDueAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      responseDueAt: '2026-06-14T12:00:00.000Z',
     };
     getMock.mockResolvedValueOnce({ data: { items: [overdueWithNulls], nextCursor: null } });
     const DataRequestsTable = await loadDataRequestsTable();
 
     render(<DataRequestsTable />);
 
-    expect(
-      await screen.findByText(`${formatExpected(overdueWithNulls.responseDueAt)} (Overdue)`),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Jun 14, 2026, 2:00 PM GMT+2 (Overdue)')).toBeInTheDocument();
     expect(screen.getAllByText('None')).toHaveLength(2);
     expect(screen.getByText('–')).toBeInTheDocument();
   });
@@ -314,6 +312,34 @@ describe('DataRequestsTable', () => {
     render(<DataRequestsTable />);
 
     expect(await screen.findByText('Overdue')).toBeInTheDocument();
+  });
+
+  it('shows the channel for each row', async () => {
+    const emailRequest = {
+      ...baseRequest,
+      id: '3fa85f64-5717-4562-b3fc-2c963f66afad',
+      channel: 'email' as const,
+    };
+    const supportRequest = {
+      ...baseRequest,
+      id: '3fa85f64-5717-4562-b3fc-2c963f66afae',
+      channel: 'support' as const,
+    };
+    const inAppRequest = {
+      ...baseRequest,
+      id: '3fa85f64-5717-4562-b3fc-2c963f66afaf',
+      channel: 'in_app' as const,
+    };
+    getMock.mockResolvedValueOnce({
+      data: { items: [emailRequest, supportRequest, inAppRequest], nextCursor: null },
+    });
+    const DataRequestsTable = await loadDataRequestsTable();
+
+    render(<DataRequestsTable />);
+
+    expect(await screen.findByText('Email')).toBeInTheDocument();
+    expect(screen.getByText('Support')).toBeInTheDocument();
+    expect(screen.getByText('In app')).toBeInTheDocument();
   });
 
   it('explains the match rules in the empty state', async () => {

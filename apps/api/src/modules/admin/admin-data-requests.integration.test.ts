@@ -10,6 +10,7 @@ import { waitForLinkInEmail } from '../../testing/mailpit.js';
 import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
 import { generateTotpCode } from '../../testing/totp.js';
 import { TEST_ENV } from '../../testing/test-env.js';
+import { ChatSocketBridge } from '../chat/chat-socket-bridge.js';
 import { GdprExportQueueService } from '../gdpr/gdpr-export-queue.service.js';
 
 const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL', 'REDIS_URL']);
@@ -20,7 +21,9 @@ interface DataRequestBody {
   id: string;
   type: string;
   status: string;
+  channel: string;
   requestedAt: string;
+  receivedAt: string;
   completedAt: string | null;
   expiresAt: string | null;
   failureReason: string | null;
@@ -189,6 +192,11 @@ describe('admin data requests integration', () => {
     type: 'export' | 'delete';
     status: 'pending' | 'processing' | 'ready' | 'completed' | 'failed' | 'cancelled';
     requestedAt: Date;
+    // responseDueAt/answeredLate are computed from receivedAt (#378); tests
+    // that only care about requestedAt-driven behaviour can omit this and it
+    // defaults to requestedAt so the due-date math stays anchored the same.
+    receivedAt?: Date;
+    channel?: 'in_app' | 'email' | 'support';
     exportKey?: string;
     expiresAt?: Date;
     failureReason?: string;
@@ -200,6 +208,8 @@ describe('admin data requests integration', () => {
         type: spec.type,
         status: spec.status,
         requestedAt: spec.requestedAt,
+        receivedAt: spec.receivedAt ?? spec.requestedAt,
+        ...(spec.channel ? { channel: spec.channel } : {}),
         ...(spec.exportKey ? { exportKey: spec.exportKey } : {}),
         ...(spec.expiresAt ? { expiresAt: spec.expiresAt } : {}),
         ...(spec.failureReason ? { failureReason: spec.failureReason } : {}),
@@ -276,6 +286,9 @@ describe('admin data requests integration', () => {
   afterAll(async () => {
     if (createdUserIds.length > 0) {
       await prisma.dataRequest.deleteMany({ where: { userId: { in: createdUserIds } } });
+      await prisma.adminPermissionGrant.deleteMany({
+        where: { grantedByAdminId: { in: createdUserIds } },
+      });
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
     if (fixtureCountryCode) {
@@ -444,6 +457,29 @@ describe('admin data requests integration', () => {
 
       const body = await fetchPage(`userId=${subject.id}&type=delete`, null, admin.headers);
       expect(body.items.map((item) => item.id)).toEqual([deletion.id]);
+    });
+
+    it('filters by channel', async () => {
+      const admin = await makeAdmin('filter-channel', ['support']);
+      const subject = await createSubjectUser('filter-channel');
+      const base = Date.now();
+      await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'completed',
+        requestedAt: new Date(base - 1000),
+        channel: 'support',
+      });
+      const viaEmail = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'pending',
+        requestedAt: new Date(base),
+        channel: 'email',
+      });
+
+      const body = await fetchPage(`userId=${subject.id}&channel=email`, null, admin.headers);
+      expect(body.items.map((item) => item.id)).toEqual([viaEmail.id]);
     });
 
     it('filters by userId', async () => {
@@ -823,6 +859,60 @@ describe('admin data requests integration', () => {
         const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
         const item = body.items.find((candidate) => candidate.id === deletion.id);
         expect(item?.responseDueAt).toBeNull();
+      });
+
+      it('is null when a later success falls after receivedAt even though it is before requestedAt', async () => {
+        const admin = await makeAdmin('due-backdated-received-nulled', ['support']);
+        const subject = await createSubjectUser('due-backdated-received-nulled');
+        const base = Date.now();
+        const receivedAt = new Date(base - 20 * 24 * 60 * 60 * 1000);
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt: new Date(base - 1000),
+          receivedAt,
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(base - 10 * 24 * 60 * 60 * 1000),
+          expiresAt: new Date(base + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.responseDueAt).toBeNull();
+      });
+
+      it('stays set when the later success is still before receivedAt', async () => {
+        const admin = await makeAdmin('due-backdated-received-kept', ['support']);
+        const subject = await createSubjectUser('due-backdated-received-kept');
+        const base = Date.now();
+        const receivedAt = new Date(base - 20 * 24 * 60 * 60 * 1000);
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt: new Date(base - 1000),
+          receivedAt,
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(base - 25 * 24 * 60 * 60 * 1000),
+          expiresAt: new Date(base + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.responseDueAt).toBe(
+          gdprResponseDueAt(receivedAt, 'Europe/Luxembourg').toISOString(),
+        );
       });
     });
 
@@ -1274,6 +1364,35 @@ describe('admin data requests integration', () => {
         const item = body.items.find((candidate) => candidate.id === failed.id);
         expect(item?.answeredLate).toBe(true);
       });
+
+      it('is true when the retry’s requestedAt falls after receivedAt but before the failed request’s own requestedAt', async () => {
+        const admin = await makeAdmin('late-retry-received-window', ['support']);
+        const subject = await createSubjectUser('late-retry-received-window');
+        const base = Date.now();
+        const receivedAt = new Date(base - 20 * 24 * 60 * 60 * 1000);
+        const requestedAt = new Date(base - 15 * 24 * 60 * 60 * 1000);
+        const due = gdprResponseDueAt(receivedAt, 'Europe/Luxembourg');
+        const failed = await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'failed',
+          requestedAt,
+          receivedAt,
+          failureReason: 'export_failed',
+        });
+        await createDataRequest({
+          userId: subject.id,
+          type: 'export',
+          status: 'ready',
+          requestedAt: new Date(receivedAt.getTime() + 1000),
+          completedAt: new Date(due.getTime() + 1),
+          expiresAt: new Date(base + 7 * 24 * 60 * 60 * 1000),
+        });
+
+        const body = await fetchPage(`userId=${subject.id}`, null, admin.headers);
+        const item = body.items.find((candidate) => candidate.id === failed.id);
+        expect(item?.answeredLate).toBe(true);
+      });
     });
   });
 
@@ -1682,6 +1801,829 @@ describe('admin data requests integration', () => {
         where: { userId: subject.id, id: { not: failed.id } },
       });
       expect(createdRows).toHaveLength(1);
+    });
+  });
+
+  describe('POST /v1/admin/data-requests', () => {
+    it('returns 401 when unauthenticated', async () => {
+      const subject = await createSubjectUser('log-unauth');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: { origin: 'http://localhost:3000' },
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('returns 403 for an admin without the support permission', async () => {
+      const admin = await makeAdmin('log-no-permission', ['finance']);
+      const subject = await createSubjectUser('log-no-permission');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+    });
+
+    it('returns 404 for an unknown user', async () => {
+      const admin = await makeAdmin('log-unknown-user', ['support']);
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: randomUUID(),
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(404);
+      const body = response.json<{ code: string; message: string }>();
+      expect(body.code).toBe('NOT_FOUND');
+      expect(body.message).toBe('User not found');
+    });
+
+    it('returns 400 when receivedAt is more than a minute in the future', async () => {
+      const admin = await makeAdmin('log-future', ['support']);
+      const subject = await createSubjectUser('log-future');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date(Date.now() + 120_000).toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json<{ code: string }>().code).toBe('VALIDATION_ERROR');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('accepts receivedAt safely inside the future skew allowance', async () => {
+      const admin = await makeAdmin('log-future-ok', ['support']);
+      const subject = await createSubjectUser('log-future-ok');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date(Date.now() + 30_000).toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(201);
+    });
+
+    it('returns 400 when receivedAt is more than 30 days in the past', async () => {
+      const admin = await makeAdmin('log-too-old', ['support']);
+      const subject = await createSubjectUser('log-too-old');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json<{ code: string }>().code).toBe('VALIDATION_ERROR');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('accepts receivedAt safely inside the 30 day age allowance', async () => {
+      const admin = await makeAdmin('log-old-ok', ['support']);
+      const subject = await createSubjectUser('log-old-ok');
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(201);
+    });
+
+    it('returns 409 EXPORT_OPEN when the user already has an open export request', async () => {
+      const admin = await makeAdmin('log-export-open', ['support']);
+      const subject = await createSubjectUser('log-export-open');
+      await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'pending',
+        requestedAt: new Date(),
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json<{ code: string }>().code).toBe('EXPORT_OPEN');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(1);
+    });
+
+    it('returns 409 DELETE_OPEN when the user already has an open deletion request', async () => {
+      const admin = await makeAdmin('log-delete-open', ['support']);
+      const subject = await createSubjectUser('log-delete-open');
+      await createDataRequest({
+        userId: subject.id,
+        type: 'delete',
+        status: 'pending',
+        requestedAt: new Date(),
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'delete',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json<{ code: string }>().code).toBe('DELETE_OPEN');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(1);
+    });
+
+    it('returns 409 USER_SUSPENDED for a suspended user', async () => {
+      const admin = await makeAdmin('log-suspended', ['support']);
+      const subject = await createSubjectUser('log-suspended', 'suspended');
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json<{ code: string }>().code).toBe('USER_SUSPENDED');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('returns 409 USER_DELETED for an already deleted user', async () => {
+      const admin = await makeAdmin('log-deleted', ['support']);
+      const subject = await createSubjectUser('log-deleted', 'deleted');
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'delete',
+          channel: 'support',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(409);
+      expect(response.json<{ code: string }>().code).toBe('USER_DELETED');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('returns 409 BLOCKING_OBLIGATIONS when a verification case is in review', async () => {
+      const admin = await makeAdmin('log-blocked-verification', ['support']);
+      const subject = await createSubjectUser('log-blocked-verification');
+      await prisma.verificationCase.create({
+        data: { userId: subject.id, countryCode: 'LU', status: 'in_review' },
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'delete',
+          channel: 'support',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(409);
+      const errorBody = response.json<{ code: string; details?: { reason?: string } }>();
+      expect(errorBody.code).toBe('BLOCKING_OBLIGATIONS');
+      expect(errorBody.details?.reason).toBe('VERIFICATION_IN_REVIEW');
+
+      const user = await prisma.user.findUniqueOrThrow({ where: { id: subject.id } });
+      expect(user.status).toBe('active');
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('returns 403 PROTECTED_TARGET when the admin targets themselves', async () => {
+      const admin = await makeAdmin('protected-self', ['support']);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: admin.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('PROTECTED_TARGET');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: admin.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('returns 403 PROTECTED_TARGET when the target has the admin role', async () => {
+      const admin = await makeAdmin('protected-admin-role-actor', ['support']);
+      const target = await createSubjectUser('protected-admin-role-target');
+      await prisma.user.update({ where: { id: target.id }, data: { roles: ['admin'] } });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: target.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('PROTECTED_TARGET');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: target.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('returns 403 PROTECTED_TARGET when the target holds an admin permission grant', async () => {
+      const admin = await makeAdmin('protected-grant-actor', ['support']);
+      const target = await createSubjectUser('protected-grant-target');
+      await prisma.adminPermissionGrant.create({
+        data: { userId: target.id, permission: 'finance', grantedByAdminId: admin.id },
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: target.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('PROTECTED_TARGET');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: target.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('lets a superadmin with fresh 2FA target an otherwise protected user', async () => {
+      const admin = await makeAdmin('protected-bypass-actor', ['support', 'superadmin']);
+      const target = await createSubjectUser('protected-bypass-target');
+      await prisma.adminPermissionGrant.create({
+        data: { userId: target.id, permission: 'finance', grantedByAdminId: admin.id },
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: target.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(201);
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: target.id } });
+      expect(rows).toHaveLength(1);
+    });
+
+    it('returns 403 PROTECTED_TARGET when a superadmin with fresh 2FA logs an export for themselves', async () => {
+      const admin = await makeAdmin('protected-superadmin-self-export', ['support', 'superadmin']);
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: admin.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('PROTECTED_TARGET');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: admin.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('returns 403 PROTECTED_TARGET when a superadmin with fresh 2FA logs a delete for themselves', async () => {
+      const admin = await makeAdmin('protected-superadmin-self-delete', ['support', 'superadmin']);
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: admin.id,
+          type: 'delete',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('PROTECTED_TARGET');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: admin.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('returns 403 TWO_FACTOR_REQUIRED for a delete logged without a fresh second factor', async () => {
+      const admin = await makeAdmin('delete-stale-2fa', ['support']);
+      await prisma.session.updateMany({
+        where: { userId: admin.id },
+        data: { twoFactorVerifiedAt: new Date(Date.now() - 20 * 60 * 1000) },
+      });
+      const subject = await createSubjectUser('delete-stale-2fa-target');
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'delete',
+          channel: 'support',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('TWO_FACTOR_REQUIRED');
+
+      const user = await prisma.user.findUniqueOrThrow({ where: { id: subject.id } });
+      expect(user.status).toBe('active');
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('rate-limits deletes more strictly than other offline mutations', async () => {
+      const admin = await makeAdmin('delete-rate-limit', ['support']);
+      const subjects = await Promise.all(
+        Array.from({ length: 6 }, (_, index) =>
+          createSubjectUser(`delete-rate-limit-${String(index)}`),
+        ),
+      );
+
+      for (const subject of subjects.slice(0, 5)) {
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/admin/data-requests',
+          headers: admin.headers,
+          payload: {
+            userId: subject.id,
+            type: 'delete',
+            channel: 'support',
+            receivedAt: new Date().toISOString(),
+          },
+        });
+        expect(response.statusCode).toBe(201);
+      }
+
+      const overflowSubject = subjects[5];
+      if (!overflowSubject) throw new Error('expected a sixth subject');
+      const overflow = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: overflowSubject.id,
+          type: 'delete',
+          channel: 'support',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(overflow.statusCode).toBe(429);
+      expect(overflow.json<{ code: string }>().code).toBe('TOO_MANY_REQUESTS');
+    });
+
+    describe('export', () => {
+      it.each(['email', 'support'] as const)(
+        'creates a pending export logged over %s, enqueues it, and writes an audit row',
+        async (channel) => {
+          const admin = await makeAdmin(`log-export-ok-${channel}`, ['support']);
+          const subject = await createSubjectUser(`log-export-ok-${channel}`);
+          const receivedAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+
+          const response = await fastify().inject({
+            method: 'POST',
+            url: '/v1/admin/data-requests',
+            headers: admin.headers,
+            remoteAddress: FAKE_IP,
+            payload: {
+              userId: subject.id,
+              type: 'export',
+              channel,
+              receivedAt: receivedAt.toISOString(),
+            },
+          });
+          expect(response.statusCode).toBe(201);
+          const body = response.json<DataRequestBody>();
+          expect(body.type).toBe('export');
+          expect(body.status).toBe('pending');
+          expect(body.channel).toBe(channel);
+          expect(body.user.id).toBe(subject.id);
+          expect(body.answeredLate).toBe(false);
+          expect(body.responseDueAt).toBe(
+            gdprResponseDueAt(receivedAt, 'Europe/Luxembourg').toISOString(),
+          );
+          expect(body.receivedAt).toBe(receivedAt.toISOString());
+          expect(Date.now() - new Date(body.requestedAt).getTime()).toBeLessThan(10_000);
+
+          const created = await prisma.dataRequest.findUnique({ where: { id: body.id } });
+          expect(created?.userId).toBe(subject.id);
+          expect(created?.type).toBe('export');
+          expect(created?.status).toBe('pending');
+          expect(created?.channel).toBe(channel);
+          expect(created?.receivedAt.toISOString()).toBe(receivedAt.toISOString());
+          expect(Date.now() - (created?.requestedAt.getTime() ?? 0)).toBeLessThan(10_000);
+
+          const auditRow = await prisma.auditLog.findFirst({
+            where: { action: 'data_request.logged_offline', targetId: body.id },
+          });
+          expect(auditRow).not.toBeNull();
+          expect(auditRow?.actorType).toBe('admin');
+          expect(auditRow?.actorId).toBe(admin.id);
+          expect(auditRow?.targetType).toBe('DataRequest');
+          expect(auditRow?.before).toBeNull();
+          expect(auditRow?.after).toEqual({
+            type: 'export',
+            channel,
+            receivedAt: receivedAt.toISOString(),
+            userId: subject.id,
+          });
+          expect(auditRow?.ip).toBe(FAKE_IP);
+
+          const enqueuedJob = await exportQueue.getJob(body.id);
+          expect(enqueuedJob).not.toBeNull();
+          expect(enqueuedJob?.data).toEqual({ dataRequestId: body.id });
+        },
+      );
+
+      it('marks the new row failed and rethrows when enqueueing it fails', async () => {
+        const admin = await makeAdmin('log-export-enqueue-fails', ['support']);
+        const subject = await createSubjectUser('log-export-enqueue-fails');
+
+        const queueService = app.get(GdprExportQueueService);
+        const originalAdd = queueService.queue.add.bind(queueService.queue);
+        queueService.queue.add = (() => {
+          throw new Error('simulated enqueue failure');
+        }) as typeof queueService.queue.add;
+
+        let response;
+        try {
+          response = await fastify().inject({
+            method: 'POST',
+            url: '/v1/admin/data-requests',
+            headers: admin.headers,
+            payload: {
+              userId: subject.id,
+              type: 'export',
+              channel: 'email',
+              receivedAt: new Date().toISOString(),
+            },
+          });
+        } finally {
+          queueService.queue.add = originalAdd;
+        }
+        expect(response.statusCode).toBe(500);
+
+        const createdRows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+        expect(createdRows).toHaveLength(1);
+        const createdRow = createdRows[0];
+        expect(createdRow).toBeDefined();
+        if (!createdRow) throw new Error('expected the logged row to exist');
+        expect(createdRow.status).toBe('failed');
+        expect(createdRow.failureReason).toBe('enqueue_failed');
+
+        const failureAuditRow = await prisma.auditLog.findFirst({
+          where: { action: 'data_request.export_failed', targetId: createdRow.id },
+        });
+        expect(failureAuditRow).not.toBeNull();
+        expect(failureAuditRow?.after).toEqual({ status: 'failed', reason: 'enqueue_failed' });
+      });
+
+      it('lets only one of two concurrent offline export logs for the same user succeed', async () => {
+        const admin = await makeAdmin('log-export-concurrent', ['support']);
+        const subject = await createSubjectUser('log-export-concurrent');
+
+        const payload = {
+          userId: subject.id,
+          type: 'export' as const,
+          channel: 'email' as const,
+          receivedAt: new Date().toISOString(),
+        };
+
+        const [first, second] = await Promise.all([
+          fastify().inject({
+            method: 'POST',
+            url: '/v1/admin/data-requests',
+            headers: admin.headers,
+            payload,
+          }),
+          fastify().inject({
+            method: 'POST',
+            url: '/v1/admin/data-requests',
+            headers: admin.headers,
+            payload,
+          }),
+        ]);
+        const statusCodes = [first.statusCode, second.statusCode].sort();
+        expect(statusCodes).toEqual([201, 409]);
+        const loser = first.statusCode === 409 ? first : second;
+        expect(loser.json<{ code: string }>().code).toBe('EXPORT_OPEN');
+
+        const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+        expect(rows).toHaveLength(1);
+      });
+    });
+
+    describe('delete', () => {
+      it('soft-deletes the user, clears sessions, and writes an audit row with the channel', async () => {
+        const admin = await makeAdmin('log-delete-ok', ['support']);
+        const subject = await createSubjectUser('log-delete-ok');
+        await prisma.session.create({
+          data: {
+            userId: subject.id,
+            tokenHash: randomUUID(),
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          },
+        });
+        const receivedAt = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/admin/data-requests',
+          headers: admin.headers,
+          remoteAddress: FAKE_IP,
+          payload: {
+            userId: subject.id,
+            type: 'delete',
+            channel: 'support',
+            receivedAt: receivedAt.toISOString(),
+          },
+        });
+        expect(response.statusCode).toBe(201);
+        const body = response.json<DataRequestBody>();
+        expect(body.type).toBe('delete');
+        expect(body.status).toBe('pending');
+        expect(body.channel).toBe('support');
+        expect(body.responseDueAt).toBeNull();
+        expect(body.answeredLate).toBe(false);
+
+        const user = await prisma.user.findUniqueOrThrow({ where: { id: subject.id } });
+        expect(user.status).toBe('deleted');
+        expect(user.deletedAt).not.toBeNull();
+
+        const sessions = await prisma.session.findMany({ where: { userId: subject.id } });
+        expect(sessions).toHaveLength(0);
+
+        const auditRow = await prisma.auditLog.findFirst({
+          where: { action: 'data_request.logged_offline', targetId: body.id },
+        });
+        expect(auditRow).not.toBeNull();
+        expect(auditRow?.actorType).toBe('admin');
+        expect(auditRow?.actorId).toBe(admin.id);
+        expect(auditRow?.targetType).toBe('DataRequest');
+        expect(auditRow?.before).toEqual({ userStatus: 'active', profileIsPublished: null });
+        expect(auditRow?.after).toEqual({
+          userStatus: 'deleted',
+          cancelledRequestIds: [],
+          declinedQuoteIds: [],
+          withdrawnQuoteIds: [],
+          closedJobOfferIds: [],
+          withdrawnJobApplicationIds: [],
+          channel: 'support',
+          receivedAt: receivedAt.toISOString(),
+        });
+        expect(auditRow?.ip).toBe(FAKE_IP);
+      });
+
+      it('revokes sessions and devices when logging an offline deletion', async () => {
+        const admin = await makeAdmin('log-delete-devices', ['support']);
+        const subject = await createSubjectUser('log-delete-devices');
+        await prisma.session.create({
+          data: {
+            userId: subject.id,
+            tokenHash: randomUUID(),
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          },
+        });
+        await prisma.device.create({
+          data: {
+            userId: subject.id,
+            expoPushToken: `ExponentPushToken[${randomUUID()}]`,
+            platform: 'ios',
+            lastSeenAt: new Date(),
+          },
+        });
+
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/admin/data-requests',
+          headers: admin.headers,
+          payload: {
+            userId: subject.id,
+            type: 'delete',
+            channel: 'support',
+            receivedAt: new Date().toISOString(),
+          },
+        });
+        expect(response.statusCode).toBe(201);
+
+        const sessions = await prisma.session.findMany({ where: { userId: subject.id } });
+        expect(sessions).toHaveLength(0);
+
+        const devices = await prisma.device.findMany({ where: { userId: subject.id } });
+        expect(devices).toHaveLength(0);
+      });
+
+      it('sends the deletion email and disconnects chat sockets after commit', async () => {
+        const admin = await makeAdmin('log-delete-side-effects', ['support']);
+        const subject = await createSubjectUser('log-delete-side-effects');
+
+        const chatSocketBridge = app.get(ChatSocketBridge);
+        const originalDisconnectUser = chatSocketBridge.disconnectUser.bind(chatSocketBridge);
+        const disconnectedUserIds: string[] = [];
+        chatSocketBridge.disconnectUser = (userId: string) => {
+          disconnectedUserIds.push(userId);
+          originalDisconnectUser(userId);
+        };
+
+        let response;
+        try {
+          response = await fastify().inject({
+            method: 'POST',
+            url: '/v1/admin/data-requests',
+            headers: admin.headers,
+            payload: {
+              userId: subject.id,
+              type: 'delete',
+              channel: 'support',
+              receivedAt: new Date().toISOString(),
+            },
+          });
+        } finally {
+          chatSocketBridge.disconnectUser = originalDisconnectUser;
+        }
+        expect(response.statusCode).toBe(201);
+        const body = response.json<DataRequestBody>();
+
+        expect(disconnectedUserIds).toContain(subject.id);
+
+        const link = await waitForLinkInEmail(
+          subject.email,
+          /https?:\/\/\S*account\/deletion\/cancel\/\S+#token=\S+/,
+        );
+        expect(link).toContain(body.id);
+      });
+
+      it('still commits the deletion and returns 201 when the post-commit side effects throw', async () => {
+        const admin = await makeAdmin('log-delete-side-effect-fails', ['support']);
+        const subject = await createSubjectUser('log-delete-side-effect-fails');
+
+        const chatSocketBridge = app.get(ChatSocketBridge);
+        const originalDisconnectUser = chatSocketBridge.disconnectUser.bind(chatSocketBridge);
+        chatSocketBridge.disconnectUser = () => {
+          throw new Error('simulated chat disconnect failure');
+        };
+
+        let response;
+        try {
+          response = await fastify().inject({
+            method: 'POST',
+            url: '/v1/admin/data-requests',
+            headers: admin.headers,
+            payload: {
+              userId: subject.id,
+              type: 'delete',
+              channel: 'support',
+              receivedAt: new Date().toISOString(),
+            },
+          });
+        } finally {
+          chatSocketBridge.disconnectUser = originalDisconnectUser;
+        }
+        expect(response.statusCode).toBe(201);
+        const body = response.json<DataRequestBody>();
+        expect(body.status).toBe('pending');
+
+        const user = await prisma.user.findUniqueOrThrow({ where: { id: subject.id } });
+        expect(user.status).toBe('deleted');
+        expect(user.deletedAt).not.toBeNull();
+
+        const row = await prisma.dataRequest.findUniqueOrThrow({ where: { id: body.id } });
+        expect(row.status).toBe('pending');
+      });
+
+      it('keeps requestedAt near now and responseDueAt null for a heavily backdated receivedAt, and allows cancellation via the emailed token', async () => {
+        const admin = await makeAdmin('log-delete-backdated', ['support']);
+        const subject = await createSubjectUser('log-delete-backdated');
+        const receivedAt = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000);
+
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/admin/data-requests',
+          headers: admin.headers,
+          payload: {
+            userId: subject.id,
+            type: 'delete',
+            channel: 'support',
+            receivedAt: receivedAt.toISOString(),
+          },
+        });
+        expect(response.statusCode).toBe(201);
+        const body = response.json<DataRequestBody>();
+        expect(body.receivedAt).toBe(receivedAt.toISOString());
+        expect(Date.now() - new Date(body.requestedAt).getTime()).toBeLessThan(10_000);
+        expect(body.responseDueAt).toBeNull();
+
+        const link = await waitForLinkInEmail(
+          subject.email,
+          /https?:\/\/\S*account\/deletion\/cancel\/\S+#token=\S+/,
+        );
+        const token = extractFragmentToken(link);
+        expect(token).not.toBeNull();
+
+        const cancelResponse = await fastify().inject({
+          method: 'POST',
+          url: `/v1/me/data-requests/${body.id}/cancel`,
+          headers: { origin: 'http://localhost:3000' },
+          payload: { token },
+        });
+        expect(cancelResponse.statusCode).toBe(200);
+        expect(cancelResponse.json<DataRequestBody>().status).toBe('cancelled');
+
+        const restored = await prisma.user.findUniqueOrThrow({ where: { id: subject.id } });
+        expect(restored.status).toBe('active');
+        expect(restored.deletedAt).toBeNull();
+      });
     });
   });
 });
