@@ -592,14 +592,25 @@
           "channelLabel": "Channel",
           "channelPlaceholder": "Select a channel",
           "receivedAtLabel": "Received at",
-          "deleteWarning": "Logging a deletion request deletes the account immediately. This can't be undone.",
+          "accountLoading": "Looking up the account…",
+          "accountNotFound": "No account found for this user id.",
+          "accountLookupError": "The account couldn't be looked up. Please try again.",
+          "accountEmailLabel": "Email",
+          "accountNameLabel": "Name",
+          "accountNameUnset": "Not provided",
+          "deleteWarning": "The account is closed immediately. The user is emailed a link to cancel the deletion, and the account is anonymised after 30 days if it isn't cancelled.",
           "confirm": "Confirm",
+          "confirmDeletion": "Confirm deletion",
           "errors": {
             "exportOpen": "This user already has an open export request.",
             "deleteOpen": "This user already has an open deletion request.",
             "userSuspended": "This user's account is suspended, so the request can't be logged.",
             "userDeleted": "This user's account has already been deleted.",
-            "blockingObligations": "This deletion is blocked by obligations the user still has open, such as active bookings or unresolved payouts."
+            "protectedTarget": "This account can't be targeted by this action.",
+            "twoFactorRequired": "Your admin session needs to be re-verified before this can be logged. You'll be redirected to confirm your second factor.",
+            "blockingObligations": "This deletion is blocked by obligations the user still has open, such as active bookings or unresolved payouts.",
+            "blockingObligationsVerificationInReview": "This deletion is blocked because a verification case is in review and must be decided or withdrawn first.",
+            "blockingObligationsAcceptedQuoteWithdrawalWindow": "This deletion is blocked because an accepted quote is still inside the statutory withdrawal window."
           }
         }
       }

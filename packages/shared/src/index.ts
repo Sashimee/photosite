@@ -411,6 +411,7 @@ export {
   GDPR_DELETION_GRACE_PERIOD_MS,
   GDPR_RESPONSE_PERIOD_MONTHS,
   gdprResponseDueAt,
+  LOGGABLE_DATA_REQUEST_CHANNELS,
   CancelDataRequestRequestSchema,
   ConsentPurposeSchema,
   ConsentRecordSchema,
