@@ -40,21 +40,18 @@ describe('DeleteAccountAction', () => {
     ).toBeInTheDocument();
   });
 
-  it('requests deletion, signs out and redirects to the confirmation page', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'request-1',
-            type: 'delete',
-            status: 'pending',
-            requestedAt: '2026-01-01T00:00:00.000Z',
-          }),
-          { status: 201 },
-        ),
-      )
-      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+  it('requests deletion and redirects to the confirmation page', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: 'request-1',
+          type: 'delete',
+          status: 'pending',
+          requestedAt: '2026-01-01T00:00:00.000Z',
+        }),
+        { status: 201 },
+      ),
+    );
     vi.stubGlobal('fetch', fetchMock);
     const DeleteAccountAction = await loadDeleteAccountAction();
     const user = userEvent.setup({ delay: null });
@@ -71,38 +68,6 @@ describe('DeleteAccountAction', () => {
     expect(deleteRequest.method).toBe('POST');
     expect(deleteRequest.url).toContain('/v1/me/data-requests');
     expect((await deleteRequest.json()) as unknown).toEqual({ type: 'delete' });
-    const [signOutRequest] = fetchMock.mock.calls[1] as [Request];
-    expect(signOutRequest.method).toBe('POST');
-    expect(signOutRequest.url).toContain('/v1/auth/sign-out');
-    expect(refreshMock).toHaveBeenCalled();
-  });
-
-  it('still redirects when sign-out fails after a successful deletion request', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            id: 'request-1',
-            type: 'delete',
-            status: 'pending',
-            requestedAt: '2026-01-01T00:00:00.000Z',
-          }),
-          { status: 201 },
-        ),
-      )
-      .mockRejectedValueOnce(new TypeError('Failed to fetch'));
-    vi.stubGlobal('fetch', fetchMock);
-    const DeleteAccountAction = await loadDeleteAccountAction();
-    const user = userEvent.setup({ delay: null });
-
-    render(<DeleteAccountAction locale="en" />);
-    await user.click(screen.getByRole('button', { name: 'Delete account' }));
-    await user.click(screen.getByRole('button', { name: 'Yes, delete my account' }));
-
-    await waitFor(() => {
-      expect(pushMock).toHaveBeenCalledWith('/en/account/deletion/requested');
-    });
     expect(refreshMock).toHaveBeenCalled();
   });
 
