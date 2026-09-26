@@ -1333,7 +1333,7 @@
         "exportComingSoon": "Data export is coming soon.",
         "deleteAccount": "Delete account",
         "deleteConfirmTitle": "Delete your account?",
-        "deleteConfirmDescription": "Your account is deactivated immediately. Your data is deleted or anonymised after a 30-day grace period, except records we must keep by law (e.g. invoices). We'll email you a link to cancel the deletion at any time before then.",
+        "deleteConfirmDescription": "Your account is deactivated immediately. After a 30-day grace period, your personal data is deleted or anonymised, except records we must keep by law or to handle disputes (e.g. invoices, identity verification and booking records). Your chat messages are deleted 90 days after your request. We'll email you a link to cancel the deletion at any time before the grace period ends.",
         "deleteConfirmCta": "Yes, delete my account",
         "deletePending": "Deleting…",
         "deleteDismissCta": "Cancel",
@@ -1363,7 +1363,7 @@
       },
       "deletionRequested": {
         "title": "Account deletion requested",
-        "description": "We've deactivated your account and sent you an email with a link to cancel the deletion within the next 30 days. After that, your data is deleted or anonymised, except records we must keep by law (e.g. invoices).",
+        "description": "We've deactivated your account and sent you an email with a link to cancel the deletion within the next 30 days. After that, your personal data is deleted or anonymised, except records we must keep by law or to handle disputes (e.g. invoices, identity verification and booking records). Your chat messages are deleted 90 days after your request.",
         "homeLink": "Back to home"
       }
     },
