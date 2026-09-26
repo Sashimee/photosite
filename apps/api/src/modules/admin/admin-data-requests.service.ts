@@ -158,14 +158,14 @@ function responseDueAt(
     return null;
   }
   const latestSuccess = latestSuccessByUser.get(row.user.id);
-  if (latestSuccess && latestSuccess > row.requestedAt) {
+  if (latestSuccess && latestSuccess > row.receivedAt) {
     return null;
   }
   return gdprResponseDueAt(row.receivedAt, row.user.country.timezone);
 }
 
 // The Art. 12(3) clock for a failed export still runs from that row's own
-// requestedAt, even when a later retry is what actually answered it.
+// receivedAt, even when a later retry is what actually answered it.
 function isFailedAnsweredLate(
   row: AdminDataRequestRow,
   successesByUser: Map<string, SuccessfulExport[]>,
