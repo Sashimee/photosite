@@ -1356,6 +1356,9 @@
         "notDeletion": "This request is not an account deletion and can't be cancelled here.",
         "gracePeriodEnded": "The 30-day window to cancel this deletion has ended.",
         "notPending": "This deletion request has already been cancelled or processed.",
+        "tooManyRequests": "Too many attempts. Please try again later.",
+        "tooManyRequestsWithRetry": "Too many attempts. Please try again in {seconds, plural, one {# second} other {# seconds}}.",
+        "invalidLink": "This cancellation link is invalid.",
         "generic": "Something went wrong. Please try again.",
         "signInLink": "Sign in"
       },
