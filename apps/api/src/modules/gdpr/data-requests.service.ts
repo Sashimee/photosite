@@ -38,8 +38,8 @@ function notFound(): HttpException {
   return new HttpException({ code: 'NOT_FOUND', message: 'Data request not found' }, 404);
 }
 
-function conflict(message: string): HttpException {
-  return new HttpException({ code: 'CONFLICT', message }, 409);
+function conflict(code: string, message: string): HttpException {
+  return new HttpException({ code, message }, 409);
 }
 
 function forbidden(message: string): HttpException {
@@ -125,7 +125,7 @@ export class DataRequestsService {
       throw notFound();
     }
     if (row.type !== 'delete') {
-      throw conflict('Only a deletion request can be cancelled');
+      throw conflict('NOT_DELETION', 'Only a deletion request can be cancelled');
     }
 
     const cancelled = await this.prisma.client.$transaction(async (tx) => {
@@ -136,9 +136,12 @@ export class DataRequestsService {
       });
       if (guarded.count === 0) {
         if (row.status === 'pending' && row.requestedAt.getTime() <= cutoff.getTime()) {
-          throw conflict('Deletion grace period has ended; the request can no longer be cancelled');
+          throw conflict(
+            'GRACE_PERIOD_ENDED',
+            'Deletion grace period has ended; the request can no longer be cancelled',
+          );
         }
-        throw conflict('Data request is no longer pending');
+        throw conflict('NOT_PENDING', 'Data request is no longer pending');
       }
 
       // The deletion's own audit row is the only record of whether the
@@ -194,10 +197,10 @@ export class DataRequestsService {
       throw forbidden('This data request belongs to another account');
     }
     if (row.type !== 'export') {
-      throw conflict('Only an export request can be downloaded');
+      throw conflict('CONFLICT', 'Only an export request can be downloaded');
     }
     if (row.status !== 'ready' || !row.exportKey || !row.expiresAt) {
-      throw conflict('This export is not ready yet');
+      throw conflict('CONFLICT', 'This export is not ready yet');
     }
     if (row.expiresAt.getTime() <= Date.now()) {
       throw gone('This download link has expired');

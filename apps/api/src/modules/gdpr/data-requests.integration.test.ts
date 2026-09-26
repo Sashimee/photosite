@@ -719,6 +719,7 @@ describe('data requests integration', () => {
         payload: { token },
       });
       expect(response.statusCode).toBe(409);
+      expect(response.json<ApiErrorBody>().code).toBe('NOT_PENDING');
     });
 
     it('returns the "no longer pending" message, not the grace-period one, for an already-completed row past the grace period', async () => {
@@ -753,6 +754,7 @@ describe('data requests integration', () => {
       });
       expect(response.statusCode).toBe(409);
       const body = response.json<ApiErrorBody>();
+      expect(body.code).toBe('NOT_PENDING');
       expect(body.message).toBe('Data request is no longer pending');
       expect(body.message).not.toMatch(/grace period/i);
 
@@ -792,7 +794,9 @@ describe('data requests integration', () => {
         payload: { token },
       });
       expect(response.statusCode).toBe(409);
-      expect(response.json<ApiErrorBody>().message).toMatch(/grace period has ended/i);
+      const body = response.json<ApiErrorBody>();
+      expect(body.code).toBe('GRACE_PERIOD_ENDED');
+      expect(body.message).toMatch(/grace period has ended/i);
 
       const unchanged = await prisma.dataRequest.findUniqueOrThrow({
         where: { id: dataRequestId },
