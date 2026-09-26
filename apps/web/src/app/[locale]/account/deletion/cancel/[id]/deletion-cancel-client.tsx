@@ -47,6 +47,10 @@ export function DeletionCancelClient({ locale, id }: { locale: Locale; id: strin
           return;
         }
         setStatus('success');
+      })
+      .catch(() => {
+        setErrorKey('generic');
+        setStatus('error');
       });
     // Runs once on mount to consume the fragment token exactly one time.
   }, [id]);

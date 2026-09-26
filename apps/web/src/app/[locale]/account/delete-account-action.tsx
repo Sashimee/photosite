@@ -30,6 +30,9 @@ export function DeleteAccountAction({ locale }: { locale: Locale }) {
       router.push(`/${locale}/account/deletion/requested`);
       router.refresh();
       return true;
+    } catch {
+      setError(t('errors.generic'));
+      return false;
     } finally {
       setPending(false);
     }
