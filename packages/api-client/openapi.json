@@ -14553,6 +14553,7 @@
     "/v1/me/data-requests/{id}/cancel": {
       "post": {
         "summary": "Cancel a data request during its grace period. Only a deletion request can be cancelled, and only within the 30-day grace period; after it, 409 even if anonymisation has not run yet. A soft-deleted account has no session, so `token` (the single-use value mailed at deletion time) is accepted in place of one.",
+        "description": "Returns 409 with a distinct `code`: `NOT_DELETION` if the request is not a deletion request, `GRACE_PERIOD_ENDED` if it is still pending but the 30-day grace period has ended, or `NOT_PENDING` if it has already been cancelled or has moved past pending.",
         "tags": [
           "gdpr"
         ],

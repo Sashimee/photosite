@@ -12,7 +12,7 @@ const ERROR_CODE_KEYS: Record<string, string> = {
   NOT_FOUND: 'notFound',
 };
 
-function retryAfterSeconds(details: unknown): number | undefined {
+export function retryAfterSeconds(details: unknown): number | undefined {
   if (typeof details !== 'object' || details === null || !('retryAfterSeconds' in details)) {
     return undefined;
   }

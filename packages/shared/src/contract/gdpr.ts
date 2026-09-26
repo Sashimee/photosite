@@ -199,6 +199,17 @@ export const CancelDataRequestRequestSchema = z
   .strict()
   .default({});
 
+// Returned as `code` on the 409 from `POST /me/data-requests/{id}/cancel`
+// (see the registerPath call below); the generic `CONFLICT` code is used
+// separately for cases that aren't specific to cancelling.
+export const DATA_REQUEST_CANCEL_CONFLICT_CODES = [
+  'NOT_DELETION',
+  'GRACE_PERIOD_ENDED',
+  'NOT_PENDING',
+] as const;
+
+export type DataRequestCancelConflictCode = (typeof DATA_REQUEST_CANCEL_CONFLICT_CODES)[number];
+
 export const DataRequestDownloadResponseSchema = z
   .object({
     url: z.url().openapi({ example: 'https://storage.photoo.lu/exports/abc123?signature=xyz' }),
@@ -338,6 +349,10 @@ registry.registerPath({
     'and only within the 30-day grace period; after it, 409 even if anonymisation has not run ' +
     'yet. A soft-deleted account has no session, so `token` (the single-use value mailed at ' +
     'deletion time) is accepted in place of one.',
+  description:
+    'Returns 409 with a distinct `code`: `NOT_DELETION` if the request is not a deletion ' +
+    'request, `GRACE_PERIOD_ENDED` if it is still pending but the 30-day grace period has ' +
+    'ended, or `NOT_PENDING` if it has already been cancelled or has moved past pending.',
   tags: ['gdpr'],
   security: AUTH_SECURITY,
   request: {
