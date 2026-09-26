@@ -277,11 +277,13 @@ export class DataRequestsService {
     await assertNoBlockingObligations(this.prisma.client, user.id);
 
     let created;
+    const requestedAt = new Date();
     try {
       created = await this.prisma.client.$transaction((tx) =>
         applyAccountDeletion(tx, {
           userId: user.id,
-          receivedAt: new Date(),
+          requestedAt,
+          receivedAt: requestedAt,
           channel: 'in_app',
           audit: {
             actorType: 'user',
