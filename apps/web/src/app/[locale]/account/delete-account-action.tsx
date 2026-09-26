@@ -27,6 +27,11 @@ export function DeleteAccountAction({ locale }: { locale: Locale }) {
         setError(requestErrorMessage(t, apiError));
         return false;
       }
+      try {
+        await api.POST('/v1/auth/sign-out');
+      } catch {
+        // no-op
+      }
       router.push(`/${locale}/account/deletion/requested`);
       router.refresh();
       return true;
