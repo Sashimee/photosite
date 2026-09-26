@@ -22,6 +22,7 @@ interface DataRequestBody {
   status: string;
   channel: string;
   requestedAt: string;
+  receivedAt: string;
   completedAt: string | null;
   expiresAt: string | null;
   failureReason: string | null;
@@ -190,6 +191,11 @@ describe('admin data requests integration', () => {
     type: 'export' | 'delete';
     status: 'pending' | 'processing' | 'ready' | 'completed' | 'failed' | 'cancelled';
     requestedAt: Date;
+    // responseDueAt/answeredLate are computed from receivedAt (#378); tests
+    // that only care about requestedAt-driven behaviour can omit this and it
+    // defaults to requestedAt so the due-date math stays anchored the same.
+    receivedAt?: Date;
+    channel?: 'in_app' | 'email' | 'support';
     exportKey?: string;
     expiresAt?: Date;
     failureReason?: string;
@@ -201,6 +207,8 @@ describe('admin data requests integration', () => {
         type: spec.type,
         status: spec.status,
         requestedAt: spec.requestedAt,
+        receivedAt: spec.receivedAt ?? spec.requestedAt,
+        ...(spec.channel ? { channel: spec.channel } : {}),
         ...(spec.exportKey ? { exportKey: spec.exportKey } : {}),
         ...(spec.expiresAt ? { expiresAt: spec.expiresAt } : {}),
         ...(spec.failureReason ? { failureReason: spec.failureReason } : {}),
@@ -445,6 +453,29 @@ describe('admin data requests integration', () => {
 
       const body = await fetchPage(`userId=${subject.id}&type=delete`, null, admin.headers);
       expect(body.items.map((item) => item.id)).toEqual([deletion.id]);
+    });
+
+    it('filters by channel', async () => {
+      const admin = await makeAdmin('filter-channel', ['support']);
+      const subject = await createSubjectUser('filter-channel');
+      const base = Date.now();
+      await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'completed',
+        requestedAt: new Date(base - 1000),
+        channel: 'support',
+      });
+      const viaEmail = await createDataRequest({
+        userId: subject.id,
+        type: 'export',
+        status: 'pending',
+        requestedAt: new Date(base),
+        channel: 'email',
+      });
+
+      const body = await fetchPage(`userId=${subject.id}&channel=email`, null, admin.headers);
+      expect(body.items.map((item) => item.id)).toEqual([viaEmail.id]);
     });
 
     it('filters by userId', async () => {
@@ -1941,6 +1972,167 @@ describe('admin data requests integration', () => {
       expect(rows).toHaveLength(0);
     });
 
+    it('returns 403 PROTECTED_TARGET when the admin targets themselves', async () => {
+      const admin = await makeAdmin('protected-self', ['support']);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: admin.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('PROTECTED_TARGET');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: admin.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('returns 403 PROTECTED_TARGET when the target has the admin role', async () => {
+      const admin = await makeAdmin('protected-admin-role-actor', ['support']);
+      const target = await createSubjectUser('protected-admin-role-target');
+      await prisma.user.update({ where: { id: target.id }, data: { roles: ['admin'] } });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: target.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('PROTECTED_TARGET');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: target.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('returns 403 PROTECTED_TARGET when the target holds an admin permission grant', async () => {
+      const admin = await makeAdmin('protected-grant-actor', ['support']);
+      const target = await createSubjectUser('protected-grant-target');
+      await prisma.adminPermissionGrant.create({
+        data: { userId: target.id, permission: 'finance', grantedByAdminId: admin.id },
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: target.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('PROTECTED_TARGET');
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: target.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('lets a superadmin with fresh 2FA target an otherwise protected user', async () => {
+      const admin = await makeAdmin('protected-bypass-actor', ['support', 'superadmin']);
+      const target = await createSubjectUser('protected-bypass-target');
+      await prisma.adminPermissionGrant.create({
+        data: { userId: target.id, permission: 'finance', grantedByAdminId: admin.id },
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: target.id,
+          type: 'export',
+          channel: 'email',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(201);
+
+      const rows = await prisma.dataRequest.findMany({ where: { userId: target.id } });
+      expect(rows).toHaveLength(1);
+    });
+
+    it('returns 403 TWO_FACTOR_REQUIRED for a delete logged without a fresh second factor', async () => {
+      const admin = await makeAdmin('delete-stale-2fa', ['support']);
+      await prisma.session.updateMany({
+        where: { userId: admin.id },
+        data: { twoFactorVerifiedAt: new Date(Date.now() - 20 * 60 * 1000) },
+      });
+      const subject = await createSubjectUser('delete-stale-2fa-target');
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: subject.id,
+          type: 'delete',
+          channel: 'support',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<{ code: string }>().code).toBe('TWO_FACTOR_REQUIRED');
+
+      const user = await prisma.user.findUniqueOrThrow({ where: { id: subject.id } });
+      expect(user.status).toBe('active');
+      const rows = await prisma.dataRequest.findMany({ where: { userId: subject.id } });
+      expect(rows).toHaveLength(0);
+    });
+
+    it('rate-limits deletes more strictly than other offline mutations', async () => {
+      const admin = await makeAdmin('delete-rate-limit', ['support']);
+      const subjects = await Promise.all(
+        Array.from({ length: 6 }, (_, index) =>
+          createSubjectUser(`delete-rate-limit-${String(index)}`),
+        ),
+      );
+
+      for (const subject of subjects.slice(0, 5)) {
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/admin/data-requests',
+          headers: admin.headers,
+          payload: {
+            userId: subject.id,
+            type: 'delete',
+            channel: 'support',
+            receivedAt: new Date().toISOString(),
+          },
+        });
+        expect(response.statusCode).toBe(201);
+      }
+
+      const overflowSubject = subjects[5];
+      if (!overflowSubject) throw new Error('expected a sixth subject');
+      const overflow = await fastify().inject({
+        method: 'POST',
+        url: '/v1/admin/data-requests',
+        headers: admin.headers,
+        payload: {
+          userId: overflowSubject.id,
+          type: 'delete',
+          channel: 'support',
+          receivedAt: new Date().toISOString(),
+        },
+      });
+      expect(overflow.statusCode).toBe(429);
+      expect(overflow.json<{ code: string }>().code).toBe('TOO_MANY_REQUESTS');
+    });
+
     describe('export', () => {
       it.each(['email', 'support'] as const)(
         'creates a pending export logged over %s, enqueues it, and writes an audit row',
@@ -1971,13 +2163,16 @@ describe('admin data requests integration', () => {
           expect(body.responseDueAt).toBe(
             gdprResponseDueAt(receivedAt, 'Europe/Luxembourg').toISOString(),
           );
+          expect(body.receivedAt).toBe(receivedAt.toISOString());
+          expect(Date.now() - new Date(body.requestedAt).getTime()).toBeLessThan(10_000);
 
           const created = await prisma.dataRequest.findUnique({ where: { id: body.id } });
           expect(created?.userId).toBe(subject.id);
           expect(created?.type).toBe('export');
           expect(created?.status).toBe('pending');
           expect(created?.channel).toBe(channel);
-          expect(created?.requestedAt.toISOString()).toBe(receivedAt.toISOString());
+          expect(created?.receivedAt.toISOString()).toBe(receivedAt.toISOString());
+          expect(Date.now() - (created?.requestedAt.getTime() ?? 0)).toBeLessThan(10_000);
 
           const auditRow = await prisma.auditLog.findFirst({
             where: { action: 'data_request.logged_offline', targetId: body.id },
