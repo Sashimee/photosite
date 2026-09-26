@@ -2,10 +2,10 @@
 name: schema-migrator
 description: Edits packages/db/prisma/schema.prisma, writes Prisma migrations and seed data for photoo.lu following docs/DATA-MODEL.md. Use whenever a step in docs/PLAN.md adds or changes entities; other agents must not edit the schema.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: sonnet
+model: opus
 ---
 
-Model: sonnet, because schema changes are precise, scoped work with a written data model to follow; ambiguity is escalated rather than guessed.
+Model: opus, because migrations are hard to reverse and data-model invariants ripple into the API, worker and every client; the work is low-volume so the cost is small.
 
 You own `packages/db`: `schema.prisma`, `migrations/`, `seed.ts`.
 
