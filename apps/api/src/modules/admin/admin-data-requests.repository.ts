@@ -108,8 +108,6 @@ export class AdminDataRequestsRepository {
     return grant !== null;
   }
 
-  // Re-read inside the transaction that creates the row, so a role change
-  // that lands between the pre-check and the write can't slip through.
   async findUserRolesInTx(
     tx: Prisma.TransactionClient,
     userId: string,
