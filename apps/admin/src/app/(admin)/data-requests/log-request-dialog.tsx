@@ -8,6 +8,7 @@ import {
   DATA_REQUEST_TYPES,
   IdSchema,
   LOGGABLE_DATA_REQUEST_CHANNELS,
+  RECEIVED_AT_MAX_AGE_MS,
   type DataRequestChannel,
   type DataRequestType,
 } from '@photoo/shared';
@@ -39,8 +40,6 @@ const LOG_REQUEST_ERROR_KEYS: Record<string, string> = {
   USER_SUSPENDED: 'userSuspended',
   USER_DELETED: 'userDeleted',
 };
-
-const RECEIVED_AT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 type AccountLookup =
   | { status: 'idle' }
@@ -187,7 +186,7 @@ export function LogRequestDialog({ onLogged }: { onLogged: () => void }) {
       setSubmitError(resolveErrorMessage(error));
       return;
     }
-    setOpen(false);
+    handleOpenChange(false);
     onLogged();
   }
 

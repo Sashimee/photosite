@@ -158,6 +158,43 @@ describe('LogRequestDialog', () => {
     });
   });
 
+  it('resets the form after a successful submit so reopening starts blank', async () => {
+    mockAccountFound();
+    postMock.mockResolvedValueOnce({
+      data: {
+        id: 'new-id',
+        type: 'export',
+        status: 'pending',
+        channel: 'email',
+        requestedAt: '2026-09-26T12:00:00.000Z',
+        completedAt: null,
+        expiresAt: null,
+        failureReason: null,
+        cancelledAt: null,
+        responseDueAt: '2026-10-26T12:00:00.000Z',
+        answeredLate: false,
+        user: { id: VALID_USER_ID, email: 'alice@example.com' },
+      },
+    });
+    const { events } = await openDialog();
+    await fillValidForm(events);
+
+    await events.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => {
+      expect(postMock).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.queryByLabelText('User id')).not.toBeInTheDocument();
+    });
+
+    await events.click(screen.getByRole('button', { name: 'Log request' }));
+
+    expect(screen.getByLabelText('User id')).toHaveValue('');
+    expect(screen.getByLabelText('Type')).toHaveValue('');
+    expect(screen.getByLabelText('Channel')).toHaveValue('');
+  });
+
   it('shows a re-verification message for TWO_FACTOR_REQUIRED', async () => {
     mockAccountFound();
     postMock.mockResolvedValueOnce({ error: { code: 'TWO_FACTOR_REQUIRED' } });
