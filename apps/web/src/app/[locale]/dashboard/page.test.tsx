@@ -141,7 +141,15 @@ describe('DashboardOverviewPage', () => {
     getSessionMock.mockResolvedValue({ id: 'user-1' });
     mockProfile(200, PROFILE, {
       portfolioItems: [
-        { id: 'image-1', url: null, width: null, height: null, order: 1, status: 'processing' },
+        {
+          id: 'image-1',
+          url: null,
+          width: null,
+          height: null,
+          order: 1,
+          status: 'processing',
+          provenance: null,
+        },
       ],
       products: [{ id: 'product-1' }],
     });

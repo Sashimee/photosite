@@ -26,6 +26,8 @@ import {
   NotifySweepJobSchema,
   PORTFOLIO_IMAGE_CLEANUP_QUEUE_NAME,
   PortfolioImageCleanupJobSchema,
+  PROVENANCE_CHECK_QUEUE_NAME,
+  ProvenanceCheckJobSchema,
   PUSH_RECEIPTS_QUEUE_NAME,
   PushReceiptsJobSchema,
   QUEUE_JOB_SCHEMAS,
@@ -58,6 +60,7 @@ describe('QUEUE_NAMES', () => {
       'gdpr-export',
       'gdpr-sweep',
       'listing-expiry',
+      'provenance-check',
     ]);
     expect(new Set(QUEUE_NAMES).size).toBe(QUEUE_NAMES.length);
   });
@@ -79,6 +82,7 @@ describe('QUEUE_NAMES', () => {
       GDPR_EXPORT_QUEUE_NAME,
       GDPR_SWEEP_QUEUE_NAME,
       LISTING_EXPIRY_QUEUE_NAME,
+      PROVENANCE_CHECK_QUEUE_NAME,
     ]).toEqual(QUEUE_NAMES);
   });
 });
@@ -429,6 +433,52 @@ describe('listing-expiry job schema', () => {
 
   it('rejects unknown extra keys', () => {
     expect(ListingExpiryJobSchema.safeParse({ uploadId: VALID_UPLOAD_ID }).success).toBe(false);
+  });
+});
+
+describe('ProvenanceCheckJobSchema', () => {
+  it('accepts a valid portfolioImageId', () => {
+    expect(ProvenanceCheckJobSchema.safeParse({ portfolioImageId: VALID_UPLOAD_ID }).success).toBe(
+      true,
+    );
+  });
+
+  it('accepts a valid portfolioImageId with force true', () => {
+    expect(
+      ProvenanceCheckJobSchema.safeParse({ portfolioImageId: VALID_UPLOAD_ID, force: true })
+        .success,
+    ).toBe(true);
+  });
+
+  it('accepts a valid portfolioImageId with force false', () => {
+    expect(
+      ProvenanceCheckJobSchema.safeParse({ portfolioImageId: VALID_UPLOAD_ID, force: false })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects a missing portfolioImageId', () => {
+    expect(ProvenanceCheckJobSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects a non-uuid portfolioImageId', () => {
+    expect(ProvenanceCheckJobSchema.safeParse({ portfolioImageId: 'not-a-uuid' }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects a non-boolean force', () => {
+    expect(
+      ProvenanceCheckJobSchema.safeParse({ portfolioImageId: VALID_UPLOAD_ID, force: 'yes' })
+        .success,
+    ).toBe(false);
+  });
+
+  it('rejects unknown extra keys', () => {
+    expect(
+      ProvenanceCheckJobSchema.safeParse({ portfolioImageId: VALID_UPLOAD_ID, extra: 'nope' })
+        .success,
+    ).toBe(false);
   });
 });
 

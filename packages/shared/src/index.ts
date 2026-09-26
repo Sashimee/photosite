@@ -85,6 +85,19 @@ export {
 
 export { BOOKING_STATUS_TRANSITIONS, isValidBookingTransition } from './booking-state-machine.js';
 
+export {
+  AI_SCORE_FAIL_THRESHOLD,
+  AI_SCORE_REVIEW_THRESHOLD,
+  FOREIGN_MATCH_FAIL_THRESHOLD,
+  MIN_SIGNAL_COUNT_FOR_AUTO_PASS,
+  FUTURE_CAPTURE_TOLERANCE_MS,
+  OLDEST_PLAUSIBLE_CAPTURE,
+  computeProvenanceScore,
+  type ProvenanceReverseMatchSignal,
+  type ProvenanceSignals,
+  type ProvenanceScoreResult,
+} from './provenance-score.js';
+
 export { SLUG_MAX_LENGTH, slugify, type SlugifyOptions } from './slug.js';
 
 export {
@@ -362,7 +375,6 @@ export {
   AdminLegalTextVersionSchema,
   AdminLogDataRequestBodySchema,
   AdminMeSchema,
-  AdminProvenanceCheckSchema,
   AdminReportSchema,
   AdminReportsQuerySchema,
   AdminReportTargetSchema,
@@ -386,7 +398,6 @@ export {
   PortfolioImageReportTargetSchema,
   PublishLegalTextRequestSchema,
   RefundBookingRequestSchema,
-  RejectProvenanceCheckRequestSchema,
   RejectVerificationCaseRequestSchema,
   RequestReportTargetSchema,
   ResolveReportRequestSchema,
@@ -400,6 +411,17 @@ export {
   UpdatePlatformSettingsRequestSchema,
   type EmailTemplateName,
 } from './contract/admin.js';
+
+export {
+  AdminProvenanceCheckSchema,
+  AdminProvenanceCheckSummarySchema,
+  AdminProvenancePhotographerSchema,
+  AdminProvenanceQuerySchema,
+  PortfolioImageProvenanceSchema,
+  PROVENANCE_DECISION_STATUSES,
+  ProvenanceDecisionRequestSchema,
+  ProvenanceDecisionStatusSchema,
+} from './contract/provenance.js';
 
 export {
   CreateReportRequestSchema,

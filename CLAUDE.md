@@ -85,7 +85,7 @@ Update this section when scripts change (docs-sync agent).
 |-------|-----|-------|
 | api-developer | NestJS API/worker modules | sonnet |
 | payments-engineer | Stripe Connect flows and payment UI review | opus |
-| schema-migrator | Prisma schema, migrations, seed | sonnet |
+| schema-migrator | Prisma schema, migrations, seed | opus |
 | web-developer | Next.js web and admin apps | sonnet |
 | mobile-developer | Expo app and store readiness | sonnet |
 | devops-engineer | Docker, CI/CD, Dokploy, backups, monitoring, EAS | sonnet |

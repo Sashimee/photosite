@@ -103,6 +103,7 @@ describe('DashboardPortfolioPage', () => {
           height: 600,
           order: 1,
           status: 'approved',
+          provenance: null,
         },
       ],
     });
