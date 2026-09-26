@@ -6,6 +6,8 @@ import {
   type AdminDataRequestsQuerySchema,
   type AdminLogDataRequestBodySchema,
   gdprResponseDueAt,
+  RECEIVED_AT_MAX_AGE_MS,
+  RECEIVED_AT_MAX_FUTURE_SKEW_MS,
 } from '@photoo/shared';
 import { Logger } from 'nestjs-pino';
 import type { z } from 'zod';
@@ -33,6 +35,10 @@ interface AdminActor {
 
 function notFound(): HttpException {
   return new HttpException({ code: 'NOT_FOUND', message: 'Data request not found' }, 404);
+}
+
+function userNotFound(): HttpException {
+  return new HttpException({ code: 'NOT_FOUND', message: 'User not found' }, 404);
 }
 
 function protectedTarget(): HttpException {
@@ -66,9 +72,6 @@ function conflictForOpenType(type: 'export' | 'delete'): HttpException {
 function badRequest(message: string): HttpException {
   return new HttpException({ code: 'VALIDATION_ERROR', message }, 400);
 }
-
-const RECEIVED_AT_MAX_FUTURE_SKEW_MS = 60 * 1000;
-const RECEIVED_AT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 function assertReceivedAtInRange(receivedAt: Date): void {
   const now = Date.now();
@@ -376,7 +379,7 @@ export class AdminDataRequestsService {
 
     const user = await this.repository.findUserForOffline(body.userId);
     if (!user) {
-      throw notFound();
+      throw userNotFound();
     }
     await this.assertTargetNotProtected(session, user);
     if (user.status !== 'active') {
@@ -387,22 +390,25 @@ export class AdminDataRequestsService {
       throw conflictForOpenType(body.type);
     }
 
-    const admin: AdminActor = { id: session.user.id };
     if (body.type === 'export') {
-      return this.logOfflineExport(admin, user, body.channel, receivedAt, ip);
+      return this.logOfflineExport(session, user, body.channel, receivedAt, ip);
     }
-    return this.logOfflineDeletion(admin, user, body.channel, receivedAt, ip);
+    return this.logOfflineDeletion(session, user, body.channel, receivedAt, ip);
   }
 
-  // An admin can't self-target or reach into another admin's account
-  // through the offline logging endpoint, unless they're a superadmin acting
-  // with a fresh second factor (AdminAccessService.isSuperadminWithFreshTwoFactor).
+  // An admin can never target themselves through this endpoint, even as a
+  // superadmin with a fresh second factor. Targeting another admin or an
+  // AdminPermissionGrant holder is blocked too, unless the actor is a
+  // superadmin acting with a fresh second factor
+  // (AdminAccessService.isSuperadminWithFreshTwoFactor).
   private async assertTargetNotProtected(
     session: SessionContext,
     target: { id: string; roles: UserRole[] },
   ): Promise<void> {
+    if (target.id === session.user.id) {
+      throw protectedTarget();
+    }
     const isProtected =
-      target.id === session.user.id ||
       target.roles.includes('admin') ||
       (await this.repository.hasAnyAdminPermissionGrant(target.id));
     if (!isProtected) {
@@ -414,8 +420,32 @@ export class AdminDataRequestsService {
     throw protectedTarget();
   }
 
+  // Re-runs assertTargetNotProtected's checks inside the same transaction that
+  // creates the row, so a role or grant change landing between the pre-check
+  // and the write can't slip through.
+  private async assertTargetNotProtectedInTx(
+    tx: Prisma.TransactionClient,
+    session: SessionContext,
+    targetId: string,
+  ): Promise<void> {
+    if (targetId === session.user.id) {
+      throw protectedTarget();
+    }
+    const target = await this.repository.findUserRolesInTx(tx, targetId);
+    const isProtected =
+      (target?.roles.includes('admin') ?? false) ||
+      (await this.repository.hasAnyAdminPermissionGrantInTx(tx, targetId));
+    if (!isProtected) {
+      return;
+    }
+    if (await this.adminAccess.isSuperadminWithFreshTwoFactor(session)) {
+      return;
+    }
+    throw protectedTarget();
+  }
+
   private async logOfflineExport(
-    admin: AdminActor,
+    session: SessionContext,
     user: { id: string; email: string },
     channel: DataRequestChannel,
     receivedAt: Date,
@@ -424,13 +454,14 @@ export class AdminDataRequestsService {
     let created: AdminDataRequestRow;
     try {
       created = await this.prisma.client.$transaction(async (tx) => {
+        await this.assertTargetNotProtectedInTx(tx, session, user.id);
         const status = await this.repository.findUserStatusInTx(tx, user.id);
         if (status !== 'active') {
           throw conflictForUserStatus(status);
         }
         const row = await this.repository.createOfflineExport(tx, user.id, channel, receivedAt);
         await this.auditService.record(tx, {
-          actorId: admin.id,
+          actorId: session.user.id,
           action: 'data_request.logged_offline',
           targetType: 'DataRequest',
           targetId: row.id,
@@ -454,7 +485,7 @@ export class AdminDataRequestsService {
     try {
       await this.exportQueue.enqueue(created.id);
     } catch (error) {
-      await this.markEnqueueFailed(created.id, admin.id, ip);
+      await this.markEnqueueFailed(created.id, session.user.id, ip);
       throw error;
     }
 
@@ -462,7 +493,7 @@ export class AdminDataRequestsService {
   }
 
   private async logOfflineDeletion(
-    admin: AdminActor,
+    session: SessionContext,
     user: { id: string; email: string },
     channel: DataRequestChannel,
     receivedAt: Date,
@@ -471,6 +502,7 @@ export class AdminDataRequestsService {
     let created: AdminDataRequestRow | null;
     try {
       created = await this.prisma.client.$transaction(async (tx) => {
+        await this.assertTargetNotProtectedInTx(tx, session, user.id);
         await assertNoBlockingObligationsForAdmin(tx, user.id);
         const row = await applyAccountDeletion(tx, {
           userId: user.id,
@@ -478,7 +510,7 @@ export class AdminDataRequestsService {
           channel,
           audit: {
             actorType: 'admin',
-            actorId: admin.id,
+            actorId: session.user.id,
             action: 'data_request.logged_offline',
             extraAfter: { channel, receivedAt: receivedAt.toISOString() },
             ip: ip ?? null,

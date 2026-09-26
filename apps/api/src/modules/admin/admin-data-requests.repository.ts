@@ -108,6 +108,26 @@ export class AdminDataRequestsRepository {
     return grant !== null;
   }
 
+  // Re-read inside the transaction that creates the row, so a role change
+  // that lands between the pre-check and the write can't slip through.
+  async findUserRolesInTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<{ roles: UserRole[] } | null> {
+    return tx.user.findUnique({ where: { id: userId }, select: { roles: true } });
+  }
+
+  async hasAnyAdminPermissionGrantInTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<boolean> {
+    const grant = await tx.adminPermissionGrant.findFirst({
+      where: { userId },
+      select: { id: true },
+    });
+    return grant !== null;
+  }
+
   async findOpenRequestForUser(
     userId: string,
     type: DataRequestType,
