@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { StrictMode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -16,11 +17,44 @@ function setHash(hash: string) {
   window.history.replaceState(null, '', `/en/account/deletion/cancel/request-1${hash}`);
 }
 
+async function confirm() {
+  const user = userEvent.setup({ delay: null });
+  await user.click(screen.getByRole('button', { name: 'Yes, cancel my account deletion' }));
+}
+
 describe('DeletionCancelClient', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.resetModules();
     setHash('');
+  });
+
+  it('does not send a request until the confirm button is clicked', async () => {
+    setHash('');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const DeletionCancelClient = await loadDeletionCancelClient();
+
+    render(<DeletionCancelClient locale="en" id="request-1" />);
+
+    expect(
+      screen.getByText(
+        "You're about to cancel your account deletion. Confirm below to keep your account.",
+      ),
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('strips the fragment token from the URL on mount', async () => {
+    setHash('#token=a1b2c3');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const DeletionCancelClient = await loadDeletionCancelClient();
+
+    render(<DeletionCancelClient locale="en" id="request-1" />);
+
+    expect(window.location.hash).toBe('');
+    expect(window.location.pathname).toBe('/en/account/deletion/cancel/request-1');
   });
 
   it('cancels using the session when the fragment has no token', async () => {
@@ -40,6 +74,7 @@ describe('DeletionCancelClient', () => {
     const DeletionCancelClient = await loadDeletionCancelClient();
 
     render(<DeletionCancelClient locale="en" id="request-1" />);
+    await confirm();
 
     expect(
       await screen.findByText('Your account deletion has been cancelled.'),
@@ -66,6 +101,7 @@ describe('DeletionCancelClient', () => {
     const DeletionCancelClient = await loadDeletionCancelClient();
 
     render(<DeletionCancelClient locale="en" id="request-1" />);
+    await confirm();
 
     expect(
       await screen.findByText('Your account deletion has been cancelled.'),
@@ -82,6 +118,7 @@ describe('DeletionCancelClient', () => {
     const DeletionCancelClient = await loadDeletionCancelClient();
 
     render(<DeletionCancelClient locale="en" id="request-1" />);
+    await confirm();
 
     expect(
       await screen.findByText('This cancellation link is invalid or has expired.'),
@@ -96,6 +133,7 @@ describe('DeletionCancelClient', () => {
     const DeletionCancelClient = await loadDeletionCancelClient();
 
     render(<DeletionCancelClient locale="en" id="request-1" />);
+    await confirm();
 
     expect(
       await screen.findByText('This deletion request could not be found.'),
@@ -114,6 +152,7 @@ describe('DeletionCancelClient', () => {
     const DeletionCancelClient = await loadDeletionCancelClient();
 
     render(<DeletionCancelClient locale="en" id="request-1" />);
+    await confirm();
 
     expect(await screen.findByText(message)).toBeInTheDocument();
   });
@@ -126,6 +165,7 @@ describe('DeletionCancelClient', () => {
     const DeletionCancelClient = await loadDeletionCancelClient();
 
     render(<DeletionCancelClient locale="en" id="request-1" />);
+    await confirm();
 
     expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
   });
@@ -136,6 +176,7 @@ describe('DeletionCancelClient', () => {
     const DeletionCancelClient = await loadDeletionCancelClient();
 
     render(<DeletionCancelClient locale="en" id="request-1" />);
+    await confirm();
 
     expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
   });
@@ -161,6 +202,7 @@ describe('DeletionCancelClient', () => {
         <DeletionCancelClient locale="en" id="request-1" />
       </StrictMode>,
     );
+    await confirm();
 
     expect(
       await screen.findByText('Your account deletion has been cancelled.'),
@@ -174,6 +216,7 @@ describe('DeletionCancelClient', () => {
     const DeletionCancelClient = await loadDeletionCancelClient();
 
     render(<DeletionCancelClient locale="en" id="request-1" />);
+    await confirm();
 
     expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
   });

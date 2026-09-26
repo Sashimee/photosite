@@ -6,11 +6,12 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { Locale } from '@photoo/shared';
 
+import { Button } from '@/components/ui/button';
 import { FormNotice } from '@/components/ui/form-message';
 import { api } from '@/lib/api';
 import { parseFragmentToken } from '@/lib/fragment-token';
 
-type Status = 'pending' | 'success' | 'error';
+type Status = 'idle' | 'pending' | 'success' | 'error';
 
 const ERROR_KEYS = {
   UNAUTHORIZED: 'unauthorized',
@@ -22,17 +23,29 @@ const ERROR_KEYS = {
 
 export function DeletionCancelClient({ locale, id }: { locale: Locale; id: string }) {
   const t = useTranslations('web.account.deletionCancel');
-  const [status, setStatus] = useState<Status>('pending');
+  const [status, setStatus] = useState<Status>('idle');
   const [errorKey, setErrorKey] = useState<string>('generic');
-  const started = useRef(false);
+  const tokenizedOnce = useRef(false);
+  const tokenRef = useRef<string | null>(null);
+  const sentRef = useRef(false);
 
   useEffect(() => {
-    if (started.current) {
+    if (tokenizedOnce.current) {
       return;
     }
-    started.current = true;
+    tokenizedOnce.current = true;
+    tokenRef.current = parseFragmentToken(window.location.hash);
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
 
-    const token = parseFragmentToken(window.location.hash);
+  function handleConfirm() {
+    if (sentRef.current) {
+      return;
+    }
+    sentRef.current = true;
+    setStatus('pending');
+
+    const token = tokenRef.current;
     void api
       .POST('/v1/me/data-requests/{id}/cancel', {
         params: { path: { id } },
@@ -52,12 +65,19 @@ export function DeletionCancelClient({ locale, id }: { locale: Locale; id: strin
         setErrorKey('generic');
         setStatus('error');
       });
-    // Runs once on mount to consume the fragment token exactly one time.
-  }, [id]);
+  }
 
   return (
     <section className="mx-auto flex max-w-md flex-col gap-6 px-4 py-16">
       <h1 className="text-2xl font-semibold text-foreground">{t('title')}</h1>
+      {status === 'idle' ? (
+        <>
+          <p className="text-sm text-muted-foreground">{t('intro')}</p>
+          <Button type="button" onClick={handleConfirm}>
+            {t('confirmCta')}
+          </Button>
+        </>
+      ) : null}
       {status === 'pending' ? <FormNotice tone="info">{t('pending')}</FormNotice> : null}
       {status === 'success' ? (
         <FormNotice tone="success">

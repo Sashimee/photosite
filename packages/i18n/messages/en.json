@@ -1346,7 +1346,9 @@
       },
       "deletionCancel": {
         "title": "Cancel account deletion",
-        "pending": "Checking your link…",
+        "intro": "You're about to cancel your account deletion. Confirm below to keep your account.",
+        "confirmCta": "Yes, cancel my account deletion",
+        "pending": "Cancelling your account deletion…",
         "success": "Your account deletion has been cancelled.",
         "continue": "Continue to your account",
         "unauthorized": "This cancellation link is invalid or has expired.",
