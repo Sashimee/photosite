@@ -3,8 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { components } from '@photoo/api-client';
 
-import { ADMIN_FORMATS, ADMIN_TIME_ZONE } from '@/lib/datetime';
-
 const serverApiMock = vi.fn();
 const notFoundMock = vi.fn(() => {
   throw new Error('NEXT_NOT_FOUND');
@@ -20,13 +18,6 @@ vi.mock('next-intl/server', async () => {
     getFormatter: () => mockUseFormatter(),
   };
 });
-
-function formatExpected(iso: string) {
-  return new Intl.DateTimeFormat('en', {
-    ...ADMIN_FORMATS.dateTime.medium,
-    timeZone: ADMIN_TIME_ZONE,
-  }).format(new Date(iso));
-}
 
 vi.mock('../../last-changed', () => ({ LastChanged: () => <div data-testid="last-changed" /> }));
 vi.mock('./country-edit-form', () => ({
@@ -181,9 +172,9 @@ describe('CountryDetailPage', () => {
     const rows = screen.getAllByRole('row').slice(1);
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent('1');
-    expect(rows[0]).toHaveTextContent(formatExpected('2026-01-01T00:00:00.000Z'));
+    expect(rows[0]).toHaveTextContent('Jan 1, 2026, 1:00 AM GMT+1');
     expect(rows[1]).toHaveTextContent('2');
-    expect(rows[1]).toHaveTextContent(formatExpected('2026-02-01T00:00:00.000Z'));
+    expect(rows[1]).toHaveTextContent('Feb 1, 2026, 1:00 AM GMT+1');
 
     expect(screen.getByTestId('last-changed')).toBeInTheDocument();
     expect(screen.getByTestId('country-edit-form')).toBeInTheDocument();

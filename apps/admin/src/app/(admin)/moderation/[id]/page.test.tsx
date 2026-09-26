@@ -80,6 +80,7 @@ describe('ReportDetailPage', () => {
     render(await ReportDetailPage({ params: Promise.resolve({ id: 'report-1' }) }));
 
     expect(screen.getByText('This request looks fraudulent.')).toBeInTheDocument();
+    expect(screen.getByText('Sep 20, 2026, 2:00 PM GMT+2')).toBeInTheDocument();
     expect(firstCallProps(reportTargetSummaryMock)).toMatchObject({
       targetType: 'request',
       target: report.target,
@@ -87,6 +88,26 @@ describe('ReportDetailPage', () => {
     expect(firstCallProps(reportActionsMock)).toMatchObject({ report });
     expect(screen.getByTestId('decision-history')).toBeInTheDocument();
     expect(firstCallProps(decisionHistoryMock)).toEqual({ targetId: 'report-1' });
+  });
+
+  it('shows the resolvedAt date once the report has been resolved', async () => {
+    const resolvedReport = {
+      ...report,
+      status: 'resolved' as const,
+      resolvedAt: '2026-09-21T08:00:00.000Z',
+    };
+    serverApiMock.mockResolvedValue({
+      GET: apiWith(
+        { data: resolvedReport, response: { status: 200 } },
+        { data: { items: [], nextCursor: null }, response: { status: 200 } },
+      ),
+    });
+    const ReportDetailPage = await loadPage();
+
+    render(await ReportDetailPage({ params: Promise.resolve({ id: 'report-1' }) }));
+
+    expect(screen.getByText('Sep 20, 2026, 2:00 PM GMT+2')).toBeInTheDocument();
+    expect(screen.getByText('Sep 21, 2026, 10:00 AM GMT+2')).toBeInTheDocument();
   });
 
   it('renders reason text literally, never as HTML', async () => {

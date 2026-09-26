@@ -5,6 +5,7 @@ import type {
 import { vi } from 'vitest';
 
 import { getMessages } from '@photoo/i18n';
+import { DEFAULT_LOCALE } from '@photoo/shared';
 
 import { ADMIN_FORMATS, ADMIN_TIME_ZONE } from '@/lib/datetime';
 
@@ -23,8 +24,8 @@ const { createTranslator, createFormatter } = await vi.importActual<{
 type LooseTranslator = (key: string, values?: Record<string, string | number | Date>) => string;
 
 const translator = createTranslator({
-  locale: 'en',
-  messages: getMessages('en'),
+  locale: DEFAULT_LOCALE,
+  messages: getMessages(DEFAULT_LOCALE),
 }) as LooseTranslator;
 
 // A `useTranslations` stand-in for component tests: looks strings up from
@@ -54,7 +55,7 @@ export function mockUseTranslations(namespace: string) {
 // so a test asserting formatted dates sees exactly what renders in production.
 export function mockUseFormatter() {
   return createFormatter({
-    locale: 'en',
+    locale: DEFAULT_LOCALE,
     timeZone: ADMIN_TIME_ZONE,
     formats: ADMIN_FORMATS,
   });
