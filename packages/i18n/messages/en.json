@@ -1332,7 +1332,35 @@
         "exportData": "Download your data",
         "exportComingSoon": "Data export is coming soon.",
         "deleteAccount": "Delete account",
-        "deleteComingSoon": "Account deletion is coming soon."
+        "deleteConfirmTitle": "Delete your account?",
+        "deleteConfirmDescription": "Your account is deactivated immediately and permanently deleted after a 30-day grace period. We'll email you a link to cancel the deletion at any time before then.",
+        "deleteConfirmCta": "Yes, delete my account",
+        "deletePending": "Deleting…",
+        "deleteDismissCta": "Cancel",
+        "errors": {
+          "generic": "Something went wrong. Please try again.",
+          "conflict": "Your account can't be deleted right now.",
+          "tooManyRequests": "Too many attempts. Please try again later.",
+          "tooManyRequestsWithRetry": "Too many attempts. Please try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "deletionCancel": {
+        "title": "Cancel account deletion",
+        "pending": "Checking your link…",
+        "success": "Your account deletion has been cancelled.",
+        "continue": "Continue to your account",
+        "unauthorized": "This cancellation link is invalid or has expired.",
+        "notFound": "This deletion request could not be found.",
+        "notDeletion": "This request is not an account deletion and can't be cancelled here.",
+        "gracePeriodEnded": "The 30-day window to cancel this deletion has ended.",
+        "notPending": "This deletion request has already been cancelled or processed.",
+        "generic": "Something went wrong. Please try again.",
+        "signInLink": "Sign in"
+      },
+      "deletionRequested": {
+        "title": "Account deletion requested",
+        "description": "We've deactivated your account and sent you an email with a link to cancel the deletion within the next 30 days. After that, your account and data are permanently deleted.",
+        "homeLink": "Back to home"
       }
     },
     "profile": {
