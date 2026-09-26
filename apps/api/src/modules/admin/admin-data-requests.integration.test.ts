@@ -286,6 +286,9 @@ describe('admin data requests integration', () => {
   afterAll(async () => {
     if (createdUserIds.length > 0) {
       await prisma.dataRequest.deleteMany({ where: { userId: { in: createdUserIds } } });
+      await prisma.adminPermissionGrant.deleteMany({
+        where: { grantedByAdminId: { in: createdUserIds } },
+      });
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     }
     if (fixtureCountryCode) {
