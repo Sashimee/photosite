@@ -6,7 +6,6 @@ import {
   FEATURE_FLAG_KEYS,
   NOTIFICATION_TYPES,
   PORTFOLIO_IMAGE_STATUSES,
-  PROVENANCE_VERDICTS,
   REPORT_STATUSES,
   USER_ROLES,
   USER_STATUSES,
@@ -35,6 +34,12 @@ import {
   RECEIVED_AT_MAX_AGE_MS,
   RECEIVED_AT_MAX_FUTURE_SKEW_MS,
 } from './gdpr.js';
+import {
+  AdminProvenanceCheckSchema,
+  AdminProvenanceCheckSummarySchema,
+  AdminProvenanceQuerySchema,
+  ProvenanceDecisionRequestSchema,
+} from './provenance.js';
 import { ADMIN_SECURITY, apiPath, registry } from './registry.js';
 import { AdminVerificationCaseSchema, AdminVerificationCaseSummarySchema } from './verification.js';
 import { z } from './zod.js';
@@ -253,31 +258,6 @@ export const DirectTakedownRequestSchema = z
 // to a moderator reading the queue, and lets a later UI tell a
 // moderator-initiated entry apart from a public one without a schema change.
 export const MODERATOR_INITIATED_REPORT_REASON = 'Found by a moderator; no report was filed.';
-
-export const AdminProvenanceCheckSchema = z
-  .object({
-    id: IdSchema,
-    portfolioImageId: IdSchema,
-    aiScore: z.number().min(0).max(1).nullable(),
-    aiVendor: z.string().min(1).max(60).nullable(),
-    reverseMatches: z.array(z.url()).nullable(),
-    c2paValid: z.boolean().nullable(),
-    exifCamera: z.string().min(1).max(120).nullable(),
-    exifCapturedAt: IsoDateTimeSchema.nullable(),
-    score: z.number().min(0).max(1).nullable(),
-    verdict: z.enum(PROVENANCE_VERDICTS),
-    reviewedByAdminId: IdSchema.nullable(),
-    reviewedAt: IsoDateTimeSchema.nullable(),
-    note: z.string().max(2000).nullable(),
-  })
-  .strict()
-  .openapi('AdminProvenanceCheck');
-
-export const RejectProvenanceCheckRequestSchema = z
-  .object({
-    note: z.string().min(1).max(2000).optional(),
-  })
-  .strict();
 
 export const AdminBookingSchema = BookingBaseSchema.extend({
   paymentIntentId: z.string().nullable(),
@@ -797,19 +777,19 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'get',
-  path: apiPath('/admin/provenance-checks'),
+  path: apiPath('/admin/provenance'),
   summary: 'List the provenance review queue',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('moderation'),
   request: {
-    query: CursorPaginationQuerySchema,
+    query: AdminProvenanceQuerySchema,
   },
   responses: {
     '200': {
-      description: 'A page of provenance checks',
+      description: 'A page of provenance checks, oldest first',
       content: {
-        'application/json': { schema: paginatedResponseSchema(AdminProvenanceCheckSchema) },
+        'application/json': { schema: paginatedResponseSchema(AdminProvenanceCheckSummarySchema) },
       },
     },
     ...errorResponses([401, 403]),
@@ -818,7 +798,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'get',
-  path: apiPath('/admin/provenance-checks/{id}'),
+  path: apiPath('/admin/provenance/{id}'),
   summary: 'Get a provenance check',
   tags: ['admin'],
   security: ADMIN_SECURITY,
@@ -837,40 +817,40 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'post',
-  path: apiPath('/admin/provenance-checks/{id}/approve'),
-  summary: 'Approve a flagged portfolio image',
+  path: apiPath('/admin/provenance/{id}/decision'),
+  summary: 'Decide the outcome of a flagged portfolio image',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('moderation'),
   request: {
     params: z.object({ id: IdSchema }).strict(),
+    body: { content: { 'application/json': { schema: ProvenanceDecisionRequestSchema } } },
   },
   responses: {
     '200': {
-      description: 'Provenance check approved',
+      description: 'Decision recorded',
       content: { 'application/json': { schema: AdminProvenanceCheckSchema } },
     },
-    ...errorResponses([401, 403, 404, 409]),
+    ...errorResponses([400, 401, 403, 404, 409, 422]),
   },
 });
 
 registry.registerPath({
   method: 'post',
-  path: apiPath('/admin/provenance-checks/{id}/reject'),
-  summary: 'Reject a flagged portfolio image',
+  path: apiPath('/admin/provenance/{id}/recheck'),
+  summary: 'Re-run a provenance check',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('moderation'),
   request: {
     params: z.object({ id: IdSchema }).strict(),
-    body: { content: { 'application/json': { schema: RejectProvenanceCheckRequestSchema } } },
   },
   responses: {
     '200': {
-      description: 'Provenance check rejected',
+      description: 'Recheck queued',
       content: { 'application/json': { schema: AdminProvenanceCheckSchema } },
     },
-    ...errorResponses([400, 401, 403, 404, 409, 422]),
+    ...errorResponses([401, 403, 404, 409]),
   },
 });
 

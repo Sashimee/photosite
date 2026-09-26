@@ -75,6 +75,7 @@ const validPortfolioImage = {
   height: 900,
   order: 0,
   status: 'approved',
+  provenance: null,
 };
 
 const validPublicProfile = {

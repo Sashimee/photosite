@@ -62,6 +62,7 @@ export function mapPortfolioImage(
     height: image.height,
     order: image.order,
     status: image.status,
+    provenance: null,
   });
 }
 

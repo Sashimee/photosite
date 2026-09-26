@@ -362,7 +362,6 @@ export {
   AdminLegalTextVersionSchema,
   AdminLogDataRequestBodySchema,
   AdminMeSchema,
-  AdminProvenanceCheckSchema,
   AdminReportSchema,
   AdminReportsQuerySchema,
   AdminReportTargetSchema,
@@ -386,7 +385,6 @@ export {
   PortfolioImageReportTargetSchema,
   PublishLegalTextRequestSchema,
   RefundBookingRequestSchema,
-  RejectProvenanceCheckRequestSchema,
   RejectVerificationCaseRequestSchema,
   RequestReportTargetSchema,
   ResolveReportRequestSchema,
@@ -400,6 +398,17 @@ export {
   UpdatePlatformSettingsRequestSchema,
   type EmailTemplateName,
 } from './contract/admin.js';
+
+export {
+  AdminProvenanceCheckSchema,
+  AdminProvenanceCheckSummarySchema,
+  AdminProvenancePhotographerSchema,
+  AdminProvenanceQuerySchema,
+  PortfolioImageProvenanceSchema,
+  PROVENANCE_DECISION_STATUSES,
+  ProvenanceDecisionRequestSchema,
+  ProvenanceDecisionStatusSchema,
+} from './contract/provenance.js';
 
 export {
   CreateReportRequestSchema,

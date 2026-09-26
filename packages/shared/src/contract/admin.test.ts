@@ -8,7 +8,6 @@ import {
   AdminEmailTemplatePreviewQuerySchema,
   AdminLegalTextVersionSchema,
   AdminLogDataRequestBodySchema,
-  AdminProvenanceCheckSchema,
   AdminReportSchema,
   AdminReportsQuerySchema,
   AdminUserSearchQuerySchema,
@@ -241,34 +240,6 @@ describe('AdminReportsQuerySchema', () => {
 
   it('rejects an unknown status', () => {
     expect(AdminReportsQuerySchema.safeParse({ status: 'escalated' }).success).toBe(false);
-  });
-});
-
-describe('AdminProvenanceCheckSchema', () => {
-  const validCheck = {
-    id,
-    portfolioImageId: id,
-    aiScore: 0.12,
-    aiVendor: 'hive',
-    reverseMatches: ['https://example.com/match.jpg'],
-    c2paValid: true,
-    exifCamera: 'Canon EOS R5',
-    exifCapturedAt: '2026-08-01T10:00:00.000Z',
-    score: 0.05,
-    verdict: 'pass',
-    reviewedByAdminId: null,
-    reviewedAt: null,
-    note: null,
-  };
-
-  it('accepts a well-formed provenance check', () => {
-    expect(AdminProvenanceCheckSchema.safeParse(validCheck).success).toBe(true);
-  });
-
-  it('rejects an unknown verdict', () => {
-    expect(AdminProvenanceCheckSchema.safeParse({ ...validCheck, verdict: 'maybe' }).success).toBe(
-      false,
-    );
   });
 });
 

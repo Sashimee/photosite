@@ -16,6 +16,7 @@ import {
   errorResponses,
   paginatedResponseSchema,
 } from './common.js';
+import { PortfolioImageProvenanceSchema } from './provenance.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
 
@@ -62,11 +63,15 @@ export const PortfolioImageSchema = z
     height: z.int().positive().nullable(),
     order: z.int().nonnegative(),
     status: z.enum(PORTFOLIO_IMAGE_STATUSES),
+    provenance: PortfolioImageProvenanceSchema.nullable(),
   })
   .strict()
   .openapi('PortfolioImage');
 
-export const PublicPortfolioImageSchema = PortfolioImageSchema.omit({ status: true })
+export const PublicPortfolioImageSchema = PortfolioImageSchema.omit({
+  status: true,
+  provenance: true,
+})
   .extend({
     url: z.url(),
     width: z.int().positive(),
