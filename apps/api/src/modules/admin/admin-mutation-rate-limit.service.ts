@@ -9,8 +9,8 @@ import {
 // mass-reassign roles at machine speed (docs/steps/1A.11-admin-api.md).
 const ADMIN_MUTATION_RULE: RateLimitRule = { windowSeconds: 60, max: 30 };
 
-// Deletions are irreversible, so they get a tighter budget than other admin
-// mutations.
+// Deletions close the account immediately, so they get a tighter budget than
+// other admin mutations.
 const ADMIN_DELETE_MUTATION_RULE: RateLimitRule = { windowSeconds: 60, max: 5 };
 
 @Injectable()
