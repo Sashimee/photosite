@@ -11,7 +11,6 @@ export const NOT_YET_IMPLEMENTED: readonly NotYetImplementedRoute[] = [
   { method: 'POST', path: '/v1/bookings/:id/cancel' },
   { method: 'POST', path: '/v1/bookings/:id/payment-intent' },
   { method: 'POST', path: '/v1/bookings/:id/refund' },
-  { method: 'POST', path: '/v1/me/stripe/account-link' },
   { method: 'POST', path: '/v1/stripe/webhook' },
   { method: 'GET', path: '/v1/admin/bookings' },
   { method: 'GET', path: '/v1/admin/bookings/:id' },

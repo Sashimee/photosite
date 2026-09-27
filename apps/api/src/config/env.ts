@@ -83,6 +83,12 @@ const OptionalUrlSchema = z.preprocess(
   z.url().optional(),
 );
 
+function optionalPrefixedSecret(pattern: RegExp, expected: string) {
+  return optionalNonEmpty().refine((value) => value === undefined || pattern.test(value), {
+    message: `must start with ${expected}`,
+  });
+}
+
 const EXAMPLE_AUTH_SECRET = 'dev-only-auth-secret-change-me-please-32-chars-min';
 const EXAMPLE_AUTH_ENCRYPTION_KEYS = [
   'qA5jxlkWykGDbMKLOSqgSGG+lbzsuDkUWUS8nV9twig=',
@@ -127,6 +133,11 @@ const EnvSchema = z
     SENTRY_ENVIRONMENT: optionalNonEmpty(),
     SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
     SENTRY_REQUIRED: BooleanFlagSchema,
+
+    STRIPE_SECRET_KEY: optionalPrefixedSecret(/^(sk|rk)_(test|live)_/, 'sk_ or rk_ (test or live)'),
+    STRIPE_WEBHOOK_SECRET: optionalPrefixedSecret(/^whsec_/, 'whsec_'),
+    STRIPE_CONNECT_REFRESH_URL: OptionalUrlSchema,
+    STRIPE_CONNECT_RETURN_URL: OptionalUrlSchema,
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== 'production') {
@@ -145,6 +156,24 @@ const EnvSchema = z
         path: ['WEB_APP_URL'],
         message: 'must be an https:// URL in production',
       });
+    }
+    // The in-memory FakeStripeGateway is a test double, never a production
+    // fallback: without these the API would take bookings it cannot charge
+    // or pay out (docs/steps/1A.8-payments.md).
+    for (const key of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] as const) {
+      if (value[key] === undefined) {
+        ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required in production` });
+      }
+    }
+    for (const key of ['STRIPE_CONNECT_REFRESH_URL', 'STRIPE_CONNECT_RETURN_URL'] as const) {
+      const url = value[key];
+      if (url !== undefined && !url.startsWith('https://')) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [key],
+          message: 'must be an https:// URL in production',
+        });
+      }
     }
     if (value.SENTRY_REQUIRED && !value.SENTRY_DSN) {
       ctx.addIssue({
