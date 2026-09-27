@@ -33,7 +33,12 @@ export class IllegalBookingTransitionError extends HttpException {
   }
 }
 
-function statusFields(to: BookingStatus, now: Date): BookingStatusFields {
+// Leaving `disputed` restores the state the booking was frozen in, so the
+// timestamps it already carries from that state stay as they were.
+function statusFields(from: BookingStatus, to: BookingStatus, now: Date): BookingStatusFields {
+  if (from === 'disputed') {
+    return {};
+  }
   switch (to) {
     case 'paid_held':
     case 'in_progress':
@@ -68,7 +73,7 @@ export async function transitionBooking(
   const now = new Date();
   const result = await tx.booking.updateMany({
     where: { id: bookingId, status: from },
-    data: { status: to, ...statusFields(to, now), ...transition.data },
+    data: { status: to, ...statusFields(from, to, now), ...transition.data },
   });
   if (result.count === 0) {
     throw new IllegalBookingTransitionError(

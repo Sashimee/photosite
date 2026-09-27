@@ -9,10 +9,15 @@ describe('BOOKING_STATUS_TRANSITIONS', () => {
     }
   });
 
-  it('leaves refunded, disputed and cancelled with no outgoing transitions', () => {
+  it('leaves refunded and cancelled with no outgoing transitions', () => {
     expect(BOOKING_STATUS_TRANSITIONS.refunded).toEqual([]);
-    expect(BOOKING_STATUS_TRANSITIONS.disputed).toEqual([]);
     expect(BOOKING_STATUS_TRANSITIONS.cancelled).toEqual([]);
+  });
+
+  it('lets disputed return only to a state money had reached', () => {
+    expect([...BOOKING_STATUS_TRANSITIONS.disputed].sort()).toEqual(
+      ['delivered', 'in_progress', 'paid_held', 'released'].sort(),
+    );
   });
 });
 
@@ -43,10 +48,16 @@ describe('isValidBookingTransition', () => {
   });
 
   it('rejects any transition out of a terminal state', () => {
-    for (const from of ['refunded', 'disputed', 'cancelled'] as const) {
+    for (const from of ['refunded', 'cancelled'] as const) {
       for (const to of BOOKING_STATUSES) {
         expect(isValidBookingTransition(from, to)).toBe(false);
       }
+    }
+  });
+
+  it('rejects leaving disputed for refunded, cancelled or pending_payment', () => {
+    for (const to of ['refunded', 'cancelled', 'pending_payment', 'disputed'] as const) {
+      expect(isValidBookingTransition('disputed', to)).toBe(false);
     }
   });
 

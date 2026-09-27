@@ -7,10 +7,11 @@ import type { BookingStatus } from './enums.js';
 // has already moved (`paid_held` onward, including `released`, since a
 // refund/reversal or a card dispute can both still happen after release), and
 // `cancelled` only applies before payment, since money never comes from the
-// client until `payment_intent.succeeded`. `refunded`, `disputed` and
-// `cancelled` are terminal: no row here lists them as a source, matching the
-// plan's "terminal branches" wording. Any transition not listed here is a 409
-// and writes nothing.
+// client until `payment_intent.succeeded`. `refunded` and `cancelled` are
+// terminal. `disputed` only leaves when Stripe closes the dispute as won: the
+// booking goes back to the state it was frozen in (`charge.dispute.closed`,
+// docs/PAYMENTS.md); a lost dispute keeps it `disputed` for finance to settle.
+// Any transition not listed here is a 409 and writes nothing.
 export const BOOKING_STATUS_TRANSITIONS: Readonly<Record<BookingStatus, readonly BookingStatus[]>> =
   {
     pending_payment: ['paid_held', 'cancelled'],
@@ -19,7 +20,7 @@ export const BOOKING_STATUS_TRANSITIONS: Readonly<Record<BookingStatus, readonly
     delivered: ['released', 'refunded', 'disputed'],
     released: ['refunded', 'disputed'],
     refunded: [],
-    disputed: [],
+    disputed: ['paid_held', 'in_progress', 'delivered', 'released'],
     cancelled: [],
   };
 
