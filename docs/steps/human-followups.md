@@ -43,6 +43,11 @@ Last updated: 2026-09-25.
 |-------|------------------|--------|----------------------|
 | Turning `PROVENANCE_ENABLED=true` sends a public portfolio image to a third-party vendor, which makes that vendor a sub-processor | A signed DPA per vendor, the vendor named in the privacy policy and in `docs/COMPLIANCE.md` sub-processors, and an EU or adequacy-decision transfer basis | Automatic AI-detection and reverse-search verdicts in any real environment | The flag stays off; only EXIF and (optionally) C2PA signals are used, and nothing leaves the worker |
 | Each uploaded portfolio image costs one vendor call | Confirm the per-image price and set a monthly cap with the vendor | – | Queue concurrency is 2 and a checked image is never re-checked without an explicit admin re-check |
+| Photographers aren't told their portfolio images are checked for provenance (EXIF, C2PA, AI detection, reverse search) (1A.10b) | Approve the notice text shown at upload, and a line in the photographer agreement and the privacy policy | Public launch | Placeholder English copy in `packages/i18n` |
+| Provenance checks are profiling-adjacent processing under legitimate interest | A DPIA screening and a legitimate-interest assessment (beside the job-board LIA) | Public launch | Checks only feed an admin review queue; no automatic takedown |
+| Reverse-search stores the URLs of matching third-party pages on `ProvenanceCheck` | Confirm we may store them, and for how long | Retention figure for provenance rows | URLs are stored and shown only to admins |
+| Art. 15(4): an access request would include provenance signals and match URLs that point at other people's sites | Confirm what the export may include | Provenance in the GDPR export | `apps/worker/src/gdpr/export/collect.ts` deliberately leaves provenance scores, vendors and matches out |
+| On reject or flag the owner gets a DSA Art. 17 statement of reasons (#444) | Approve the reason categories and the notice wording, incl. the redress route | Real user-facing copy | Placeholder English copy in `packages/i18n` |
 
 ## Legal review (1A.12 GDPR)
 
