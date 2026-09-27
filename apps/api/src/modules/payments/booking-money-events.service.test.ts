@@ -3,7 +3,7 @@ import type { Logger } from 'nestjs-pino';
 import { describe, expect, it, vi } from 'vitest';
 import type { NotificationsService } from '../notifications/notifications.service.js';
 import { BookingMoneyEventsService, stripeDisputeReason } from './booking-money-events.service.js';
-import type { GatewayEvent } from './stripe/stripe-gateway.js';
+import type { GatewayEvent, Refund } from './stripe/stripe-gateway.js';
 
 interface LedgerRow {
   bookingId: string;
@@ -225,10 +225,11 @@ function chargeRefunded(overrides: Record<string, unknown> = {}): GatewayEvent {
     amount: 26250,
     amount_refunded: 26250,
     currency: 'eur',
-    refunds: { data: [{ id: 're_1', amount: 26250, status: 'succeeded' }] },
     ...overrides,
   });
 }
+
+const FULL_REFUND: Refund[] = [{ id: 're_1', amountCents: 26250, status: 'succeeded' }];
 
 function dispute(type: string, overrides: Record<string, unknown> = {}): GatewayEvent {
   return event(type, {
@@ -254,7 +255,7 @@ describe('BookingMoneyEventsService.onChargeRefunded', () => {
   it('records the refund and moves a fully refunded booking to refunded', async () => {
     const { service, txClient, ledger, booking, audits } = setup();
 
-    const outcome = await service.onChargeRefunded(txClient, chargeRefunded());
+    const outcome = await service.onChargeRefunded(txClient, chargeRefunded(), FULL_REFUND);
 
     expect(outcome.status).toBe('processed');
     expect(ledger).toEqual([
@@ -270,13 +271,9 @@ describe('BookingMoneyEventsService.onChargeRefunded', () => {
   it('keeps the state on a partial refund', async () => {
     const { service, txClient, booking, ledger } = setup({ booking: { status: 'delivered' } });
 
-    await service.onChargeRefunded(
-      txClient,
-      chargeRefunded({
-        amount_refunded: 1000,
-        refunds: { data: [{ id: 're_1', amount: 1000, status: 'succeeded' }] },
-      }),
-    );
+    await service.onChargeRefunded(txClient, chargeRefunded({ amount_refunded: 1000 }), [
+      { id: 're_1', amountCents: 1000, status: 'succeeded' },
+    ]);
 
     expect(booking?.status).toBe('delivered');
     expect(ledger).toHaveLength(1);
@@ -285,9 +282,9 @@ describe('BookingMoneyEventsService.onChargeRefunded', () => {
   it('is a no-op on replay once the refund row and state change are recorded', async () => {
     const { service, txClient, audits, tx } = setup();
 
-    await service.onChargeRefunded(txClient, chargeRefunded());
+    await service.onChargeRefunded(txClient, chargeRefunded(), FULL_REFUND);
     const auditCount = audits.length;
-    await service.onChargeRefunded(txClient, chargeRefunded());
+    await service.onChargeRefunded(txClient, chargeRefunded(), FULL_REFUND);
 
     expect(audits).toHaveLength(auditCount);
     expect(tx.booking.updateMany).toHaveBeenCalledOnce();
@@ -296,18 +293,10 @@ describe('BookingMoneyEventsService.onChargeRefunded', () => {
   it('does not record failed or canceled refunds', async () => {
     const { service, txClient, ledger } = setup();
 
-    await service.onChargeRefunded(
-      txClient,
-      chargeRefunded({
-        amount_refunded: 0,
-        refunds: {
-          data: [
-            { id: 're_1', amount: 100, status: 'failed' },
-            { id: 're_2', amount: 100, status: 'canceled' },
-          ],
-        },
-      }),
-    );
+    await service.onChargeRefunded(txClient, chargeRefunded({ amount_refunded: 0 }), [
+      { id: 're_1', amountCents: 100, status: 'failed' },
+      { id: 're_2', amountCents: 100, status: 'canceled' },
+    ]);
 
     expect(ledger).toHaveLength(0);
   });
@@ -315,7 +304,7 @@ describe('BookingMoneyEventsService.onChargeRefunded', () => {
   it('audits a refunded amount the ledger cannot account for', async () => {
     const { service, txClient, audits, logger } = setup();
 
-    await service.onChargeRefunded(txClient, chargeRefunded({ refunds: undefined }));
+    await service.onChargeRefunded(txClient, chargeRefunded(), []);
 
     expect(audits[0]).toMatchObject({
       action: 'booking.refund_unreconciled',
@@ -327,7 +316,7 @@ describe('BookingMoneyEventsService.onChargeRefunded', () => {
   it('leaves a disputed booking disputed', async () => {
     const { service, txClient, booking } = setup({ booking: { status: 'disputed' } });
 
-    await service.onChargeRefunded(txClient, chargeRefunded());
+    await service.onChargeRefunded(txClient, chargeRefunded(), FULL_REFUND);
 
     expect(booking?.status).toBe('disputed');
   });
@@ -338,7 +327,7 @@ describe('BookingMoneyEventsService.onChargeRefunded', () => {
       ledger: [{ bookingId: 'b1', type: 'transfer', amountCents: -23750, stripeObjectId: 'tr_1' }],
     });
 
-    await service.onChargeRefunded(txClient, chargeRefunded());
+    await service.onChargeRefunded(txClient, chargeRefunded(), FULL_REFUND);
 
     expect(booking?.status).toBe('refunded');
     expect(logger.error).toHaveBeenCalledWith(
@@ -350,7 +339,7 @@ describe('BookingMoneyEventsService.onChargeRefunded', () => {
   it('finds the booking by payment intent when the charge id is not stored yet', async () => {
     const { service, txClient, ledger } = setup({ booking: { chargeId: null } });
 
-    const outcome = await service.onChargeRefunded(txClient, chargeRefunded());
+    const outcome = await service.onChargeRefunded(txClient, chargeRefunded(), FULL_REFUND);
 
     expect(outcome.status).toBe('processed');
     expect(ledger).toHaveLength(1);
@@ -359,12 +348,12 @@ describe('BookingMoneyEventsService.onChargeRefunded', () => {
   it('defers when no paid booking holds the charge yet', async () => {
     const missing = setup({ booking: null });
     await expect(
-      missing.service.onChargeRefunded(missing.txClient, chargeRefunded()),
+      missing.service.onChargeRefunded(missing.txClient, chargeRefunded(), FULL_REFUND),
     ).resolves.toMatchObject({ status: 'deferred' });
 
     const pending = setup({ booking: { status: 'pending_payment' } });
     await expect(
-      pending.service.onChargeRefunded(pending.txClient, chargeRefunded()),
+      pending.service.onChargeRefunded(pending.txClient, chargeRefunded(), FULL_REFUND),
     ).resolves.toMatchObject({ status: 'deferred' });
     expect(pending.ledger).toHaveLength(0);
   });
@@ -372,7 +361,11 @@ describe('BookingMoneyEventsService.onChargeRefunded', () => {
   it('defers on a currency that differs from the quote', async () => {
     const { service, txClient, ledger } = setup();
 
-    const outcome = await service.onChargeRefunded(txClient, chargeRefunded({ currency: 'usd' }));
+    const outcome = await service.onChargeRefunded(
+      txClient,
+      chargeRefunded({ currency: 'usd' }),
+      FULL_REFUND,
+    );
 
     expect(outcome.status).toBe('deferred');
     expect(ledger).toHaveLength(0);
@@ -382,7 +375,7 @@ describe('BookingMoneyEventsService.onChargeRefunded', () => {
     const { service, txClient } = setup();
 
     await expect(
-      service.onChargeRefunded(txClient, chargeRefunded({ id: 'pi_1' })),
+      service.onChargeRefunded(txClient, chargeRefunded({ id: 'pi_1' }), FULL_REFUND),
     ).rejects.toThrow();
   });
 });

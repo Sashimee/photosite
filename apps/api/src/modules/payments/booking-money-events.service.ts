@@ -7,7 +7,7 @@ import { transitionBooking } from '../bookings/booking-state.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { ledgerTotals, reversibleCents } from './booking-ledger.js';
 import type { AfterCommit } from './stripe-connect.service.js';
-import type { GatewayEvent } from './stripe/stripe-gateway.js';
+import type { GatewayEvent, Refund } from './stripe/stripe-gateway.js';
 
 export interface MoneyEventOutcome {
   status: 'processed' | 'deferred';
@@ -31,18 +31,6 @@ const ChargeRefundedSchema = z.object({
   amount: z.number().int().nonnegative(),
   amount_refunded: z.number().int().nonnegative(),
   currency: z.string().length(3),
-  refunds: z
-    .object({
-      data: z.array(
-        z.object({
-          id: z.string().startsWith('re_'),
-          amount: z.number().int().nonnegative(),
-          status: z.string().nullable().optional(),
-        }),
-      ),
-    })
-    .nullable()
-    .optional(),
 });
 
 const TransferReversedSchema = z.object({
@@ -112,9 +100,12 @@ export class BookingMoneyEventsService {
     @Inject(Logger) private readonly logger: Logger,
   ) {}
 
+  // Since API version 2022-11-15 the charge in a charge.refunded payload no
+  // longer embeds its refunds, so the caller lists them from Stripe first.
   async onChargeRefunded(
     tx: Prisma.TransactionClient,
     event: GatewayEvent,
+    refunds: readonly Refund[],
   ): Promise<MoneyEventOutcome> {
     const charge = ChargeRefundedSchema.parse(event.data.object);
     const ids = { stripeEventId: event.id, chargeId: charge.id };
@@ -129,7 +120,7 @@ export class BookingMoneyEventsService {
       return DEFERRED;
     }
 
-    for (const refund of charge.refunds?.data ?? []) {
+    for (const refund of refunds) {
       if (refund.status === 'failed' || refund.status === 'canceled') {
         continue;
       }
@@ -138,7 +129,7 @@ export class BookingMoneyEventsService {
           {
             bookingId: booking.id,
             type: 'refund',
-            amountCents: -refund.amount,
+            amountCents: -refund.amountCents,
             currency: booking.currency,
             stripeObjectId: refund.id,
           },
@@ -148,7 +139,7 @@ export class BookingMoneyEventsService {
       if (recorded.count > 0) {
         await this.auditSystem(tx, booking, 'booking.refund_recorded', {
           refundId: refund.id,
-          amountCents: refund.amount,
+          amountCents: refund.amountCents,
           chargeId: charge.id,
           stripeEventId: event.id,
         });

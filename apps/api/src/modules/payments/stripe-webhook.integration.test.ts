@@ -265,6 +265,7 @@ describe('stripe webhook integration', () => {
     if (chargeId === null) {
       throw new Error('payment_intent.succeeded did not store a charge id');
     }
+    gateway().linkCharge(chargeId, booking.paymentIntentId);
     return { ...booking, chargeId };
   }
 
@@ -292,11 +293,19 @@ describe('stripe webhook integration', () => {
     return { ...booking, transferId: outcome.transferId, payoutCents: outcome.amountCents };
   }
 
+  async function dashboardRefund(booking: { paymentIntentId: string }, amountCents: number) {
+    return gateway().createRefund({
+      paymentIntentId: booking.paymentIntentId,
+      amountCents,
+      metadata: {},
+      idempotencyKey: `it_dashboard_${randomUUID()}`,
+    });
+  }
+
   function chargeRefundedEvent(
     booking: { chargeId: string; paymentIntentId: string },
-    refunds: readonly { id: string; amount: number }[],
+    amountRefunded: number,
   ) {
-    const amountRefunded = refunds.reduce((sum, refund) => sum + refund.amount, 0);
     return {
       id: `evt_it_${randomUUID()}`,
       object: 'event',
@@ -309,11 +318,8 @@ describe('stripe webhook integration', () => {
           payment_intent: booking.paymentIntentId,
           amount: 25050,
           amount_refunded: amountRefunded,
+          refunded: amountRefunded === 25050,
           currency: 'eur',
-          refunds: {
-            object: 'list',
-            data: refunds.map((refund) => ({ ...refund, object: 'refund', status: 'succeeded' })),
-          },
         },
       },
     };
@@ -686,13 +692,16 @@ describe('stripe webhook integration', () => {
   describe('refund, reversal and dispute webhooks', () => {
     it('records a full charge.refunded once and moves the booking to refunded', async () => {
       const booking = await paidBooking('refund-full');
-      const event = chargeRefundedEvent(booking, [{ id: `re_it_${randomUUID()}`, amount: 25050 }]);
+      const dashboard = await dashboardRefund(booking, 25050);
+      const event = chargeRefundedEvent(booking, 25050);
 
       expect((await sendEvent(event)).statusCode).toBe(200);
       expect((await sendEvent(event)).statusCode).toBe(200);
 
       const refunds = (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'refund');
-      expect(refunds.map((row) => row.amountCents)).toEqual([-25050]);
+      expect(refunds.map((row) => [row.stripeObjectId, row.amountCents])).toEqual([
+        [dashboard.id, -25050],
+      ]);
       const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
       expect(stored.status).toBe('refunded');
       expect(await bookingAuditCount(booking.bookingId, 'booking.refund_recorded')).toBe(1);
@@ -701,14 +710,75 @@ describe('stripe webhook integration', () => {
 
     it('keeps a partially refunded booking in paid_held', async () => {
       const booking = await paidBooking('refund-partial');
-      const event = chargeRefundedEvent(booking, [{ id: `re_it_${randomUUID()}`, amount: 5000 }]);
+      const dashboard = await dashboardRefund(booking, 5000);
+      const event = chargeRefundedEvent(booking, 5000);
 
       expect((await sendEvent(event)).statusCode).toBe(200);
 
       const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
       expect(stored.status).toBe('paid_held');
       const refunds = (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'refund');
-      expect(refunds.map((row) => row.amountCents)).toEqual([-5000]);
+      expect(refunds.map((row) => [row.stripeObjectId, row.amountCents])).toEqual([
+        [dashboard.id, -5000],
+      ]);
+    });
+
+    it('lists refunds for a real-shaped charge.refunded that carries no refunds field', async () => {
+      const booking = await paidBooking('refund-real-shape');
+      const first = await dashboardRefund(booking, 10000);
+      const partialEvent = chargeRefundedEvent(booking, 10000);
+      expect(partialEvent.data.object).not.toHaveProperty('refunds');
+
+      expect((await sendEvent(partialEvent)).statusCode).toBe(200);
+
+      const afterPartial = await prisma.booking.findUniqueOrThrow({
+        where: { id: booking.bookingId },
+      });
+      expect(afterPartial.status).toBe('paid_held');
+
+      const second = await dashboardRefund(booking, 15050);
+      const fullEvent = chargeRefundedEvent(booking, 25050);
+      expect((await sendEvent(fullEvent)).statusCode).toBe(200);
+      expect((await sendEvent(fullEvent)).statusCode).toBe(200);
+
+      const refunds = (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'refund');
+      expect(
+        refunds
+          .map((row) => [row.stripeObjectId, row.amountCents])
+          .sort(([a], [b]) => String(a).localeCompare(String(b))),
+      ).toEqual(
+        [
+          [first.id, -10000],
+          [second.id, -15050],
+        ].sort(([a], [b]) => String(a).localeCompare(String(b))),
+      );
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(stored.status).toBe('refunded');
+      expect(await bookingAuditCount(booking.bookingId, 'booking.refund_recorded')).toBe(2);
+      expect(await bookingAuditCount(booking.bookingId, 'booking.refund_unreconciled')).toBe(0);
+      expect((await storedEvent(partialEvent.id))?.processedAt).not.toBeNull();
+      expect((await storedEvent(fullEvent.id))?.processedAt).not.toBeNull();
+    });
+
+    it('stores and defers a charge.refunded whose refunds cannot be listed', async () => {
+      const booking = await paidBooking('refund-list-fails');
+      const event = chargeRefundedEvent(
+        { ...booking, chargeId: `ch_it_unknown_${randomUUID()}` },
+        25050,
+      );
+
+      expect((await sendEvent(event)).statusCode).toBe(200);
+
+      const stored = await storedEvent(event.id);
+      expect(stored?.type).toBe('charge.refunded');
+      expect(stored?.processedAt).toBeNull();
+      expect(
+        (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'refund'),
+      ).toHaveLength(0);
+      const unchanged = await prisma.booking.findUniqueOrThrow({
+        where: { id: booking.bookingId },
+      });
+      expect(unchanged.status).toBe('paid_held');
     });
 
     it('freezes the booking on a dispute, notifies finance and restores it when won', async () => {
@@ -959,10 +1029,7 @@ describe('stripe webhook integration', () => {
 
       const refunds = (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'refund');
       expect(refunds.map((row) => row.amountCents)).toEqual([-5000, -20050]);
-      const echo = chargeRefundedEvent(
-        booking,
-        refunds.map((row) => ({ id: row.stripeObjectId, amount: -row.amountCents })),
-      );
+      const echo = chargeRefundedEvent(booking, 25050);
       expect((await sendEvent(echo)).statusCode).toBe(200);
       expect(
         (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'refund'),

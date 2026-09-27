@@ -107,6 +107,7 @@ export interface StripeGateway {
   createTransfer(input: CreateTransferInput): Promise<Transfer>;
   findTransfer(transferGroup: string, bookingId: string): Promise<Transfer | null>;
   createRefund(input: CreateRefundInput): Promise<Refund>;
+  listChargeRefunds(chargeId: string): Promise<Refund[]>;
   reverseTransfer(input: ReverseTransferInput): Promise<TransferReversal>;
   retrieveEvent(eventId: string): Promise<GatewayEvent>;
   constructWebhookEvent(rawBody: Buffer | string, signature: string): GatewayEvent;

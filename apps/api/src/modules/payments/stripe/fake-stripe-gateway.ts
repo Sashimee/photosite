@@ -40,6 +40,8 @@ export class FakeStripeGateway implements StripeGateway {
     Transfer & { reversedCents: number; transferGroup: string; metadata: Record<string, string> }
   >();
   private readonly refundedCents = new Map<string, number>();
+  private readonly refundsByIntent = new Map<string, Refund[]>();
+  private readonly chargeIntents = new Map<string, string>();
   private readonly events = new Map<string, GatewayEvent>();
 
   constructor(
@@ -156,8 +158,19 @@ export class FakeStripeGateway implements StripeGateway {
         throw new Error(`fake stripe: refund exceeds the unrefunded amount of ${intent.id}`);
       }
       this.refundedCents.set(intent.id, refunded + amountCents);
-      return { id: this.nextId('re_fake'), amountCents, status: 'succeeded' };
+      const refund: Refund = { id: this.nextId('re_fake'), amountCents, status: 'succeeded' };
+      this.refundsByIntent.set(intent.id, [...(this.refundsByIntent.get(intent.id) ?? []), refund]);
+      return { ...refund };
     });
+  }
+
+  listChargeRefunds(chargeId: string): Promise<Refund[]> {
+    const paymentIntentId = this.chargeIntents.get(chargeId);
+    if (paymentIntentId === undefined) {
+      return Promise.reject(new Error(`fake stripe: no such charge ${chargeId}`));
+    }
+    const refunds = this.refundsByIntent.get(paymentIntentId) ?? [];
+    return Promise.resolve(refunds.map((refund) => ({ ...refund })).reverse());
   }
 
   reverseTransfer(input: ReverseTransferInput): Promise<TransferReversal> {
@@ -214,6 +227,13 @@ export class FakeStripeGateway implements StripeGateway {
 
   signPayload(payload: string, timestamp: number = this.nowSeconds()): string {
     return `t=${String(timestamp)},v1=${this.hmac(timestamp, payload)}`;
+  }
+
+  linkCharge(chargeId: string, paymentIntentId: string): void {
+    if (!this.paymentIntents.has(paymentIntentId)) {
+      throw new Error(`fake stripe: no such payment_intent ${paymentIntentId}`);
+    }
+    this.chargeIntents.set(chargeId, paymentIntentId);
   }
 
   updateAccount(
