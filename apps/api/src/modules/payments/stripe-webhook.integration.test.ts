@@ -754,6 +754,71 @@ describe('stripe webhook integration', () => {
       expect(won.amountRefundedCents).toBe(0);
     });
 
+    it('refuses to release a disputed booking and resumes the release once the dispute is won', async () => {
+      const booking = await paidBooking('dispute-release');
+      const account = await gateway().createConnectedAccount({
+        country: 'LU',
+        metadata: {},
+        idempotencyKey: `it_account_${booking.bookingId}`,
+      });
+      await prisma.photographerProfile.update({
+        where: { id: booking.photographer.profileId },
+        data: { stripeAccountId: account.id },
+      });
+      await prisma.booking.update({
+        where: { id: booking.bookingId },
+        data: { status: 'delivered', releaseDueAt: new Date(Date.now() - 60 * 1000) },
+      });
+
+      const disputeId = `dp_it_${randomUUID()}`;
+      const created = disputeEvent('charge.dispute.created', {
+        id: disputeId,
+        chargeId: booking.chargeId,
+        status: 'needs_response',
+      });
+      expect((await sendEvent(created)).statusCode).toBe(200);
+      const disputed = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(disputed.status).toBe('disputed');
+
+      const releaseService = app.get(BookingReleaseService);
+      const refused = await releaseService.release(booking.bookingId, { type: 'system', id: null });
+      expect(refused).toEqual({ status: 'skipped', reason: 'disputed' });
+      const stillDisputed = await prisma.booking.findUniqueOrThrow({
+        where: { id: booking.bookingId },
+      });
+      expect(stillDisputed.status).toBe('disputed');
+      expect(stillDisputed.transferId).toBeNull();
+      expect(
+        (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'transfer'),
+      ).toHaveLength(0);
+
+      const closed = disputeEvent('charge.dispute.closed', {
+        id: disputeId,
+        chargeId: booking.chargeId,
+        status: 'won',
+      });
+      expect((await sendEvent(closed)).statusCode).toBe(200);
+      const restored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(restored.status).toBe('delivered');
+
+      const released = await releaseService.release(booking.bookingId, {
+        type: 'system',
+        id: null,
+      });
+      expect(released).toMatchObject({
+        status: 'released',
+        amountCents: expect.any(Number) as unknown,
+      });
+      const finalBooking = await prisma.booking.findUniqueOrThrow({
+        where: { id: booking.bookingId },
+      });
+      expect(finalBooking.status).toBe('released');
+      expect(finalBooking.transferId).not.toBeNull();
+      expect(
+        (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'transfer'),
+      ).toHaveLength(1);
+    });
+
     it('keeps the booking disputed when the dispute is lost', async () => {
       const booking = await paidBooking('dispute-lost');
       const disputeId = `dp_it_${randomUUID()}`;
@@ -905,6 +970,33 @@ describe('stripe webhook integration', () => {
       expect(await bookingAuditCount(booking.bookingId, 'booking.refund_recorded')).toBe(0);
       expect(await bookingAuditCount(booking.bookingId, 'booking.refund_partial')).toBe(1);
       expect(await bookingAuditCount(booking.bookingId, 'booking.refunded')).toBe(1);
+    });
+
+    it.each([0, -1, 1.5])('rejects an amountCents of %s with 400', async (amountCents) => {
+      const booking = await paidBooking('refund-bad-amount');
+
+      const response = await refund(booking.bookingId, booking.client.token, { amountCents });
+
+      expect(response.statusCode).toBe(400);
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(stored.status).toBe('paid_held');
+    });
+
+    it('returns 404 when a stranger requests a refund on someone else’s booking', async () => {
+      const booking = await paidBooking('refund-stranger');
+      const stranger = await signUpAndSignIn('refund-stranger-caller', ['client']);
+
+      const response = await refund(booking.bookingId, stranger.token, {});
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('returns 409 when the client refunds a booking that has already been released', async () => {
+      const booking = await releasedBooking('refund-after-release');
+
+      const response = await refund(booking.bookingId, booking.client.token, {});
+
+      expect(response.statusCode).toBe(409);
     });
   });
 
