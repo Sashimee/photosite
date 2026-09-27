@@ -78,7 +78,10 @@ export interface ProvenanceCheckRow {
 
 export interface ProvenanceCheckTransactionClient {
   portfolioImage: {
-    update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<unknown>;
+    updateMany(args: {
+      where: { id: string; status: string };
+      data: Record<string, unknown>;
+    }): Promise<{ count: number }>;
   };
   provenanceCheck: {
     create(args: { data: Record<string, unknown> }): Promise<ProvenanceCheckRow>;
@@ -257,22 +260,26 @@ export function createProvenanceCheckProcessor(
             data: { portfolioImageId: payload.portfolioImageId, ...data },
           });
 
+      // Only auto-apply the verdict while the image is still awaiting a
+      // decision; a forced recheck must never clobber an admin's decision.
       const status = VERDICT_STATUS[verdict];
       if (status) {
-        await tx.portfolioImage.update({
-          where: { id: payload.portfolioImageId },
+        const result = await tx.portfolioImage.updateMany({
+          where: { id: payload.portfolioImageId, status: 'pending_review' },
           data: { status },
         });
-        await tx.auditLog.create({
-          data: {
-            actorType: 'system',
-            actorId: null,
-            action: `provenance_check.${status}`,
-            targetType: 'ProvenanceCheck',
-            targetId: check.id,
-            after: { verdict },
-          },
-        });
+        if (result.count > 0) {
+          await tx.auditLog.create({
+            data: {
+              actorType: 'system',
+              actorId: null,
+              action: `provenance_check.${status}`,
+              targetType: 'ProvenanceCheck',
+              targetId: check.id,
+              after: { verdict },
+            },
+          });
+        }
       }
 
       return check;

@@ -61,16 +61,16 @@ function fakeDeps(options: {
   provenanceEnabled?: boolean;
   provenanceC2paEnabled?: boolean;
 }) {
+  const portfolioImageRow =
+    options.portfolioImage === undefined ? BASE_PORTFOLIO_IMAGE : options.portfolioImage;
   const findUniqueProvenanceCheck = vi.fn(() => Promise.resolve(options.existing ?? null));
-  const findUniquePortfolioImage = vi.fn(() =>
-    Promise.resolve(
-      options.portfolioImage === undefined ? BASE_PORTFOLIO_IMAGE : options.portfolioImage,
-    ),
-  );
+  const findUniquePortfolioImage = vi.fn(() => Promise.resolve(portfolioImageRow));
   const findUniqueUpload = vi.fn(() =>
     Promise.resolve(options.upload === undefined ? BASE_UPLOAD : options.upload),
   );
-  const portfolioImageUpdate = vi.fn(() => Promise.resolve(undefined));
+  const portfolioImageUpdateMany = vi.fn((args: { where: { status: string } }) =>
+    Promise.resolve({ count: portfolioImageRow?.status === args.where.status ? 1 : 0 }),
+  );
   const auditLogCreate = vi.fn(() => Promise.resolve(undefined));
   let nextId = 0;
   const provenanceCheckCreate = vi.fn((args: { data: Record<string, unknown> }) =>
@@ -100,7 +100,7 @@ function fakeDeps(options: {
         upload: { findUnique: findUniqueUpload },
         $transaction: (fn) =>
           fn({
-            portfolioImage: { update: portfolioImageUpdate },
+            portfolioImage: { updateMany: portfolioImageUpdateMany },
             provenanceCheck: { create: provenanceCheckCreate, update: provenanceCheckUpdate },
             auditLog: { create: auditLogCreate },
           }),
@@ -119,7 +119,7 @@ function fakeDeps(options: {
     findUniqueProvenanceCheck,
     findUniquePortfolioImage,
     findUniqueUpload,
-    portfolioImageUpdate,
+    portfolioImageUpdateMany,
     auditLogCreate,
     provenanceCheckCreate,
     provenanceCheckUpdate,
@@ -172,7 +172,7 @@ describe('createProvenanceCheckProcessor', () => {
   });
 
   it('marks a pass verdict approved and writes an audit log row', async () => {
-    const { deps, portfolioImageUpdate, auditLogCreate, provenanceCheckCreate } = fakeDeps({});
+    const { deps, portfolioImageUpdateMany, auditLogCreate, provenanceCheckCreate } = fakeDeps({});
 
     await createProvenanceCheckProcessor(deps)(fakeJob(), undefined, undefined);
 
@@ -181,8 +181,8 @@ describe('createProvenanceCheckProcessor', () => {
         data: expect.objectContaining({ verdict: 'pass' }) as unknown,
       }),
     );
-    expect(portfolioImageUpdate).toHaveBeenCalledWith({
-      where: { id: PORTFOLIO_IMAGE_ID },
+    expect(portfolioImageUpdateMany).toHaveBeenCalledWith({
+      where: { id: PORTFOLIO_IMAGE_ID, status: 'pending_review' },
       data: { status: 'approved' },
     });
     expect(auditLogCreate).toHaveBeenCalledWith({
@@ -196,14 +196,14 @@ describe('createProvenanceCheckProcessor', () => {
   });
 
   it('marks a fail verdict flagged and writes an audit log row, never rejected', async () => {
-    const { deps, portfolioImageUpdate, auditLogCreate } = fakeDeps({
+    const { deps, portfolioImageUpdateMany, auditLogCreate } = fakeDeps({
       detect: vi.fn(() => Promise.resolve({ vendor: 'test-vendor', score: 0.99, raw: null })),
     });
 
     await createProvenanceCheckProcessor(deps)(fakeJob(), undefined, undefined);
 
-    expect(portfolioImageUpdate).toHaveBeenCalledWith({
-      where: { id: PORTFOLIO_IMAGE_ID },
+    expect(portfolioImageUpdateMany).toHaveBeenCalledWith({
+      where: { id: PORTFOLIO_IMAGE_ID, status: 'pending_review' },
       data: { status: 'flagged' },
     });
     expect(auditLogCreate).toHaveBeenCalledWith({
@@ -212,24 +212,24 @@ describe('createProvenanceCheckProcessor', () => {
         after: { verdict: 'fail' },
       }) as unknown,
     });
-    expect(portfolioImageUpdate).not.toHaveBeenCalledWith(
+    expect(portfolioImageUpdateMany).not.toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: 'rejected' } }) as unknown,
     );
   });
 
   it('leaves status untouched and writes no audit row on a review verdict', async () => {
-    const { deps, portfolioImageUpdate, auditLogCreate } = fakeDeps({
+    const { deps, portfolioImageUpdateMany, auditLogCreate } = fakeDeps({
       detect: vi.fn(() => Promise.resolve({ vendor: 'test-vendor', score: 0.5, raw: null })),
     });
 
     await createProvenanceCheckProcessor(deps)(fakeJob(), undefined, undefined);
 
-    expect(portfolioImageUpdate).not.toHaveBeenCalled();
+    expect(portfolioImageUpdateMany).not.toHaveBeenCalled();
     expect(auditLogCreate).not.toHaveBeenCalled();
   });
 
   it('forces a review verdict when a provider fails, even if the raw score would pass', async () => {
-    const { deps, portfolioImageUpdate, auditLogCreate, provenanceCheckCreate } = fakeDeps({
+    const { deps, portfolioImageUpdateMany, auditLogCreate, provenanceCheckCreate } = fakeDeps({
       detect: vi.fn(() => Promise.reject(new Error('vendor timeout'))),
     });
 
@@ -238,7 +238,7 @@ describe('createProvenanceCheckProcessor', () => {
     expect(provenanceCheckCreate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ verdict: 'review' }) as unknown }),
     );
-    expect(portfolioImageUpdate).not.toHaveBeenCalled();
+    expect(portfolioImageUpdateMany).not.toHaveBeenCalled();
     expect(auditLogCreate).not.toHaveBeenCalled();
   });
 
@@ -273,7 +273,7 @@ describe('createProvenanceCheckProcessor', () => {
   });
 
   it('forces a review verdict when the reverse-search provider rejects, even if the raw score would pass', async () => {
-    const { deps, portfolioImageUpdate, auditLogCreate, provenanceCheckCreate } = fakeDeps({
+    const { deps, portfolioImageUpdateMany, auditLogCreate, provenanceCheckCreate } = fakeDeps({
       search: vi.fn(() => Promise.reject(new Error('vendor unavailable'))),
     });
 
@@ -282,12 +282,12 @@ describe('createProvenanceCheckProcessor', () => {
     expect(provenanceCheckCreate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ verdict: 'review' }) as unknown }),
     );
-    expect(portfolioImageUpdate).not.toHaveBeenCalled();
+    expect(portfolioImageUpdateMany).not.toHaveBeenCalled();
     expect(auditLogCreate).not.toHaveBeenCalled();
   });
 
   it('forces a review verdict when the C2PA reader rejects, even if the raw score would pass', async () => {
-    const { deps, portfolioImageUpdate, auditLogCreate, provenanceCheckCreate } = fakeDeps({
+    const { deps, portfolioImageUpdateMany, auditLogCreate, provenanceCheckCreate } = fakeDeps({
       provenanceC2paEnabled: true,
       read: vi.fn(() => Promise.reject(new Error('reader crashed'))),
     });
@@ -299,12 +299,12 @@ describe('createProvenanceCheckProcessor', () => {
         data: expect.objectContaining({ verdict: 'review', c2paValid: null }) as unknown,
       }),
     );
-    expect(portfolioImageUpdate).not.toHaveBeenCalled();
+    expect(portfolioImageUpdateMany).not.toHaveBeenCalled();
     expect(auditLogCreate).not.toHaveBeenCalled();
   });
 
   it('does not downgrade an already-fail verdict when a provider also fails', async () => {
-    const { deps, portfolioImageUpdate, auditLogCreate, provenanceCheckCreate } = fakeDeps({
+    const { deps, portfolioImageUpdateMany, auditLogCreate, provenanceCheckCreate } = fakeDeps({
       detect: vi.fn(() => Promise.resolve({ vendor: 'test-vendor', score: 0.99, raw: null })),
       search: vi.fn(() => Promise.reject(new Error('vendor unavailable'))),
     });
@@ -314,8 +314,8 @@ describe('createProvenanceCheckProcessor', () => {
     expect(provenanceCheckCreate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ verdict: 'fail' }) as unknown }),
     );
-    expect(portfolioImageUpdate).toHaveBeenCalledWith({
-      where: { id: PORTFOLIO_IMAGE_ID },
+    expect(portfolioImageUpdateMany).toHaveBeenCalledWith({
+      where: { id: PORTFOLIO_IMAGE_ID, status: 'pending_review' },
       data: { status: 'flagged' },
     });
     expect(auditLogCreate).toHaveBeenCalledWith({
@@ -324,6 +324,22 @@ describe('createProvenanceCheckProcessor', () => {
         after: { verdict: 'fail' },
       }) as unknown,
     });
+  });
+
+  it('does not overwrite an admin decision when a forced recheck runs', async () => {
+    const { deps, portfolioImageUpdateMany, auditLogCreate, provenanceCheckCreate } = fakeDeps({
+      portfolioImage: { ...BASE_PORTFOLIO_IMAGE, status: 'approved' },
+      existing: { id: 'existing-check-id', verdict: 'pass' },
+    });
+
+    await createProvenanceCheckProcessor(deps)(fakeJob(true), undefined, undefined);
+
+    expect(provenanceCheckCreate).not.toHaveBeenCalled();
+    expect(portfolioImageUpdateMany).toHaveBeenCalledWith({
+      where: { id: PORTFOLIO_IMAGE_ID, status: 'pending_review' },
+      data: { status: 'approved' },
+    });
+    expect(auditLogCreate).not.toHaveBeenCalled();
   });
 
   it('treats a missing or malformed EXIF blob as no camera and no capture date', async () => {
