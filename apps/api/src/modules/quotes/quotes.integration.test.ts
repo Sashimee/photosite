@@ -378,6 +378,11 @@ describe('quotes integration', () => {
       await prisma.conversation.deleteMany({
         where: { type: 'quote', participants: { some: { userId: { in: createdUserIds } } } },
       });
+      await prisma.booking.deleteMany({
+        where: {
+          OR: [{ clientId: { in: createdUserIds } }, { photographerId: { in: createdProfileIds } }],
+        },
+      });
       await prisma.quote.deleteMany({
         where: {
           OR: [{ clientId: { in: createdUserIds } }, { photographerId: { in: createdProfileIds } }],
@@ -1158,6 +1163,125 @@ describe('quotes integration', () => {
         headers: authHeaders(photographer.token),
       });
       expect(again.statusCode).toBe(409);
+    });
+  });
+
+  describe('booking on accept', () => {
+    function accept(clientToken: string, quoteId: string) {
+      return fastify().inject({
+        method: 'POST',
+        url: `/v1/quotes/${quoteId}/accept`,
+        headers: authHeaders(clientToken),
+      });
+    }
+
+    it('creates a pending_payment booking from the quote snapshot and returns its id', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const request = await createRequestAs(client.token);
+      const photographer = await createPublishedPhotographer('booking-request');
+      const quote = (
+        await sendQuote(photographer.token, request.id, [
+          { label: 'Coverage', qty: 2, unitCents: 12525 },
+        ])
+      ).json<QuoteBody>();
+
+      const response = await accept(client.token, quote.id);
+      expect(response.statusCode).toBe(200);
+      const body = response.json<QuoteBody & { bookingId: string | null }>();
+      expect(body.status).toBe('accepted');
+      expect(body.bookingId).not.toBeNull();
+
+      const booking = await prisma.booking.findUniqueOrThrow({
+        where: { id: body.bookingId ?? '' },
+      });
+      const requestRow = await prisma.request.findUniqueOrThrow({ where: { id: request.id } });
+      expect(booking).toMatchObject({
+        quoteId: quote.id,
+        clientId: client.id,
+        photographerId: photographer.profileId,
+        status: 'pending_payment',
+        paymentIntentId: null,
+        scheduledAt: requestRow.eventDate,
+      });
+
+      const [location] = await prisma.$queryRaw<{ same: boolean }[]>`
+        SELECT b.location::text = r.location::text AS same
+        FROM "Booking" b JOIN "Request" r ON r.id = ${request.id}
+        WHERE b.id = ${booking.id} AND b.location IS NOT NULL
+      `;
+      expect(location?.same).toBe(true);
+
+      const audit = await prisma.auditLog.findFirst({
+        where: { targetType: 'Booking', targetId: booking.id, action: 'booking.created' },
+      });
+      expect(audit?.actorId).toBe(client.id);
+      expect(audit?.after).toMatchObject({
+        status: 'pending_payment',
+        quoteId: quote.id,
+        totalCents: 25050,
+        platformFeeCents: 1253,
+        currency: 'EUR',
+      });
+    });
+
+    it('creates a booking without schedule or location for a direct quote', async () => {
+      const photographer = await createPublishedPhotographer('booking-direct');
+      const product = await createProduct(photographer.token);
+      const tier = product.tiers[0];
+      if (!tier) {
+        throw new Error('expected a tier');
+      }
+      const client = await signUpAndSignIn(['client']);
+      const quote = (
+        await requestDirectQuote(client.token, photographer.slug, product.id, {
+          productTierId: tier.id,
+        })
+      ).json<QuoteBody>();
+
+      const response = await accept(client.token, quote.id);
+      expect(response.statusCode).toBe(200);
+      const bookingId = response.json<{ bookingId: string }>().bookingId;
+
+      const [row] = await prisma.$queryRaw<
+        { scheduledAt: Date | null; hasLocation: boolean; status: string }[]
+      >`
+        SELECT "scheduledAt", location IS NOT NULL AS "hasLocation", status::text AS status
+        FROM "Booking" WHERE id = ${bookingId}
+      `;
+      expect(row).toEqual({ scheduledAt: null, hasLocation: false, status: 'pending_payment' });
+    });
+
+    it('refuses a non-EUR quote with 422 and leaves the quote sent without a booking', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const request = await createRequestAs(client.token);
+      const photographer = await createPublishedPhotographer('booking-usd');
+      const quote = (await sendQuote(photographer.token, request.id)).json<QuoteBody>();
+      await prisma.quote.update({ where: { id: quote.id }, data: { currency: 'USD' } });
+
+      const response = await accept(client.token, quote.id);
+      expect(response.statusCode).toBe(422);
+
+      const after = await prisma.quote.findUniqueOrThrow({ where: { id: quote.id } });
+      expect(after.status).toBe('sent');
+      expect(await prisma.booking.count({ where: { quoteId: quote.id } })).toBe(0);
+    });
+
+    it('fails loudly on a stored platform fee that does not match the recomputed one', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const request = await createRequestAs(client.token);
+      const photographer = await createPublishedPhotographer('booking-fee-mismatch');
+      const quote = (await sendQuote(photographer.token, request.id)).json<QuoteBody>();
+      await prisma.quote.update({
+        where: { id: quote.id },
+        data: { platformFeeCents: quote.platformFee.amountCents + 1 },
+      });
+
+      const response = await accept(client.token, quote.id);
+      expect(response.statusCode).toBe(500);
+
+      const after = await prisma.quote.findUniqueOrThrow({ where: { id: quote.id } });
+      expect(after.status).toBe('sent');
+      expect(await prisma.booking.count({ where: { quoteId: quote.id } })).toBe(0);
     });
   });
 

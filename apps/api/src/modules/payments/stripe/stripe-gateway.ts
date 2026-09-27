@@ -102,6 +102,7 @@ export interface StripeGateway {
   createConnectedAccount(input: CreateConnectedAccountInput): Promise<ConnectedAccount>;
   createAccountLink(input: CreateAccountLinkInput): Promise<AccountLink>;
   createPaymentIntent(input: CreatePaymentIntentInput): Promise<PaymentIntent>;
+  retrievePaymentIntent(paymentIntentId: string): Promise<PaymentIntent>;
   createTransfer(input: CreateTransferInput): Promise<Transfer>;
   createRefund(input: CreateRefundInput): Promise<Refund>;
   reverseTransfer(input: ReverseTransferInput): Promise<TransferReversal>;

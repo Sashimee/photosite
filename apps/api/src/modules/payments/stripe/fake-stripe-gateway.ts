@@ -91,6 +91,14 @@ export class FakeStripeGateway implements StripeGateway {
     });
   }
 
+  retrievePaymentIntent(paymentIntentId: string): Promise<PaymentIntent> {
+    const intent = this.paymentIntents.get(paymentIntentId);
+    if (!intent) {
+      return Promise.reject(new Error(`fake stripe: no such payment_intent ${paymentIntentId}`));
+    }
+    return Promise.resolve({ ...intent });
+  }
+
   createTransfer(input: CreateTransferInput): Promise<Transfer> {
     return this.idempotent('transfers', input.idempotencyKey, input, () => {
       this.requireAccount(input.destinationAccountId);

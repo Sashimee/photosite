@@ -91,6 +91,21 @@ describe('FakeStripeGateway', () => {
       });
     });
 
+    it('retrieves a created payment intent and rejects an unknown one', async () => {
+      const fake = gateway();
+      const intent = await fake.createPaymentIntent({
+        amountCents: 10_500,
+        currency: 'EUR',
+        transferGroup: 'booking_1',
+        metadata: {},
+        idempotencyKey: 'booking_1_pi',
+      });
+      await expect(fake.retrievePaymentIntent(intent.id)).resolves.toEqual(intent);
+      await expect(fake.retrievePaymentIntent('pi_missing')).rejects.toThrow(
+        /no such payment_intent pi_missing/,
+      );
+    });
+
     it('refunds the full amount by default and rejects an unknown payment intent', async () => {
       const fake = gateway();
       const intent = await fake.createPaymentIntent({
