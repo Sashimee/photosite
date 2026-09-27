@@ -309,6 +309,17 @@ describe('PlatformSettingsSchema and UpdatePlatformSettingsRequestSchema', () =>
     ).toBe(false);
   });
 
+  it('accepts a feePercent with two decimals and rejects a third', () => {
+    expect(
+      PlatformSettingsSchema.safeParse({ feePercent: 7.35, autoReleaseDays: 7, featureFlags })
+        .success,
+    ).toBe(true);
+    expect(UpdatePlatformSettingsRequestSchema.safeParse({ feePercent: 5.05 }).success).toBe(true);
+    expect(UpdatePlatformSettingsRequestSchema.safeParse({ feePercent: 12.345 }).success).toBe(
+      false,
+    );
+  });
+
   it('rejects an autoReleaseDays outside 1..60', () => {
     expect(
       PlatformSettingsSchema.safeParse({ feePercent: 5, autoReleaseDays: 61, featureFlags })

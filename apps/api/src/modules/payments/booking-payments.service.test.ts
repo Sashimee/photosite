@@ -42,45 +42,42 @@ function bookingRow(overrides: Partial<BookingRow> = {}): BookingRow {
   };
 }
 
-function setup(
-  options: {
-    booking?: BookingRow | null;
-    storedByOtherCall?: () => string | null;
-    gateway?: FakeStripeGateway;
-  } = {},
-) {
+function setup(options: { booking?: BookingRow | null; gateway?: FakeStripeGateway } = {}) {
   let row = options.booking === undefined ? bookingRow() : options.booking;
-  const booking = {
-    findUnique: vi.fn(() => Promise.resolve(row && { ...row, quote: { ...row.quote } })),
-    findUniqueOrThrow: vi.fn(() => Promise.resolve({ paymentIntentId: row?.paymentIntentId })),
-    updateMany: vi.fn(
-      ({
-        where,
-        data,
-      }: {
-        where: { paymentIntentId: null };
-        data: { paymentIntentId: string };
-      }) => {
+  const calls: string[] = [];
+  const tx = {
+    $queryRaw: vi.fn((strings: TemplateStringsArray, id: string, clientId: string) => {
+      calls.push(strings.join('?'));
+      return Promise.resolve(row?.id === id && row.clientId === clientId ? [{ id }] : []);
+    }),
+    booking: {
+      findUniqueOrThrow: vi.fn(() => {
+        calls.push('findUniqueOrThrow');
         if (!row) {
-          return Promise.resolve({ count: 0 });
+          return Promise.reject(new Error('booking missing'));
         }
-        const concurrent = options.storedByOtherCall?.();
-        if (concurrent) {
-          row = { ...row, paymentIntentId: concurrent };
-        }
-        if (row.paymentIntentId !== where.paymentIntentId) {
-          return Promise.resolve({ count: 0 });
+        return Promise.resolve({ ...row, quote: { ...row.quote } });
+      }),
+      update: vi.fn(({ data }: { data: { paymentIntentId: string } }) => {
+        if (!row) {
+          return Promise.reject(new Error('booking missing'));
         }
         row = { ...row, paymentIntentId: data.paymentIntentId };
-        return Promise.resolve({ count: 1 });
-      },
-    ),
+        return Promise.resolve(row);
+      }),
+    },
   };
-  const prisma = { client: { booking } } as unknown as PrismaService;
+  let lock: Promise<unknown> = Promise.resolve();
+  const $transaction = vi.fn((fn: (client: typeof tx) => Promise<unknown>) => {
+    const run = lock.then(() => fn(tx));
+    lock = run.catch(() => undefined);
+    return run;
+  });
+  const prisma = { client: { $transaction } } as unknown as PrismaService;
   const gateway = options.gateway ?? new FakeStripeGateway('whsec_unit');
   const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
   const service = new BookingPaymentsService(prisma, gateway, logger as unknown as Logger);
-  return { service, gateway, booking, logger, current: () => row };
+  return { service, gateway, tx, $transaction, logger, calls, current: () => row };
 }
 
 async function expectHttpStatus(promise: Promise<unknown>, status: number) {
@@ -167,25 +164,35 @@ describe('BookingPaymentsService.createPaymentIntent', () => {
     expect(createSpy).not.toHaveBeenCalled();
   });
 
-  it('returns the intent a concurrent call stored instead of its own', async () => {
-    let otherId: string | null = null;
-    const { service, gateway, logger } = setup({ storedByOtherCall: () => otherId });
-    const other = await gateway.createPaymentIntent({
-      amountCents: 25050,
-      currency: 'EUR',
-      transferGroup: 'booking_booking-1',
-      metadata: { bookingId: 'booking-1' },
-      idempotencyKey: 'another-key',
-    });
-    otherId = other.id;
+  it('locks the booking row before reading it', async () => {
+    const { service, tx, calls } = setup();
 
-    const result = await service.createPaymentIntent(CLIENT, 'booking-1');
+    await service.createPaymentIntent(CLIENT, 'booking-1');
 
-    expect(result.clientSecret).toBe(other.clientSecret);
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ bookingId: 'booking-1', paymentIntentId: other.id }),
-      expect.any(String),
-    );
+    expect(calls[0]).toContain('FOR UPDATE');
+    expect(calls[1]).toBe('findUniqueOrThrow');
+    expect(tx.$queryRaw.mock.calls[0]?.slice(1)).toEqual(['booking-1', CLIENT.id]);
+  });
+
+  it('creates a single intent when two calls race for the same booking', async () => {
+    const { service, gateway } = setup();
+    const createSpy = vi.spyOn(gateway, 'createPaymentIntent');
+
+    const [first, second] = await Promise.all([
+      service.createPaymentIntent(CLIENT, 'booking-1'),
+      service.createPaymentIntent(CLIENT, 'booking-1'),
+    ]);
+
+    expect(createSpy).toHaveBeenCalledTimes(1);
+    expect(second).toEqual(first);
+  });
+
+  it('does not store an intent when Stripe fails', async () => {
+    const { service, gateway, tx } = setup();
+    vi.spyOn(gateway, 'createPaymentIntent').mockRejectedValueOnce(new Error('stripe down'));
+
+    await expect(service.createPaymentIntent(CLIENT, 'booking-1')).rejects.toThrow('stripe down');
+    expect(tx.booking.update).not.toHaveBeenCalled();
   });
 
   it('throws when the stored intent amount differs from the quote', async () => {

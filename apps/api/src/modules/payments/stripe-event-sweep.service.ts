@@ -7,7 +7,7 @@ import {
 import { Logger } from 'nestjs-pino';
 import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { StripeWebhookService } from './stripe-webhook.service.js';
+import { HANDLED_EVENT_TYPES, StripeWebhookService } from './stripe-webhook.service.js';
 
 // Younger events may still be mid-transaction in the request that received
 // them; older ones are past Stripe's own retry horizon and need a human.
@@ -54,6 +54,7 @@ export class StripeEventSweepService implements OnApplicationBootstrap, OnModule
     const stuck = await this.prisma.client.stripeEvent.findMany({
       where: {
         processedAt: null,
+        type: { in: [...HANDLED_EVENT_TYPES] },
         receivedAt: {
           lt: new Date(now.getTime() - STUCK_EVENT_MIN_AGE_MS),
           gt: new Date(now.getTime() - STUCK_EVENT_MAX_AGE_MS),

@@ -303,7 +303,7 @@ export const FeatureFlagStateSchema = z
 // so a fee change here is never retroactive.
 export const PlatformSettingsSchema = z
   .object({
-    feePercent: z.number().min(0).max(100).nullable(),
+    feePercent: z.number().min(0).max(100).multipleOf(0.01).nullable(),
     autoReleaseDays: z.int().min(1).max(60),
     featureFlags: z.array(FeatureFlagStateSchema),
   })
@@ -322,7 +322,7 @@ export const UpdateFeatureFlagsRequestSchema = z
 
 export const UpdatePlatformSettingsRequestSchema = z
   .object({
-    feePercent: z.number().min(0).max(100).optional(),
+    feePercent: z.number().min(0).max(100).multipleOf(0.01).optional(),
     autoReleaseDays: z.int().min(1).max(60).optional(),
     featureFlags: UpdateFeatureFlagsRequestSchema.optional(),
   })
