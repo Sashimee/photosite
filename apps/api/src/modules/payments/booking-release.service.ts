@@ -7,7 +7,7 @@ import {
   transitionBooking,
   type BookingTransition,
 } from '../bookings/booking-state.js';
-import { assertQuoteFeeMatches, assertSupportedCurrency } from '../bookings/create-booking.js';
+import { assertSupportedCurrency } from '../bookings/create-booking.js';
 import { transferGroupFor } from './booking-payments.service.js';
 import { STRIPE_GATEWAY, type StripeGateway, type Transfer } from './stripe/stripe-gateway.js';
 
@@ -135,7 +135,6 @@ export class BookingReleaseService {
 
         const { quote } = booking;
         assertSupportedCurrency(quote.currency);
-        assertQuoteFeeMatches(quote);
         const amountCents = payoutAmount(quote);
         if (amountCents <= 0) {
           throw new Error(

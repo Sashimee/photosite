@@ -209,6 +209,23 @@ describe('BookingReleaseService.release', () => {
     expect(ledger.reduce((sum, entry) => sum + entry.amountCents, 0)).toBe(0);
   });
 
+  it('pays out from the charged quote snapshot even when the fee helper would round differently', async () => {
+    const { service, ledger, row } = await setup({
+      quote: {
+        subtotalCents: 25050,
+        platformFeeCents: 1300,
+        feePercent: new Prisma.Decimal('5.00'),
+        totalCents: 25050,
+        currency: 'EUR',
+      },
+    });
+
+    const outcome = await service.release('booking-1', user, NOW);
+
+    expect(outcome).toEqual({ status: 'released', transferId: row.transferId, amountCents: 23750 });
+    expect(ledger.reduce((sum, entry) => sum + entry.amountCents, 0)).toBe(0);
+  });
+
   it('releases an accepted delivery before releaseDueAt and records the trigger', async () => {
     const { service, row, audits } = await setup({
       releaseDueAt: FUTURE,
