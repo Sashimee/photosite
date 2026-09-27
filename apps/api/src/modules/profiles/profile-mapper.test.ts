@@ -43,6 +43,8 @@ function fakeProvenanceCheck(overrides: Partial<ProvenanceCheck> = {}): Provenan
     reviewedByAdminId: null,
     reviewedAt: null,
     note: null,
+    decisionReason: null,
+    decisionReasonText: null,
     raw: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
@@ -73,6 +75,8 @@ describe('mapPortfolioImage', () => {
       verdict: 'pass',
       status: 'approved',
       checkedAt: '2026-01-15T10:00:00.000Z',
+      decisionReason: null,
+      decisionReasonText: null,
     });
   });
 
@@ -86,6 +90,29 @@ describe('mapPortfolioImage', () => {
       verdict: 'fail',
       status: 'flagged',
       checkedAt: '2026-01-15T10:00:00.000Z',
+      decisionReason: null,
+      decisionReasonText: null,
     });
+  });
+
+  it('surfaces the decision reason and text to the image owner, but never the admin note', () => {
+    const image = fakeImage({ status: 'rejected' });
+    const check = fakeProvenanceCheck({
+      verdict: 'fail',
+      note: 'admin-internal detail',
+      decisionReason: 'ai_generated',
+      decisionReasonText: 'Detected generative artifacts',
+    });
+
+    const result = mapPortfolioImage(image, fakeUpload(), BASE_URL, check);
+
+    expect(result.provenance).toEqual({
+      verdict: 'fail',
+      status: 'rejected',
+      checkedAt: '2026-01-15T10:00:00.000Z',
+      decisionReason: 'ai_generated',
+      decisionReasonText: 'Detected generative artifacts',
+    });
+    expect(JSON.stringify(result)).not.toContain('admin-internal detail');
   });
 });

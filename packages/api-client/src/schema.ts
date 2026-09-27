@@ -11388,6 +11388,12 @@ export interface components {
              * @example 2026-09-16T12:00:00.000Z
              */
             checkedAt: string | null;
+            /**
+             * @example ai_generated
+             * @enum {string|null}
+             */
+            decisionReason: "ai_generated" | "not_own_work" | "manipulated_metadata" | "other" | null;
+            decisionReasonText: string | null;
         } | null;
         OwnProfessionalProfile: {
             /**
@@ -12865,6 +12871,12 @@ export interface components {
              */
             reviewedByAdminId: string | null;
             note: string | null;
+            /**
+             * @example ai_generated
+             * @enum {string|null}
+             */
+            decisionReason: "ai_generated" | "not_own_work" | "manipulated_metadata" | "other" | null;
+            decisionReasonText: string | null;
         };
         ProvenanceDecisionRequest: {
             /**
@@ -12873,6 +12885,12 @@ export interface components {
              */
             status: "approved" | "flagged" | "rejected";
             note: string;
+            /**
+             * @example ai_generated
+             * @enum {string}
+             */
+            decisionReason?: "ai_generated" | "not_own_work" | "manipulated_metadata" | "other";
+            decisionReasonText?: string;
         };
         AdminBooking: {
             /**
@@ -13148,7 +13166,7 @@ export interface components {
          * @example quote_received
          * @enum {string}
          */
-        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "data-export-ready" | "data-export-failed" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action";
+        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "data-export-ready" | "data-export-failed" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision";
         AdminEmailTemplatePreview: {
             subject: string;
             html: string;
@@ -13183,7 +13201,7 @@ export interface components {
              * @example quote_received
              * @enum {string}
              */
-            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action";
+            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision";
             payload: components["schemas"]["NotificationPayload"];
             channels: ("email" | "push" | "in_app")[];
             /**
@@ -13237,6 +13255,10 @@ export interface components {
             jobApplicationId?: string;
             /** @enum {string} */
             moderationOutcome?: "resolved" | "dismissed" | "takedown" | "restored";
+            /** @enum {string} */
+            provenanceDecision?: "flagged" | "rejected";
+            /** @enum {string} */
+            decisionReason?: "ai_generated" | "not_own_work" | "manipulated_metadata" | "other";
         };
         UnreadCount: {
             count: number;
@@ -13252,7 +13274,7 @@ export interface components {
              * @example quote_received
              * @enum {string}
              */
-            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action";
+            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision";
             /**
              * @example email
              * @enum {string}

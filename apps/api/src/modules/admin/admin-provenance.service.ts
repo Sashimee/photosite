@@ -7,6 +7,7 @@ import type {
 } from '@photoo/shared';
 import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { ProvenanceCheckQueueService } from '../profiles/provenance-check-queue.service.js';
 import { AdminAuditService } from './admin-audit.service.js';
 import {
@@ -43,6 +44,7 @@ export class AdminProvenanceService {
     @Inject(AdminAuditService) private readonly auditService: AdminAuditService,
     @Inject(ProvenanceCheckQueueService)
     private readonly provenanceQueue: ProvenanceCheckQueueService,
+    @Inject(NotificationsService) private readonly notifications: NotificationsService,
     @Inject(APP_CONFIG) config: Env,
   ) {
     this.baseUrl = config.S3_PUBLIC_BASE_URL;
@@ -93,11 +95,21 @@ export class AdminProvenanceService {
       throw notFound();
     }
 
+    const decisionReason = body.status === 'approved' ? null : (body.decisionReason ?? null);
+    const decisionReasonText =
+      body.status === 'approved' ? null : (body.decisionReasonText ?? null);
+
     const updated = await this.prisma.client.$transaction(async (tx) => {
       const reviewedAt = new Date();
       await tx.provenanceCheck.update({
         where: { id },
-        data: { reviewedByAdminId: admin.id, reviewedAt, note: body.note },
+        data: {
+          reviewedByAdminId: admin.id,
+          reviewedAt,
+          note: body.note,
+          decisionReason,
+          decisionReasonText,
+        },
       });
       await tx.portfolioImage.update({
         where: { id: existing.portfolioImageId },
@@ -113,7 +125,12 @@ export class AdminProvenanceService {
           portfolioImageStatus: existing.portfolioImage.status,
           reviewedByAdminId: existing.reviewedByAdminId,
         },
-        after: { portfolioImageStatus: body.status, note: body.note },
+        after: {
+          portfolioImageStatus: body.status,
+          note: body.note,
+          decisionReason,
+          decisionReasonText,
+        },
         ip: ip ?? null,
       });
 
@@ -122,6 +139,18 @@ export class AdminProvenanceService {
         include: withPortfolioImage,
       });
     });
+
+    if (body.status === 'flagged' || body.status === 'rejected') {
+      await this.notifications.notify(
+        existing.portfolioImage.profile.userId,
+        'provenance_decision',
+        {
+          provenanceDecision: body.status,
+          decisionReason: decisionReason ?? undefined,
+          reason: decisionReasonText ?? undefined,
+        },
+      );
+    }
 
     return mapAdminProvenanceCheck(updated, this.baseUrl);
   }

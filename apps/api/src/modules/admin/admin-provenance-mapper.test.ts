@@ -24,6 +24,8 @@ function fakeCheck(
     reviewedByAdminId: null,
     reviewedAt: null,
     note: null,
+    decisionReason: null,
+    decisionReasonText: null,
     raw: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
@@ -116,6 +118,21 @@ describe('mapAdminProvenanceCheck', () => {
     const detail = mapAdminProvenanceCheck(fakeCheck({ reverseMatches: null }), BASE_URL);
 
     expect(detail.reverseMatches).toBeNull();
+  });
+
+  it('includes the decision reason and text alongside the admin note', () => {
+    const detail = mapAdminProvenanceCheck(
+      fakeCheck({
+        note: 'admin-internal detail',
+        decisionReason: 'ai_generated',
+        decisionReasonText: 'Detected generative artifacts',
+      }),
+      BASE_URL,
+    );
+
+    expect(detail.decisionReason).toBe('ai_generated');
+    expect(detail.decisionReasonText).toBe('Detected generative artifacts');
+    expect(detail.note).toBe('admin-internal detail');
   });
 
   it('drops malformed reverse match entries instead of trusting their shape', () => {

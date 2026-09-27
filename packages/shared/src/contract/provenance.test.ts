@@ -39,6 +39,8 @@ const validCheck = {
   exifCapturedAt: '2026-08-01T10:00:00.000Z',
   reviewedByAdminId: null,
   note: null,
+  decisionReason: null,
+  decisionReasonText: null,
 };
 
 describe('PortfolioImageProvenanceSchema', () => {
@@ -48,6 +50,8 @@ describe('PortfolioImageProvenanceSchema', () => {
         verdict: 'pass',
         status: 'approved',
         checkedAt: '2026-09-16T12:00:00.000Z',
+        decisionReason: null,
+        decisionReasonText: null,
       }).success,
     ).toBe(true);
   });
@@ -58,6 +62,20 @@ describe('PortfolioImageProvenanceSchema', () => {
         verdict: 'review',
         status: 'pending_review',
         checkedAt: null,
+        decisionReason: null,
+        decisionReasonText: null,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts a decision reason for a rejected image', () => {
+    expect(
+      PortfolioImageProvenanceSchema.safeParse({
+        verdict: 'fail',
+        status: 'rejected',
+        checkedAt: '2026-09-16T12:00:00.000Z',
+        decisionReason: 'ai_generated',
+        decisionReasonText: null,
       }).success,
     ).toBe(true);
   });
@@ -68,6 +86,8 @@ describe('PortfolioImageProvenanceSchema', () => {
         verdict: 'suspicious',
         status: 'approved',
         checkedAt: null,
+        decisionReason: null,
+        decisionReasonText: null,
       }).success,
     ).toBe(false);
   });
@@ -78,6 +98,8 @@ describe('PortfolioImageProvenanceSchema', () => {
         verdict: 'pass',
         status: 'approved',
         checkedAt: null,
+        decisionReason: null,
+        decisionReasonText: null,
         score: 0.1,
       }).success,
     ).toBe(false);
@@ -193,6 +215,16 @@ describe('AdminProvenanceCheckSchema', () => {
       AdminProvenanceCheckSchema.safeParse({ ...validCheck, note: 'a'.repeat(2001) }).success,
     ).toBe(false);
   });
+
+  it('accepts a decision reason and text for a rejected image', () => {
+    expect(
+      AdminProvenanceCheckSchema.safeParse({
+        ...validCheck,
+        decisionReason: 'other',
+        decisionReasonText: 'Watermark from a stock library',
+      }).success,
+    ).toBe(true);
+  });
 });
 
 describe('PROVENANCE_DECISION_STATUSES', () => {
@@ -229,8 +261,58 @@ describe('ProvenanceDecisionRequestSchema', () => {
 
   it('accepts a note at exactly 2000 characters', () => {
     expect(
-      ProvenanceDecisionRequestSchema.safeParse({ status: 'rejected', note: 'a'.repeat(2000) })
-        .success,
+      ProvenanceDecisionRequestSchema.safeParse({
+        status: 'rejected',
+        note: 'a'.repeat(2000),
+        decisionReason: 'ai_generated',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a rejected decision with no decisionReason', () => {
+    expect(
+      ProvenanceDecisionRequestSchema.safeParse({ status: 'rejected', note: 'Looks fake' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an approved decision that sets decisionReason', () => {
+    expect(
+      ProvenanceDecisionRequestSchema.safeParse({
+        status: 'approved',
+        note: 'Looks fine',
+        decisionReason: 'other',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an approved decision that sets decisionReasonText', () => {
+    expect(
+      ProvenanceDecisionRequestSchema.safeParse({
+        status: 'approved',
+        note: 'Looks fine',
+        decisionReasonText: 'not needed',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects decisionReason "other" with no decisionReasonText', () => {
+    expect(
+      ProvenanceDecisionRequestSchema.safeParse({
+        status: 'flagged',
+        note: 'Needs a closer look',
+        decisionReason: 'other',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts decisionReason "other" with decisionReasonText', () => {
+    expect(
+      ProvenanceDecisionRequestSchema.safeParse({
+        status: 'flagged',
+        note: 'Needs a closer look',
+        decisionReason: 'other',
+        decisionReasonText: 'Metadata timestamp predates the camera model',
+      }).success,
     ).toBe(true);
   });
 });

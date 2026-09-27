@@ -73,6 +73,8 @@ export function mapPortfolioImage(
           verdict: provenanceCheck.verdict,
           status: image.status,
           checkedAt: provenanceCheck.createdAt.toISOString(),
+          decisionReason: provenanceCheck.decisionReason,
+          decisionReasonText: provenanceCheck.decisionReasonText,
         }
       : null,
   });

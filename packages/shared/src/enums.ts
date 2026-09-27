@@ -202,6 +202,7 @@ export const NOTIFICATION_TYPES = [
   'job_application_status_changed',
   'report_decision',
   'moderation_action',
+  'provenance_decision',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

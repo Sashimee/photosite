@@ -74,5 +74,7 @@ export function mapAdminProvenanceCheck(
     exifCapturedAt: check.exifCapturedAt?.toISOString() ?? null,
     reviewedByAdminId: check.reviewedByAdminId,
     note: check.note,
+    decisionReason: check.decisionReason,
+    decisionReasonText: check.decisionReasonText,
   });
 }

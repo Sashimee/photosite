@@ -36,6 +36,8 @@ interface ProvenanceDetailBody extends ProvenanceSummaryBody {
   exifCapturedAt: string | null;
   reviewedByAdminId: string | null;
   note: string | null;
+  decisionReason: string | null;
+  decisionReasonText: string | null;
 }
 
 interface PageBody<T> {
@@ -173,7 +175,7 @@ describe('admin provenance integration', () => {
       status?: 'processing' | 'pending_review' | 'approved' | 'flagged' | 'rejected';
       score?: string;
     } = {},
-  ): Promise<{ id: string; portfolioImageId: string; profileId: string }> {
+  ): Promise<{ id: string; portfolioImageId: string; profileId: string; userId: string }> {
     const slug = `fx-provenance-${label}-${randomUUID().slice(0, 8)}`;
     const user = await prisma.user.create({
       data: {
@@ -251,7 +253,12 @@ describe('admin provenance integration', () => {
       },
     });
 
-    return { id: check.id, portfolioImageId: portfolioImage.id, profileId: profile.id };
+    return {
+      id: check.id,
+      portfolioImageId: portfolioImage.id,
+      profileId: profile.id,
+      userId: user.id,
+    };
   }
 
   async function fetchPage(
@@ -495,6 +502,51 @@ describe('admin provenance integration', () => {
       expect(response.statusCode).toBe(404);
     });
 
+    it('returns 400 when decisionReason is missing on a flagged decision', async () => {
+      const admin = await makeAdmin('decision-missing-reason', ['moderation']);
+      const check = await createFixtureCheck('decision-missing-reason', {
+        status: 'pending_review',
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/provenance/${check.id}/decision`,
+        headers: admin.headers,
+        payload: { status: 'flagged', note: 'possible AI generation' },
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('returns 400 when decisionReason is supplied on an approved decision', async () => {
+      const admin = await makeAdmin('decision-approved-with-reason', ['moderation']);
+      const check = await createFixtureCheck('decision-approved-with-reason', {
+        status: 'pending_review',
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/provenance/${check.id}/decision`,
+        headers: admin.headers,
+        payload: { status: 'approved', note: 'looks fine', decisionReason: 'ai_generated' },
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('returns 400 when decisionReason is "other" without decisionReasonText', async () => {
+      const admin = await makeAdmin('decision-other-no-text', ['moderation']);
+      const check = await createFixtureCheck('decision-other-no-text', {
+        status: 'pending_review',
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/provenance/${check.id}/decision`,
+        headers: admin.headers,
+        payload: { status: 'rejected', note: 'possible AI generation', decisionReason: 'other' },
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
     it('updates the portfolio image status and writes an audit row', async () => {
       const admin = await makeAdmin('decision-ok', ['moderation']);
       const check = await createFixtureCheck('decision-ok', { status: 'pending_review' });
@@ -504,13 +556,19 @@ describe('admin provenance integration', () => {
         url: `/v1/admin/provenance/${check.id}/decision`,
         headers: admin.headers,
         remoteAddress: FAKE_IP,
-        payload: { status: 'flagged', note: 'possible AI generation' },
+        payload: {
+          status: 'flagged',
+          note: 'possible AI generation',
+          decisionReason: 'ai_generated',
+        },
       });
       expect(response.statusCode).toBe(200);
       const body = response.json<ProvenanceDetailBody>();
       expect(body.portfolioImageStatus).toBe('flagged');
       expect(body.reviewedByAdminId).toBe(admin.id);
       expect(body.note).toBe('possible AI generation');
+      expect(body.decisionReason).toBe('ai_generated');
+      expect(body.decisionReasonText).toBeNull();
 
       const portfolioImage = await prisma.portfolioImage.findUnique({
         where: { id: check.portfolioImageId },
@@ -531,8 +589,43 @@ describe('admin provenance integration', () => {
       expect(auditRow?.after).toEqual({
         portfolioImageStatus: 'flagged',
         note: 'possible AI generation',
+        decisionReason: 'ai_generated',
+        decisionReasonText: null,
       });
       expect(auditRow?.ip).toBe(FAKE_IP);
+
+      const notification = await prisma.notification.findFirst({
+        where: { userId: check.userId, type: 'provenance_decision' },
+      });
+      expect(notification).not.toBeNull();
+      expect(
+        (notification?.payload as { provenanceDecision?: string; decisionReason?: string } | null)
+          ?.provenanceDecision,
+      ).toBe('flagged');
+      expect(
+        (notification?.payload as { provenanceDecision?: string; decisionReason?: string } | null)
+          ?.decisionReason,
+      ).toBe('ai_generated');
+    });
+
+    it('does not notify the owner when the decision approves the image', async () => {
+      const admin = await makeAdmin('decision-approve-no-notify', ['moderation']);
+      const check = await createFixtureCheck('decision-approve-no-notify', {
+        status: 'pending_review',
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/provenance/${check.id}/decision`,
+        headers: admin.headers,
+        payload: { status: 'approved', note: 'looks fine' },
+      });
+      expect(response.statusCode).toBe(200);
+
+      const notification = await prisma.notification.findFirst({
+        where: { userId: check.userId, type: 'provenance_decision' },
+      });
+      expect(notification).toBeNull();
     });
   });
 
