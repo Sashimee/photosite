@@ -34,17 +34,27 @@ async function fakeJpegBuffer(): Promise<Buffer> {
     .toBuffer();
 }
 
-function fakeDeps(buffer: Buffer, upload: UploadRow | null = BASE_UPLOAD) {
+function fakeDeps(
+  buffer: Buffer,
+  upload: UploadRow | null = BASE_UPLOAD,
+  portfolioImageRows: { id: string }[] = [],
+) {
   const update = vi.fn(() => Promise.resolve(upload ?? BASE_UPLOAD));
   const putObject = vi.fn<(input: PutObjectArgs) => Promise<void>>(() => Promise.resolve());
-  const portfolioImageUpdateMany = vi.fn(() => Promise.resolve({ count: 0 }));
+  const portfolioImageUpdateManyAndReturn = vi.fn(() => Promise.resolve(portfolioImageRows));
+  const provenanceCheckQueueAdd = vi.fn<
+    (name: string, data: unknown, opts?: object) => Promise<void>
+  >(() => Promise.resolve());
 
   const deps: ImageProcessDeps = {
     prisma: {
       client: {
         upload: { findUnique: vi.fn(() => Promise.resolve(upload)), update },
         $transaction: (fn) =>
-          fn({ upload: { update }, portfolioImage: { updateMany: portfolioImageUpdateMany } }),
+          fn({
+            upload: { update },
+            portfolioImage: { updateManyAndReturn: portfolioImageUpdateManyAndReturn },
+          }),
       },
     },
     storage: {
@@ -52,11 +62,12 @@ function fakeDeps(buffer: Buffer, upload: UploadRow | null = BASE_UPLOAD) {
       getObjectBuffer: vi.fn(() => Promise.resolve(buffer)),
       putObject,
     },
+    provenanceCheckQueue: { add: provenanceCheckQueueAdd },
     maxPixels: 100_000_000,
     logger: fakeLogger(),
   };
 
-  return { deps, update, putObject, portfolioImageUpdateMany };
+  return { deps, update, putObject, portfolioImageUpdateManyAndReturn, provenanceCheckQueueAdd };
 }
 
 describe('createImageProcessProcessor', () => {
@@ -84,14 +95,50 @@ describe('createImageProcessProcessor', () => {
 
   it('moves a portfolio image linked to the upload from processing to pending_review', async () => {
     const buffer = await fakeJpegBuffer();
-    const { deps, portfolioImageUpdateMany } = fakeDeps(buffer);
+    const { deps, portfolioImageUpdateManyAndReturn } = fakeDeps(buffer);
 
     await createImageProcessProcessor(deps)(fakeJob(), undefined, undefined);
 
-    expect(portfolioImageUpdateMany).toHaveBeenCalledWith({
+    expect(portfolioImageUpdateManyAndReturn).toHaveBeenCalledWith({
       where: { uploadId: UPLOAD_ID, status: 'processing' },
       data: { status: 'pending_review', width: 400, height: 300 },
     });
+  });
+
+  it('enqueues a provenance check for a portfolio image affected by the update', async () => {
+    const buffer = await fakeJpegBuffer();
+    const { deps, provenanceCheckQueueAdd } = fakeDeps(buffer, BASE_UPLOAD, [
+      { id: 'portfolio-image-1' },
+    ]);
+
+    await createImageProcessProcessor(deps)(fakeJob(), undefined, undefined);
+
+    expect(provenanceCheckQueueAdd).toHaveBeenCalledWith(
+      'check',
+      { portfolioImageId: 'portfolio-image-1' },
+      expect.objectContaining({ jobId: 'portfolio-image-1' }) as unknown,
+    );
+  });
+
+  it('does not enqueue a provenance check when the upload has no portfolio image', async () => {
+    const buffer = await fakeJpegBuffer();
+    const { deps, provenanceCheckQueueAdd } = fakeDeps(buffer, BASE_UPLOAD, []);
+
+    await createImageProcessProcessor(deps)(fakeJob(), undefined, undefined);
+
+    expect(provenanceCheckQueueAdd).not.toHaveBeenCalled();
+  });
+
+  it('does not fail the job when enqueuing the provenance check throws', async () => {
+    const buffer = await fakeJpegBuffer();
+    const { deps, provenanceCheckQueueAdd } = fakeDeps(buffer, BASE_UPLOAD, [
+      { id: 'portfolio-image-1' },
+    ]);
+    provenanceCheckQueueAdd.mockRejectedValueOnce(new Error('redis down'));
+
+    await expect(
+      createImageProcessProcessor(deps)(fakeJob(), undefined, undefined),
+    ).resolves.toBeUndefined();
   });
 
   it('marks the upload failed on a magic-byte mismatch instead of throwing', async () => {

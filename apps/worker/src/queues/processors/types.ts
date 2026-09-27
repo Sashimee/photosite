@@ -15,6 +15,7 @@ export interface UploadRow {
   objectKey: string;
   virusScanStatus: string;
   expiresAt: Date | null;
+  exif?: unknown;
 }
 
 export interface UploadRepository {

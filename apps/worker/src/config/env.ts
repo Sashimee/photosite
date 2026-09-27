@@ -61,6 +61,21 @@ const BaseEnvSchema = z.object({
     .default(60 * 60 * 1000),
   IMAGE_PROCESS_MAX_PIXELS: z.coerce.number().int().positive().default(100_000_000),
 
+  WORKER_CONCURRENCY_PROVENANCE_CHECK: z.coerce.number().int().positive().default(2),
+  // Off by default: with no vendor keys configured, every check would only
+  // ever produce EXIF-only signals, which computeProvenanceScore treats as
+  // too thin to auto-pass (docs/steps/1A.10-provenance.md).
+  PROVENANCE_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  PROVENANCE_C2PA_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  PROVENANCE_AI_DETECTION_API_KEY: optionalNonEmpty(),
+  PROVENANCE_REVERSE_SEARCH_API_KEY: optionalNonEmpty(),
+
   S3_ENDPOINT: z.url(),
   S3_REGION: z.string().min(1),
   S3_ACCESS_KEY_ID: z.string().min(1),

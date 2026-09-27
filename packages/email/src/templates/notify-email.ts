@@ -47,6 +47,26 @@ export function requireReason(type: NotificationType, payload: NotificationPaylo
   return payload.reason;
 }
 
+export function requireProvenanceDecision(
+  type: NotificationType,
+  payload: NotificationPayload,
+): NonNullable<NotificationPayload['provenanceDecision']> {
+  if (!payload.provenanceDecision) {
+    throw new Error(`notify templates: "${type}" payload is missing provenanceDecision`);
+  }
+  return payload.provenanceDecision;
+}
+
+export function requireDecisionReason(
+  type: NotificationType,
+  payload: NotificationPayload,
+): NonNullable<NotificationPayload['decisionReason']> {
+  if (!payload.decisionReason) {
+    throw new Error(`notify templates: "${type}" payload is missing decisionReason`);
+  }
+  return payload.decisionReason;
+}
+
 export function requireQuoteId(type: NotificationType, payload: NotificationPayload): string {
   if (!payload.quoteId) {
     throw new Error(`notify templates: "${type}" payload is missing quoteId`);
@@ -148,6 +168,38 @@ function renderModerationNoticeEmail(
   };
 }
 
+// Mirrors renderModerationNoticeEmail's shape, but keyed by the payload's
+// provenanceDecision outcome rather than moderationOutcome.
+function renderProvenanceDecisionEmail(
+  payload: NotificationPayload,
+  locale: string,
+  to: string,
+  webAppUrl: string,
+  messages: ReturnType<typeof getMessages>,
+): MailMessage {
+  const t = messages.email.notifications;
+  const outcome = requireProvenanceDecision('provenance_decision', payload);
+  const decisionReason = requireDecisionReason('provenance_decision', payload);
+  const template = t.provenanceDecision[outcome];
+  const category = t.provenanceDecisionReasons[decisionReason];
+  const url = `${webAppUrl}${buildModerationNoticePath(locale)}`;
+  const preferencesUrl = `${webAppUrl}/${locale}/account/notifications`;
+  const values = { category, reason: payload.reason ?? '' };
+
+  const bodyText = formatText(template.body, { ...values, url });
+  const bodyHtml = renderHtmlWithLink(template.body, values, url);
+  const footerText = formatText(messages.email.footer.preferences, { url: preferencesUrl });
+  const footerHtml = renderHtmlWithLink(messages.email.footer.preferences, {}, preferencesUrl);
+
+  return {
+    to,
+    subject: formatText(template.subject, values),
+    text: `${bodyText}\n\n${footerText}`,
+    html: `<p>${bodyHtml}</p><p>${footerHtml}</p>`,
+    headers: { 'List-Unsubscribe': `<${preferencesUrl}>` },
+  };
+}
+
 export function renderNotifyEmail(
   type: NotificationType,
   payload: NotificationPayload,
@@ -162,8 +214,12 @@ export function renderNotifyEmail(
     return renderModerationNoticeEmail(type, payload, locale, to, webAppUrl, messages);
   }
 
+  if (type === 'provenance_decision') {
+    return renderProvenanceDecisionEmail(payload, locale, to, webAppUrl, messages);
+  }
+
   const templates: Record<
-    Exclude<NotificationType, 'report_decision' | 'moderation_action'>,
+    Exclude<NotificationType, 'report_decision' | 'moderation_action' | 'provenance_decision'>,
     { subject: string; body: string }
   > = {
     quote_received: t.quoteReceived,

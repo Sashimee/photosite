@@ -108,4 +108,30 @@ describe('buildPinoOptions redaction', () => {
     expect(line.dataRequest.exportKey).toBe('[Redacted]');
     expect(line.dataRequest.anonymousId).toBe('[Redacted]');
   });
+
+  it('redacts a provenance check reverseMatches/raw, at top level and one level deep', () => {
+    const { stream, lines } = collectLogs();
+    const logger = pino({ redact: getRedact() }, stream);
+
+    logger.info({
+      reverseMatches: ['https://example.com/stolen.jpg'],
+      raw: { vendor: 'acme', score: 0.9 },
+      check: {
+        reverseMatches: ['https://example.com/stolen.jpg'],
+        raw: { vendor: 'acme', score: 0.9 },
+      },
+    });
+
+    const [line] = lines() as [
+      {
+        reverseMatches: string;
+        raw: string;
+        check: { reverseMatches: string; raw: string };
+      },
+    ];
+    expect(line.reverseMatches).toBe('[Redacted]');
+    expect(line.raw).toBe('[Redacted]');
+    expect(line.check.reverseMatches).toBe('[Redacted]');
+    expect(line.check.raw).toBe('[Redacted]');
+  });
 });

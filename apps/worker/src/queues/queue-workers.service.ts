@@ -10,6 +10,7 @@ import {
   NOTIFICATIONS_CLEANUP_QUEUE_NAME,
   NOTIFY_QUEUE_NAME,
   NOTIFY_SWEEP_QUEUE_NAME,
+  PROVENANCE_CHECK_QUEUE_NAME,
   PUSH_RECEIPTS_QUEUE_NAME,
   QUOTE_EXPIRY_QUEUE_NAME,
   UPLOADS_CLEANUP_QUEUE_NAME,
@@ -24,6 +25,11 @@ import { createMailTransport } from '../email/mail-transport.js';
 import { createGdprExportProcessor } from '../gdpr/gdpr-export.processor.js';
 import { createGdprSweepProcessor } from '../gdpr/gdpr-sweep.processor.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import {
+  selectAiDetectionProvider,
+  selectC2paReader,
+  selectReverseSearchProvider,
+} from '../provenance/null-providers.js';
 import { createExpoPushSender } from '../push/push-sender.js';
 import { createRedisPushTicketStore } from '../push/push-ticket-store.js';
 import { StorageService } from '../storage/storage.service.js';
@@ -35,6 +41,7 @@ import { createListingExpiryProcessor } from './processors/listing-expiry.proces
 import { createNotificationsCleanupProcessor } from './processors/notifications-cleanup.processor.js';
 import { createNotifyProcessor } from './processors/notify.processor.js';
 import { createNotifySweepProcessor } from './processors/notify-sweep.processor.js';
+import { createProvenanceCheckProcessor } from './processors/provenance-check.processor.js';
 import { createPushReceiptsProcessor } from './processors/push-receipts.processor.js';
 import { createQuoteExpiryProcessor } from './processors/quote-expiry.processor.js';
 import { createUploadsCleanupProcessor } from './processors/uploads-cleanup.processor.js';
@@ -88,6 +95,9 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
     const imageProcessQueue = new Queue(IMAGE_PROCESS_QUEUE_NAME, {
       connection: this.newConnection(),
     });
+    const provenanceCheckQueue = new Queue(PROVENANCE_CHECK_QUEUE_NAME, {
+      connection: this.newConnection(),
+    });
     const uploadsCleanupQueue = new Queue(UPLOADS_CLEANUP_QUEUE_NAME, {
       connection: this.newConnection(),
     });
@@ -120,6 +130,7 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
     });
     this.queues.push(
       imageProcessQueue,
+      provenanceCheckQueue,
       uploadsCleanupQueue,
       quoteExpiryQueue,
       listingExpiryQueue,
@@ -243,12 +254,36 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       createImageProcessProcessor({
         prisma: this.prisma,
         storage: this.storage,
+        provenanceCheckQueue,
         maxPixels: this.config.IMAGE_PROCESS_MAX_PIXELS,
         logger: this.logger,
       }),
       {
         connection: this.newConnection(),
         concurrency: this.config.WORKER_CONCURRENCY_IMAGE_PROCESS,
+      },
+    );
+
+    const provenanceCheckWorker = new Worker(
+      PROVENANCE_CHECK_QUEUE_NAME,
+      createProvenanceCheckProcessor({
+        prisma: this.prisma,
+        aiDetectionProvider: selectAiDetectionProvider(
+          this.config.PROVENANCE_AI_DETECTION_API_KEY,
+          this.logger,
+        ),
+        reverseSearchProvider: selectReverseSearchProvider(
+          this.config.PROVENANCE_REVERSE_SEARCH_API_KEY,
+          this.logger,
+        ),
+        c2paReader: selectC2paReader(this.config.PROVENANCE_C2PA_ENABLED, this.logger),
+        provenanceEnabled: this.config.PROVENANCE_ENABLED,
+        provenanceC2paEnabled: this.config.PROVENANCE_C2PA_ENABLED,
+        logger: this.logger,
+      }),
+      {
+        connection: this.newConnection(),
+        concurrency: this.config.WORKER_CONCURRENCY_PROVENANCE_CHECK,
       },
     );
 
@@ -375,6 +410,7 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
     for (const [name, worker] of [
       [FILE_SCAN_QUEUE_NAME, fileScanWorker],
       [IMAGE_PROCESS_QUEUE_NAME, imageProcessWorker],
+      [PROVENANCE_CHECK_QUEUE_NAME, provenanceCheckWorker],
       [UPLOADS_CLEANUP_QUEUE_NAME, uploadsCleanupWorker],
       [QUOTE_EXPIRY_QUEUE_NAME, quoteExpiryWorker],
       [LISTING_EXPIRY_QUEUE_NAME, listingExpiryWorker],

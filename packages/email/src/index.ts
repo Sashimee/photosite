@@ -11,8 +11,10 @@ export {
   buildVerificationCasePath,
   renderNotifyEmail,
   requireConversationId,
+  requireDecisionReason,
   requireJobOfferId,
   requireModerationOutcome,
+  requireProvenanceDecision,
   requireQuoteId,
   requireReason,
 } from './templates/notify-email.js';

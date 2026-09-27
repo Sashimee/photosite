@@ -1,4 +1,9 @@
-import { DEVICE_PLATFORMS, NOTIFICATION_CHANNELS, NOTIFICATION_TYPES } from '../enums.js';
+import {
+  DEVICE_PLATFORMS,
+  NOTIFICATION_CHANNELS,
+  NOTIFICATION_TYPES,
+  PROVENANCE_DECISION_REASONS,
+} from '../enums.js';
 import {
   CursorPaginationQuerySchema,
   IdSchema,
@@ -35,6 +40,8 @@ export const NotificationPayloadSchema = z
     jobOfferTitle: z.string().min(1).max(NOTIFICATION_TEXT_MAX_LENGTH).optional(),
     jobApplicationId: IdSchema.optional(),
     moderationOutcome: z.enum(['resolved', 'dismissed', 'takedown', 'restored']).optional(),
+    provenanceDecision: z.enum(['flagged', 'rejected']).optional(),
+    decisionReason: z.enum(PROVENANCE_DECISION_REASONS).optional(),
   })
   .strict()
   .openapi('NotificationPayload');

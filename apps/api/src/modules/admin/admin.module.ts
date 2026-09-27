@@ -20,6 +20,9 @@ import { AdminMeController } from './admin-me.controller.js';
 import { AdminMeService } from './admin-me.service.js';
 import { AdminMutationRateLimitService } from './admin-mutation-rate-limit.service.js';
 import { AdminPermissionsService } from './admin-permissions.service.js';
+import { AdminProvenanceController } from './admin-provenance.controller.js';
+import { AdminProvenanceRepository } from './admin-provenance.repository.js';
+import { AdminProvenanceService } from './admin-provenance.service.js';
 import { AdminReportsController } from './admin-reports.controller.js';
 import { AdminReportsRepository } from './admin-reports.repository.js';
 import { AdminReportsService } from './admin-reports.service.js';
@@ -28,6 +31,7 @@ import { AdminSettingsService } from './admin-settings.service.js';
 import { AdminUsersController } from './admin-users.controller.js';
 import { AdminUsersRepository } from './admin-users.repository.js';
 import { AdminUsersService } from './admin-users.service.js';
+import { ProvenanceCheckQueueModule } from '../profiles/provenance-check-queue.module.js';
 
 @Module({
   imports: [
@@ -37,6 +41,7 @@ import { AdminUsersService } from './admin-users.service.js';
     NotificationsModule,
     GdprExportQueueModule,
     DataRequestsModule,
+    ProvenanceCheckQueueModule,
   ],
   controllers: [
     AdminMeController,
@@ -46,6 +51,7 @@ import { AdminUsersService } from './admin-users.service.js';
     AdminReportsController,
     AdminEmailTemplatesController,
     AdminDataRequestsController,
+    AdminProvenanceController,
   ],
   providers: [
     AdminAccessService,
@@ -63,6 +69,8 @@ import { AdminUsersService } from './admin-users.service.js';
     AdminEmailTemplatesService,
     AdminDataRequestsService,
     AdminDataRequestsRepository,
+    AdminProvenanceService,
+    AdminProvenanceRepository,
     OriginGuard,
   ],
   exports: [

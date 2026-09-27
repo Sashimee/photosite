@@ -1,4 +1,9 @@
-import type { PhotographerProfile, PortfolioImage as DbPortfolioImage, Upload } from '@photoo/db';
+import type {
+  PhotographerProfile,
+  PortfolioImage as DbPortfolioImage,
+  ProvenanceCheck,
+  Upload,
+} from '@photoo/db';
 import {
   OwnPhotographerProfileSchema,
   PhotographerSummarySchema,
@@ -54,6 +59,7 @@ export function mapPortfolioImage(
   image: DbPortfolioImage,
   upload: Upload,
   baseUrl: string,
+  provenanceCheck?: ProvenanceCheck | null,
 ): z.infer<typeof PortfolioImageSchema> {
   return PortfolioImageSchema.parse({
     id: image.id,
@@ -62,7 +68,15 @@ export function mapPortfolioImage(
     height: image.height,
     order: image.order,
     status: image.status,
-    provenance: null,
+    provenance: provenanceCheck
+      ? {
+          verdict: provenanceCheck.verdict,
+          status: image.status,
+          checkedAt: provenanceCheck.createdAt.toISOString(),
+          decisionReason: provenanceCheck.decisionReason,
+          decisionReasonText: provenanceCheck.decisionReasonText,
+        }
+      : null,
   });
 }
 

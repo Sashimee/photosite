@@ -39,6 +39,15 @@ export const REDACT_PATHS = [
   '*.exportKey',
   'anonymousId',
   'exportKey',
+  // `reverseMatches` is the list of URLs a reverse-image-search vendor
+  // returned for a photographer's own portfolio photo; `raw` is a
+  // provenance provider's unparsed response. Neither is a secret, but both
+  // can carry other sites' content and vendor-specific payloads that have
+  // no reason to sit in a log line.
+  '*.reverseMatches',
+  '*.raw',
+  'reverseMatches',
+  'raw',
 ];
 
 export const REDACT_CENSOR = '[Redacted]';

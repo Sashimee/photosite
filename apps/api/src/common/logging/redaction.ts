@@ -4,6 +4,8 @@ export const SENSITIVE_KEY_NAMES = [
   'secret',
   'authorization',
   'cookie',
+  'reversematches',
+  'raw',
 ] as const;
 
 // Substring match, not exact: catches header/field name variants

@@ -1,14 +1,26 @@
-import { PORTFOLIO_IMAGE_STATUSES, PROVENANCE_VERDICTS } from '../enums.js';
+import {
+  PORTFOLIO_IMAGE_STATUSES,
+  PROVENANCE_DECISION_REASONS,
+  PROVENANCE_VERDICTS,
+} from '../enums.js';
 import { CursorPaginationQuerySchema, IdSchema, IsoDateTimeSchema, SlugSchema } from './common.js';
 import { z } from './zod.js';
 
+export const ProvenanceDecisionReasonSchema = z
+  .enum(PROVENANCE_DECISION_REASONS)
+  .openapi({ example: 'ai_generated' });
+
 // No score, vendor, match URLs or admin note: that would be a map of how to
-// evade the check (docs/steps/1A.10-provenance.md).
+// evade the check (docs/steps/1A.10-provenance.md). decisionReason/decisionReasonText
+// are the photographer-facing statement of reasons (DSA Art. 17), distinct
+// from the admin-internal note.
 export const PortfolioImageProvenanceSchema = z
   .object({
     verdict: z.enum(PROVENANCE_VERDICTS),
     status: z.enum(PORTFOLIO_IMAGE_STATUSES),
     checkedAt: IsoDateTimeSchema.nullable(),
+    decisionReason: ProvenanceDecisionReasonSchema.nullable(),
+    decisionReasonText: z.string().max(2000).nullable(),
   })
   .strict()
   .openapi('PortfolioImageProvenance');
@@ -54,6 +66,8 @@ export const AdminProvenanceCheckSchema = AdminProvenanceCheckSummarySchema.exte
   exifCapturedAt: IsoDateTimeSchema.nullable(),
   reviewedByAdminId: IdSchema.nullable(),
   note: z.string().max(2000).nullable(),
+  decisionReason: ProvenanceDecisionReasonSchema.nullable(),
+  decisionReasonText: z.string().max(2000).nullable(),
 })
   .strict()
   .openapi('AdminProvenanceCheck');
@@ -65,10 +79,37 @@ export const ProvenanceDecisionStatusSchema = z
   .openapi({ example: 'approved' });
 
 // The note is admin-internal and is never returned to the photographer.
+// decisionReason/decisionReasonText are the photographer-facing statement of
+// reasons: required when flagging or rejecting, forbidden when approving,
+// and decisionReasonText is required when decisionReason is "other".
 export const ProvenanceDecisionRequestSchema = z
   .object({
     status: ProvenanceDecisionStatusSchema,
     note: z.string().min(1).max(2000),
+    decisionReason: ProvenanceDecisionReasonSchema.optional(),
+    decisionReasonText: z.string().min(1).max(2000).optional(),
   })
   .strict()
+  .refine(
+    (data) =>
+      data.status === 'approved'
+        ? data.decisionReason === undefined
+        : data.decisionReason !== undefined,
+    {
+      message:
+        'decisionReason is required when flagging or rejecting, and must not be set when approving',
+      path: ['decisionReason'],
+    },
+  )
+  .refine((data) => data.status !== 'approved' || data.decisionReasonText === undefined, {
+    message: 'decisionReasonText must not be set when approving',
+    path: ['decisionReasonText'],
+  })
+  .refine(
+    (data) => data.decisionReason !== 'other' || Boolean(data.decisionReasonText?.trim().length),
+    {
+      message: 'decisionReasonText is required when decisionReason is "other"',
+      path: ['decisionReasonText'],
+    },
+  )
   .openapi('ProvenanceDecisionRequest');
