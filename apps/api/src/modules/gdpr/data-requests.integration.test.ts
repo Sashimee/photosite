@@ -655,6 +655,54 @@ describe('data requests integration', () => {
       expect(signedInAgain.id).toBe(user.id);
     });
 
+    it.each([
+      { payoutsEnabled: true, expectedPublished: true },
+      { payoutsEnabled: false, expectedPublished: false },
+    ])(
+      're-publishes a photographer profile on cancel only if it can still publish (payouts enabled: $payoutsEnabled)',
+      async ({ payoutsEnabled, expectedPublished }) => {
+        const photographer = await createPublishedPhotographer(
+          `cancel-publish-${String(payoutsEnabled)}`,
+        );
+
+        const created = await fastify().inject({
+          method: 'POST',
+          url: '/v1/me/data-requests',
+          headers: { ...authHeaders(photographer.token), origin: 'http://localhost:3000' },
+          payload: { type: 'delete' },
+        });
+        expect(created.statusCode).toBe(201);
+        const dataRequestId = created.json<DataRequestBody>().id;
+
+        await prisma.photographerProfile.update({
+          where: { id: photographer.profileId },
+          data: { stripePayoutsEnabled: payoutsEnabled },
+        });
+
+        const link = await waitForLinkInEmail(
+          photographer.email,
+          /https?:\/\/\S*account\/deletion\/cancel\/\S+#token=\S+/,
+        );
+        const cancelResponse = await fastify().inject({
+          method: 'POST',
+          url: `/v1/me/data-requests/${dataRequestId}/cancel`,
+          headers: { origin: 'http://localhost:3000' },
+          payload: { token: extractFragmentToken(link) },
+        });
+        expect(cancelResponse.statusCode).toBe(200);
+
+        const profile = await prisma.photographerProfile.findUniqueOrThrow({
+          where: { id: photographer.profileId },
+        });
+        expect(profile.isPublished).toBe(expectedPublished);
+
+        const audit = await prisma.auditLog.findFirst({
+          where: { action: 'data_request.cancelled', targetId: dataRequestId },
+        });
+        expect(audit?.after).toMatchObject({ restoredIsPublished: expectedPublished });
+      },
+    );
+
     it('returns 401 with no session and no token', async () => {
       const user = await signUpAndSignIn('cancel-no-token', ['client']);
       const created = await fastify().inject({

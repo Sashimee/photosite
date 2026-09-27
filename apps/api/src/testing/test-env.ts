@@ -29,6 +29,10 @@ export const TEST_ENV: Env = {
   SENTRY_ENVIRONMENT: undefined,
   SENTRY_TRACES_SAMPLE_RATE: 0,
   SENTRY_REQUIRED: false,
+  STRIPE_SECRET_KEY: undefined,
+  STRIPE_WEBHOOK_SECRET: undefined,
+  STRIPE_CONNECT_REFRESH_URL: undefined,
+  STRIPE_CONNECT_RETURN_URL: undefined,
 };
 
 export const UNREACHABLE_TEST_ENV: Env = {
