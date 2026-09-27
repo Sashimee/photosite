@@ -1,1 +1,42 @@
-{}
+{
+  "web": {
+    "dashboard": {
+      "requests": {
+        "sendQuote": {
+          "triggerCta": "Enviar orçamento",
+          "formTitle": "Enviar orçamento",
+          "formDescription": "Adicione cada serviço oferecido e o respetivo preço. Revê o total antes de enviar.",
+          "lineItemsHeading": "O que está incluído",
+          "lineItemLabelLabel": "Serviço",
+          "lineItemQtyLabel": "Quantidade",
+          "lineItemPriceLabel": "Preço unitário ({currency})",
+          "removeLineItemCta": "Remover serviço",
+          "addLineItemCta": "Adicionar serviço",
+          "validUntilLabel": "Válido até",
+          "messageLabel": "Mensagem (opcional)",
+          "cancelCta": "Cancelar",
+          "reviewCta": "Rever orçamento",
+          "invalidForm": "Verifique os campos destacados e tente novamente.",
+          "reviewTitle": "Rever antes de enviar",
+          "reviewDescription": "É isto que o cliente pagará. A taxa de plataforma é calculada quando o orçamento é enviado.",
+          "totalLabel": "Total",
+          "feeLabel": "Taxa de plataforma",
+          "payoutLabel": "O seu pagamento",
+          "previewLoading": "A calcular o seu pagamento…",
+          "previewError": "Não foi possível calcular o seu pagamento neste momento. Ainda assim, pode enviar este orçamento.",
+          "feeNotice": "Uma taxa de plataforma é deduzida do seu pagamento no momento da liberação; não é adicionada a este total.",
+          "backCta": "Voltar",
+          "confirmSendCta": "Enviar orçamento",
+          "sending": "A enviar…",
+          "errors": {
+            "generic": "Algo correu mal ao enviar o seu orçamento. Tente novamente.",
+            "conflict": "Este pedido já não aceita orçamentos.",
+            "invalid": "Este orçamento não pode ser enviado como introduzido. Recarregue o pedido e tente novamente.",
+            "tooManyRequests": "Está a enviar orçamentos demasiado depressa. Abrandar e tente novamente.",
+            "tooManyRequestsWithRetry": "Está a enviar orçamentos demasiado depressa. Tente novamente em {seconds, plural, one {# segundo} other {# segundos}}."
+          }
+        }
+      }
+    }
+  }
+}

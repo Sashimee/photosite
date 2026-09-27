@@ -282,6 +282,8 @@ export {
   DirectQuoteRequestSchema,
   LineItemSchema,
   QuotePhotographerSchema,
+  QuotePreviewRequestSchema,
+  QuotePreviewSchema,
   QuoteSchema,
   QuotesMineQuerySchema,
 } from './contract/quotes.js';

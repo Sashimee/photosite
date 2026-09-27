@@ -1,1 +1,42 @@
-{}
+{
+  "web": {
+    "dashboard": {
+      "requests": {
+        "sendQuote": {
+          "triggerCta": "Envoyer un devis",
+          "formTitle": "Envoyer un devis",
+          "formDescription": "Ajoutez chaque prestation proposée et son tarif. Vous vérifierez le total avant l'envoi.",
+          "lineItemsHeading": "Ce qui est inclus",
+          "lineItemLabelLabel": "Prestation",
+          "lineItemQtyLabel": "Quantité",
+          "lineItemPriceLabel": "Prix unitaire ({currency})",
+          "removeLineItemCta": "Supprimer la prestation",
+          "addLineItemCta": "Ajouter une prestation",
+          "validUntilLabel": "Valide jusqu'au",
+          "messageLabel": "Message (optionnel)",
+          "cancelCta": "Annuler",
+          "reviewCta": "Vérifier le devis",
+          "invalidForm": "Vérifiez les champs en surbrillance et réessayez.",
+          "reviewTitle": "Vérifier avant d'envoyer",
+          "reviewDescription": "C'est ce que le client paiera. Les frais de plateforme sont calculés lors de l'envoi du devis.",
+          "totalLabel": "Total",
+          "feeLabel": "Frais de plateforme",
+          "payoutLabel": "Votre rémunération",
+          "previewLoading": "Calcul de votre rémunération…",
+          "previewError": "Impossible de calculer votre rémunération pour le moment. Vous pouvez toujours envoyer ce devis.",
+          "feeNotice": "Les frais de plateforme sont déduits de votre rémunération au moment de la libération ; ils ne s'ajoutent pas au total.",
+          "backCta": "Retour",
+          "confirmSendCta": "Envoyer le devis",
+          "sending": "Envoi…",
+          "errors": {
+            "generic": "Une erreur s'est produite lors de l'envoi de votre devis. Réessayez.",
+            "conflict": "Cette demande n'accepte plus de devis.",
+            "invalid": "Ce devis ne peut pas être envoyé tel que saisi. Rechargez la demande et réessayez.",
+            "tooManyRequests": "Vous envoyez des devis trop rapidement. Ralentissez et réessayez.",
+            "tooManyRequestsWithRetry": "Vous envoyez des devis trop rapidement. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}."
+          }
+        }
+      }
+    }
+  }
+}

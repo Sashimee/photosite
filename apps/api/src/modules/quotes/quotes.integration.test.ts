@@ -48,6 +48,12 @@ interface QuoteBody {
   status: string;
 }
 
+interface QuotePreviewBody {
+  subtotal: { amountCents: number; currency: string };
+  platformFee: { amountCents: number; currency: string };
+  total: { amountCents: number; currency: string };
+}
+
 interface RequestBody {
   id: string;
   currency: string;
@@ -287,6 +293,21 @@ describe('quotes integration', () => {
       remoteAddress: AUTH_FAKE_IP,
       headers: authHeaders(photographerToken),
       payload: { requestId, lineItems, validUntil: futureIso(5) },
+    });
+  }
+
+  async function sendPreview(
+    photographerToken: string,
+    lineItems: { label: string; qty: number; unitCents: number }[] = [
+      { label: 'Coverage', qty: 1, unitCents: 50000 },
+    ],
+  ) {
+    return fastify().inject({
+      method: 'POST',
+      url: '/v1/quotes/preview',
+      remoteAddress: AUTH_FAKE_IP,
+      headers: authHeaders(photographerToken),
+      payload: { lineItems },
     });
   }
 
@@ -629,6 +650,91 @@ describe('quotes integration', () => {
       const request = await createRequestDirect(client.id, 'rl-overflow');
       const overflow = await sendQuote(photographer.token, request.id);
       expect(overflow.statusCode).toBe(429);
+    });
+  });
+
+  describe('POST /v1/quotes/preview', () => {
+    it('rejects an unverified account with EMAIL_NOT_VERIFIED, then succeeds once verified', async () => {
+      const photographer = await createPublishedPhotographer('unverified-preview');
+      await unverifyEmail(photographer.userId);
+
+      const blocked = await sendPreview(photographer.token);
+      expect(blocked.statusCode).toBe(403);
+      expect(blocked.json<{ code: string }>().code).toBe('EMAIL_NOT_VERIFIED');
+
+      await prisma.user.update({
+        where: { id: photographer.userId },
+        data: { emailVerifiedAt: new Date() },
+      });
+
+      const allowed = await sendPreview(photographer.token);
+      expect(allowed.statusCode).toBe(200);
+    });
+
+    it('computes the same totals as creating a quote for the same line items', async () => {
+      const client = await signUpAndSignIn(['client']);
+      const request = await createRequestAs(client.token);
+      const photographer = await createPublishedPhotographer('preview-matches-create');
+      const lineItems = [{ label: 'Half day', qty: 2, unitCents: 12525 }];
+
+      const preview = await sendPreview(photographer.token, lineItems);
+      expect(preview.statusCode).toBe(200);
+      const previewBody = preview.json<QuotePreviewBody>();
+      expect(previewBody.subtotal).toEqual({ amountCents: 25050, currency: 'EUR' });
+      expect(previewBody.platformFee).toEqual({ amountCents: 1253, currency: 'EUR' });
+      expect(previewBody.total).toEqual({ amountCents: 25050, currency: 'EUR' });
+
+      const created = await sendQuote(photographer.token, request.id, lineItems);
+      expect(created.statusCode).toBe(201);
+      const createdBody = created.json<QuoteBody>();
+      expect(createdBody.subtotal).toEqual(previewBody.subtotal);
+      expect(createdBody.platformFee).toEqual(previewBody.platformFee);
+      expect(createdBody.total).toEqual(previewBody.total);
+    });
+
+    it('rejects a caller without a photographer profile with 404', async () => {
+      const client = await signUpAndSignIn(['client']);
+
+      const response = await sendPreview(client.token);
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('rejects a zero total with 422', async () => {
+      const photographer = await createPublishedPhotographer('preview-zero-total');
+
+      const response = await sendPreview(photographer.token, [
+        { label: 'Free', qty: 1, unitCents: 0 },
+      ]);
+      expect(response.statusCode).toBe(422);
+    });
+
+    it('rejects a total above the cap with 422', async () => {
+      const photographer = await createPublishedPhotographer('preview-over-cap');
+
+      const response = await sendPreview(photographer.token, [
+        { label: 'A', qty: 1, unitCents: 99_999_999 },
+        { label: 'B', qty: 1, unitCents: 99_999_999 },
+      ]);
+      expect(response.statusCode).toBe(422);
+    });
+
+    it('rejects an empty lineItems array with 400', async () => {
+      const photographer = await createPublishedPhotographer('preview-empty-line-items');
+
+      const response = await sendPreview(photographer.token, []);
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('persists nothing', async () => {
+      const photographer = await createPublishedPhotographer('preview-no-persist');
+
+      const before = await prisma.quote.count({
+        where: { photographerId: photographer.profileId },
+      });
+      const response = await sendPreview(photographer.token);
+      expect(response.statusCode).toBe(200);
+      const after = await prisma.quote.count({ where: { photographerId: photographer.profileId } });
+      expect(after).toBe(before);
     });
   });
 

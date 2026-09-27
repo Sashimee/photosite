@@ -47,6 +47,25 @@ function priceLabel() {
   return translate(NS, 'lineItemPriceLabel', { currency: 'EUR' });
 }
 
+async function reachReviewStep(user: ReturnType<typeof userEvent.setup>) {
+  await openDialog(user);
+  await user.type(screen.getByLabelText(translate(NS, 'lineItemLabelLabel')), 'Full day coverage');
+  await user.type(screen.getByLabelText(priceLabel()), '1500');
+  await user.click(screen.getByRole('button', { name: translate(NS, 'reviewCta') }));
+  await screen.findByRole('heading', { name: translate(NS, 'reviewTitle') });
+}
+
+function previewResponse() {
+  return new Response(
+    JSON.stringify({
+      subtotal: { amountCents: 150000, currency: 'EUR' },
+      platformFee: { amountCents: 7500, currency: 'EUR' },
+      total: { amountCents: 150000, currency: 'EUR' },
+    }),
+    { status: 200 },
+  );
+}
+
 describe('SendQuoteDialog', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -106,24 +125,23 @@ describe('SendQuoteDialog', () => {
   });
 
   it('sends the quote on confirm and navigates to the created quote', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ id: 'quote-1' }), { status: 201 }));
+    const fetchMock = vi.fn((input: Request) =>
+      input.url.includes('/v1/quotes/preview')
+        ? Promise.resolve(previewResponse())
+        : Promise.resolve(new Response(JSON.stringify({ id: 'quote-1' }), { status: 201 })),
+    );
     vi.stubGlobal('fetch', fetchMock);
     const SendQuoteDialog = await loadSendQuoteDialog();
     const user = userEvent.setup();
 
     render(<SendQuoteDialog request={REQUEST} locale="en" />);
-    await openDialog(user);
-    await user.type(
-      screen.getByLabelText(translate(NS, 'lineItemLabelLabel')),
-      'Full day coverage',
-    );
-    await user.type(screen.getByLabelText(priceLabel()), '1500');
-    await user.click(screen.getByRole('button', { name: translate(NS, 'reviewCta') }));
+    await reachReviewStep(user);
     await user.click(await screen.findByRole('button', { name: translate(NS, 'confirmSendCta') }));
 
-    const [request] = fetchMock.mock.calls[0] as [Request];
+    const createCall = fetchMock.mock.calls.find(
+      ([request]) => !request.url.includes('/v1/quotes/preview'),
+    );
+    const [request] = createCall as [Request];
     expect(request.url).toContain('/v1/quotes');
     const body: unknown = JSON.parse(await request.clone().text());
     expect(body).toMatchObject({
@@ -136,7 +154,9 @@ describe('SendQuoteDialog', () => {
   it('shows a photographer-facing mapped error on the review step and lets them retry', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ code: 'CONFLICT' }), { status: 409 }));
+      .mockImplementation(
+        () => new Response(JSON.stringify({ code: 'CONFLICT' }), { status: 409 }),
+      );
     vi.stubGlobal('fetch', fetchMock);
     const SendQuoteDialog = await loadSendQuoteDialog();
     const user = userEvent.setup();
@@ -156,14 +176,15 @@ describe('SendQuoteDialog', () => {
   });
 
   it('maps a validUntil-after-expiry 422 onto the field and returns to the form step', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          code: 'UNPROCESSABLE_ENTITY',
-          message: 'validUntil must not be after the request expires',
-        }),
-        { status: 422 },
-      ),
+    const fetchMock = vi.fn().mockImplementation(
+      () =>
+        new Response(
+          JSON.stringify({
+            code: 'UNPROCESSABLE_ENTITY',
+            message: 'validUntil must not be after the request expires',
+          }),
+          { status: 422 },
+        ),
     );
     vi.stubGlobal('fetch', fetchMock);
     const SendQuoteDialog = await loadSendQuoteDialog();
@@ -191,14 +212,15 @@ describe('SendQuoteDialog', () => {
   });
 
   it('shows a different 422 as a photographer-facing notice instead of the field error', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          code: 'UNPROCESSABLE_ENTITY',
-          message: 'Cannot send a quote on your own request',
-        }),
-        { status: 422 },
-      ),
+    const fetchMock = vi.fn().mockImplementation(
+      () =>
+        new Response(
+          JSON.stringify({
+            code: 'UNPROCESSABLE_ENTITY',
+            message: 'Cannot send a quote on your own request',
+          }),
+          { status: 422 },
+        ),
     );
     vi.stubGlobal('fetch', fetchMock);
     const SendQuoteDialog = await loadSendQuoteDialog();
@@ -256,5 +278,61 @@ describe('SendQuoteDialog', () => {
       'max',
       expect.stringContaining(REQUEST.expiresAt.slice(0, 10)),
     );
+  });
+
+  it('renders the platform fee and payout from the payout preview response', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(previewResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    const SendQuoteDialog = await loadSendQuoteDialog();
+    const user = userEvent.setup();
+
+    render(<SendQuoteDialog request={REQUEST} locale="en" />);
+    await reachReviewStep(user);
+
+    expect(await screen.findByText('−€75.00')).toBeInTheDocument();
+    expect(screen.getByText('€1,425.00')).toBeInTheDocument();
+  });
+
+  it('shows a loading state while the payout preview request is in flight', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- never resolves, keeps the preview request pending
+    const fetchMock = vi.fn().mockReturnValue(new Promise<Response>(() => {}));
+    vi.stubGlobal('fetch', fetchMock);
+    const SendQuoteDialog = await loadSendQuoteDialog();
+    const user = userEvent.setup();
+
+    render(<SendQuoteDialog request={REQUEST} locale="en" />);
+    await reachReviewStep(user);
+
+    expect(await screen.findByText(translate(NS, 'previewLoading'))).toBeInTheDocument();
+  });
+
+  it('shows an error and keeps sending enabled when the payout preview request fails', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('network error'));
+    vi.stubGlobal('fetch', fetchMock);
+    const SendQuoteDialog = await loadSendQuoteDialog();
+    const user = userEvent.setup();
+
+    render(<SendQuoteDialog request={REQUEST} locale="en" />);
+    await reachReviewStep(user);
+
+    expect(await screen.findByText(translate(NS, 'previewError'))).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: translate(NS, 'confirmSendCta') })).toBeEnabled();
+  });
+
+  it('does not call the payout preview endpoint before the review step', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const SendQuoteDialog = await loadSendQuoteDialog();
+    const user = userEvent.setup();
+
+    render(<SendQuoteDialog request={REQUEST} locale="en" />);
+    await openDialog(user);
+    await user.type(
+      screen.getByLabelText(translate(NS, 'lineItemLabelLabel')),
+      'Full day coverage',
+    );
+    await user.type(screen.getByLabelText(priceLabel()), '1500');
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

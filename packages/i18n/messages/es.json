@@ -1,1 +1,42 @@
-{}
+{
+  "web": {
+    "dashboard": {
+      "requests": {
+        "sendQuote": {
+          "triggerCta": "Enviar presupuesto",
+          "formTitle": "Enviar presupuesto",
+          "formDescription": "Añada cada servicio ofrecido y su precio. Revisará el total antes de enviar.",
+          "lineItemsHeading": "Qué está incluido",
+          "lineItemLabelLabel": "Servicio",
+          "lineItemQtyLabel": "Cantidad",
+          "lineItemPriceLabel": "Precio unitario ({currency})",
+          "removeLineItemCta": "Eliminar servicio",
+          "addLineItemCta": "Añadir servicio",
+          "validUntilLabel": "Válido hasta",
+          "messageLabel": "Mensaje (opcional)",
+          "cancelCta": "Cancelar",
+          "reviewCta": "Revisar presupuesto",
+          "invalidForm": "Compruebe los campos resaltados e intente de nuevo.",
+          "reviewTitle": "Revisar antes de enviar",
+          "reviewDescription": "Esto es lo que el cliente pagará. La cuota de plataforma se calcula cuando se envía el presupuesto.",
+          "totalLabel": "Total",
+          "feeLabel": "Cuota de plataforma",
+          "payoutLabel": "Su pago",
+          "previewLoading": "Calculando su pago…",
+          "previewError": "No se pudo calcular su pago en este momento. Aún puede enviar este presupuesto.",
+          "feeNotice": "Una cuota de plataforma se deduce de su pago al momento de la liberación; no se añade a este total.",
+          "backCta": "Atrás",
+          "confirmSendCta": "Enviar presupuesto",
+          "sending": "Enviando…",
+          "errors": {
+            "generic": "Algo salió mal al enviar su presupuesto. Intente de nuevo.",
+            "conflict": "Esta solicitud ya no acepta presupuestos.",
+            "invalid": "Este presupuesto no se puede enviar tal como está ingresado. Recargue la solicitud e intente de nuevo.",
+            "tooManyRequests": "Está enviando presupuestos demasiado rápido. Vaya más lentamente e intente de nuevo.",
+            "tooManyRequestsWithRetry": "Está enviando presupuestos demasiado rápido. Intente de nuevo en {seconds, plural, one {# segundo} other {# segundos}}."
+          }
+        }
+      }
+    }
+  }
+}
