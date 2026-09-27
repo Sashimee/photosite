@@ -5,6 +5,9 @@ import { OriginGuard } from '../auth/origin-guard.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { AdminBookingsController } from './admin-bookings.controller.js';
 import { AdminBookingsService } from './admin-bookings.service.js';
+import { BookingDocumentsQueueService } from './booking-documents-queue.service.js';
+import { BookingDocumentsController } from './booking-documents.controller.js';
+import { BookingDocumentsService } from './booking-documents.service.js';
 import { BookingMoneyEventsService } from './booking-money-events.service.js';
 import { BookingMoneyLockService } from './booking-money-lock.service.js';
 import { BookingPaymentsController } from './booking-payments.controller.js';
@@ -25,6 +28,7 @@ import { stripeGatewayProvider } from './stripe/stripe-gateway.provider.js';
   controllers: [
     MyStripeController,
     BookingPaymentsController,
+    BookingDocumentsController,
     AdminBookingsController,
     StripeWebhookController,
   ],
@@ -34,6 +38,8 @@ import { stripeGatewayProvider } from './stripe/stripe-gateway.provider.js';
     BookingReleaseService,
     BookingReleaseQueueService,
     BookingRefundService,
+    BookingDocumentsService,
+    BookingDocumentsQueueService,
     BookingMoneyEventsService,
     BookingMoneyLockService,
     AdminBookingsService,

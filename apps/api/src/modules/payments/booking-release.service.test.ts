@@ -3,6 +3,7 @@ import type { Logger } from 'nestjs-pino';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import { InMemoryMoneyLock } from '../../testing/in-memory-money-lock.js';
+import type { BookingDocumentsQueueService } from './booking-documents-queue.service.js';
 import { BookingReleaseService, transferIdempotencyKey } from './booking-release.service.js';
 import { FakeStripeGateway } from './stripe/fake-stripe-gateway.js';
 
@@ -37,7 +38,12 @@ interface LedgerRow {
 
 async function setup(
   overrides: Partial<BookingRow> = {},
-  options: { openDisputes?: number; dueIds?: string[]; refunds?: number[] } = {},
+  options: {
+    openDisputes?: number;
+    dueIds?: string[];
+    refunds?: number[];
+    enqueueFails?: boolean;
+  } = {},
 ) {
   const gateway = new FakeStripeGateway('whsec_unit', () => NOW);
   const account = await gateway.createConnectedAccount({
@@ -169,10 +175,14 @@ async function setup(
   } as unknown as PrismaService;
   const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
   const moneyLock = new InMemoryMoneyLock();
+  const enqueueDocuments = vi.fn(() =>
+    options.enqueueFails ? Promise.reject(new Error('redis down')) : Promise.resolve(),
+  );
   const service = new BookingReleaseService(
     prisma,
     gateway,
     moneyLock.asService(),
+    { enqueue: enqueueDocuments } as unknown as BookingDocumentsQueueService,
     logger as unknown as Logger,
   );
   return {
@@ -188,6 +198,7 @@ async function setup(
     findTransfer,
     account,
     logger,
+    enqueueDocuments,
   };
 }
 
@@ -296,6 +307,43 @@ describe('BookingReleaseService.release', () => {
     expect(second).toEqual({ status: 'skipped', reason: 'already_released' });
     expect(createTransfer).toHaveBeenCalledTimes(1);
     expect(ledger).toHaveLength(3);
+  });
+
+  it('enqueues the booking documents once, after the release committed and the lock is free', async () => {
+    const { service, row, moneyLock, enqueueDocuments } = await setup();
+    const seen: { status: string; locked: boolean }[] = [];
+    enqueueDocuments.mockImplementation(() => {
+      seen.push({ status: row.status, locked: moneyLock.held.has('booking-1') });
+      return Promise.resolve();
+    });
+
+    await service.release('booking-1', user, NOW);
+    await service.release('booking-1', { type: 'system', id: null }, NOW);
+
+    expect(enqueueDocuments).toHaveBeenCalledTimes(1);
+    expect(enqueueDocuments).toHaveBeenCalledWith('booking-1');
+    expect(seen).toEqual([{ status: 'released', locked: false }]);
+  });
+
+  it('does not enqueue documents for a skipped release', async () => {
+    const { service, enqueueDocuments } = await setup({ status: 'disputed' });
+
+    await service.release('booking-1', user, NOW);
+
+    expect(enqueueDocuments).not.toHaveBeenCalled();
+  });
+
+  it('keeps a committed release when the documents cannot be enqueued', async () => {
+    const { service, row, logger } = await setup({}, { enqueueFails: true });
+
+    const outcome = await service.release('booking-1', user, NOW);
+
+    expect(outcome.status).toBe('released');
+    expect(row.status).toBe('released');
+    expect(logger.error).toHaveBeenCalledWith(
+      { bookingId: 'booking-1', err: expect.any(Error) as unknown },
+      'booking release: could not enqueue booking documents',
+    );
   });
 
   it('two runs in a row look up the transfer group and produce exactly one transfer', async () => {

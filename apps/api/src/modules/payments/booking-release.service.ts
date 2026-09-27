@@ -9,6 +9,7 @@ import {
 } from '../bookings/booking-state.js';
 import { assertSupportedCurrency } from '../bookings/create-booking.js';
 import { ledgerTotals } from './booking-ledger.js';
+import { BookingDocumentsQueueService } from './booking-documents-queue.service.js';
 import { BookingMoneyLockService } from './booking-money-lock.service.js';
 import { transferGroupFor } from './booking-payments.service.js';
 import { STRIPE_GATEWAY, type StripeGateway, type Transfer } from './stripe/stripe-gateway.js';
@@ -49,6 +50,8 @@ export class BookingReleaseService {
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(STRIPE_GATEWAY) private readonly gateway: StripeGateway,
     @Inject(BookingMoneyLockService) private readonly moneyLock: BookingMoneyLockService,
+    @Inject(BookingDocumentsQueueService)
+    private readonly documentsQueue: BookingDocumentsQueueService,
     @Inject(Logger) private readonly logger: Logger,
   ) {}
 
@@ -71,7 +74,24 @@ export class BookingReleaseService {
       this.logger.log({ bookingId }, 'booking release: skipped, booking money lock is held');
       return { status: 'skipped', reason: 'locked' };
     }
+    if (result.value.status === 'released') {
+      await this.enqueueDocuments(bookingId);
+    }
     return result.value;
+  }
+
+  // Runs after the release transaction committed, so the worker always reads
+  // a released booking. The money has moved by now: a Redis failure must not
+  // fail the release, and the download endpoint re-enqueues a missing PDF.
+  private async enqueueDocuments(bookingId: string): Promise<void> {
+    try {
+      await this.documentsQueue.enqueue(bookingId);
+    } catch (error) {
+      this.logger.error(
+        { bookingId, err: error },
+        'booking release: could not enqueue booking documents',
+      );
+    }
   }
 
   private async releaseLocked(
