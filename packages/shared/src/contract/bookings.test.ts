@@ -3,6 +3,7 @@ import {
   BookingSchema,
   CancelBookingRequestSchema,
   CreateDeliveryRequestSchema,
+  DeliverySchema,
   PaymentIntentResponseSchema,
 } from './bookings.js';
 
@@ -79,6 +80,26 @@ describe('CreateDeliveryRequestSchema', () => {
     ).toBe(false);
   });
 
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html,<script>alert(1)</script>',
+    'ftp://files.example.com/gallery.zip',
+  ])('rejects a non-http external link %s', (externalLink) => {
+    expect(
+      CreateDeliveryRequestSchema.safeParse({ message: 'Here is your gallery', externalLink })
+        .success,
+    ).toBe(false);
+  });
+
+  it('accepts a plain http external link', () => {
+    expect(
+      CreateDeliveryRequestSchema.safeParse({
+        message: 'Here is your gallery',
+        externalLink: 'http://gallery.example.com/abc',
+      }).success,
+    ).toBe(true);
+  });
+
   it('rejects an empty message', () => {
     expect(
       CreateDeliveryRequestSchema.safeParse({
@@ -87,6 +108,29 @@ describe('CreateDeliveryRequestSchema', () => {
       }).success,
     ).toBe(false);
   });
+});
+
+describe('DeliverySchema', () => {
+  const delivery = {
+    id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+    bookingId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+    message: 'Here is your gallery',
+    fileIds: null,
+    externalLink: 'https://gallery.example.com/abc',
+    deliveredAt: '2026-10-01T10:00:00.000Z',
+    acceptedAt: null,
+  };
+
+  it('accepts an https external link', () => {
+    expect(DeliverySchema.safeParse(delivery).success).toBe(true);
+  });
+
+  it.each(['javascript:alert(1)', 'data:text/html,hi'])(
+    'rejects a stored external link %s',
+    (externalLink) => {
+      expect(DeliverySchema.safeParse({ ...delivery, externalLink }).success).toBe(false);
+    },
+  );
 });
 
 describe('CancelBookingRequestSchema', () => {
