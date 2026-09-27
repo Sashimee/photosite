@@ -18,6 +18,7 @@ import type {
 } from './stripe-gateway.js';
 
 const TRANSFER_LOOKUP_LIMIT = 10;
+const CHARGE_REFUNDS_LIMIT = 100;
 
 function toConnectedAccount(account: Stripe.Account): ConnectedAccount {
   return {
@@ -172,6 +173,20 @@ export class LiveStripeGateway implements StripeGateway {
     );
     this.logger.log({ refundId: refund.id }, 'stripe: refund created');
     return { id: refund.id, amountCents: refund.amount, status: refund.status };
+  }
+
+  async listChargeRefunds(chargeId: string): Promise<Refund[]> {
+    const page = await this.stripe.refunds.list({ charge: chargeId, limit: CHARGE_REFUNDS_LIMIT });
+    if (page.has_more) {
+      throw new Error(
+        `stripe gateway: more than ${String(CHARGE_REFUNDS_LIMIT)} refunds on charge ${chargeId}; reconcile it by hand`,
+      );
+    }
+    return page.data.map((refund) => ({
+      id: refund.id,
+      amountCents: refund.amount,
+      status: refund.status,
+    }));
   }
 
   async reverseTransfer(input: ReverseTransferInput): Promise<TransferReversal> {

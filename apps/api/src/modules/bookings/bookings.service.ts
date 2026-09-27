@@ -1,7 +1,6 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
-import { Prisma, type Booking, type Upload } from '@photoo/db';
+import { Prisma, type Upload } from '@photoo/db';
 import type {
-  BookingSchema,
   CancelBookingRequestSchema,
   CreateDeliveryRequestSchema,
   CursorPaginationQuerySchema,
@@ -16,9 +15,9 @@ import {
 import { PlatformSettingsService } from '../../common/platform-settings/platform-settings.service.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { BookingReleaseService } from '../payments/booking-release.service.js';
+import { BOOKING_INCLUDE, toBookingDtos, type BookingDto } from './booking-dto.js';
 import { IllegalBookingTransitionError, transitionBooking } from './booking-state.js';
 
-type BookingDto = z.infer<typeof BookingSchema>;
 type DeliveryDto = z.infer<typeof DeliverySchema>;
 type ListQuery = z.infer<typeof CursorPaginationQuerySchema>;
 type CreateDeliveryInput = z.infer<typeof CreateDeliveryRequestSchema>;
@@ -28,16 +27,7 @@ interface SessionUser {
   id: string;
 }
 
-type BookingRow = Booking & { quote: { totalCents: number; currency: string } };
-
-interface LocationRow {
-  id: string;
-  lat: number;
-  lng: number;
-}
-
 const DAY_MS = 86_400_000;
-const BOOKING_INCLUDE = { quote: { select: { totalCents: true, currency: true } } } as const;
 
 function notFound(): HttpException {
   return new HttpException({ code: 'NOT_FOUND', message: 'Booking not found' }, 404);
@@ -98,7 +88,7 @@ export class BookingsService {
     const page = hasMore ? rows.slice(0, query.limit) : rows;
     const last = page.at(-1);
     return {
-      items: await this.toDtos(page),
+      items: await toBookingDtos(this.prisma.client, page),
       nextCursor: hasMore && last ? encodeCreatedAtCursor(last.createdAt, last.id) : null,
     };
   }
@@ -111,7 +101,7 @@ export class BookingsService {
     if (!row) {
       throw notFound();
     }
-    const [dto] = await this.toDtos([row]);
+    const [dto] = await toBookingDtos(this.prisma.client, [row]);
     if (!dto) {
       throw notFound();
     }
@@ -317,32 +307,5 @@ export class BookingsService {
     if (alreadyDelivered > 0) {
       throw unprocessable('A file can only be part of one delivery');
     }
-  }
-
-  private async toDtos(rows: BookingRow[]): Promise<BookingDto[]> {
-    if (rows.length === 0) {
-      return [];
-    }
-    // Booking.location is a PostGIS column Prisma cannot select.
-    const locations = await this.prisma.client.$queryRaw<LocationRow[]>`
-      SELECT id, ST_Y(location::geometry) AS "lat", ST_X(location::geometry) AS "lng"
-      FROM "Booking"
-      WHERE id IN (${Prisma.join(rows.map((row) => row.id))}) AND location IS NOT NULL`;
-    const byId = new Map(locations.map((row) => [row.id, { lat: row.lat, lng: row.lng }]));
-    return rows.map((row) => ({
-      id: row.id,
-      quoteId: row.quoteId,
-      clientId: row.clientId,
-      photographerId: row.photographerId,
-      scheduledAt: row.scheduledAt?.toISOString() ?? null,
-      location: byId.get(row.id) ?? null,
-      total: { amountCents: row.quote.totalCents, currency: row.quote.currency },
-      status: row.status,
-      releaseDueAt: row.releaseDueAt?.toISOString() ?? null,
-      deliveredAt: row.deliveredAt?.toISOString() ?? null,
-      releasedAt: row.releasedAt?.toISOString() ?? null,
-      cancelledAt: row.cancelledAt?.toISOString() ?? null,
-      cancellationReason: row.cancellationReason,
-    }));
   }
 }

@@ -5456,7 +5456,7 @@ export interface paths {
         put?: never;
         /**
          * Request a refund for a booking before release
-         * @description Self-service, before release only. After release a refund requires a transfer reversal and is admin-only (POST /v1/admin/bookings/{id}/refund).
+         * @description Client only, before release (paid_held, in_progress or delivered), otherwise 409. `amountCents` omitted refunds whatever is left; a cumulative refund above the charged total is 422. A full refund moves the booking to `refunded`, a partial one keeps its state. After release a refund requires a transfer reversal and is admin-only (POST /v1/admin/bookings/{id}/refund).
          */
         post: {
             parameters: {
@@ -5474,7 +5474,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Refund requested */
+                /** @description Refund created */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5530,6 +5530,15 @@ export interface paths {
                 };
                 /** @description Unprocessable entity */
                 422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -9362,7 +9371,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Refund a booking */
+        /**
+         * Refund a booking after release
+         * @description Released bookings only, otherwise 409. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. Subject to the admin mutation rate limit (429).
+         */
         post: {
             parameters: {
                 query?: never;
@@ -9445,6 +9457,15 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
+                /** @description Too many requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -9462,7 +9483,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reverse the payout transfer for a booking */
+        /**
+         * Reverse the payout transfer for a booking
+         * @description After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. The booking keeps its status. Subject to the admin mutation rate limit (429).
+         */
         post: {
             parameters: {
                 query?: never;
@@ -9537,6 +9561,15 @@ export interface paths {
                 };
                 /** @description Unprocessable entity */
                 422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -12362,7 +12395,10 @@ export interface components {
         };
         CreateRefundResponse: {
             /** @enum {string} */
-            status: "refunded";
+            status: "refunded" | "partially_refunded";
+            amount: components["schemas"]["Money"];
+            refundedTotal: components["schemas"]["Money"];
+            booking: components["schemas"]["Booking"];
         };
         CreateRefundRequest: {
             amountCents?: number;
@@ -13205,6 +13241,10 @@ export interface components {
             paymentIntentId: string | null;
             chargeId: string | null;
             transferId: string | null;
+            refundedCents: number;
+            reversedCents: number;
+            /** @enum {string|null} */
+            disputeStatus: "open" | "won" | "lost" | null;
         };
         AdminReport: {
             /**
@@ -13416,7 +13456,7 @@ export interface components {
          * @example quote_received
          * @enum {string}
          */
-        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "data-export-ready" | "data-export-failed" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision" | "payouts_disabled";
+        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "data-export-ready" | "data-export-failed" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision" | "payouts_disabled" | "dispute_opened";
         AdminEmailTemplatePreview: {
             subject: string;
             html: string;
@@ -13451,7 +13491,7 @@ export interface components {
              * @example quote_received
              * @enum {string}
              */
-            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision" | "payouts_disabled";
+            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision" | "payouts_disabled" | "dispute_opened";
             payload: components["schemas"]["NotificationPayload"];
             channels: ("email" | "push" | "in_app")[];
             /**
@@ -13524,7 +13564,7 @@ export interface components {
              * @example quote_received
              * @enum {string}
              */
-            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision" | "payouts_disabled";
+            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision" | "payouts_disabled" | "dispute_opened";
             /**
              * @example email
              * @enum {string}

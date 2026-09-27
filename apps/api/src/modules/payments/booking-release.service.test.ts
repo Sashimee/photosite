@@ -2,6 +2,7 @@ import { Prisma } from '@photoo/db';
 import type { Logger } from 'nestjs-pino';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
+import { InMemoryMoneyLock } from '../../testing/in-memory-money-lock.js';
 import { BookingReleaseService, transferIdempotencyKey } from './booking-release.service.js';
 import { FakeStripeGateway } from './stripe/fake-stripe-gateway.js';
 
@@ -36,7 +37,7 @@ interface LedgerRow {
 
 async function setup(
   overrides: Partial<BookingRow> = {},
-  options: { openDisputes?: number; dueIds?: string[] } = {},
+  options: { openDisputes?: number; dueIds?: string[]; refunds?: number[] } = {},
 ) {
   const gateway = new FakeStripeGateway('whsec_unit', () => NOW);
   const account = await gateway.createConnectedAccount({
@@ -72,6 +73,13 @@ async function setup(
       currency: row.quote.currency,
       stripeObjectId: 'ch_1',
     },
+    ...(options.refunds ?? []).map((amountCents, index) => ({
+      bookingId: row.id,
+      type: 'refund',
+      amountCents: -amountCents,
+      currency: row.quote.currency,
+      stripeObjectId: `re_unit_${String(index)}`,
+    })),
   ];
   const audits: { action: string; after: Record<string, unknown> }[] = [];
 
@@ -94,6 +102,21 @@ async function setup(
     },
     dispute: { count: vi.fn(() => Promise.resolve(options.openDisputes ?? 0)) },
     ledgerEntry: {
+      groupBy: vi.fn((args: { where: { type: { in: string[] } } }) => {
+        const groups = new Map<string, { sum: number; count: number }>();
+        for (const entry of ledger.filter((row) => args.where.type.in.includes(row.type))) {
+          const group = groups.get(entry.type) ?? { sum: 0, count: 0 };
+          groups.set(entry.type, { sum: group.sum + entry.amountCents, count: group.count + 1 });
+        }
+        return Promise.resolve(
+          [...groups].map(([type, group]) => ({
+            bookingId: row.id,
+            type,
+            _sum: { amountCents: group.sum },
+            _count: { _all: group.count },
+          })),
+        );
+      }),
       createMany: vi.fn((args: { data: LedgerRow[]; skipDuplicates?: boolean }) => {
         const fresh = args.data.filter(
           (entry) =>
@@ -145,9 +168,16 @@ async function setup(
     },
   } as unknown as PrismaService;
   const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
-  const service = new BookingReleaseService(prisma, gateway, logger as unknown as Logger);
+  const moneyLock = new InMemoryMoneyLock();
+  const service = new BookingReleaseService(
+    prisma,
+    gateway,
+    moneyLock.asService(),
+    logger as unknown as Logger,
+  );
   return {
     service,
+    moneyLock,
     row,
     ledger,
     audits,
@@ -224,6 +254,24 @@ describe('BookingReleaseService.release', () => {
 
     expect(outcome).toEqual({ status: 'released', transferId: row.transferId, amountCents: 23750 });
     expect(ledger.reduce((sum, entry) => sum + entry.amountCents, 0)).toBe(0);
+  });
+
+  it('transfers what is left after a partial client refund and keeps the ledger balanced', async () => {
+    const { service, ledger, row, createTransfer } = await setup({}, { refunds: [5000] });
+
+    const outcome = await service.release('booking-1', user, NOW);
+
+    expect(outcome).toEqual({ status: 'released', transferId: row.transferId, amountCents: 18797 });
+    expect(createTransfer).toHaveBeenCalledWith(expect.objectContaining({ amountCents: 18797 }));
+    expect(ledger.reduce((sum, entry) => sum + entry.amountCents, 0)).toBe(0);
+  });
+
+  it('refuses to release when refunds leave nothing beyond the platform fee', async () => {
+    const { service, row, createTransfer } = await setup({}, { refunds: [23797] });
+
+    await expect(service.release('booking-1', user, NOW)).rejects.toThrow(/nothing to transfer/);
+    expect(createTransfer).not.toHaveBeenCalled();
+    expect(row.status).toBe('delivered');
   });
 
   it('releases an accepted delivery before releaseDueAt and records the trigger', async () => {
@@ -385,6 +433,31 @@ describe('BookingReleaseService.release', () => {
       expect(createTransfer).not.toHaveBeenCalled();
     },
   );
+
+  it('skips without calling Stripe while a refund holds the booking money lock', async () => {
+    const { service, row, ledger, createTransfer, moneyLock } = await setup();
+    moneyLock.held.add('booking-1');
+
+    const outcome = await service.release('booking-1', user, NOW);
+
+    expect(outcome).toEqual({ status: 'skipped', reason: 'locked' });
+    expect(createTransfer).not.toHaveBeenCalled();
+    expect(row.status).toBe('delivered');
+    expect(ledger).toHaveLength(1);
+
+    moneyLock.held.delete('booking-1');
+    await expect(service.release('booking-1', user, NOW)).resolves.toMatchObject({
+      status: 'released',
+    });
+  });
+
+  it('frees the money lock after a failed release', async () => {
+    const { service, moneyLock } = await setup({ chargeId: null });
+
+    await expect(service.release('booking-1', user, NOW)).rejects.toThrow(/no chargeId/);
+
+    expect(moneyLock.held.size).toBe(0);
+  });
 
   it('rejects a delivery that is neither accepted nor due with a 409', async () => {
     const { service, createTransfer } = await setup({ releaseDueAt: FUTURE });

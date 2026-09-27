@@ -116,6 +116,17 @@ describe('renderNotifyPush', () => {
     expect(push.url).toBe('/en/account');
   });
 
+  it('renders dispute_opened without an amount and with an account deep link', () => {
+    const push = renderNotifyPush(
+      'dispute_opened',
+      { total: { amountCents: 150000, currency: 'EUR' } },
+      'en',
+    );
+    expect(push.title).toBe('Payment disputed');
+    expect(push.body).not.toContain('1,500');
+    expect(push.url).toBe('/en/account');
+  });
+
   it('throws when a job application notification has no jobOfferId', () => {
     expect(() => renderNotifyPush('job_application_received', {}, 'en')).toThrow(/jobOfferId/);
   });

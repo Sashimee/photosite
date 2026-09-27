@@ -11,8 +11,8 @@ const BOOKING_RELEASE_SCHEDULER_ID = 'booking-release';
 
 // Runs in the API rather than apps/worker because creating a Transfer needs
 // the Stripe gateway, which only the API holds. BullMQ's job scheduler keeps
-// one sweep per interval across API replicas; the row lock in
-// BookingReleaseService covers an overlap with accept-delivery.
+// one sweep per interval across API replicas; the per-booking money lock in
+// BookingReleaseService covers an overlap with accept-delivery or a refund.
 @Injectable()
 export class BookingReleaseQueueService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly connections: Redis[] = [];

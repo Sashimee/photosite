@@ -44,6 +44,10 @@
       "payoutsDisabled": {
         "title": "Versements en pause",
         "body": "Votre profil est caché jusqu'à ce que les informations de paiement soient complètes"
+      },
+      "disputeOpened": {
+        "title": "Paiement contesté",
+        "body": "Une réservation est gelée jusqu'à l'examen par la finance"
       }
     }
   },
@@ -52,6 +56,10 @@
       "payoutsDisabled": {
         "subject": "Les versements sont en pause sur votre compte",
         "body": "Stripe a mis en pause les versements sur votre compte connecté. Votre profil est donc caché de la recherche jusqu'à ce que ce problème soit résolu. Complétez les informations demandées par Stripe ici : {url}"
+      },
+      "disputeOpened": {
+        "subject": "Un paiement de réservation a été contesté",
+        "body": "Un client a contesté auprès de sa banque un paiement de réservation de {total}. La réservation est gelée et ne sera pas libérée avant l'examen d'un administrateur finance dans le back-office. Détails : {url}"
       }
     }
   }

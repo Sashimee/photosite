@@ -261,10 +261,37 @@ describe('AdminBookingSchema', () => {
     paymentIntentId: 'pi_123',
     chargeId: 'ch_123',
     transferId: null,
+    refundedCents: 0,
+    reversedCents: 0,
+    disputeStatus: null,
   };
 
   it('accepts payment identifiers for finance admins', () => {
     expect(AdminBookingSchema.safeParse(validBooking).success).toBe(true);
+  });
+
+  it('accepts a disputed booking with refunds and reversals', () => {
+    expect(
+      AdminBookingSchema.safeParse({
+        ...validBooking,
+        status: 'disputed',
+        refundedCents: 5000,
+        reversedCents: 4750,
+        disputeStatus: 'open',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects negative ledger sums and unknown dispute statuses', () => {
+    expect(AdminBookingSchema.safeParse({ ...validBooking, refundedCents: -1 }).success).toBe(
+      false,
+    );
+    expect(AdminBookingSchema.safeParse({ ...validBooking, reversedCents: 1.5 }).success).toBe(
+      false,
+    );
+    expect(
+      AdminBookingSchema.safeParse({ ...validBooking, disputeStatus: 'pending' }).success,
+    ).toBe(false);
   });
 
   it('rejects unknown keys', () => {

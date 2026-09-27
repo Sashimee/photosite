@@ -204,6 +204,7 @@ export const NOTIFICATION_TYPES = [
   'moderation_action',
   'provenance_decision',
   'payouts_disabled',
+  'dispute_opened',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

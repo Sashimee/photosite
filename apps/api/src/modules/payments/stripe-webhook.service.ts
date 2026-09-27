@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { IllegalBookingTransitionError, transitionBooking } from '../bookings/booking-state.js';
+import { BookingMoneyEventsService } from './booking-money-events.service.js';
 import { type AfterCommit, StripeConnectService } from './stripe-connect.service.js';
 import {
   type ConnectedAccount,
@@ -12,6 +13,7 @@ import {
   isLiveSecretKey,
   parseConnectedAccount,
   parseGatewayEvent,
+  type Refund,
   STRIPE_GATEWAY,
   type StripeGateway,
 } from './stripe/stripe-gateway.js';
@@ -32,18 +34,26 @@ export const HANDLED_EVENT_TYPES = [
   'payment_intent.succeeded',
   'payment_intent.payment_failed',
   'account.updated',
+  'charge.refunded',
+  'transfer.reversed',
+  'charge.dispute.created',
+  'charge.dispute.closed',
 ] as const;
 
 export type ReprocessResult = 'processed' | 'deferred' | 'skipped';
 
 // State read from Stripe before the transaction opens, so no network call
 // holds a database transaction. `account` is null when the event is not an
-// account.updated or the fetch failed.
+// account.updated or the fetch failed; `chargeRefunds` likewise for a
+// platform charge.refunded.
 interface Prefetched {
   account: ConnectedAccount | null;
+  chargeRefunds: Refund[] | null;
 }
 
-const NOTHING_PREFETCHED: Prefetched = { account: null };
+const NOTHING_PREFETCHED: Prefetched = { account: null, chargeRefunds: null };
+
+const RefundedChargeIdSchema = z.object({ id: z.string().startsWith('ch_') });
 
 const PROCESSED: Outcome = { status: 'processed', afterCommit: NOTHING_AFTER_COMMIT };
 const DEFERRED: Outcome = { status: 'deferred', afterCommit: NOTHING_AFTER_COMMIT };
@@ -85,6 +95,7 @@ export class StripeWebhookService {
     @Inject(STRIPE_GATEWAY) private readonly gateway: StripeGateway,
     @Inject(APP_CONFIG) env: Env,
     @Inject(Logger) private readonly logger: Logger,
+    @Inject(BookingMoneyEventsService) private readonly moneyEvents: BookingMoneyEventsService,
   ) {
     this.live = isLiveSecretKey(env.STRIPE_SECRET_KEY);
   }
@@ -148,12 +159,15 @@ export class StripeWebhookService {
   }
 
   private async prefetch(event: GatewayEvent): Promise<Prefetched> {
+    if (event.type === 'charge.refunded' && event.account === undefined) {
+      return this.prefetchChargeRefunds(event);
+    }
     if (event.type !== 'account.updated') {
       return NOTHING_PREFETCHED;
     }
     const accountId = parseConnectedAccount(event.data.object).id;
     try {
-      return { account: await this.connect.fetchAccount(accountId) };
+      return { ...NOTHING_PREFETCHED, account: await this.connect.fetchAccount(accountId) };
     } catch (error) {
       this.logger.error(
         {
@@ -162,6 +176,33 @@ export class StripeWebhookService {
           error: error instanceof Error ? error.message : String(error),
         },
         'stripe webhook: could not re-read the connected account from Stripe',
+      );
+      return NOTHING_PREFETCHED;
+    }
+  }
+
+  private async prefetchChargeRefunds(event: GatewayEvent): Promise<Prefetched> {
+    const charge = RefundedChargeIdSchema.safeParse(event.data.object);
+    if (!charge.success) {
+      this.logger.error(
+        { stripeEventId: event.id, type: event.type },
+        'stripe webhook: charge.refunded payload has no charge id',
+      );
+      return NOTHING_PREFETCHED;
+    }
+    try {
+      return {
+        ...NOTHING_PREFETCHED,
+        chargeRefunds: await this.gateway.listChargeRefunds(charge.data.id),
+      };
+    } catch (error) {
+      this.logger.error(
+        {
+          stripeEventId: event.id,
+          chargeId: charge.data.id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'stripe webhook: could not list the refunds of the charge from Stripe',
       );
       return NOTHING_PREFETCHED;
     }
@@ -204,6 +245,22 @@ export class StripeWebhookService {
           status: 'processed',
           afterCommit: await this.connect.applyAccountUpdated(tx, prefetched.account),
         };
+      case 'charge.refunded':
+        if (!this.fromPlatform(event)) {
+          return PROCESSED;
+        }
+        if (!prefetched.chargeRefunds) {
+          return DEFERRED;
+        }
+        return this.moneyEvents.onChargeRefunded(tx, event, prefetched.chargeRefunds);
+      case 'transfer.reversed':
+        return this.fromPlatform(event)
+          ? this.moneyEvents.onTransferReversed(tx, event)
+          : PROCESSED;
+      case 'charge.dispute.created':
+        return this.fromPlatform(event) ? this.moneyEvents.onDisputeCreated(tx, event) : PROCESSED;
+      case 'charge.dispute.closed':
+        return this.fromPlatform(event) ? this.moneyEvents.onDisputeClosed(tx, event) : PROCESSED;
       default:
         this.logger.log(
           { stripeEventId: event.id, type: event.type },
@@ -211,6 +268,17 @@ export class StripeWebhookService {
         );
         return IGNORED;
     }
+  }
+
+  private fromPlatform(event: GatewayEvent): boolean {
+    if (event.account === undefined) {
+      return true;
+    }
+    this.logger.warn(
+      { stripeEventId: event.id, type: event.type, stripeAccountId: event.account },
+      'stripe webhook: money event from a connected account, ignoring',
+    );
+    return false;
   }
 
   private parsePaymentIntent(event: GatewayEvent): PaymentIntentObject | null {

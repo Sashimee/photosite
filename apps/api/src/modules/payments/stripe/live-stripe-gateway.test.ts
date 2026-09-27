@@ -48,6 +48,13 @@ function stripeMock() {
     },
     refunds: {
       create: vi.fn().mockResolvedValue({ id: 're_1', amount: 10_500, status: 'succeeded' }),
+      list: vi.fn().mockResolvedValue({
+        data: [
+          { id: 're_2', amount: 500, status: 'pending', charge: 'ch_1', metadata: {} },
+          { id: 're_1', amount: 1_000, status: 'succeeded', charge: 'ch_1', metadata: {} },
+        ],
+        has_more: false,
+      }),
     },
     events: {
       retrieve: vi.fn().mockResolvedValue({
@@ -267,6 +274,21 @@ describe('LiveStripeGateway', () => {
     expect(stripe.refunds.create.mock.calls[0]?.[0]).not.toHaveProperty('amount');
     expect(stripe.refunds.create.mock.calls[1]?.[0]).toMatchObject({ amount: 500 });
     expect(stripe.refunds.create.mock.calls[1]?.[1]).toEqual({ idempotencyKey: 'r2' });
+  });
+
+  it('lists the refunds of a charge', async () => {
+    const { stripe, gateway } = build();
+    await expect(gateway.listChargeRefunds('ch_1')).resolves.toEqual([
+      { id: 're_2', amountCents: 500, status: 'pending' },
+      { id: 're_1', amountCents: 1_000, status: 'succeeded' },
+    ]);
+    expect(stripe.refunds.list).toHaveBeenCalledWith({ charge: 'ch_1', limit: 100 });
+  });
+
+  it('refuses a charge with more refunds than one page', async () => {
+    const { stripe, gateway } = build();
+    stripe.refunds.list.mockResolvedValueOnce({ data: [], has_more: true });
+    await expect(gateway.listChargeRefunds('ch_1')).rejects.toThrow(/more than 100 refunds/);
   });
 
   it('reverses a transfer', async () => {

@@ -2,11 +2,14 @@ import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createPrismaClient, type PrismaClient } from '@photoo/db';
 import { Redis } from 'ioredis';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createTestApp } from '../../testing/create-test-app.js';
 import { waitForLinkInEmail } from '../../testing/mailpit.js';
 import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
 import { TEST_ENV } from '../../testing/test-env.js';
+import { generateTotpCode } from '../../testing/totp.js';
+import { stripeDisputeReason } from './booking-money-events.service.js';
+import { BookingReleaseService } from './booking-release.service.js';
 import { StripeEventSweepService } from './stripe-event-sweep.service.js';
 import { FakeStripeGateway } from './stripe/fake-stripe-gateway.js';
 import { STRIPE_GATEWAY } from './stripe/stripe-gateway.js';
@@ -43,7 +46,7 @@ describe('stripe webhook integration', () => {
   async function signUpAndSignIn(
     label: string,
     roles: readonly string[],
-  ): Promise<{ token: string; id: string }> {
+  ): Promise<{ token: string; id: string; email: string; cookie: string | undefined }> {
     const email = `stripe-webhook-${label}-${randomUUID()}@photoo.test`;
     const signUpResponse = await fastify().inject({
       method: 'POST',
@@ -73,7 +76,12 @@ describe('stripe webhook integration', () => {
     if (!body.session) {
       throw new Error(`sign-in for ${label} did not return a session`);
     }
-    return { token: body.session.token, id: body.user.id };
+    return {
+      token: body.session.token,
+      id: body.user.id,
+      email,
+      cookie: sessionCookieHeader(signInResponse),
+    };
   }
 
   async function createPublishedPhotographer(label: string) {
@@ -246,6 +254,179 @@ describe('stripe webhook integration', () => {
     return prisma.stripeEvent.findUnique({ where: { id } });
   }
 
+  async function paidBooking(label: string) {
+    const booking = await paymentIntentFor(label);
+    const event = paymentIntentEvent('payment_intent.succeeded', booking.paymentIntentId);
+    expect((await sendEvent(event)).statusCode).toBe(200);
+    const { chargeId } = await prisma.booking.findUniqueOrThrow({
+      where: { id: booking.bookingId },
+      select: { chargeId: true },
+    });
+    if (chargeId === null) {
+      throw new Error('payment_intent.succeeded did not store a charge id');
+    }
+    gateway().linkCharge(chargeId, booking.paymentIntentId);
+    return { ...booking, chargeId };
+  }
+
+  async function deliveredDueBooking(label: string) {
+    const booking = await paidBooking(label);
+    const account = await gateway().createConnectedAccount({
+      country: 'LU',
+      metadata: {},
+      idempotencyKey: `it_account_${booking.bookingId}`,
+    });
+    await prisma.photographerProfile.update({
+      where: { id: booking.photographer.profileId },
+      data: { stripeAccountId: account.id },
+    });
+    await prisma.booking.update({
+      where: { id: booking.bookingId },
+      data: { status: 'delivered', releaseDueAt: new Date(Date.now() - 60 * 1000) },
+    });
+    return booking;
+  }
+
+  async function releasedBooking(label: string) {
+    const booking = await deliveredDueBooking(label);
+    const outcome = await app
+      .get(BookingReleaseService)
+      .release(booking.bookingId, { type: 'system', id: null });
+    if (outcome.status !== 'released') {
+      throw new Error(`release of ${booking.bookingId} was ${outcome.status}`);
+    }
+    return { ...booking, transferId: outcome.transferId, payoutCents: outcome.amountCents };
+  }
+
+  async function dashboardRefund(booking: { paymentIntentId: string }, amountCents: number) {
+    return gateway().createRefund({
+      paymentIntentId: booking.paymentIntentId,
+      amountCents,
+      metadata: {},
+      idempotencyKey: `it_dashboard_${randomUUID()}`,
+    });
+  }
+
+  function chargeRefundedEvent(
+    booking: { chargeId: string; paymentIntentId: string },
+    amountRefunded: number,
+  ) {
+    return {
+      id: `evt_it_${randomUUID()}`,
+      object: 'event',
+      type: 'charge.refunded',
+      livemode: false,
+      data: {
+        object: {
+          id: booking.chargeId,
+          object: 'charge',
+          payment_intent: booking.paymentIntentId,
+          amount: 25050,
+          amount_refunded: amountRefunded,
+          refunded: amountRefunded === 25050,
+          currency: 'eur',
+        },
+      },
+    };
+  }
+
+  function disputeEvent(
+    type: 'charge.dispute.created' | 'charge.dispute.closed',
+    dispute: { id: string; chargeId: string; status: string; amount?: number },
+  ) {
+    return {
+      id: `evt_it_${randomUUID()}`,
+      object: 'event',
+      type,
+      livemode: false,
+      data: {
+        object: {
+          id: dispute.id,
+          object: 'dispute',
+          charge: dispute.chargeId,
+          amount: dispute.amount ?? 25050,
+          currency: 'eur',
+          reason: 'fraudulent',
+          status: dispute.status,
+        },
+      },
+    };
+  }
+
+  function transferReversedEvent(
+    transferId: string,
+    amount: number,
+    reversals: readonly { id: string; amount: number }[],
+  ) {
+    return {
+      id: `evt_it_${randomUUID()}`,
+      object: 'event',
+      type: 'transfer.reversed',
+      livemode: false,
+      data: {
+        object: {
+          id: transferId,
+          object: 'transfer',
+          amount,
+          amount_reversed: reversals.reduce((sum, reversal) => sum + reversal.amount, 0),
+          currency: 'eur',
+          reversals: {
+            object: 'list',
+            data: reversals.map((reversal) => ({ ...reversal, object: 'transfer_reversal' })),
+          },
+        },
+      },
+    };
+  }
+
+  function sessionCookieHeader(response: {
+    cookies: { name: string; value: string }[];
+  }): string | undefined {
+    const cookie = response.cookies.find((candidate) => candidate.name === 'photoo_session');
+    return cookie ? `${cookie.name}=${cookie.value}` : undefined;
+  }
+
+  async function adminWithTwoFactor(label: string, finance: boolean) {
+    const admin = await signUpAndSignIn(`admin-${label}`, ['client']);
+    await prisma.user.update({ where: { id: admin.id }, data: { roles: ['admin'] } });
+    if (finance) {
+      await prisma.adminPermissionGrant.create({
+        data: { userId: admin.id, permission: 'finance', grantedByAdminId: admin.id },
+      });
+    }
+
+    let cookie = admin.cookie;
+    if (!cookie) {
+      throw new Error('expected a session cookie on admin sign-in');
+    }
+    const enrollResponse = await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/totp/enroll',
+      headers: { cookie, origin: 'http://localhost:3000' },
+      payload: { password: PASSWORD },
+    });
+    const { secret } = enrollResponse.json<{ secret: string }>();
+    const verifyResponse = await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/totp/verify',
+      headers: { cookie, origin: 'http://localhost:3000' },
+      payload: { code: generateTotpCode(secret) },
+    });
+    cookie = sessionCookieHeader(verifyResponse) ?? cookie;
+    return { id: admin.id, headers: { cookie, origin: 'http://localhost:3000' } };
+  }
+
+  function bookingAuditCount(bookingId: string, action: string) {
+    return prisma.auditLog.count({ where: { targetType: 'Booking', targetId: bookingId, action } });
+  }
+
+  function ledgerOf(bookingId: string) {
+    return prisma.ledgerEntry.findMany({
+      where: { bookingId },
+      orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
+    });
+  }
+
   async function clearRateLimitKeys(): Promise<void> {
     const patterns = [
       `rate-limit:*:${FAKE_IP}`,
@@ -281,6 +462,15 @@ describe('stripe webhook integration', () => {
         select: { id: true },
       });
       const bookingIds = bookings.map((booking) => booking.id);
+      await prisma.auditLog.deleteMany({
+        where: {
+          OR: [
+            { targetType: 'Booking', targetId: { in: bookingIds } },
+            { actorId: { in: createdUserIds } },
+          ],
+        },
+      });
+      await prisma.dispute.deleteMany({ where: { bookingId: { in: bookingIds } } });
       await prisma.ledgerEntry.deleteMany({ where: { bookingId: { in: bookingIds } } });
       await prisma.booking.deleteMany({ where: { id: { in: bookingIds } } });
       await prisma.conversation.deleteMany({
@@ -501,6 +691,623 @@ describe('stripe webhook integration', () => {
       const stored = await storedEvent(event.id);
       expect(stored?.type).toBe('customer.created');
       expect(stored?.processedAt).toBeNull();
+    });
+  });
+
+  describe('refund, reversal and dispute webhooks', () => {
+    it('records a full charge.refunded once and moves the booking to refunded', async () => {
+      const booking = await paidBooking('refund-full');
+      const dashboard = await dashboardRefund(booking, 25050);
+      const event = chargeRefundedEvent(booking, 25050);
+
+      expect((await sendEvent(event)).statusCode).toBe(200);
+      expect((await sendEvent(event)).statusCode).toBe(200);
+
+      const refunds = (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'refund');
+      expect(refunds.map((row) => [row.stripeObjectId, row.amountCents])).toEqual([
+        [dashboard.id, -25050],
+      ]);
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(stored.status).toBe('refunded');
+      expect(await bookingAuditCount(booking.bookingId, 'booking.refund_recorded')).toBe(1);
+      expect((await storedEvent(event.id))?.processedAt).not.toBeNull();
+    });
+
+    it('keeps a partially refunded booking in paid_held', async () => {
+      const booking = await paidBooking('refund-partial');
+      const dashboard = await dashboardRefund(booking, 5000);
+      const event = chargeRefundedEvent(booking, 5000);
+
+      expect((await sendEvent(event)).statusCode).toBe(200);
+
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(stored.status).toBe('paid_held');
+      const refunds = (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'refund');
+      expect(refunds.map((row) => [row.stripeObjectId, row.amountCents])).toEqual([
+        [dashboard.id, -5000],
+      ]);
+    });
+
+    it('lists refunds for a real-shaped charge.refunded that carries no refunds field', async () => {
+      const booking = await paidBooking('refund-real-shape');
+      const first = await dashboardRefund(booking, 10000);
+      const partialEvent = chargeRefundedEvent(booking, 10000);
+      expect(partialEvent.data.object).not.toHaveProperty('refunds');
+
+      expect((await sendEvent(partialEvent)).statusCode).toBe(200);
+
+      const afterPartial = await prisma.booking.findUniqueOrThrow({
+        where: { id: booking.bookingId },
+      });
+      expect(afterPartial.status).toBe('paid_held');
+
+      const second = await dashboardRefund(booking, 15050);
+      const fullEvent = chargeRefundedEvent(booking, 25050);
+      expect((await sendEvent(fullEvent)).statusCode).toBe(200);
+      expect((await sendEvent(fullEvent)).statusCode).toBe(200);
+
+      const refunds = (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'refund');
+      expect(
+        refunds
+          .map((row) => [row.stripeObjectId, row.amountCents])
+          .sort(([a], [b]) => String(a).localeCompare(String(b))),
+      ).toEqual(
+        [
+          [first.id, -10000],
+          [second.id, -15050],
+        ].sort(([a], [b]) => String(a).localeCompare(String(b))),
+      );
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(stored.status).toBe('refunded');
+      expect(await bookingAuditCount(booking.bookingId, 'booking.refund_recorded')).toBe(2);
+      expect(await bookingAuditCount(booking.bookingId, 'booking.refund_unreconciled')).toBe(0);
+      expect((await storedEvent(partialEvent.id))?.processedAt).not.toBeNull();
+      expect((await storedEvent(fullEvent.id))?.processedAt).not.toBeNull();
+    });
+
+    it('stores and defers a charge.refunded whose refunds cannot be listed', async () => {
+      const booking = await paidBooking('refund-list-fails');
+      const event = chargeRefundedEvent(
+        { ...booking, chargeId: `ch_it_unknown_${randomUUID()}` },
+        25050,
+      );
+
+      expect((await sendEvent(event)).statusCode).toBe(200);
+
+      const stored = await storedEvent(event.id);
+      expect(stored?.type).toBe('charge.refunded');
+      expect(stored?.processedAt).toBeNull();
+      expect(
+        (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'refund'),
+      ).toHaveLength(0);
+      const unchanged = await prisma.booking.findUniqueOrThrow({
+        where: { id: booking.bookingId },
+      });
+      expect(unchanged.status).toBe('paid_held');
+    });
+
+    it('freezes the booking on a dispute, notifies finance and restores it when won', async () => {
+      const admin = await adminWithTwoFactor('dispute-won', true);
+      const booking = await paidBooking('dispute-won');
+      const disputeId = `dp_it_${randomUUID()}`;
+      const created = disputeEvent('charge.dispute.created', {
+        id: disputeId,
+        chargeId: booking.chargeId,
+        status: 'needs_response',
+      });
+
+      expect((await sendEvent(created)).statusCode).toBe(200);
+      expect((await sendEvent(created)).statusCode).toBe(200);
+
+      const disputed = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(disputed.status).toBe('disputed');
+      const disputes = await prisma.dispute.findMany({ where: { bookingId: booking.bookingId } });
+      expect(disputes).toHaveLength(1);
+      expect(disputes[0]?.status).toBe('open');
+      expect(disputes[0]?.reason).toBe(stripeDisputeReason(disputeId, 'fraudulent'));
+      const notifications = await prisma.notification.findMany({
+        where: { userId: admin.id, type: 'dispute_opened' },
+      });
+      expect(notifications).toHaveLength(1);
+      expect(notifications[0]?.payload).toMatchObject({
+        total: { amountCents: 25050, currency: 'EUR' },
+      });
+
+      const closed = disputeEvent('charge.dispute.closed', {
+        id: disputeId,
+        chargeId: booking.chargeId,
+        status: 'won',
+      });
+      expect((await sendEvent(closed)).statusCode).toBe(200);
+
+      const restored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(restored.status).toBe('paid_held');
+      const won = await prisma.dispute.findFirstOrThrow({
+        where: { bookingId: booking.bookingId },
+      });
+      expect(won.status).toBe('won');
+      expect(won.amountRefundedCents).toBe(0);
+    });
+
+    it('refuses to release a disputed booking and resumes the release once the dispute is won', async () => {
+      const booking = await paidBooking('dispute-release');
+      const account = await gateway().createConnectedAccount({
+        country: 'LU',
+        metadata: {},
+        idempotencyKey: `it_account_${booking.bookingId}`,
+      });
+      await prisma.photographerProfile.update({
+        where: { id: booking.photographer.profileId },
+        data: { stripeAccountId: account.id },
+      });
+      await prisma.booking.update({
+        where: { id: booking.bookingId },
+        data: { status: 'delivered', releaseDueAt: new Date(Date.now() - 60 * 1000) },
+      });
+
+      const disputeId = `dp_it_${randomUUID()}`;
+      const created = disputeEvent('charge.dispute.created', {
+        id: disputeId,
+        chargeId: booking.chargeId,
+        status: 'needs_response',
+      });
+      expect((await sendEvent(created)).statusCode).toBe(200);
+      const disputed = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(disputed.status).toBe('disputed');
+
+      const releaseService = app.get(BookingReleaseService);
+      const refused = await releaseService.release(booking.bookingId, { type: 'system', id: null });
+      expect(refused).toEqual({ status: 'skipped', reason: 'disputed' });
+      const stillDisputed = await prisma.booking.findUniqueOrThrow({
+        where: { id: booking.bookingId },
+      });
+      expect(stillDisputed.status).toBe('disputed');
+      expect(stillDisputed.transferId).toBeNull();
+      expect(
+        (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'transfer'),
+      ).toHaveLength(0);
+
+      const closed = disputeEvent('charge.dispute.closed', {
+        id: disputeId,
+        chargeId: booking.chargeId,
+        status: 'won',
+      });
+      expect((await sendEvent(closed)).statusCode).toBe(200);
+      const restored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(restored.status).toBe('delivered');
+
+      const released = await releaseService.release(booking.bookingId, {
+        type: 'system',
+        id: null,
+      });
+      expect(released).toMatchObject({
+        status: 'released',
+        amountCents: expect.any(Number) as unknown,
+      });
+      const finalBooking = await prisma.booking.findUniqueOrThrow({
+        where: { id: booking.bookingId },
+      });
+      expect(finalBooking.status).toBe('released');
+      expect(finalBooking.transferId).not.toBeNull();
+      expect(
+        (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'transfer'),
+      ).toHaveLength(1);
+    });
+
+    it('keeps the booking disputed when the dispute is lost', async () => {
+      const booking = await paidBooking('dispute-lost');
+      const disputeId = `dp_it_${randomUUID()}`;
+      await sendEvent(
+        disputeEvent('charge.dispute.created', {
+          id: disputeId,
+          chargeId: booking.chargeId,
+          status: 'needs_response',
+        }),
+      );
+
+      const closed = disputeEvent('charge.dispute.closed', {
+        id: disputeId,
+        chargeId: booking.chargeId,
+        status: 'lost',
+      });
+      expect((await sendEvent(closed)).statusCode).toBe(200);
+
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(stored.status).toBe('disputed');
+      const lost = await prisma.dispute.findFirstOrThrow({
+        where: { bookingId: booking.bookingId },
+      });
+      expect(lost.status).toBe('lost');
+      expect(lost.amountRefundedCents).toBe(25050);
+    });
+
+    it('opens and closes a dispute whose closed event arrives before its created event', async () => {
+      const booking = await paidBooking('dispute-out-of-order');
+      const disputeId = `dp_it_${randomUUID()}`;
+
+      const closed = disputeEvent('charge.dispute.closed', {
+        id: disputeId,
+        chargeId: booking.chargeId,
+        status: 'lost',
+      });
+      expect((await sendEvent(closed)).statusCode).toBe(200);
+      const created = disputeEvent('charge.dispute.created', {
+        id: disputeId,
+        chargeId: booking.chargeId,
+        status: 'needs_response',
+      });
+      expect((await sendEvent(created)).statusCode).toBe(200);
+
+      const disputes = await prisma.dispute.findMany({ where: { bookingId: booking.bookingId } });
+      expect(disputes.map((dispute) => dispute.status)).toEqual(['lost']);
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(stored.status).toBe('disputed');
+      expect((await storedEvent(created.id))?.processedAt).not.toBeNull();
+    });
+
+    it('records a transfer.reversed on a released booking once', async () => {
+      const booking = await releasedBooking('reversed');
+      const reversalId = `trr_it_${randomUUID()}`;
+      const event = transferReversedEvent(booking.transferId, booking.payoutCents, [
+        { id: reversalId, amount: 3000 },
+      ]);
+
+      expect((await sendEvent(event)).statusCode).toBe(200);
+      expect((await sendEvent(event)).statusCode).toBe(200);
+
+      const reversals = (await ledgerOf(booking.bookingId)).filter(
+        (row) => row.type === 'reversal',
+      );
+      expect(reversals.map((row) => [row.stripeObjectId, row.amountCents])).toEqual([
+        [reversalId, 3000],
+      ]);
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(stored.status).toBe('released');
+    });
+
+    it('backfills a stored dispute event older than the sweep window', async () => {
+      const booking = await paidBooking('dispute-backfill');
+      const event = disputeEvent('charge.dispute.created', {
+        id: `dp_it_${randomUUID()}`,
+        chargeId: booking.chargeId,
+        status: 'needs_response',
+      });
+      eventIds.push(event.id);
+      await prisma.stripeEvent.create({
+        data: {
+          id: event.id,
+          type: event.type,
+          receivedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+          processedAt: null,
+          payload: event,
+        },
+      });
+
+      const result = await app.get(StripeEventSweepService).sweep();
+
+      expect(result.processed).toBeGreaterThanOrEqual(1);
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(stored.status).toBe('disputed');
+      expect((await storedEvent(event.id))?.processedAt).not.toBeNull();
+    });
+  });
+
+  describe('POST /v1/bookings/:id/refund', () => {
+    function refund(bookingId: string, token: string, payload: Record<string, unknown>) {
+      return fastify().inject({
+        method: 'POST',
+        url: `/v1/bookings/${bookingId}/refund`,
+        remoteAddress: FAKE_IP,
+        headers: headers(token),
+        payload: { reason: 'Shoot cancelled', ...payload },
+      });
+    }
+
+    it('refunds in parts before release and ignores the echoing webhook', async () => {
+      const booking = await paidBooking('client-refund');
+
+      const byPhotographer = await refund(booking.bookingId, booking.photographer.token, {});
+      expect(byPhotographer.statusCode).toBe(403);
+      const tooMuch = await refund(booking.bookingId, booking.client.token, { amountCents: 25051 });
+      expect(tooMuch.statusCode).toBe(422);
+
+      const partial = await refund(booking.bookingId, booking.client.token, { amountCents: 5000 });
+      expect(partial.statusCode).toBe(200);
+      expect(partial.json()).toMatchObject({
+        status: 'partially_refunded',
+        amount: { amountCents: 5000, currency: 'EUR' },
+        refundedTotal: { amountCents: 5000, currency: 'EUR' },
+        booking: { status: 'paid_held' },
+      });
+
+      const rest = await refund(booking.bookingId, booking.client.token, {});
+      expect(rest.statusCode).toBe(200);
+      expect(rest.json()).toMatchObject({
+        status: 'refunded',
+        amount: { amountCents: 20050, currency: 'EUR' },
+        refundedTotal: { amountCents: 25050, currency: 'EUR' },
+        booking: { status: 'refunded' },
+      });
+
+      const again = await refund(booking.bookingId, booking.client.token, { amountCents: 1 });
+      expect(again.statusCode).toBe(409);
+
+      const refunds = (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'refund');
+      expect(refunds.map((row) => row.amountCents)).toEqual([-5000, -20050]);
+      const echo = chargeRefundedEvent(booking, 25050);
+      expect((await sendEvent(echo)).statusCode).toBe(200);
+      expect(
+        (await ledgerOf(booking.bookingId)).filter((row) => row.type === 'refund'),
+      ).toHaveLength(2);
+      expect(await bookingAuditCount(booking.bookingId, 'booking.refund_recorded')).toBe(0);
+      expect(await bookingAuditCount(booking.bookingId, 'booking.refund_partial')).toBe(1);
+      expect(await bookingAuditCount(booking.bookingId, 'booking.refunded')).toBe(1);
+    });
+
+    it.each([0, -1, 1.5])('rejects an amountCents of %s with 400', async (amountCents) => {
+      const booking = await paidBooking('refund-bad-amount');
+
+      const response = await refund(booking.bookingId, booking.client.token, { amountCents });
+
+      expect(response.statusCode).toBe(400);
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(stored.status).toBe('paid_held');
+    });
+
+    it('returns 404 when a stranger requests a refund on someone else’s booking', async () => {
+      const booking = await paidBooking('refund-stranger');
+      const stranger = await signUpAndSignIn('refund-stranger-caller', ['client']);
+
+      const response = await refund(booking.bookingId, stranger.token, {});
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('returns 409 when the client refunds a booking that has already been released', async () => {
+      const booking = await releasedBooking('refund-after-release');
+
+      const response = await refund(booking.bookingId, booking.client.token, {});
+
+      expect(response.statusCode).toBe(409);
+    });
+  });
+
+  describe('refund and release concurrency', () => {
+    const ONE_WINS_TIMEOUT_MS = 5_000;
+
+    function clientRefund(bookingId: string, token: string, payload: Record<string, unknown>) {
+      return fastify().inject({
+        method: 'POST',
+        url: `/v1/bookings/${bookingId}/refund`,
+        remoteAddress: FAKE_IP,
+        headers: headers(token),
+        payload: { reason: 'Shoot cancelled', ...payload },
+      });
+    }
+
+    // Holds whichever contender reaches Stripe first inside its Stripe call
+    // until the other has settled, so the second one is guaranteed to arrive
+    // while the first still owns the booking. Without the lock both would
+    // reach the gate and the timeout would let them through together.
+    async function raceWithGatedStripe<A, B>(
+      first: () => Promise<A>,
+      second: () => Promise<B>,
+    ): Promise<[A, B]> {
+      let open!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        open = resolve;
+      });
+      const fake = gateway();
+      const createRefund = fake.createRefund.bind(fake);
+      const createTransfer = fake.createTransfer.bind(fake);
+      const refundSpy = vi.spyOn(fake, 'createRefund').mockImplementation(async (input) => {
+        await gate;
+        return createRefund(input);
+      });
+      const transferSpy = vi.spyOn(fake, 'createTransfer').mockImplementation(async (input) => {
+        await gate;
+        return createTransfer(input);
+      });
+      let timer: NodeJS.Timeout | undefined;
+      try {
+        const a = first();
+        const b = second();
+        const timeout = new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, ONE_WINS_TIMEOUT_MS);
+        });
+        await Promise.race([Promise.race([a, b]).then(() => undefined), timeout]);
+        open();
+        return await Promise.all([a, b]);
+      } finally {
+        clearTimeout(timer);
+        open();
+        refundSpy.mockRestore();
+        transferSpy.mockRestore();
+      }
+    }
+
+    async function moneyOf(bookingId: string) {
+      const ledger = await ledgerOf(bookingId);
+      const refunded = ledger
+        .filter((row) => row.type === 'refund')
+        .reduce((sum, row) => sum - row.amountCents, 0);
+      const transfers = ledger.filter((row) => row.type === 'transfer');
+      return { refunded, transfers };
+    }
+
+    it('lets only one of a parallel client refund and release move the money', async () => {
+      const booking = await deliveredDueBooking('race-refund-release');
+      const releaseService = app.get(BookingReleaseService);
+
+      const [refunded, released] = await raceWithGatedStripe(
+        () => clientRefund(booking.bookingId, booking.client.token, {}),
+        () => releaseService.release(booking.bookingId, { type: 'system', id: null }),
+      );
+
+      const refundWon = refunded.statusCode === 200;
+      const releaseWon = released.status === 'released';
+      expect([refundWon, releaseWon].filter(Boolean)).toHaveLength(1);
+      if (refundWon) {
+        expect(released).toEqual({ status: 'skipped', reason: 'locked' });
+      } else {
+        expect(refunded.statusCode).toBe(409);
+      }
+
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      const money = await moneyOf(booking.bookingId);
+      expect(money.refunded).toBeLessThanOrEqual(25050);
+      if (refundWon) {
+        expect(stored.status).toBe('refunded');
+        expect(stored.transferId).toBeNull();
+        expect(money.refunded).toBe(25050);
+        expect(money.transfers).toHaveLength(0);
+      } else {
+        expect(stored.status).toBe('released');
+        expect(money.refunded).toBe(0);
+        expect(money.transfers).toHaveLength(1);
+      }
+
+      const retried = await releaseService.release(booking.bookingId, { type: 'system', id: null });
+      expect(retried.status).toBe('skipped');
+      expect((await moneyOf(booking.bookingId)).transfers).toHaveLength(refundWon ? 0 : 1);
+    });
+
+    it('lets only one of two parallel client refunds through and never over-refunds', async () => {
+      const booking = await paidBooking('race-double-refund');
+
+      const [firstRefund, secondRefund] = await raceWithGatedStripe(
+        () => clientRefund(booking.bookingId, booking.client.token, { amountCents: 20000 }),
+        () => clientRefund(booking.bookingId, booking.client.token, { amountCents: 20000 }),
+      );
+
+      expect([firstRefund.statusCode, secondRefund.statusCode].sort()).toEqual([200, 409]);
+      const money = await moneyOf(booking.bookingId);
+      expect(money.refunded).toBe(20000);
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(stored.status).toBe('paid_held');
+
+      const rest = await clientRefund(booking.bookingId, booking.client.token, {});
+      expect(rest.statusCode).toBe(200);
+      expect((await moneyOf(booking.bookingId)).refunded).toBe(25050);
+    });
+  });
+
+  describe('admin booking refunds', () => {
+    function adminPost(
+      admin: { headers: Record<string, string> },
+      bookingId: string,
+      action: 'refund' | 'reverse-transfer',
+      payload: Record<string, unknown>,
+    ) {
+      return fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/bookings/${bookingId}/${action}`,
+        remoteAddress: FAKE_IP,
+        headers: admin.headers,
+        payload: { reason: 'Photographer no-show confirmed', ...payload },
+      });
+    }
+
+    it('reads bookings only with the finance permission', async () => {
+      const booking = await paidBooking('admin-read');
+      const plain = await adminWithTwoFactor('read-plain', false);
+      const finance = await adminWithTwoFactor('read-finance', true);
+
+      const forbidden = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/bookings/${booking.bookingId}`,
+        remoteAddress: FAKE_IP,
+        headers: plain.headers,
+      });
+      expect(forbidden.statusCode).toBe(403);
+
+      const allowed = await fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/bookings/${booking.bookingId}`,
+        remoteAddress: FAKE_IP,
+        headers: finance.headers,
+      });
+      expect(allowed.statusCode).toBe(200);
+      expect(allowed.json()).toMatchObject({
+        id: booking.bookingId,
+        status: 'paid_held',
+        paymentIntentId: booking.paymentIntentId,
+        chargeId: booking.chargeId,
+        transferId: null,
+        refundedCents: 0,
+        reversedCents: 0,
+        disputeStatus: null,
+      });
+
+      const list = await fastify().inject({
+        method: 'GET',
+        url: '/v1/admin/bookings',
+        remoteAddress: FAKE_IP,
+        headers: plain.headers,
+      });
+      expect(list.statusCode).toBe(403);
+    });
+
+    it('refuses admin money mutations before release', async () => {
+      const admin = await adminWithTwoFactor('refund-held', true);
+      const held = await paidBooking('admin-refund-held');
+
+      const refunded = await adminPost(admin, held.bookingId, 'refund', { amountCents: 5000 });
+      const reversed = await adminPost(admin, held.bookingId, 'reverse-transfer', {});
+
+      expect(refunded.statusCode).toBe(409);
+      expect(reversed.statusCode).toBe(409);
+      expect((await ledgerOf(held.bookingId)).map((row) => row.type)).toEqual(['charge']);
+    });
+
+    it('reverses the transfer before refunding a released booking', async () => {
+      const admin = await adminWithTwoFactor('refund', true);
+      const booking = await releasedBooking('admin-refund');
+      const refunded = await adminPost(admin, booking.bookingId, 'refund', { amountCents: 5000 });
+      expect(refunded.statusCode).toBe(200);
+      expect(refunded.json()).toMatchObject({
+        status: 'released',
+        transferId: booking.transferId,
+        refundedCents: 5000,
+        reversedCents: 5000,
+      });
+      const ledger = await ledgerOf(booking.bookingId);
+      expect(
+        ledger
+          .filter((row) => row.type === 'reversal' || row.type === 'refund')
+          .map((row) => [row.type, row.amountCents]),
+      ).toEqual([
+        ['reversal', 5000],
+        ['refund', -5000],
+      ]);
+
+      const reversed = await adminPost(admin, booking.bookingId, 'reverse-transfer', {});
+      expect(reversed.statusCode).toBe(200);
+      expect(reversed.json()).toMatchObject({ reversedCents: booking.payoutCents });
+
+      const nothingLeft = await adminPost(admin, booking.bookingId, 'refund', { amountCents: 1 });
+      expect(nothingLeft.statusCode).toBe(422);
+      const noTransferLeft = await adminPost(admin, booking.bookingId, 'reverse-transfer', {});
+      expect(noTransferLeft.statusCode).toBe(422);
+      expect(await bookingAuditCount(booking.bookingId, 'booking.refund_reversal')).toBe(1);
+      expect(await bookingAuditCount(booking.bookingId, 'booking.admin_refund')).toBe(1);
+      expect(await bookingAuditCount(booking.bookingId, 'booking.transfer_reversed')).toBe(1);
+    });
+
+    it('rejects a money mutation when the 2FA check is stale', async () => {
+      const admin = await adminWithTwoFactor('stale', true);
+      const booking = await releasedBooking('admin-stale');
+      await prisma.session.updateMany({
+        where: { userId: admin.id },
+        data: { twoFactorVerifiedAt: new Date(Date.now() - 20 * 60 * 1000) },
+      });
+
+      const response = await adminPost(admin, booking.bookingId, 'refund', { amountCents: 1000 });
+
+      expect(response.statusCode).toBe(403);
+      expect(
+        (await ledgerOf(booking.bookingId)).filter((row) => row.type !== 'charge'),
+      ).toHaveLength(2);
     });
   });
 });

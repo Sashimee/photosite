@@ -14,6 +14,9 @@ import { HANDLED_EVENT_TYPES, StripeWebhookService } from './stripe-webhook.serv
 export const STUCK_EVENT_MIN_AGE_MS = 5 * 60 * 1000;
 export const STUCK_EVENT_MAX_AGE_MS = 72 * 60 * 60 * 1000;
 const SWEEP_BATCH_SIZE = 100;
+// Dispute events were stored unhandled before their handlers existed, so any
+// age is picked up; a dispute stays actionable long after Stripe stops retrying.
+export const BACKFILLED_EVENT_TYPES = ['charge.dispute.created', 'charge.dispute.closed'] as const;
 
 export interface SweepResult {
   attempted: number;
@@ -54,11 +57,14 @@ export class StripeEventSweepService implements OnApplicationBootstrap, OnModule
     const stuck = await this.prisma.client.stripeEvent.findMany({
       where: {
         processedAt: null,
-        type: { in: [...HANDLED_EVENT_TYPES] },
-        receivedAt: {
-          lt: new Date(now.getTime() - STUCK_EVENT_MIN_AGE_MS),
-          gt: new Date(now.getTime() - STUCK_EVENT_MAX_AGE_MS),
-        },
+        receivedAt: { lt: new Date(now.getTime() - STUCK_EVENT_MIN_AGE_MS) },
+        OR: [
+          {
+            type: { in: [...HANDLED_EVENT_TYPES] },
+            receivedAt: { gt: new Date(now.getTime() - STUCK_EVENT_MAX_AGE_MS) },
+          },
+          { type: { in: [...BACKFILLED_EVENT_TYPES] } },
+        ],
       },
       orderBy: { receivedAt: 'asc' },
       take: SWEEP_BATCH_SIZE,

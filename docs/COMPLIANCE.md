@@ -44,6 +44,7 @@ photoo.lu is a Luxembourg platform (supervisory authority: CNPD). This document 
 | Server logs | 30 days |
 | Consent records | 5 years after last update |
 | Notifications (in-app/email/push records) | 12 months, deleted by the worker's `notifications-cleanup` job |
+| `AuditLog` rows, including refund and dispute reasons (the only place a refund reason is stored) | 10 years, with the ledger they explain (proposal, pending the 0.7 lawyer brief; free-text reasons may hold personal data, #471). No expiry job yet |
 
 ## Platform-specific obligations
 
