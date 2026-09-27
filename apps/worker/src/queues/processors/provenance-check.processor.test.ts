@@ -271,4 +271,89 @@ describe('createProvenanceCheckProcessor', () => {
 
     expect(read).toHaveBeenCalledTimes(1);
   });
+
+  it('forces a review verdict when the reverse-search provider rejects, even if the raw score would pass', async () => {
+    const { deps, portfolioImageUpdate, auditLogCreate, provenanceCheckCreate } = fakeDeps({
+      search: vi.fn(() => Promise.reject(new Error('vendor unavailable'))),
+    });
+
+    await createProvenanceCheckProcessor(deps)(fakeJob(), undefined, undefined);
+
+    expect(provenanceCheckCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ verdict: 'review' }) as unknown }),
+    );
+    expect(portfolioImageUpdate).not.toHaveBeenCalled();
+    expect(auditLogCreate).not.toHaveBeenCalled();
+  });
+
+  it('forces a review verdict when the C2PA reader rejects, even if the raw score would pass', async () => {
+    const { deps, portfolioImageUpdate, auditLogCreate, provenanceCheckCreate } = fakeDeps({
+      provenanceC2paEnabled: true,
+      read: vi.fn(() => Promise.reject(new Error('reader crashed'))),
+    });
+
+    await createProvenanceCheckProcessor(deps)(fakeJob(), undefined, undefined);
+
+    expect(provenanceCheckCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ verdict: 'review', c2paValid: null }) as unknown,
+      }),
+    );
+    expect(portfolioImageUpdate).not.toHaveBeenCalled();
+    expect(auditLogCreate).not.toHaveBeenCalled();
+  });
+
+  it('does not downgrade an already-fail verdict when a provider also fails', async () => {
+    const { deps, portfolioImageUpdate, auditLogCreate, provenanceCheckCreate } = fakeDeps({
+      detect: vi.fn(() => Promise.resolve({ vendor: 'test-vendor', score: 0.99, raw: null })),
+      search: vi.fn(() => Promise.reject(new Error('vendor unavailable'))),
+    });
+
+    await createProvenanceCheckProcessor(deps)(fakeJob(), undefined, undefined);
+
+    expect(provenanceCheckCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ verdict: 'fail' }) as unknown }),
+    );
+    expect(portfolioImageUpdate).toHaveBeenCalledWith({
+      where: { id: PORTFOLIO_IMAGE_ID },
+      data: { status: 'flagged' },
+    });
+    expect(auditLogCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: 'provenance_check.flagged',
+        after: { verdict: 'fail' },
+      }) as unknown,
+    });
+  });
+
+  it('treats a missing or malformed EXIF blob as no camera and no capture date', async () => {
+    const { deps, provenanceCheckCreate } = fakeDeps({
+      upload: { ...BASE_UPLOAD, exif: null },
+    });
+
+    await createProvenanceCheckProcessor(deps)(fakeJob(), undefined, undefined);
+
+    expect(provenanceCheckCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ exifCamera: null }) as unknown,
+      }),
+    );
+  });
+
+  it('persists the full reverse-match objects, not just the domains used for scoring', async () => {
+    const matches = [
+      { url: 'https://stolen.example/photo.jpg', domain: 'stolen.example', similarity: 0.97 },
+    ];
+    const { deps, provenanceCheckCreate } = fakeDeps({
+      search: vi.fn(() => Promise.resolve({ vendor: 'test-vendor', matches })),
+    });
+
+    await createProvenanceCheckProcessor(deps)(fakeJob(), undefined, undefined);
+
+    expect(provenanceCheckCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ reverseMatches: matches }) as unknown,
+      }),
+    );
+  });
 });
