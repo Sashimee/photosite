@@ -1,4 +1,4 @@
-import { IdSchema, errorResponses } from './common.js';
+import { IdSchema, errorResponses, requiresVerifiedEmail } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
 
@@ -94,6 +94,7 @@ registry.registerPath({
     'Photographer only. Idempotent: the first call creates the Express account and returns 201; later calls return the existing account with 200.',
   tags: ['payments'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(true),
   responses: {
     '200': {
       description: 'Connected account already existed',
@@ -115,6 +116,7 @@ registry.registerPath({
     'Photographer only. Requires a connected account to already exist (POST /v1/me/stripe/account), otherwise 409. Returns a short-lived, Stripe-hosted onboarding URL.',
   tags: ['payments'],
   security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(true),
   responses: {
     '200': {
       description: 'Onboarding link created',

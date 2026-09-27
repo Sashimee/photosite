@@ -12847,6 +12847,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "responses": {
           "200": {
             "description": "Connected account already existed",
@@ -12926,6 +12927,7 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
         "responses": {
           "200": {
             "description": "Onboarding link created",
