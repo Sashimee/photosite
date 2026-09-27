@@ -2707,6 +2707,28 @@
         ],
         "additionalProperties": false
       },
+      "StripeAccountResponse": {
+        "type": "object",
+        "properties": {
+          "stripeAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "example": "acct_1P000000000000000"
+          },
+          "onboardingComplete": {
+            "type": "boolean"
+          },
+          "payoutsEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stripeAccountId",
+          "onboardingComplete",
+          "payoutsEnabled"
+        ],
+        "additionalProperties": false
+      },
       "StripeAccountLinkResponse": {
         "type": "object",
         "properties": {
@@ -5319,7 +5341,8 @@
           "job_application_status_changed",
           "report_decision",
           "moderation_action",
-          "provenance_decision"
+          "provenance_decision",
+          "payouts_disabled"
         ],
         "example": "quote_received"
       },
@@ -5418,7 +5441,8 @@
               "job_application_status_changed",
               "report_decision",
               "moderation_action",
-              "provenance_decision"
+              "provenance_decision",
+              "payouts_disabled"
             ],
             "example": "quote_received"
           },
@@ -5607,7 +5631,8 @@
               "job_application_status_changed",
               "report_decision",
               "moderation_action",
-              "provenance_decision"
+              "provenance_decision",
+              "payouts_disabled"
             ],
             "example": "quote_received"
           },
@@ -12807,10 +12832,10 @@
         }
       }
     },
-    "/v1/me/stripe/account-link": {
+    "/v1/me/stripe/account": {
       "post": {
-        "summary": "Create a Stripe Connect Express onboarding link for the caller's account",
-        "description": "Requires a connected account to already exist (POST /v1/me/stripe/account, 1A.8b). Returns a short-lived, Stripe-hosted onboarding URL.",
+        "summary": "Create the caller's Stripe Connect Express account",
+        "description": "Photographer only. Idempotent: the first call creates the Express account and returns 201; later calls return the existing account with 200.",
         "tags": [
           "payments"
         ],
@@ -12822,6 +12847,87 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
+        "responses": {
+          "200": {
+            "description": "Connected account already existed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StripeAccountResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Connected account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StripeAccountResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/stripe/account-link": {
+      "post": {
+        "summary": "Create a Stripe Connect Express onboarding link for the caller's account",
+        "description": "Photographer only. Requires a connected account to already exist (POST /v1/me/stripe/account), otherwise 409. Returns a short-lived, Stripe-hosted onboarding URL.",
+        "tags": [
+          "payments"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-requires-verified-email": true,
         "responses": {
           "200": {
             "description": "Onboarding link created",
@@ -12863,8 +12969,18 @@
               }
             }
           },
-          "422": {
-            "description": "Unprocessable entity",
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
             "content": {
               "application/json": {
                 "schema": {

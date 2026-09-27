@@ -5545,6 +5545,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/stripe/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create the caller's Stripe Connect Express account
+         * @description Photographer only. Idempotent: the first call creates the Express account and returns 201; later calls return the existing account with 200.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Connected account already existed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StripeAccountResponse"];
+                    };
+                };
+                /** @description Connected account created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StripeAccountResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/stripe/account-link": {
         parameters: {
             query?: never;
@@ -5556,7 +5640,7 @@ export interface paths {
         put?: never;
         /**
          * Create a Stripe Connect Express onboarding link for the caller's account
-         * @description Requires a connected account to already exist (POST /v1/me/stripe/account, 1A.8b). Returns a short-lived, Stripe-hosted onboarding URL.
+         * @description Photographer only. Requires a connected account to already exist (POST /v1/me/stripe/account), otherwise 409. Returns a short-lived, Stripe-hosted onboarding URL.
          */
         post: {
             parameters: {
@@ -5603,8 +5687,17 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                /** @description Unprocessable entity */
-                422: {
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -12216,6 +12309,12 @@ export interface components {
             amountCents?: number;
             reason: string;
         };
+        StripeAccountResponse: {
+            /** @example acct_1P000000000000000 */
+            stripeAccountId: string;
+            onboardingComplete: boolean;
+            payoutsEnabled: boolean;
+        };
         StripeAccountLinkResponse: {
             /**
              * Format: uri
@@ -13258,7 +13357,7 @@ export interface components {
          * @example quote_received
          * @enum {string}
          */
-        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "data-export-ready" | "data-export-failed" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision";
+        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "data-export-ready" | "data-export-failed" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision" | "payouts_disabled";
         AdminEmailTemplatePreview: {
             subject: string;
             html: string;
@@ -13293,7 +13392,7 @@ export interface components {
              * @example quote_received
              * @enum {string}
              */
-            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision";
+            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision" | "payouts_disabled";
             payload: components["schemas"]["NotificationPayload"];
             channels: ("email" | "push" | "in_app")[];
             /**
@@ -13366,7 +13465,7 @@ export interface components {
              * @example quote_received
              * @enum {string}
              */
-            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision";
+            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision" | "payouts_disabled";
             /**
              * @example email
              * @enum {string}

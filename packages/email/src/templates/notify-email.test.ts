@@ -224,6 +224,19 @@ describe('renderNotifyEmail', () => {
     );
   });
 
+  it('renders payouts_disabled with an account deep link and no ids required', () => {
+    const message = renderNotifyEmail(
+      'payouts_disabled',
+      {},
+      'en',
+      'photographer@example.com',
+      'https://photoo.lu',
+    );
+    expect(message.subject).toBe('Payouts are paused on your account');
+    expect(message.text).toContain('https://photoo.lu/en/account\n');
+    expect(message.html).toContain('<a href="https://photoo.lu/en/account">');
+  });
+
   it('renders job_application_status_changed with a fallback job offer title when absent', () => {
     const message = renderNotifyEmail(
       'job_application_status_changed',

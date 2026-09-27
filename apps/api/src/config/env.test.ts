@@ -22,6 +22,11 @@ const validEnv = {
   S3_PUBLIC_BASE_URL: 'http://127.0.0.1:9000/photoo-public',
 };
 
+const productionStripe = {
+  STRIPE_SECRET_KEY: 'sk_test_env_validation_only',
+  STRIPE_WEBHOOK_SECRET: 'whsec_env_validation_only',
+};
+
 describe('loadEnv', () => {
   it('parses a well-formed environment', () => {
     const env = loadEnv(validEnv);
@@ -96,6 +101,7 @@ describe('loadEnv', () => {
     const env = loadEnv({
       ...validEnv,
       NODE_ENV: 'production',
+      ...productionStripe,
       AUTH_SECRET: 'b'.repeat(32),
       AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
       WEB_APP_URL: 'https://photoo.lu',
@@ -270,6 +276,7 @@ describe('loadEnv', () => {
     const env = loadEnv({
       ...validEnv,
       NODE_ENV: 'production',
+      ...productionStripe,
       AUTH_SECRET: 'b'.repeat(32),
       AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
       WEB_APP_URL: 'https://photoo.lu',
@@ -294,6 +301,7 @@ describe('loadEnv', () => {
     const env = loadEnv({
       ...validEnv,
       NODE_ENV: 'production',
+      ...productionStripe,
       AUTH_SECRET: 'b'.repeat(32),
       AUTH_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
       WEB_APP_URL: 'https://photoo.lu',
@@ -301,5 +309,89 @@ describe('loadEnv', () => {
       SENTRY_DSN: 'https://public@o0.ingest.sentry.io/1',
     });
     expect(env.SENTRY_DSN).toBe('https://public@o0.ingest.sentry.io/1');
+  });
+
+  it('leaves Stripe unconfigured outside production, so the fake gateway is selected', () => {
+    const env = loadEnv(validEnv);
+    expect(env.STRIPE_SECRET_KEY).toBeUndefined();
+    expect(env.STRIPE_WEBHOOK_SECRET).toBeUndefined();
+    expect(env.STRIPE_CONNECT_REFRESH_URL).toBeUndefined();
+    expect(env.STRIPE_CONNECT_RETURN_URL).toBeUndefined();
+  });
+
+  it('treats empty-string Stripe variables (as .env files set unfilled keys) as unset', () => {
+    const env = loadEnv({
+      ...validEnv,
+      STRIPE_SECRET_KEY: '',
+      STRIPE_WEBHOOK_SECRET: '',
+      STRIPE_CONNECT_REFRESH_URL: '',
+      STRIPE_CONNECT_RETURN_URL: '',
+    });
+    expect(env.STRIPE_SECRET_KEY).toBeUndefined();
+    expect(env.STRIPE_CONNECT_RETURN_URL).toBeUndefined();
+  });
+
+  it('refuses to boot in production without STRIPE_SECRET_KEY', () => {
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: 'production',
+        STRIPE_WEBHOOK_SECRET: productionStripe.STRIPE_WEBHOOK_SECRET,
+        AUTH_SECRET: 'b'.repeat(32),
+        WEB_APP_URL: 'https://photoo.lu',
+      }),
+    ).toThrow(/STRIPE_SECRET_KEY: STRIPE_SECRET_KEY is required in production/);
+  });
+
+  it('refuses to boot in production without STRIPE_WEBHOOK_SECRET', () => {
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: 'production',
+        STRIPE_SECRET_KEY: productionStripe.STRIPE_SECRET_KEY,
+        AUTH_SECRET: 'b'.repeat(32),
+        WEB_APP_URL: 'https://photoo.lu',
+      }),
+    ).toThrow(/STRIPE_WEBHOOK_SECRET: STRIPE_WEBHOOK_SECRET is required in production/);
+  });
+
+  it('rejects a STRIPE_SECRET_KEY that is not a secret or restricted key, without echoing it', () => {
+    let message = '';
+    try {
+      loadEnv({ ...validEnv, STRIPE_SECRET_KEY: 'pk_test_publishable_by_mistake' });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toMatch(/STRIPE_SECRET_KEY: must start with sk_ or rk_/);
+    expect(message).not.toContain('pk_test_publishable_by_mistake');
+  });
+
+  it('rejects a STRIPE_WEBHOOK_SECRET without the whsec_ prefix', () => {
+    expect(() => loadEnv({ ...validEnv, STRIPE_WEBHOOK_SECRET: 'not-a-webhook-secret' })).toThrow(
+      /STRIPE_WEBHOOK_SECRET: must start with whsec_/,
+    );
+  });
+
+  it('accepts test and restricted Stripe keys and http Connect URLs outside production', () => {
+    const env = loadEnv({
+      ...validEnv,
+      STRIPE_SECRET_KEY: 'rk_test_restricted',
+      STRIPE_CONNECT_RETURN_URL: 'http://localhost:3000/en/account',
+    });
+    expect(env.STRIPE_SECRET_KEY).toBe('rk_test_restricted');
+    expect(env.STRIPE_CONNECT_RETURN_URL).toBe('http://localhost:3000/en/account');
+  });
+
+  it('rejects a non-https Connect URL in production', () => {
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: 'production',
+        ...productionStripe,
+        AUTH_SECRET: 'b'.repeat(32),
+        WEB_APP_URL: 'https://photoo.lu',
+        STRIPE_CONNECT_REFRESH_URL: 'http://photoo.lu/en/account',
+      }),
+    ).toThrow(/STRIPE_CONNECT_REFRESH_URL: must be an https:\/\/ URL in production/);
   });
 });
