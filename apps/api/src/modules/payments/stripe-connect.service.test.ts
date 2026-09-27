@@ -42,6 +42,9 @@ function setup(options: { profile?: ProfileRow | null; env?: Partial<Env> } = {}
   let row = options.profile === undefined ? profileRow() : options.profile;
   const tx = {
     photographerProfile: {
+      findFirst: vi.fn(({ where }: { where: { stripeAccountId: string } }) =>
+        Promise.resolve(row?.stripeAccountId === where.stripeAccountId ? { ...row } : null),
+      ),
       updateMany: vi.fn(
         ({ where, data }: { where: { stripeAccountId: null }; data: Partial<ProfileRow> }) => {
           if (row?.stripeAccountId !== where.stripeAccountId) {
@@ -338,7 +341,7 @@ describe('StripeConnectService.handleAccountUpdated', () => {
       await ctx.service.handleAccountUpdated(ENABLED);
       await ctx.service.handleAccountUpdated(ENABLED);
 
-      expect(ctx.prisma.client.$transaction).toHaveBeenCalledOnce();
+      expect(ctx.tx.photographerProfile.update).toHaveBeenCalledOnce();
       expect(ctx.tx.auditLog.create).toHaveBeenCalledOnce();
     });
 
@@ -402,7 +405,7 @@ describe('StripeConnectService.handleAccountUpdated', () => {
       { stripeAccountId: 'acct_unknown' },
       expect.stringContaining('unknown account'),
     );
-    expect(ctx.prisma.client.$transaction).not.toHaveBeenCalled();
+    expect(ctx.tx.photographerProfile.update).not.toHaveBeenCalled();
     expect(ctx.notifications.notify).not.toHaveBeenCalled();
   });
 });

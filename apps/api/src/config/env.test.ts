@@ -331,6 +331,16 @@ describe('loadEnv', () => {
     expect(env.STRIPE_CONNECT_RETURN_URL).toBeUndefined();
   });
 
+  it('defaults the stuck Stripe event sweep to every 5 minutes and allows 0 to disable it', () => {
+    expect(loadEnv(validEnv).STRIPE_EVENT_SWEEP_INTERVAL_MS).toBe(300_000);
+    expect(
+      loadEnv({ ...validEnv, STRIPE_EVENT_SWEEP_INTERVAL_MS: '0' }).STRIPE_EVENT_SWEEP_INTERVAL_MS,
+    ).toBe(0);
+    expect(() => loadEnv({ ...validEnv, STRIPE_EVENT_SWEEP_INTERVAL_MS: '-1' })).toThrow(
+      /STRIPE_EVENT_SWEEP_INTERVAL_MS/,
+    );
+  });
+
   it('refuses to boot in production without STRIPE_SECRET_KEY', () => {
     expect(() =>
       loadEnv({

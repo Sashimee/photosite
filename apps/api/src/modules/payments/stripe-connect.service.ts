@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { HttpException, Inject, Injectable } from '@nestjs/common';
+import type { Prisma } from '@photoo/db';
 import type { StripeAccountLinkResponseSchema, StripeAccountResponseSchema } from '@photoo/shared';
 import { Logger } from 'nestjs-pino';
 import type { z } from 'zod';
@@ -15,6 +16,10 @@ import {
   type ConnectedAccount,
   type StripeGateway,
 } from './stripe/stripe-gateway.js';
+
+export type AfterCommit = () => Promise<void>;
+
+const NOTHING_AFTER_COMMIT: AfterCommit = () => Promise.resolve();
 
 interface SessionUser {
   id: string;
@@ -186,7 +191,20 @@ export class StripeConnectService {
   }
 
   async handleAccountUpdated(account: ConnectedAccount): Promise<void> {
-    const profile = await this.prisma.client.photographerProfile.findFirst({
+    const afterCommit = await this.prisma.client.$transaction((tx) =>
+      this.applyAccountUpdated(tx, account),
+    );
+    await afterCommit();
+  }
+
+  // Runs inside the caller's transaction so the webhook can record the
+  // StripeEvent and the mirrored state atomically; the returned callback holds
+  // the side effects that must only happen once that transaction commits.
+  async applyAccountUpdated(
+    tx: Prisma.TransactionClient,
+    account: ConnectedAccount,
+  ): Promise<AfterCommit> {
+    const profile = await tx.photographerProfile.findFirst({
       where: { stripeAccountId: account.id },
     });
     if (!profile) {
@@ -194,7 +212,7 @@ export class StripeConnectService {
         { stripeAccountId: account.id },
         'stripe connect: account.updated for an unknown account, ignoring',
       );
-      return;
+      return NOTHING_AFTER_COMMIT;
     }
 
     const onboardingComplete = account.detailsSubmitted && account.chargesEnabled;
@@ -203,62 +221,60 @@ export class StripeConnectService {
       profile.stripeOnboardingComplete === onboardingComplete &&
       profile.stripePayoutsEnabled === payoutsEnabled
     ) {
-      return;
+      return NOTHING_AFTER_COMMIT;
     }
 
-    const unpublished = await this.prisma.client.$transaction(async (tx) => {
-      const updated = await tx.photographerProfile.update({
+    const updated = await tx.photographerProfile.update({
+      where: { id: profile.id },
+      data: {
+        stripeOnboardingComplete: onboardingComplete,
+        stripePayoutsEnabled: payoutsEnabled,
+      },
+    });
+    const unpublished = updated.isPublished && !PublishPolicy.canPublish(updated);
+    if (unpublished) {
+      await tx.photographerProfile.update({
         where: { id: profile.id },
-        data: {
+        data: { isPublished: false },
+      });
+    }
+    await tx.auditLog.create({
+      data: {
+        actorType: 'system',
+        actorId: null,
+        action: 'stripe_account.updated',
+        targetType: 'PhotographerProfile',
+        targetId: profile.id,
+        before: {
+          stripeAccountId: account.id,
+          stripeOnboardingComplete: profile.stripeOnboardingComplete,
+          stripePayoutsEnabled: profile.stripePayoutsEnabled,
+          isPublished: profile.isPublished,
+        },
+        after: {
+          stripeAccountId: account.id,
           stripeOnboardingComplete: onboardingComplete,
           stripePayoutsEnabled: payoutsEnabled,
+          isPublished: unpublished ? false : updated.isPublished,
         },
-      });
-      const mustUnpublish = updated.isPublished && !PublishPolicy.canPublish(updated);
-      if (mustUnpublish) {
-        await tx.photographerProfile.update({
-          where: { id: profile.id },
-          data: { isPublished: false },
-        });
-      }
-      await tx.auditLog.create({
-        data: {
-          actorType: 'system',
-          actorId: null,
-          action: 'stripe_account.updated',
-          targetType: 'PhotographerProfile',
-          targetId: profile.id,
-          before: {
-            stripeAccountId: account.id,
-            stripeOnboardingComplete: profile.stripeOnboardingComplete,
-            stripePayoutsEnabled: profile.stripePayoutsEnabled,
-            isPublished: profile.isPublished,
-          },
-          after: {
-            stripeAccountId: account.id,
-            stripeOnboardingComplete: onboardingComplete,
-            stripePayoutsEnabled: payoutsEnabled,
-            isPublished: mustUnpublish ? false : updated.isPublished,
-          },
-          ip: null,
-        },
-      });
-      return mustUnpublish;
+        ip: null,
+      },
     });
 
-    this.logger.log(
-      {
-        photographerProfileId: profile.id,
-        stripeAccountId: account.id,
-        onboardingComplete,
-        payoutsEnabled,
-        unpublished,
-      },
-      'stripe connect: account state mirrored',
-    );
-
-    if (profile.stripePayoutsEnabled && !payoutsEnabled) {
-      await this.notifications.notify(profile.userId, 'payouts_disabled', {});
-    }
+    return async () => {
+      this.logger.log(
+        {
+          photographerProfileId: profile.id,
+          stripeAccountId: account.id,
+          onboardingComplete,
+          payoutsEnabled,
+          unpublished,
+        },
+        'stripe connect: account state mirrored',
+      );
+      if (profile.stripePayoutsEnabled && !payoutsEnabled) {
+        await this.notifications.notify(profile.userId, 'payouts_disabled', {});
+      }
+    };
   }
 }

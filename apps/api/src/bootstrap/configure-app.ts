@@ -4,8 +4,10 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { API_PREFIX } from '@photoo/shared';
 import { REQUEST_ID_HEADER, REVISION_HEADER } from '../common/constants.js';
 import type { Env } from '../config/env.js';
+import { captureRawBodyOn } from './raw-body.js';
 
 const EXCLUDED_FROM_PREFIX = ['health', 'ready', 'openapi.json'];
+export const STRIPE_WEBHOOK_PATH = `${API_PREFIX}/stripe/webhook`;
 
 export async function configureApp(app: NestFastifyApplication, config: Env): Promise<void> {
   const fastify = app.getHttpAdapter().getInstance();
@@ -15,6 +17,7 @@ export async function configureApp(app: NestFastifyApplication, config: Env): Pr
     reply.header(REVISION_HEADER, process.env.PHOTOO_REVISION ?? 'unknown');
     done();
   });
+  captureRawBodyOn(fastify, [STRIPE_WEBHOOK_PATH]);
 
   await app.register(helmet);
   await app.register(cors, { origin: config.WEB_ORIGINS, credentials: true });

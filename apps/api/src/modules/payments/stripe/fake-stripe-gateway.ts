@@ -1,5 +1,4 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { z } from 'zod';
 import type {
   AccountLink,
   ConnectedAccount,
@@ -16,18 +15,11 @@ import type {
   Transfer,
   TransferReversal,
 } from './stripe-gateway.js';
+import { parseGatewayEvent } from './stripe-gateway.js';
 
 export const FAKE_WEBHOOK_SECRET = 'whsec_fake';
 const SIGNATURE_TOLERANCE_SECONDS = 300;
 const ACCOUNT_LINK_TTL_SECONDS = 300;
-
-const GatewayEventSchema = z.object({
-  id: z.string().min(1),
-  type: z.string().min(1),
-  account: z.string().optional(),
-  livemode: z.boolean(),
-  data: z.object({ object: z.record(z.string(), z.unknown()) }),
-});
 
 interface IdempotentRecord {
   fingerprint: string;
@@ -176,7 +168,7 @@ export class FakeStripeGateway implements StripeGateway {
     if (Math.abs(this.nowSeconds() - timestamp) > SIGNATURE_TOLERANCE_SECONDS) {
       throw new Error('fake stripe: timestamp outside the tolerance zone');
     }
-    return GatewayEventSchema.parse(JSON.parse(payload));
+    return parseGatewayEvent(JSON.parse(payload));
   }
 
   signPayload(payload: string, timestamp: number = this.nowSeconds()): string {

@@ -138,6 +138,7 @@ const EnvSchema = z
     STRIPE_WEBHOOK_SECRET: optionalPrefixedSecret(/^whsec_/, 'whsec_'),
     STRIPE_CONNECT_REFRESH_URL: OptionalUrlSchema,
     STRIPE_CONNECT_RETURN_URL: OptionalUrlSchema,
+    STRIPE_EVENT_SWEEP_INTERVAL_MS: z.coerce.number().int().min(0).default(300_000),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== 'production') {

@@ -126,3 +126,19 @@ export function parseConnectedAccount(object: unknown): ConnectedAccount {
     detailsSubmitted: parsed.details_submitted,
   };
 }
+
+const GatewayEventSchema = z.object({
+  id: z.string().min(1),
+  type: z.string().min(1),
+  account: z.string().optional(),
+  livemode: z.boolean(),
+  data: z.object({ object: z.record(z.string(), z.unknown()) }),
+});
+
+export function parseGatewayEvent(value: unknown): GatewayEvent {
+  return GatewayEventSchema.parse(value);
+}
+
+export function isLiveSecretKey(secretKey: string | undefined): boolean {
+  return secretKey !== undefined && /^(sk|rk)_live_/.test(secretKey);
+}

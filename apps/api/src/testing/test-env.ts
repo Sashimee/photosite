@@ -33,6 +33,7 @@ export const TEST_ENV: Env = {
   STRIPE_WEBHOOK_SECRET: undefined,
   STRIPE_CONNECT_REFRESH_URL: undefined,
   STRIPE_CONNECT_RETURN_URL: undefined,
+  STRIPE_EVENT_SWEEP_INTERVAL_MS: 0,
 };
 
 export const UNREACHABLE_TEST_ENV: Env = {

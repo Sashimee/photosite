@@ -10,7 +10,6 @@ export const NOT_YET_IMPLEMENTED: readonly NotYetImplementedRoute[] = [
   { method: 'POST', path: '/v1/bookings/:id/accept-delivery' },
   { method: 'POST', path: '/v1/bookings/:id/cancel' },
   { method: 'POST', path: '/v1/bookings/:id/refund' },
-  { method: 'POST', path: '/v1/stripe/webhook' },
   { method: 'GET', path: '/v1/admin/bookings' },
   { method: 'GET', path: '/v1/admin/bookings/:id' },
   { method: 'POST', path: '/v1/admin/bookings/:id/refund' },
