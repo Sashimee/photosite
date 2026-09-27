@@ -208,9 +208,9 @@ export class BookingRefundService {
         await lockBooking(tx, bookingId);
         const booking = await tx.booking.findUniqueOrThrow({
           where: { id: bookingId },
-          include: { quote: true },
+          include: { quote: true, photographer: { select: { userId: true } } },
         });
-        if (booking.clientId !== user.id && booking.photographerId !== user.id) {
+        if (booking.clientId !== user.id && booking.photographer.userId !== user.id) {
           throw notFound();
         }
         if (booking.clientId !== user.id) {

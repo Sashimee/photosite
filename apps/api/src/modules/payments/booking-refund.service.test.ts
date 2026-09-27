@@ -22,6 +22,7 @@ interface BookingRow {
   status: string;
   clientId: string;
   photographerId: string;
+  photographer: { userId: string };
   paymentIntentId: string | null;
   chargeId: string | null;
   transferId: string | null;
@@ -66,7 +67,8 @@ async function setup(overrides: Partial<BookingRow> = {}, options: { openDispute
     id: 'booking-1',
     status: 'delivered',
     clientId: 'client-1',
-    photographerId: 'photographer-1',
+    photographerId: 'photographer-profile-1',
+    photographer: { userId: 'photographer-1' },
     paymentIntentId: intent.id,
     chargeId: 'ch_1',
     transferId: null,
@@ -355,6 +357,16 @@ describe('BookingRefundService.refundAsClient', () => {
     ).resolves.toBe(403);
     await expect(
       httpStatus(service.refundAsClient({ id: 'someone' }, 'booking-1', { reason: 'r' }, null)),
+    ).resolves.toBe(404);
+    await expect(
+      httpStatus(
+        service.refundAsClient(
+          { id: 'photographer-profile-1' },
+          'booking-1',
+          { reason: 'r' },
+          null,
+        ),
+      ),
     ).resolves.toBe(404);
     await expect(
       httpStatus(service.refundAsClient(client, 'missing', { reason: 'r' }, null)),
