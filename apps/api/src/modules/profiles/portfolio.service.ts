@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { mapPortfolioImage } from './profile-mapper.js';
 import { PortfolioCleanupQueueService } from './portfolio-cleanup-queue.service.js';
 import { decodePortfolioCursor, encodePortfolioCursor } from './portfolio-cursor.js';
+import { ProvenanceCheckQueueService } from './provenance-check-queue.service.js';
 import { ProfilesService } from './profiles.service.js';
 
 interface SessionUser {
@@ -29,6 +30,8 @@ export class PortfolioService {
     @Inject(ProfilesService) private readonly profiles: ProfilesService,
     @Inject(PortfolioCleanupQueueService)
     private readonly cleanupQueue: PortfolioCleanupQueueService,
+    @Inject(ProvenanceCheckQueueService)
+    private readonly provenanceQueue: ProvenanceCheckQueueService,
     @Inject(APP_CONFIG) config: Env,
   ) {
     this.baseUrl = config.S3_PUBLIC_BASE_URL;
@@ -55,7 +58,7 @@ export class PortfolioService {
       },
       orderBy: [{ order: 'asc' }, { id: 'asc' }],
       take: query.limit + 1,
-      include: { upload: true },
+      include: { upload: true, provenanceCheck: true },
     });
 
     const hasMore = rows.length > query.limit;
@@ -64,7 +67,9 @@ export class PortfolioService {
     const nextCursor = hasMore && last ? encodePortfolioCursor(last.order, last.id) : null;
 
     return {
-      items: page.map((row) => mapPortfolioImage(row, row.upload, this.baseUrl)),
+      items: page.map((row) =>
+        mapPortfolioImage(row, row.upload, this.baseUrl, row.provenanceCheck),
+      ),
       nextCursor,
     };
   }
@@ -124,6 +129,10 @@ export class PortfolioService {
       include: { upload: true },
     });
 
+    if (alreadyProcessed) {
+      await this.provenanceQueue.enqueue({ portfolioImageId: created.id });
+    }
+
     return mapPortfolioImage(created, created.upload, this.baseUrl);
   }
 
@@ -160,10 +169,12 @@ export class PortfolioService {
     const updated = await this.prisma.client.portfolioImage.findMany({
       where: { profileId: profile.id, deletedAt: null },
       orderBy: { order: 'asc' },
-      include: { upload: true },
+      include: { upload: true, provenanceCheck: true },
     });
 
-    return updated.map((image) => mapPortfolioImage(image, image.upload, this.baseUrl));
+    return updated.map((image) =>
+      mapPortfolioImage(image, image.upload, this.baseUrl, image.provenanceCheck),
+    );
   }
 
   async delete(user: SessionUser, imageId: string): Promise<void> {

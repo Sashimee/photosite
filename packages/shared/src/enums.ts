@@ -121,6 +121,15 @@ export const PROVENANCE_VERDICTS = ['pass', 'review', 'fail'] as const;
 
 export type ProvenanceVerdict = (typeof PROVENANCE_VERDICTS)[number];
 
+export const PROVENANCE_DECISION_REASONS = [
+  'ai_generated',
+  'not_own_work',
+  'manipulated_metadata',
+  'other',
+] as const;
+
+export type ProvenanceDecisionReason = (typeof PROVENANCE_DECISION_REASONS)[number];
+
 export const DATA_REQUEST_TYPES = ['export', 'delete'] as const;
 
 export type DataRequestType = (typeof DATA_REQUEST_TYPES)[number];
@@ -193,6 +202,7 @@ export const NOTIFICATION_TYPES = [
   'job_application_status_changed',
   'report_decision',
   'moderation_action',
+  'provenance_decision',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

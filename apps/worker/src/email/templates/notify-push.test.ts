@@ -148,4 +148,27 @@ describe('renderNotifyPush', () => {
       /moderationOutcome/,
     );
   });
+
+  it('renders provenance_decision with a notifications deep link and no decision reason text', () => {
+    const push = renderNotifyPush(
+      'provenance_decision',
+      { provenanceDecision: 'rejected', decisionReason: 'ai_generated' },
+      'en',
+    );
+    expect(push.title).toBe('One of your portfolio images was rejected');
+    expect(push.body).not.toContain('AI-generated');
+    expect(push.url).toBe('/en/account/notifications');
+  });
+
+  it('renders every provenance decision outcome without throwing', () => {
+    for (const provenanceDecision of ['flagged', 'rejected'] as const) {
+      expect(() =>
+        renderNotifyPush('provenance_decision', { provenanceDecision }, 'en'),
+      ).not.toThrow();
+    }
+  });
+
+  it('throws when a provenance decision payload has no provenanceDecision', () => {
+    expect(() => renderNotifyPush('provenance_decision', {}, 'en')).toThrow(/provenanceDecision/);
+  });
 });

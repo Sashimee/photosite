@@ -52,6 +52,8 @@ const SAMPLE_NOTIFICATION_PAYLOAD: NotificationPayload = {
   jobOfferTitle: 'Second shooter needed for a preview event',
   jobApplicationId: '00000000-0000-4000-8000-000000000005',
   moderationOutcome: 'resolved',
+  provenanceDecision: 'rejected',
+  decisionReason: 'ai_generated',
 };
 
 const AUTH_EMAIL_TEMPLATE_NAME_SET: ReadonlySet<string> = new Set(AUTH_EMAIL_TEMPLATE_NAMES);

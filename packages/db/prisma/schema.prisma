@@ -120,6 +120,13 @@ enum ProvenanceVerdict {
   fail
 }
 
+enum ProvenanceDecisionReason {
+  ai_generated
+  not_own_work
+  manipulated_metadata
+  other
+}
+
 enum LicenceUsage {
   personal
   commercial
@@ -702,25 +709,29 @@ model PortfolioImage {
 // computed by `computeProvenanceScore` from whatever signals are available.
 // `raw` holds the vendor payload and is cleared by the retention sweep after
 // 90 days for a passed check, so it stays nullable even after being set.
+// `note` is admin-internal; `decisionReason`/`decisionReasonText` are the
+// owner-visible DSA Art. 17 statement of reasons for a reject/flag decision.
 model ProvenanceCheck {
-  id                String            @id @default(uuid(7))
-  portfolioImageId  String            @unique
-  portfolioImage    PortfolioImage    @relation(fields: [portfolioImageId], references: [id], onDelete: Cascade)
-  aiScore           Decimal?          @db.Decimal(4, 3)
-  aiVendor          String
-  reverseMatches    Json
-  c2paValid         Boolean?
-  exifCamera        String?
-  exifCapturedAt    DateTime?
-  score             Decimal           @db.Decimal(4, 3)
-  verdict           ProvenanceVerdict
-  reviewedByAdminId String?
-  reviewedByAdmin   User?             @relation("ProvenanceCheckReviewedByAdmin", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
-  reviewedAt        DateTime?
-  note              String?
-  raw               Json?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  id                 String                    @id @default(uuid(7))
+  portfolioImageId   String                    @unique
+  portfolioImage     PortfolioImage            @relation(fields: [portfolioImageId], references: [id], onDelete: Cascade)
+  aiScore            Decimal?                  @db.Decimal(4, 3)
+  aiVendor           String
+  reverseMatches     Json
+  c2paValid          Boolean?
+  exifCamera         String?
+  exifCapturedAt     DateTime?
+  score              Decimal                   @db.Decimal(4, 3)
+  verdict            ProvenanceVerdict
+  reviewedByAdminId  String?
+  reviewedByAdmin    User?                     @relation("ProvenanceCheckReviewedByAdmin", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  reviewedAt         DateTime?
+  note               String?
+  decisionReason     ProvenanceDecisionReason?
+  decisionReasonText String?
+  raw                Json?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
 
   @@index([verdict, createdAt])
 }

@@ -9,6 +9,7 @@ import {
   requireConversationId,
   requireJobOfferId,
   requireModerationOutcome,
+  requireProvenanceDecision,
   requireQuoteId,
 } from '@photoo/email';
 import { getMessages } from '@photoo/i18n';
@@ -44,8 +45,14 @@ export function renderNotifyPush(
     return { title: template.title, body: template.body, url: buildModerationNoticePath(locale) };
   }
 
+  if (type === 'provenance_decision') {
+    const outcome = requireProvenanceDecision(type, payload);
+    const template = t.provenanceDecision[outcome];
+    return { title: template.title, body: template.body, url: buildModerationNoticePath(locale) };
+  }
+
   const templates: Record<
-    Exclude<NotificationType, 'report_decision' | 'moderation_action'>,
+    Exclude<NotificationType, 'report_decision' | 'moderation_action' | 'provenance_decision'>,
     { title: string; body: string }
   > = {
     quote_received: t.quoteReceived,

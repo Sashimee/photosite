@@ -14,6 +14,8 @@ describe('isSensitiveKeyName', () => {
     'currentPassword',
     'apiToken',
     'clientSecret',
+    'reverseMatches',
+    'raw',
   ])('flags %s as sensitive', (key) => {
     expect(isSensitiveKeyName(key)).toBe(true);
   });
@@ -30,5 +32,7 @@ describe('buildSensitiveKeyRedactPaths', () => {
     expect(paths).toContain('*.password');
     expect(paths).toContain('authorization');
     expect(paths).toContain('*.cookie');
+    expect(paths).toContain('reversematches');
+    expect(paths).toContain('*.raw');
   });
 });

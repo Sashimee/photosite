@@ -920,12 +920,35 @@
             "format": "date-time",
             "description": "ISO 8601 date-time",
             "example": "2026-09-16T12:00:00.000Z"
+          },
+          "decisionReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "ai_generated",
+              "not_own_work",
+              "manipulated_metadata",
+              "other",
+              null
+            ],
+            "example": "ai_generated"
+          },
+          "decisionReasonText": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
           }
         },
         "required": [
           "verdict",
           "status",
-          "checkedAt"
+          "checkedAt",
+          "decisionReason",
+          "decisionReasonText"
         ],
         "additionalProperties": false
       },
@@ -4449,6 +4472,27 @@
               "null"
             ],
             "maxLength": 2000
+          },
+          "decisionReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "ai_generated",
+              "not_own_work",
+              "manipulated_metadata",
+              "other",
+              null
+            ],
+            "example": "ai_generated"
+          },
+          "decisionReasonText": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
           }
         },
         "required": [
@@ -4468,7 +4512,9 @@
           "exifCamera",
           "exifCapturedAt",
           "reviewedByAdminId",
-          "note"
+          "note",
+          "decisionReason",
+          "decisionReasonText"
         ],
         "additionalProperties": false
       },
@@ -4485,6 +4531,21 @@
             "example": "approved"
           },
           "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "decisionReason": {
+            "type": "string",
+            "enum": [
+              "ai_generated",
+              "not_own_work",
+              "manipulated_metadata",
+              "other"
+            ],
+            "example": "ai_generated"
+          },
+          "decisionReasonText": {
             "type": "string",
             "minLength": 1,
             "maxLength": 2000
@@ -5237,7 +5298,8 @@
           "job_application_received",
           "job_application_status_changed",
           "report_decision",
-          "moderation_action"
+          "moderation_action",
+          "provenance_decision"
         ],
         "example": "quote_received"
       },
@@ -5335,7 +5397,8 @@
               "job_application_received",
               "job_application_status_changed",
               "report_decision",
-              "moderation_action"
+              "moderation_action",
+              "provenance_decision"
             ],
             "example": "quote_received"
           },
@@ -5445,6 +5508,22 @@
               "takedown",
               "restored"
             ]
+          },
+          "provenanceDecision": {
+            "type": "string",
+            "enum": [
+              "flagged",
+              "rejected"
+            ]
+          },
+          "decisionReason": {
+            "type": "string",
+            "enum": [
+              "ai_generated",
+              "not_own_work",
+              "manipulated_metadata",
+              "other"
+            ]
           }
         },
         "additionalProperties": false
@@ -5507,7 +5586,8 @@
               "job_application_received",
               "job_application_status_changed",
               "report_decision",
-              "moderation_action"
+              "moderation_action",
+              "provenance_decision"
             ],
             "example": "quote_received"
           },

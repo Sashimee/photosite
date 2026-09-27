@@ -878,6 +878,22 @@
           "subject": "Your content was restored",
           "body": "Content of yours that had been removed was restored after further review. Reason: {reason} If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
         }
+      },
+      "provenanceDecision": {
+        "flagged": {
+          "subject": "One of your portfolio images was flagged",
+          "body": "One of your portfolio images was flagged after an automated provenance check and human review. Category: {category}. {reason} This decision involved an automated check. If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        },
+        "rejected": {
+          "subject": "One of your portfolio images was rejected",
+          "body": "One of your portfolio images was rejected after an automated provenance check and human review. Category: {category}. {reason} This decision involved an automated check. If you disagree, contact hello@photoo.lu. Manage your notifications here: {url}"
+        }
+      },
+      "provenanceDecisionReasons": {
+        "ai_generated": "it appears to be AI-generated",
+        "not_own_work": "it does not appear to be your own work",
+        "manipulated_metadata": "its metadata appears to have been manipulated",
+        "other": "other"
       }
     }
   },
@@ -1086,6 +1102,16 @@
         },
         "takedown": { "title": "Your content was removed", "body": "See the details by email" },
         "restored": { "title": "Your content was restored", "body": "See the details by email" }
+      },
+      "provenanceDecision": {
+        "flagged": {
+          "title": "One of your portfolio images was flagged",
+          "body": "See the details by email"
+        },
+        "rejected": {
+          "title": "One of your portfolio images was rejected",
+          "body": "See the details by email"
+        }
       }
     }
   },
