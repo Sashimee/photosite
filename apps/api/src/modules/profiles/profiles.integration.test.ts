@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createPrismaClient, type PrismaClient } from '@photoo/db';
+import { PROVENANCE_CHECK_QUEUE_NAME } from '@photoo/shared';
+import { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp } from '../../testing/create-test-app.js';
@@ -121,6 +123,8 @@ describe('profiles integration', () => {
   let app: NestFastifyApplication;
   let prisma: PrismaClient;
   let redis: Redis;
+  let provenanceQueueConnection: Redis;
+  let provenanceQueue: Queue;
   const createdUserIds: string[] = [];
 
   function fastify() {
@@ -374,6 +378,10 @@ describe('profiles integration', () => {
     });
     prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
     redis = new Redis(testEnv.REDIS_URL);
+    provenanceQueueConnection = new Redis(testEnv.REDIS_URL, { maxRetriesPerRequest: null });
+    provenanceQueue = new Queue(PROVENANCE_CHECK_QUEUE_NAME, {
+      connection: provenanceQueueConnection,
+    });
     await clearRateLimitKeys(redis);
     await cleanupOrphanedFixtures();
 
@@ -469,6 +477,8 @@ describe('profiles integration', () => {
   afterAll(async () => {
     await cleanupCreatedUsers();
     await prisma.$disconnect();
+    await provenanceQueue.close();
+    provenanceQueueConnection.disconnect();
     redis.disconnect();
     await app.close();
   });
@@ -1086,6 +1096,53 @@ describe('profiles integration', () => {
         payload: { uploadId },
       });
       expect(response.statusCode).toBe(422);
+    });
+
+    it('attaches an upload that already finished processing as pending_review and enqueues a provenance check', async () => {
+      const owner = await signUpAndSignIn(['photographer']);
+      await createOwnProfile(owner.token, 'attach-already-processed');
+      const uploadId = await uploadAndComplete(owner.token, 'portfolio');
+      const variants = placeholderVariants(`test/portfolio-processed/${uploadId}`);
+      await prisma.upload.update({
+        where: { id: uploadId },
+        data: { status: 'processed', virusScanStatus: 'clean', variants, width: 800, height: 600 },
+      });
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/photographer-profile/portfolio',
+        headers: authHeaders(owner.token),
+        payload: { uploadId },
+      });
+      expect(response.statusCode).toBe(201);
+      const image = response.json<PortfolioImageBody>();
+      expect(image.status).toBe('pending_review');
+      expect(image.url).not.toBeNull();
+      expect(image.width).toBe(800);
+      expect(image.height).toBe(600);
+
+      const enqueuedJob = await provenanceQueue.getJob(image.id);
+      expect(enqueuedJob).not.toBeNull();
+      expect(enqueuedJob?.data).toEqual({ portfolioImageId: image.id });
+    });
+
+    it('does not enqueue a provenance check when attaching an upload that only finished virus scanning', async () => {
+      const owner = await signUpAndSignIn(['photographer']);
+      await createOwnProfile(owner.token, 'attach-clean-only');
+      const uploadId = await uploadScannedAndComplete(owner.token, 'portfolio');
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/photographer-profile/portfolio',
+        headers: authHeaders(owner.token),
+        payload: { uploadId },
+      });
+      expect(response.statusCode).toBe(201);
+      const image = response.json<PortfolioImageBody>();
+      expect(image.status).toBe('processing');
+
+      const enqueuedJob = await provenanceQueue.getJob(image.id);
+      expect(enqueuedJob).toBeUndefined();
     });
 
     it('attaches, lists, reorders and deletes portfolio images', async () => {
