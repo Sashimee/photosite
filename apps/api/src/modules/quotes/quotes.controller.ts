@@ -15,6 +15,7 @@ import {
   CursorPaginationQuerySchema,
   DirectQuoteRequestSchema,
   IdSchema,
+  QuotePreviewRequestSchema,
   QuotesMineQuerySchema,
   SlugSchema,
 } from '@photoo/shared';
@@ -42,6 +43,17 @@ export class QuotesController {
   ) {
     const { user } = await requireSession(this.auth, request);
     return this.quotes.createForRequest(user, body, request.ip);
+  }
+
+  @HttpCode(200)
+  @Post('quotes/preview')
+  async preview(
+    @Body(new ZodValidationPipe(QuotePreviewRequestSchema))
+    body: ReturnType<(typeof QuotePreviewRequestSchema)['parse']>,
+    @Req() request: FastifyRequest,
+  ) {
+    const { user } = await requireSession(this.auth, request);
+    return this.quotes.preview(user, body);
   }
 
   @Post('photographers/:slug/products/:productId/quotes')
