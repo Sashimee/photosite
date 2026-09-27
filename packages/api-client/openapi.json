@@ -2483,6 +2483,127 @@
         ],
         "additionalProperties": false
       },
+      "AcceptedQuote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "requestId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "photographerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "photographer": {
+            "$ref": "#/components/schemas/QuotePhotographer"
+          },
+          "clientId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "productId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "productTierId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "lineItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LineItem"
+            },
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "subtotal": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "platformFee": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "sent",
+              "accepted",
+              "declined",
+              "expired",
+              "withdrawn"
+            ]
+          },
+          "bookingId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          }
+        },
+        "required": [
+          "id",
+          "requestId",
+          "photographerId",
+          "photographer",
+          "clientId",
+          "productId",
+          "productTierId",
+          "lineItems",
+          "subtotal",
+          "platformFee",
+          "total",
+          "validUntil",
+          "message",
+          "status",
+          "bookingId"
+        ],
+        "additionalProperties": false
+      },
       "Booking": {
         "type": "object",
         "properties": {
@@ -2511,13 +2632,26 @@
             "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
           },
           "scheduledAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
             "description": "ISO 8601 date-time",
             "example": "2026-09-16T12:00:00.000Z"
           },
           "location": {
-            "$ref": "#/components/schemas/LatLng"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LatLng"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
           },
           "total": {
             "$ref": "#/components/schemas/Money"
@@ -2667,10 +2801,14 @@
           "clientSecret": {
             "type": "string",
             "example": "pi_3P_secret_abc123"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
           }
         },
         "required": [
-          "clientSecret"
+          "clientSecret",
+          "amount"
         ],
         "additionalProperties": false
       },
@@ -4627,13 +4765,26 @@
             "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
           },
           "scheduledAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
             "description": "ISO 8601 date-time",
             "example": "2026-09-16T12:00:00.000Z"
           },
           "location": {
-            "$ref": "#/components/schemas/LatLng"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LatLng"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
           },
           "total": {
             "$ref": "#/components/schemas/Money"
@@ -11906,7 +12057,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Quote"
+                  "$ref": "#/components/schemas/AcceptedQuote"
                 }
               }
             }

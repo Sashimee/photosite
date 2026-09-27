@@ -4760,7 +4760,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Quote"];
+                        "application/json": components["schemas"]["AcceptedQuote"];
                     };
                 };
                 /** @description Unauthorized */
@@ -12206,6 +12206,64 @@ export interface components {
             platformFee: components["schemas"]["Money"];
             total: components["schemas"]["Money"];
         };
+        AcceptedQuote: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            requestId: string | null;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            photographerId: string;
+            photographer: components["schemas"]["QuotePhotographer"];
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            clientId: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            productId: string | null;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            productTierId: string | null;
+            lineItems: components["schemas"]["LineItem"][];
+            subtotal: components["schemas"]["Money"];
+            platformFee: components["schemas"]["Money"];
+            total: components["schemas"]["Money"];
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            validUntil: string;
+            message: string | null;
+            /** @enum {string} */
+            status: "draft" | "sent" | "accepted" | "declined" | "expired" | "withdrawn";
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            bookingId: string | null;
+        };
         Booking: {
             /**
              * Format: uuid
@@ -12236,8 +12294,8 @@ export interface components {
              * @description ISO 8601 date-time
              * @example 2026-09-16T12:00:00.000Z
              */
-            scheduledAt: string;
-            location: components["schemas"]["LatLng"];
+            scheduledAt: string | null;
+            location: components["schemas"]["LatLng"] & (Record<string, never> | null);
             total: components["schemas"]["Money"];
             /** @enum {string} */
             status: "pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled";
@@ -12300,6 +12358,7 @@ export interface components {
         BookingPaymentIntent: {
             /** @example pi_3P_secret_abc123 */
             clientSecret: string;
+            amount: components["schemas"]["Money"];
         };
         CreateRefundResponse: {
             /** @enum {string} */
@@ -13113,8 +13172,8 @@ export interface components {
              * @description ISO 8601 date-time
              * @example 2026-09-16T12:00:00.000Z
              */
-            scheduledAt: string;
-            location: components["schemas"]["LatLng"];
+            scheduledAt: string | null;
+            location: components["schemas"]["LatLng"] & (Record<string, never> | null);
             total: components["schemas"]["Money"];
             /** @enum {string} */
             status: "pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled";
