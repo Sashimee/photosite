@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AcceptQuoteResponseSchema,
   CreateQuoteRequestSchema,
   DirectQuoteRequestSchema,
   LineItemSchema,
@@ -105,6 +106,31 @@ describe('QuoteSchema', () => {
     const withoutPhotographer: Partial<typeof validQuote> = { ...validQuote };
     delete withoutPhotographer.photographer;
     expect(QuoteSchema.safeParse(withoutPhotographer).success).toBe(false);
+  });
+});
+
+describe('AcceptQuoteResponseSchema', () => {
+  it('accepts an accepted quote with its booking id', () => {
+    expect(
+      AcceptQuoteResponseSchema.safeParse({
+        ...validQuote,
+        status: 'accepted',
+        bookingId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts a null booking id', () => {
+    expect(
+      AcceptQuoteResponseSchema.safeParse({ ...validQuote, status: 'accepted', bookingId: null })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects a response without a booking id', () => {
+    expect(AcceptQuoteResponseSchema.safeParse({ ...validQuote, status: 'accepted' }).success).toBe(
+      false,
+    );
   });
 });
 

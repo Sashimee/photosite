@@ -28,6 +28,13 @@ function stripeMock() {
         amount: 10_500,
         currency: 'eur',
       }),
+      retrieve: vi.fn().mockResolvedValue({
+        id: 'pi_1',
+        client_secret: 'pi_1_secret_x',
+        status: 'requires_action',
+        amount: 10_500,
+        currency: 'eur',
+      }),
     },
     transfers: {
       create: vi.fn().mockResolvedValue({
@@ -152,6 +159,18 @@ describe('LiveStripeGateway', () => {
         idempotencyKey: 'k',
       }),
     ).rejects.toThrow(/pi_2 has no client secret/);
+  });
+
+  it('retrieves an existing payment intent by id', async () => {
+    const { stripe, gateway } = build();
+    await expect(gateway.retrievePaymentIntent('pi_1')).resolves.toEqual({
+      id: 'pi_1',
+      clientSecret: 'pi_1_secret_x',
+      status: 'requires_action',
+      amountCents: 10_500,
+      currency: 'EUR',
+    });
+    expect(stripe.paymentIntents.retrieve).toHaveBeenCalledWith('pi_1');
   });
 
   it('creates a transfer tied to the source charge', async () => {

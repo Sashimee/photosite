@@ -278,6 +278,7 @@ export {
 } from './contract/requests.js';
 
 export {
+  AcceptQuoteResponseSchema,
   CreateQuoteRequestSchema,
   DirectQuoteRequestSchema,
   LineItemSchema,

@@ -13,6 +13,7 @@ describe('createStripeGateway', () => {
     const gateway = createStripeGateway(
       {
         NODE_ENV: 'development',
+        STRIPE_FAKE: false,
         STRIPE_SECRET_KEY: 'sk_test_unit',
         STRIPE_WEBHOOK_SECRET: 'whsec_unit',
       },
@@ -25,6 +26,7 @@ describe('createStripeGateway', () => {
     const gateway = createStripeGateway(
       {
         NODE_ENV: 'production',
+        STRIPE_FAKE: false,
         STRIPE_SECRET_KEY: 'sk_test_unit',
         STRIPE_WEBHOOK_SECRET: 'whsec_unit',
       },
@@ -34,11 +36,16 @@ describe('createStripeGateway', () => {
   });
 
   it.each(['development', 'test'] as const)(
-    'falls back to the fake gateway with a warning in %s without a key',
+    'returns the fake gateway with a warning in %s when STRIPE_FAKE is set',
     (nodeEnv) => {
       const warn = vi.fn();
       const gateway = createStripeGateway(
-        { NODE_ENV: nodeEnv, STRIPE_SECRET_KEY: undefined, STRIPE_WEBHOOK_SECRET: undefined },
+        {
+          NODE_ENV: nodeEnv,
+          STRIPE_FAKE: true,
+          STRIPE_SECRET_KEY: undefined,
+          STRIPE_WEBHOOK_SECRET: 'whsec_unit',
+        },
         logger(warn),
       );
       expect(gateway).toBeInstanceOf(FakeStripeGateway);
@@ -46,11 +53,57 @@ describe('createStripeGateway', () => {
     },
   );
 
+  it.each(['development', 'test'] as const)(
+    'refuses to fall back to the fake in %s without STRIPE_FAKE',
+    (nodeEnv) => {
+      expect(() =>
+        createStripeGateway(
+          {
+            NODE_ENV: nodeEnv,
+            STRIPE_FAKE: false,
+            STRIPE_SECRET_KEY: undefined,
+            STRIPE_WEBHOOK_SECRET: undefined,
+          },
+          logger(),
+        ),
+      ).toThrow(/set STRIPE_FAKE=true to use the in-memory fake outside production/);
+    },
+  );
+
+  it('refuses the fake in production even when STRIPE_FAKE is set', () => {
+    expect(() =>
+      createStripeGateway(
+        {
+          NODE_ENV: 'production',
+          STRIPE_FAKE: true,
+          STRIPE_SECRET_KEY: undefined,
+          STRIPE_WEBHOOK_SECRET: 'whsec_unit',
+        },
+        logger(),
+      ),
+    ).toThrow(/STRIPE_SECRET_KEY is required when NODE_ENV=production/);
+  });
+
+  it('refuses STRIPE_FAKE together with a key', () => {
+    expect(() =>
+      createStripeGateway(
+        {
+          NODE_ENV: 'development',
+          STRIPE_FAKE: true,
+          STRIPE_SECRET_KEY: 'sk_test_unit',
+          STRIPE_WEBHOOK_SECRET: 'whsec_unit',
+        },
+        logger(),
+      ),
+    ).toThrow(/STRIPE_FAKE and STRIPE_SECRET_KEY are both set/);
+  });
+
   it('refuses to boot in production without a key', () => {
     expect(() =>
       createStripeGateway(
         {
           NODE_ENV: 'production',
+          STRIPE_FAKE: false,
           STRIPE_SECRET_KEY: undefined,
           STRIPE_WEBHOOK_SECRET: 'whsec_unit',
         },

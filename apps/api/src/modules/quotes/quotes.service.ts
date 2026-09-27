@@ -8,6 +8,7 @@ import {
   type LineItem,
   type QuotePreviewRequestSchema,
   type QuotePreviewSchema,
+  type AcceptQuoteResponseSchema,
   type QuotesMineQuerySchema,
   type QuoteSchema,
 } from '@photoo/shared';
@@ -22,6 +23,7 @@ import {
 import { PlatformSettingsService } from '../../common/platform-settings/platform-settings.service.js';
 import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { createBookingForAcceptedQuote } from '../bookings/create-booking.js';
 import { ChatService } from '../chat/chat.service.js';
 import { mapQuote, mapQuotePhotographer } from './quote-mapper.js';
 import { QUOTE_EVENTS, type QuoteEvents } from './quote-events.js';
@@ -39,6 +41,7 @@ type DirectQuoteInput = z.infer<typeof DirectQuoteRequestSchema>;
 type MineQuery = z.infer<typeof QuotesMineQuerySchema>;
 type ListQuery = z.infer<typeof CursorPaginationQuerySchema>;
 type QuoteDto = z.infer<typeof QuoteSchema>;
+type AcceptedQuoteDto = z.infer<typeof AcceptQuoteResponseSchema>;
 type PreviewInput = z.infer<typeof QuotePreviewRequestSchema>;
 type QuotePreviewDto = z.infer<typeof QuotePreviewSchema>;
 
@@ -380,7 +383,7 @@ export class QuotesService {
     return this.paginate(rows, query.limit);
   }
 
-  async accept(user: SessionUser, id: string): Promise<QuoteDto> {
+  async accept(user: SessionUser, id: string): Promise<AcceptedQuoteDto> {
     const quote = await this.prisma.client.quote.findUnique({ where: { id } });
     if (quote?.clientId !== user.id) {
       throw notFound();
@@ -460,11 +463,10 @@ export class QuotesService {
         },
       });
 
-      return {
-        ok: true as const,
-        quote: await tx.quote.findUniqueOrThrow({ where: { id } }),
-        siblings,
-      };
+      const acceptedQuote = await tx.quote.findUniqueOrThrow({ where: { id } });
+      const booking = await createBookingForAcceptedQuote(tx, acceptedQuote, { id: user.id });
+
+      return { ok: true as const, quote: acceptedQuote, bookingId: booking.id, siblings };
     });
 
     if (!result.ok) {
@@ -482,7 +484,7 @@ export class QuotesService {
         );
       }
     }
-    return this.mapWithPhotographer(result.quote);
+    return { ...(await this.mapWithPhotographer(result.quote)), bookingId: result.bookingId };
   }
 
   async decline(user: SessionUser, id: string): Promise<QuoteDto> {

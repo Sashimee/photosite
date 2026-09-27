@@ -26,6 +26,19 @@ function toConnectedAccount(account: Stripe.Account): ConnectedAccount {
   };
 }
 
+function toPaymentIntent(intent: Stripe.PaymentIntent): PaymentIntent {
+  if (intent.client_secret === null) {
+    throw new Error(`stripe gateway: PaymentIntent ${intent.id} has no client secret`);
+  }
+  return {
+    id: intent.id,
+    clientSecret: intent.client_secret,
+    status: intent.status,
+    amountCents: intent.amount,
+    currency: intent.currency.toUpperCase(),
+  };
+}
+
 function toGatewayEvent(event: Stripe.Event): GatewayEvent {
   return {
     id: event.id,
@@ -65,6 +78,10 @@ export class LiveStripeGateway implements StripeGateway {
     return toConnectedAccount(account);
   }
 
+  async retrieveAccount(accountId: string): Promise<ConnectedAccount> {
+    return toConnectedAccount(await this.stripe.accounts.retrieve(accountId));
+  }
+
   async createAccountLink(input: CreateAccountLinkInput): Promise<AccountLink> {
     const link = await this.stripe.accountLinks.create(
       {
@@ -89,17 +106,12 @@ export class LiveStripeGateway implements StripeGateway {
       },
       { idempotencyKey: input.idempotencyKey },
     );
-    if (intent.client_secret === null) {
-      throw new Error(`stripe gateway: PaymentIntent ${intent.id} has no client secret`);
-    }
     this.logger.log({ paymentIntentId: intent.id }, 'stripe: payment intent created');
-    return {
-      id: intent.id,
-      clientSecret: intent.client_secret,
-      status: intent.status,
-      amountCents: intent.amount,
-      currency: intent.currency.toUpperCase(),
-    };
+    return toPaymentIntent(intent);
+  }
+
+  async retrievePaymentIntent(paymentIntentId: string): Promise<PaymentIntent> {
+    return toPaymentIntent(await this.stripe.paymentIntents.retrieve(paymentIntentId));
   }
 
   async createTransfer(input: CreateTransferInput): Promise<Transfer> {

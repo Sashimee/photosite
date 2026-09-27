@@ -3,6 +3,7 @@ import {
   BookingSchema,
   CancelBookingRequestSchema,
   CreateDeliveryRequestSchema,
+  PaymentIntentResponseSchema,
 } from './bookings.js';
 
 const validBooking = {
@@ -34,6 +35,12 @@ describe('BookingSchema', () => {
 
   it('rejects an unknown status', () => {
     expect(BookingSchema.safeParse({ ...validBooking, status: 'archived' }).success).toBe(false);
+  });
+
+  it('accepts a direct-quote booking without schedule or location', () => {
+    expect(
+      BookingSchema.safeParse({ ...validBooking, scheduledAt: null, location: null }).success,
+    ).toBe(true);
   });
 });
 
@@ -95,5 +102,22 @@ describe('CancelBookingRequestSchema', () => {
 
   it('rejects unknown keys', () => {
     expect(CancelBookingRequestSchema.safeParse({ refundCents: 1000 }).success).toBe(false);
+  });
+});
+
+describe('PaymentIntentResponseSchema', () => {
+  it('accepts a client secret with the server-side amount', () => {
+    expect(
+      PaymentIntentResponseSchema.safeParse({
+        clientSecret: 'pi_123_secret_abc',
+        amount: { amountCents: 150000, currency: 'EUR' },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a response without the amount', () => {
+    expect(
+      PaymentIntentResponseSchema.safeParse({ clientSecret: 'pi_123_secret_abc' }).success,
+    ).toBe(false);
   });
 });

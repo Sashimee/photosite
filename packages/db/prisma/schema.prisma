@@ -1018,7 +1018,7 @@ model Booking {
   client             User                                   @relation(fields: [clientId], references: [id], onDelete: Restrict)
   photographerId     String
   photographer       PhotographerProfile                    @relation(fields: [photographerId], references: [id], onDelete: Restrict)
-  scheduledAt        DateTime
+  scheduledAt        DateTime?
   location           Unsupported("geography(Point, 4326)")?
   status             BookingStatus                          @default(pending_payment)
   paymentIntentId    String?                                @unique

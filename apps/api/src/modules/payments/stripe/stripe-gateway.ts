@@ -101,7 +101,9 @@ export interface GatewayEvent {
 export interface StripeGateway {
   createConnectedAccount(input: CreateConnectedAccountInput): Promise<ConnectedAccount>;
   createAccountLink(input: CreateAccountLinkInput): Promise<AccountLink>;
+  retrieveAccount(accountId: string): Promise<ConnectedAccount>;
   createPaymentIntent(input: CreatePaymentIntentInput): Promise<PaymentIntent>;
+  retrievePaymentIntent(paymentIntentId: string): Promise<PaymentIntent>;
   createTransfer(input: CreateTransferInput): Promise<Transfer>;
   createRefund(input: CreateRefundInput): Promise<Refund>;
   reverseTransfer(input: ReverseTransferInput): Promise<TransferReversal>;
@@ -124,4 +126,20 @@ export function parseConnectedAccount(object: unknown): ConnectedAccount {
     payoutsEnabled: parsed.payouts_enabled,
     detailsSubmitted: parsed.details_submitted,
   };
+}
+
+const GatewayEventSchema = z.object({
+  id: z.string().min(1),
+  type: z.string().min(1),
+  account: z.string().optional(),
+  livemode: z.boolean(),
+  data: z.object({ object: z.record(z.string(), z.unknown()) }),
+});
+
+export function parseGatewayEvent(value: unknown): GatewayEvent {
+  return GatewayEventSchema.parse(value);
+}
+
+export function isLiveSecretKey(secretKey: string | undefined): boolean {
+  return secretKey !== undefined && /^(sk|rk)_live_/.test(secretKey);
 }

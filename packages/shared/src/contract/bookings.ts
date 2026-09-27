@@ -16,8 +16,8 @@ export const BookingBaseSchema = z.object({
   quoteId: IdSchema,
   clientId: IdSchema,
   photographerId: IdSchema,
-  scheduledAt: IsoDateTimeSchema,
-  location: LatLngSchema,
+  scheduledAt: IsoDateTimeSchema.nullable(),
+  location: LatLngSchema.nullable(),
   total: MoneySchema,
   status: z.enum(BOOKING_STATUSES),
   releaseDueAt: IsoDateTimeSchema.nullable(),
@@ -78,6 +78,7 @@ export const CreateDeliveryResponseSchema = z
 export const PaymentIntentResponseSchema = z
   .object({
     clientSecret: z.string().openapi({ example: 'pi_3P_secret_abc123' }),
+    amount: MoneySchema,
   })
   .strict()
   .openapi('BookingPaymentIntent');

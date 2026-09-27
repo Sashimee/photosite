@@ -29,10 +29,12 @@ export const TEST_ENV: Env = {
   SENTRY_ENVIRONMENT: undefined,
   SENTRY_TRACES_SAMPLE_RATE: 0,
   SENTRY_REQUIRED: false,
+  STRIPE_FAKE: true,
   STRIPE_SECRET_KEY: undefined,
-  STRIPE_WEBHOOK_SECRET: undefined,
+  STRIPE_WEBHOOK_SECRET: 'whsec_test_only_not_a_secret',
   STRIPE_CONNECT_REFRESH_URL: undefined,
   STRIPE_CONNECT_RETURN_URL: undefined,
+  STRIPE_EVENT_SWEEP_INTERVAL_MS: 0,
 };
 
 export const UNREACHABLE_TEST_ENV: Env = {

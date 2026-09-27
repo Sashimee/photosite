@@ -311,8 +311,9 @@ describe('loadEnv', () => {
     expect(env.SENTRY_DSN).toBe('https://public@o0.ingest.sentry.io/1');
   });
 
-  it('leaves Stripe unconfigured outside production, so the fake gateway is selected', () => {
+  it('leaves Stripe unconfigured and the fake off by default outside production', () => {
     const env = loadEnv(validEnv);
+    expect(env.STRIPE_FAKE).toBe(false);
     expect(env.STRIPE_SECRET_KEY).toBeUndefined();
     expect(env.STRIPE_WEBHOOK_SECRET).toBeUndefined();
     expect(env.STRIPE_CONNECT_REFRESH_URL).toBeUndefined();
@@ -329,6 +330,43 @@ describe('loadEnv', () => {
     });
     expect(env.STRIPE_SECRET_KEY).toBeUndefined();
     expect(env.STRIPE_CONNECT_RETURN_URL).toBeUndefined();
+  });
+
+  it('defaults the stuck Stripe event sweep to every 5 minutes and allows 0 to disable it', () => {
+    expect(loadEnv(validEnv).STRIPE_EVENT_SWEEP_INTERVAL_MS).toBe(300_000);
+    expect(
+      loadEnv({ ...validEnv, STRIPE_EVENT_SWEEP_INTERVAL_MS: '0' }).STRIPE_EVENT_SWEEP_INTERVAL_MS,
+    ).toBe(0);
+    expect(() => loadEnv({ ...validEnv, STRIPE_EVENT_SWEEP_INTERVAL_MS: '-1' })).toThrow(
+      /STRIPE_EVENT_SWEEP_INTERVAL_MS/,
+    );
+  });
+
+  it('accepts STRIPE_FAKE=true outside production', () => {
+    expect(loadEnv({ ...validEnv, STRIPE_FAKE: 'true' }).STRIPE_FAKE).toBe(true);
+  });
+
+  it('refuses STRIPE_FAKE together with a STRIPE_SECRET_KEY', () => {
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        STRIPE_FAKE: 'true',
+        STRIPE_SECRET_KEY: productionStripe.STRIPE_SECRET_KEY,
+      }),
+    ).toThrow(/STRIPE_FAKE: set either STRIPE_FAKE=true or STRIPE_SECRET_KEY, not both/);
+  });
+
+  it('refuses STRIPE_FAKE in production', () => {
+    expect(() =>
+      loadEnv({
+        ...validEnv,
+        NODE_ENV: 'production',
+        STRIPE_FAKE: 'true',
+        STRIPE_WEBHOOK_SECRET: productionStripe.STRIPE_WEBHOOK_SECRET,
+        AUTH_SECRET: 'b'.repeat(32),
+        WEB_APP_URL: 'https://photoo.lu',
+      }),
+    ).toThrow(/STRIPE_FAKE: the fake Stripe gateway is refused in production/);
   });
 
   it('refuses to boot in production without STRIPE_SECRET_KEY', () => {
