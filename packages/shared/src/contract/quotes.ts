@@ -84,6 +84,21 @@ export const QuotesMineQuerySchema = CursorPaginationQuerySchema.extend({
   role: z.enum(['photographer', 'client']).optional(),
 }).strict();
 
+export const QuotePreviewRequestSchema = z
+  .object({
+    lineItems: z.array(LineItemSchema).min(1).max(MAX_LINE_ITEMS),
+  })
+  .strict();
+
+export const QuotePreviewSchema = z
+  .object({
+    subtotal: MoneySchema,
+    platformFee: MoneySchema,
+    total: MoneySchema,
+  })
+  .strict()
+  .openapi('QuotePreview');
+
 registry.registerPath({
   method: 'post',
   path: apiPath('/quotes'),
@@ -100,6 +115,25 @@ registry.registerPath({
       content: { 'application/json': { schema: QuoteSchema } },
     },
     ...errorResponses([400, 401, 403, 404, 409, 422, 429]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
+  path: apiPath('/quotes/preview'),
+  summary: 'Preview the subtotal, platform fee and total for a set of line items',
+  tags: ['quotes'],
+  security: AUTH_SECURITY,
+  ...requiresVerifiedEmail(true),
+  request: {
+    body: { content: { 'application/json': { schema: QuotePreviewRequestSchema } } },
+  },
+  responses: {
+    '200': {
+      description: 'The computed quote preview',
+      content: { 'application/json': { schema: QuotePreviewSchema } },
+    },
+    ...errorResponses([400, 401, 403, 422]),
   },
 });
 

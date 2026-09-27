@@ -4348,6 +4348,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/quotes/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview the subtotal, platform fee and total for a set of line items */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        lineItems: components["schemas"]["LineItem"][];
+                    };
+                };
+            };
+            responses: {
+                /** @description The computed quote preview */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["QuotePreview"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/photographers/{slug}/products/{productId}/quotes": {
         parameters: {
             query?: never;
@@ -12020,6 +12098,11 @@ export interface components {
             label: string;
             qty: number;
             unitCents: number;
+        };
+        QuotePreview: {
+            subtotal: components["schemas"]["Money"];
+            platformFee: components["schemas"]["Money"];
+            total: components["schemas"]["Money"];
         };
         Booking: {
             /**
