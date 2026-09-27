@@ -4,11 +4,6 @@ export interface NotYetImplementedRoute {
 }
 
 export const NOT_YET_IMPLEMENTED: readonly NotYetImplementedRoute[] = [
-  { method: 'GET', path: '/v1/bookings' },
-  { method: 'GET', path: '/v1/bookings/:id' },
-  { method: 'POST', path: '/v1/bookings/:id/delivery' },
-  { method: 'POST', path: '/v1/bookings/:id/accept-delivery' },
-  { method: 'POST', path: '/v1/bookings/:id/cancel' },
   { method: 'POST', path: '/v1/bookings/:id/refund' },
   { method: 'GET', path: '/v1/admin/bookings' },
   { method: 'GET', path: '/v1/admin/bookings/:id' },
