@@ -36,7 +36,7 @@ interface LedgerRow {
 
 async function setup(
   overrides: Partial<BookingRow> = {},
-  options: { openDisputes?: number; dueIds?: string[] } = {},
+  options: { openDisputes?: number; dueIds?: string[]; refunds?: number[] } = {},
 ) {
   const gateway = new FakeStripeGateway('whsec_unit', () => NOW);
   const account = await gateway.createConnectedAccount({
@@ -72,6 +72,13 @@ async function setup(
       currency: row.quote.currency,
       stripeObjectId: 'ch_1',
     },
+    ...(options.refunds ?? []).map((amountCents, index) => ({
+      bookingId: row.id,
+      type: 'refund',
+      amountCents: -amountCents,
+      currency: row.quote.currency,
+      stripeObjectId: `re_unit_${String(index)}`,
+    })),
   ];
   const audits: { action: string; after: Record<string, unknown> }[] = [];
 
@@ -94,6 +101,21 @@ async function setup(
     },
     dispute: { count: vi.fn(() => Promise.resolve(options.openDisputes ?? 0)) },
     ledgerEntry: {
+      groupBy: vi.fn((args: { where: { type: { in: string[] } } }) => {
+        const groups = new Map<string, { sum: number; count: number }>();
+        for (const entry of ledger.filter((row) => args.where.type.in.includes(row.type))) {
+          const group = groups.get(entry.type) ?? { sum: 0, count: 0 };
+          groups.set(entry.type, { sum: group.sum + entry.amountCents, count: group.count + 1 });
+        }
+        return Promise.resolve(
+          [...groups].map(([type, group]) => ({
+            bookingId: row.id,
+            type,
+            _sum: { amountCents: group.sum },
+            _count: { _all: group.count },
+          })),
+        );
+      }),
       createMany: vi.fn((args: { data: LedgerRow[]; skipDuplicates?: boolean }) => {
         const fresh = args.data.filter(
           (entry) =>
@@ -224,6 +246,24 @@ describe('BookingReleaseService.release', () => {
 
     expect(outcome).toEqual({ status: 'released', transferId: row.transferId, amountCents: 23750 });
     expect(ledger.reduce((sum, entry) => sum + entry.amountCents, 0)).toBe(0);
+  });
+
+  it('transfers what is left after a partial client refund and keeps the ledger balanced', async () => {
+    const { service, ledger, row, createTransfer } = await setup({}, { refunds: [5000] });
+
+    const outcome = await service.release('booking-1', user, NOW);
+
+    expect(outcome).toEqual({ status: 'released', transferId: row.transferId, amountCents: 18797 });
+    expect(createTransfer).toHaveBeenCalledWith(expect.objectContaining({ amountCents: 18797 }));
+    expect(ledger.reduce((sum, entry) => sum + entry.amountCents, 0)).toBe(0);
+  });
+
+  it('refuses to release when refunds leave nothing beyond the platform fee', async () => {
+    const { service, row, createTransfer } = await setup({}, { refunds: [23797] });
+
+    await expect(service.release('booking-1', user, NOW)).rejects.toThrow(/nothing to transfer/);
+    expect(createTransfer).not.toHaveBeenCalled();
+    expect(row.status).toBe('delivered');
   });
 
   it('releases an accepted delivery before releaseDueAt and records the trigger', async () => {

@@ -8,6 +8,7 @@ import {
   type BookingTransition,
 } from '../bookings/booking-state.js';
 import { assertSupportedCurrency } from '../bookings/create-booking.js';
+import { ledgerTotals } from './booking-ledger.js';
 import { transferGroupFor } from './booking-payments.service.js';
 import { STRIPE_GATEWAY, type StripeGateway, type Transfer } from './stripe/stripe-gateway.js';
 
@@ -135,10 +136,13 @@ export class BookingReleaseService {
 
         const { quote } = booking;
         assertSupportedCurrency(quote.currency);
-        const amountCents = payoutAmount(quote);
+        // A client refund before release comes out of the photographer's share;
+        // the platform fee on the quote is kept either way.
+        const { refundedCents } = await ledgerTotals(tx, booking.id);
+        const amountCents = payoutAmount(quote) - refundedCents;
         if (amountCents <= 0) {
           throw new Error(
-            `booking release: booking ${booking.id} has nothing to transfer (subtotal ${String(quote.subtotalCents)}, fee ${String(quote.platformFeeCents)}); resolve it by hand`,
+            `booking release: booking ${booking.id} has nothing to transfer (subtotal ${String(quote.subtotalCents)}, fee ${String(quote.platformFeeCents)}, refunded ${String(refundedCents)}); resolve it by hand`,
           );
         }
         return {
