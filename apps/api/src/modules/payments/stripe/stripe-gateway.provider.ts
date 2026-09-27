@@ -6,6 +6,8 @@ import { FakeStripeGateway } from './fake-stripe-gateway.js';
 import { LiveStripeGateway } from './live-stripe-gateway.js';
 import { STRIPE_GATEWAY, type StripeGateway } from './stripe-gateway.js';
 
+const STRIPE_REQUEST_TIMEOUT_MS = 20_000;
+
 type StripeGatewayEnv = Pick<
   Env,
   'NODE_ENV' | 'STRIPE_FAKE' | 'STRIPE_SECRET_KEY' | 'STRIPE_WEBHOOK_SECRET'
@@ -21,7 +23,14 @@ export function createStripeGateway(env: StripeGatewayEnv, logger: Logger): Stri
   }
   if (env.STRIPE_SECRET_KEY) {
     logger.log({ stripeGateway: 'live' }, 'stripe gateway selected');
-    const stripe = new Stripe(env.STRIPE_SECRET_KEY, { maxNetworkRetries: 2, typescript: true });
+    // The SDK default of 80s per attempt, times three attempts, would keep a
+    // release or refund waiting for minutes; failing fast leaves the retry to
+    // the release sweep, which finds a transfer that did go through.
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+      maxNetworkRetries: 2,
+      timeout: STRIPE_REQUEST_TIMEOUT_MS,
+      typescript: true,
+    });
     return new LiveStripeGateway(stripe, env.STRIPE_WEBHOOK_SECRET, logger);
   }
   if (env.NODE_ENV === 'production') {

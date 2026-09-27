@@ -199,6 +199,27 @@ describe('FakeStripeGateway', () => {
         fake.reverseTransfer({ transferId: 'tr_missing', metadata: {}, idempotencyKey: 'rev-4' }),
       ).rejects.toThrow(/no such transfer/);
     });
+    it('finds a transfer by transfer group and booking id', async () => {
+      const fake = gateway();
+      const account = await accountOn(fake);
+      const input = {
+        amountCents: 10_000,
+        currency: 'EUR',
+        destinationAccountId: account.id,
+        sourceTransactionId: 'ch_1',
+        transferGroup: 'booking_1',
+        metadata: { bookingId: '1' },
+      };
+      await expect(fake.findTransfer('booking_1', '1')).resolves.toBeNull();
+
+      const transfer = await fake.createTransfer({ ...input, idempotencyKey: 'first' });
+      await expect(fake.findTransfer('booking_1', '1')).resolves.toEqual(transfer);
+      await expect(fake.findTransfer('booking_1', '2')).resolves.toBeNull();
+      await expect(fake.findTransfer('booking_2', '1')).resolves.toBeNull();
+
+      await fake.createTransfer({ ...input, idempotencyKey: 'second' });
+      await expect(fake.findTransfer('booking_1', '1')).rejects.toThrow(/2 transfers/);
+    });
   });
 
   describe('events and webhook signatures', () => {

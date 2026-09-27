@@ -45,6 +45,7 @@ async function setup(
     idempotencyKey: 'acct-unit',
   });
   const createTransfer = vi.spyOn(gateway, 'createTransfer');
+  const findTransfer = vi.spyOn(gateway, 'findTransfer');
 
   const row: BookingRow = {
     id: 'booking-1',
@@ -75,7 +76,9 @@ async function setup(
   const audits: { action: string; after: Record<string, unknown> }[] = [];
 
   const tx = {
-    $queryRaw: vi.fn(() => Promise.resolve([{ id: row.id }])),
+    $queryRaw: vi.fn((_sql: TemplateStringsArray, id: string) =>
+      Promise.resolve(id === row.id ? [{ id: row.id }] : []),
+    ),
     booking: {
       findUniqueOrThrow: vi.fn(() => Promise.resolve({ ...row })),
       updateMany: vi.fn(
@@ -91,9 +94,21 @@ async function setup(
     },
     dispute: { count: vi.fn(() => Promise.resolve(options.openDisputes ?? 0)) },
     ledgerEntry: {
-      createMany: vi.fn((args: { data: LedgerRow[] }) => {
-        ledger.push(...args.data);
-        return Promise.resolve({ count: args.data.length });
+      createMany: vi.fn((args: { data: LedgerRow[]; skipDuplicates?: boolean }) => {
+        const fresh = args.data.filter(
+          (entry) =>
+            !ledger.some(
+              (existing) =>
+                existing.bookingId === entry.bookingId &&
+                existing.type === entry.type &&
+                existing.stripeObjectId === entry.stripeObjectId,
+            ),
+        );
+        if (fresh.length !== args.data.length && !args.skipDuplicates) {
+          return Promise.reject(new Error('unique constraint on LedgerEntry'));
+        }
+        ledger.push(...fresh);
+        return Promise.resolve({ count: fresh.length });
       }),
     },
     auditLog: {
@@ -103,9 +118,27 @@ async function setup(
       }),
     },
   };
+  // Transactions run one at a time, standing in for the FOR UPDATE row lock,
+  // and roll the in-memory rows back when they throw.
+  let lock: Promise<unknown> = Promise.resolve();
+  const runTransaction = async (fn: (client: typeof tx) => Promise<unknown>) => {
+    const snapshot = { row: { ...row }, ledger: ledger.length, audits: audits.length };
+    try {
+      return await fn(tx);
+    } catch (error) {
+      Object.assign(row, snapshot.row);
+      ledger.length = snapshot.ledger;
+      audits.length = snapshot.audits;
+      throw error;
+    }
+  };
   const prisma = {
     client: {
-      $transaction: vi.fn((fn: (client: typeof tx) => Promise<unknown>) => fn(tx)),
+      $transaction: vi.fn((fn: (client: typeof tx) => Promise<unknown>) => {
+        const run = lock.then(() => runTransaction(fn));
+        lock = run.catch(() => undefined);
+        return run;
+      }),
       booking: {
         findMany: vi.fn(() => Promise.resolve((options.dueIds ?? [row.id]).map((id) => ({ id })))),
       },
@@ -113,7 +146,19 @@ async function setup(
   } as unknown as PrismaService;
   const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
   const service = new BookingReleaseService(prisma, gateway, logger as unknown as Logger);
-  return { service, row, ledger, audits, tx, createTransfer, account, logger };
+  return {
+    service,
+    row,
+    ledger,
+    audits,
+    tx,
+    prisma,
+    gateway,
+    createTransfer,
+    findTransfer,
+    account,
+    logger,
+  };
 }
 
 const user = { type: 'user' as const, id: 'client-1' };
@@ -188,6 +233,108 @@ describe('BookingReleaseService.release', () => {
     expect(ledger).toHaveLength(3);
   });
 
+  it('two runs in a row look up the transfer group and produce exactly one transfer', async () => {
+    const { service, gateway, createTransfer, findTransfer, row } = await setup();
+
+    await service.release('booking-1', user, NOW);
+    await service.release('booking-1', { type: 'system', id: null }, NOW);
+
+    expect(createTransfer).toHaveBeenCalledTimes(1);
+    expect(findTransfer).toHaveBeenCalledWith('booking_booking-1', 'booking-1');
+    const found = await gateway.findTransfer('booking_booking-1', 'booking-1');
+    expect(found?.id).toBe(row.transferId);
+  });
+
+  it('two overlapping runs share one transfer through the idempotency key and record it once', async () => {
+    const { service, ledger, createTransfer, row } = await setup();
+
+    const outcomes = await Promise.all([
+      service.release('booking-1', user, NOW),
+      service.release('booking-1', { type: 'system', id: null }, NOW),
+    ]);
+
+    expect(outcomes.map((outcome) => outcome.status).sort()).toEqual(['released', 'skipped']);
+    const transferIds = await Promise.all(
+      createTransfer.mock.results.map(
+        async (result) => ((await result.value) as { id: string }).id,
+      ),
+    );
+    expect(new Set(transferIds)).toEqual(new Set([row.transferId]));
+    expect(ledger).toHaveLength(3);
+    expect(ledger.reduce((sum, entry) => sum + entry.amountCents, 0)).toBe(0);
+  });
+
+  it('reuses the transfer on retry when recording the release failed after Stripe succeeded', async () => {
+    const { service, gateway, tx, ledger, row, audits, createTransfer, findTransfer } =
+      await setup();
+    tx.auditLog.create.mockRejectedValueOnce(new Error('connection reset'));
+
+    await expect(service.release('booking-1', user, NOW)).rejects.toThrow(/connection reset/);
+    expect(createTransfer).toHaveBeenCalledTimes(1);
+    expect(row.status).toBe('delivered');
+    expect(row.transferId).toBeNull();
+    expect(ledger).toHaveLength(1);
+    const created = await gateway.findTransfer('booking_booking-1', 'booking-1');
+
+    const retry = await service.release('booking-1', { type: 'system', id: null }, NOW);
+
+    expect(createTransfer).toHaveBeenCalledTimes(1);
+    expect(findTransfer).toHaveBeenCalledTimes(3);
+    expect(created).not.toBeNull();
+    expect(row.transferId).toBe(created?.id);
+    expect(retry).toEqual({ status: 'released', transferId: row.transferId, amountCents: 23797 });
+    expect(row.status).toBe('released');
+    expect(ledger.map((entry) => [entry.type, entry.amountCents, entry.stripeObjectId])).toEqual([
+      ['charge', 25050, 'ch_1'],
+      ['transfer', -23797, row.transferId],
+      ['platform_fee', -1253, row.transferId],
+    ]);
+    expect(ledger.reduce((sum, entry) => sum + entry.amountCents, 0)).toBe(0);
+    expect(audits.map((audit) => audit.action)).toEqual(['booking.released']);
+  });
+
+  it('records the ledger and fails loudly when the booking left delivered during the transfer', async () => {
+    const { service, gateway, row, ledger, audits, logger } = await setup();
+    const create = gateway.createTransfer.bind(gateway);
+    vi.spyOn(gateway, 'createTransfer').mockImplementationOnce(async (input) => {
+      const transfer = await create(input);
+      row.status = 'disputed';
+      return transfer;
+    });
+
+    await expect(service.release('booking-1', user, NOW)).rejects.toThrow(
+      /was created but booking booking-1 is now disputed/,
+    );
+
+    expect(row.status).toBe('disputed');
+    expect(row.transferId).toBeNull();
+    expect(ledger.map((entry) => entry.type)).toEqual(['charge', 'transfer', 'platform_fee']);
+    expect(audits).toEqual([
+      expect.objectContaining({
+        action: 'booking.release_conflict',
+        after: expect.objectContaining({ amountCents: 23797 }) as unknown,
+      }),
+    ]);
+    expect(logger.error).toHaveBeenCalled();
+  });
+
+  it('refuses a found transfer whose amount does not match the booking', async () => {
+    const { service, gateway, account, row, ledger } = await setup();
+    await gateway.createTransfer({
+      amountCents: 100,
+      currency: 'EUR',
+      destinationAccountId: account.id,
+      sourceTransactionId: 'ch_1',
+      transferGroup: 'booking_booking-1',
+      metadata: { bookingId: 'booking-1' },
+      idempotencyKey: 'manual',
+    });
+
+    await expect(service.release('booking-1', user, NOW)).rejects.toThrow(/does not match/);
+    expect(row.status).toBe('delivered');
+    expect(ledger).toHaveLength(1);
+  });
+
   it('skips a disputed booking without calling Stripe', async () => {
     const { service, row, ledger, createTransfer } = await setup({ status: 'disputed' });
 
@@ -230,8 +377,7 @@ describe('BookingReleaseService.release', () => {
   });
 
   it('returns 404 when the booking does not exist', async () => {
-    const { service, tx } = await setup();
-    tx.$queryRaw.mockResolvedValueOnce([]);
+    const { service } = await setup();
 
     await expect(service.release('missing', user, NOW)).rejects.toMatchObject({ status: 404 });
   });
@@ -253,11 +399,7 @@ describe('BookingReleaseService.release', () => {
 
 describe('BookingReleaseService.sweep', () => {
   it('releases due bookings and counts skips and failures without stopping', async () => {
-    const { service, tx } = await setup({}, { dueIds: ['booking-1', 'booking-1', 'missing'] });
-    tx.$queryRaw
-      .mockResolvedValueOnce([{ id: 'booking-1' }])
-      .mockResolvedValueOnce([{ id: 'booking-1' }])
-      .mockResolvedValueOnce([]);
+    const { service } = await setup({}, { dueIds: ['booking-1', 'booking-1', 'missing'] });
 
     const result = await service.sweep(NOW);
 

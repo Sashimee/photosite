@@ -35,7 +35,10 @@ export class FakeStripeGateway implements StripeGateway {
   private readonly idempotency = new Map<string, IdempotentRecord>();
   private readonly accounts = new Map<string, ConnectedAccount>();
   private readonly paymentIntents = new Map<string, PaymentIntent>();
-  private readonly transfers = new Map<string, Transfer & { reversedCents: number }>();
+  private readonly transfers = new Map<
+    string,
+    Transfer & { reversedCents: number; transferGroup: string; metadata: Record<string, string> }
+  >();
   private readonly events = new Map<string, GatewayEvent>();
 
   constructor(
@@ -107,8 +110,35 @@ export class FakeStripeGateway implements StripeGateway {
         currency: input.currency.toUpperCase(),
         destinationAccountId: input.destinationAccountId,
       };
-      this.transfers.set(transfer.id, { ...transfer, reversedCents: 0 });
+      this.transfers.set(transfer.id, {
+        ...transfer,
+        reversedCents: 0,
+        transferGroup: input.transferGroup,
+        metadata: { ...input.metadata },
+      });
       return transfer;
+    });
+  }
+
+  findTransfer(transferGroup: string, bookingId: string): Promise<Transfer | null> {
+    const matches = [...this.transfers.values()].filter(
+      (transfer) =>
+        transfer.transferGroup === transferGroup && transfer.metadata.bookingId === bookingId,
+    );
+    if (matches.length > 1) {
+      return Promise.reject(
+        new Error(`fake stripe: ${String(matches.length)} transfers in group ${transferGroup}`),
+      );
+    }
+    const [match] = matches;
+    if (!match) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve({
+      id: match.id,
+      amountCents: match.amountCents,
+      currency: match.currency,
+      destinationAccountId: match.destinationAccountId,
     });
   }
 
