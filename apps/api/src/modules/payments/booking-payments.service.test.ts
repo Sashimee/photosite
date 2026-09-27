@@ -77,7 +77,7 @@ function setup(
     ),
   };
   const prisma = { client: { booking } } as unknown as PrismaService;
-  const gateway = options.gateway ?? new FakeStripeGateway();
+  const gateway = options.gateway ?? new FakeStripeGateway('whsec_unit');
   const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
   const service = new BookingPaymentsService(prisma, gateway, logger as unknown as Logger);
   return { service, gateway, booking, logger, current: () => row };
@@ -189,7 +189,7 @@ describe('BookingPaymentsService.createPaymentIntent', () => {
   });
 
   it('throws when the stored intent amount differs from the quote', async () => {
-    const gateway = new FakeStripeGateway();
+    const gateway = new FakeStripeGateway('whsec_unit');
     const stale = await gateway.createPaymentIntent({
       amountCents: 100,
       currency: 'EUR',

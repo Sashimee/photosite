@@ -8,6 +8,8 @@ import { waitForLinkInEmail } from '../../testing/mailpit.js';
 import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
 import { TEST_ENV } from '../../testing/test-env.js';
 import { StripeConnectService } from './stripe-connect.service.js';
+import { FakeStripeGateway } from './stripe/fake-stripe-gateway.js';
+import { STRIPE_GATEWAY } from './stripe/stripe-gateway.js';
 
 const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL', 'REDIS_URL']);
 const PASSWORD = `photoo-test-${randomUUID()}`;
@@ -311,6 +313,14 @@ describe('payments (Stripe Connect onboarding) integration', () => {
   });
 
   describe('account.updated handling', () => {
+    function gateway(): FakeStripeGateway {
+      const instance = app.get<unknown>(STRIPE_GATEWAY);
+      if (!(instance instanceof FakeStripeGateway)) {
+        throw new Error('payments integration: expected the fake gateway under TEST_ENV');
+      }
+      return instance;
+    }
+
     async function onboardedAccount(label: string) {
       const photographer = await createPhotographer(label);
       const account = (await createAccount(photographer.token)).json<StripeAccountBody>();
@@ -321,12 +331,12 @@ describe('payments (Stripe Connect onboarding) integration', () => {
       const photographer = await onboardedAccount('enable');
       const connect = app.get(StripeConnectService);
 
-      await connect.handleAccountUpdated({
-        id: photographer.accountId,
+      gateway().updateAccount(photographer.accountId, {
         chargesEnabled: true,
         payoutsEnabled: true,
         detailsSubmitted: true,
       });
+      await connect.handleAccountUpdated(photographer.accountId);
 
       const profile = await prisma.photographerProfile.findUniqueOrThrow({
         where: { id: photographer.profileId },
@@ -360,15 +370,14 @@ describe('payments (Stripe Connect onboarding) integration', () => {
         },
       });
       const connect = app.get(StripeConnectService);
-      const disabled = {
-        id: photographer.accountId,
+      gateway().updateAccount(photographer.accountId, {
         chargesEnabled: true,
         payoutsEnabled: false,
         detailsSubmitted: true,
-      };
+      });
 
-      await connect.handleAccountUpdated(disabled);
-      await connect.handleAccountUpdated(disabled);
+      await connect.handleAccountUpdated(photographer.accountId);
+      await connect.handleAccountUpdated(photographer.accountId);
 
       const profile = await prisma.photographerProfile.findUniqueOrThrow({
         where: { id: photographer.profileId },
@@ -386,16 +395,21 @@ describe('payments (Stripe Connect onboarding) integration', () => {
       ).toBe(1);
     });
 
-    it('ignores an unknown account id', async () => {
+    it('ignores an account no profile links to', async () => {
       const connect = app.get(StripeConnectService);
-      await expect(
-        connect.handleAccountUpdated({
-          id: `acct_unknown_${RUN_ID}`,
-          chargesEnabled: true,
-          payoutsEnabled: true,
-          detailsSubmitted: true,
-        }),
-      ).resolves.toBeUndefined();
+      const orphan = await gateway().createConnectedAccount({
+        country: 'LU',
+        metadata: {},
+        idempotencyKey: `orphan_${RUN_ID}`,
+      });
+      await expect(connect.handleAccountUpdated(orphan.id)).resolves.toBeUndefined();
+    });
+
+    it('rejects an account Stripe does not know without writing anything', async () => {
+      const connect = app.get(StripeConnectService);
+      await expect(connect.handleAccountUpdated(`acct_unknown_${RUN_ID}`)).rejects.toThrow(
+        /no such account/,
+      );
     });
   });
 });

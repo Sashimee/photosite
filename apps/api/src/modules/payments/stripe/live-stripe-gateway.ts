@@ -78,6 +78,10 @@ export class LiveStripeGateway implements StripeGateway {
     return toConnectedAccount(account);
   }
 
+  async retrieveAccount(accountId: string): Promise<ConnectedAccount> {
+    return toConnectedAccount(await this.stripe.accounts.retrieve(accountId));
+  }
+
   async createAccountLink(input: CreateAccountLinkInput): Promise<AccountLink> {
     const link = await this.stripe.accountLinks.create(
       {

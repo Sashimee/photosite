@@ -101,6 +101,7 @@ export interface GatewayEvent {
 export interface StripeGateway {
   createConnectedAccount(input: CreateConnectedAccountInput): Promise<ConnectedAccount>;
   createAccountLink(input: CreateAccountLinkInput): Promise<AccountLink>;
+  retrieveAccount(accountId: string): Promise<ConnectedAccount>;
   createPaymentIntent(input: CreatePaymentIntentInput): Promise<PaymentIntent>;
   retrievePaymentIntent(paymentIntentId: string): Promise<PaymentIntent>;
   createTransfer(input: CreateTransferInput): Promise<Transfer>;

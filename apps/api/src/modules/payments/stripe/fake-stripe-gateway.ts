@@ -17,7 +17,6 @@ import type {
 } from './stripe-gateway.js';
 import { parseGatewayEvent } from './stripe-gateway.js';
 
-export const FAKE_WEBHOOK_SECRET = 'whsec_fake';
 const SIGNATURE_TOLERANCE_SECONDS = 300;
 const ACCOUNT_LINK_TTL_SECONDS = 300;
 
@@ -27,7 +26,7 @@ interface IdempotentRecord {
 }
 
 // Deterministic, in-memory stand-in for Stripe used by tests and local
-// development without keys. It mirrors the behaviours callers rely on:
+// development with STRIPE_FAKE=true. It mirrors the behaviours callers rely on:
 // idempotency keys replay the first result (and reject reuse with different
 // parameters, as Stripe does) and webhook payloads carry a Stripe-format
 // `t=...,v1=...` HMAC signature.
@@ -40,7 +39,7 @@ export class FakeStripeGateway implements StripeGateway {
   private readonly events = new Map<string, GatewayEvent>();
 
   constructor(
-    private readonly webhookSecret: string = FAKE_WEBHOOK_SECRET,
+    private readonly webhookSecret: string | undefined,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
@@ -55,6 +54,14 @@ export class FakeStripeGateway implements StripeGateway {
       this.accounts.set(account.id, account);
       return { ...account };
     });
+  }
+
+  retrieveAccount(accountId: string): Promise<ConnectedAccount> {
+    const account = this.accounts.get(accountId);
+    if (!account) {
+      return Promise.reject(new Error(`fake stripe: no such account ${accountId}`));
+    }
+    return Promise.resolve({ ...account });
   }
 
   createAccountLink(input: CreateAccountLinkInput): Promise<AccountLink> {
@@ -242,6 +249,11 @@ export class FakeStripeGateway implements StripeGateway {
   }
 
   private hmac(timestamp: number, payload: string): string {
+    if (this.webhookSecret === undefined) {
+      throw new Error(
+        'fake stripe: STRIPE_WEBHOOK_SECRET is not set, cannot sign or verify webhooks',
+      );
+    }
     return createHmac('sha256', this.webhookSecret)
       .update(`${String(timestamp)}.${payload}`)
       .digest('hex');

@@ -6,7 +6,7 @@ import type { PrismaService } from '../../prisma/prisma.service.js';
 import { TEST_ENV } from '../../testing/test-env.js';
 import type { StripeConnectService } from './stripe-connect.service.js';
 import { StripeWebhookService } from './stripe-webhook.service.js';
-import type { GatewayEvent } from './stripe/stripe-gateway.js';
+import type { ConnectedAccount, GatewayEvent } from './stripe/stripe-gateway.js';
 
 interface BookingRow {
   id: string;
@@ -64,6 +64,7 @@ function setup(
   options: {
     booking?: BookingRow | null;
     alreadyStored?: { processedAt: Date | null };
+    pendingPayload?: GatewayEvent;
     env?: Partial<Env>;
   } = {},
 ) {
@@ -86,9 +87,17 @@ function setup(
     ledgerEntry: { create: vi.fn(() => Promise.resolve({})) },
   };
   const transaction = vi.fn((fn: (client: typeof tx) => Promise<unknown>) => fn(tx));
-  const prisma = { client: { $transaction: transaction } } as unknown as PrismaService;
+  const findFirst = vi.fn(() =>
+    Promise.resolve(options.pendingPayload ? { payload: options.pendingPayload } : null),
+  );
+  const prisma = {
+    client: { $transaction: transaction, stripeEvent: { findFirst } },
+  } as unknown as PrismaService;
   const accountAfterCommit = vi.fn(() => Promise.resolve());
   const connect = {
+    fetchAccount: vi.fn((id: string): Promise<ConnectedAccount> =>
+      Promise.resolve({ ...FRESH_ACCOUNT, id }),
+    ),
     applyAccountUpdated: vi.fn(() => Promise.resolve(accountAfterCommit)),
   };
   const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
@@ -98,7 +107,33 @@ function setup(
     { ...TEST_ENV, ...options.env },
     logger as unknown as Logger,
   );
-  return { service, tx, transaction, connect, accountAfterCommit, logger };
+  return { service, tx, transaction, findFirst, connect, accountAfterCommit, logger };
+}
+
+const FRESH_ACCOUNT: ConnectedAccount = {
+  id: 'acct_1',
+  chargesEnabled: true,
+  payoutsEnabled: false,
+  detailsSubmitted: true,
+};
+
+function accountUpdated(
+  overrides: { livemode?: boolean; payoutsEnabled?: boolean } = {},
+): GatewayEvent {
+  return {
+    id: 'evt_a',
+    type: 'account.updated',
+    account: 'acct_1',
+    livemode: overrides.livemode ?? false,
+    data: {
+      object: {
+        id: 'acct_1',
+        charges_enabled: true,
+        payouts_enabled: overrides.payoutsEnabled ?? true,
+        details_submitted: true,
+      },
+    },
+  };
 }
 
 describe('StripeWebhookService.receive', () => {
@@ -306,32 +341,44 @@ describe('StripeWebhookService.receive', () => {
     expect(tx.stripeEvent.update).toHaveBeenCalledOnce();
   });
 
-  it('hands account.updated to the connect service and runs its side effects after commit', async () => {
-    const { service, tx, connect, accountAfterCommit } = setup();
+  it('applies the account state fetched from Stripe, not the payload, and runs side effects after commit', async () => {
+    const { service, tx, transaction, connect, accountAfterCommit } = setup();
 
-    await service.receive({
-      id: 'evt_a',
-      type: 'account.updated',
-      account: 'acct_1',
-      livemode: false,
-      data: {
-        object: {
-          id: 'acct_1',
-          charges_enabled: true,
-          payouts_enabled: false,
-          details_submitted: true,
-        },
-      },
-    });
+    await service.receive(accountUpdated({ payoutsEnabled: true }));
 
-    expect(connect.applyAccountUpdated).toHaveBeenCalledWith(tx, {
-      id: 'acct_1',
-      chargesEnabled: true,
-      payoutsEnabled: false,
-      detailsSubmitted: true,
-    });
+    expect(connect.fetchAccount).toHaveBeenCalledWith('acct_1');
+    expect(connect.fetchAccount.mock.invocationCallOrder[0]).toBeLessThan(
+      transaction.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(connect.applyAccountUpdated).toHaveBeenCalledWith(tx, FRESH_ACCOUNT);
     expect(accountAfterCommit).toHaveBeenCalledOnce();
     expect(tx.stripeEvent.update).toHaveBeenCalledOnce();
+  });
+
+  it('does not fetch or apply an account.updated whose livemode does not match', async () => {
+    const { service, transaction, connect } = setup();
+
+    await service.receive(accountUpdated({ livemode: true }));
+
+    expect(connect.fetchAccount).not.toHaveBeenCalled();
+    expect(connect.applyAccountUpdated).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('stores account.updated unprocessed when Stripe cannot be read, for the sweep to retry', async () => {
+    const { service, tx, connect, accountAfterCommit, logger } = setup();
+    connect.fetchAccount.mockRejectedValueOnce(new Error('stripe unavailable'));
+
+    await service.receive(accountUpdated());
+
+    expect(tx.stripeEvent.createMany).toHaveBeenCalledOnce();
+    expect(connect.applyAccountUpdated).not.toHaveBeenCalled();
+    expect(tx.stripeEvent.update).not.toHaveBeenCalled();
+    expect(accountAfterCommit).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      { stripeEventId: 'evt_a', stripeAccountId: 'acct_1', error: 'stripe unavailable' },
+      expect.any(String),
+    );
   });
 
   it('records and acks an event type it does not handle', async () => {
@@ -351,8 +398,19 @@ describe('StripeWebhookService.receive', () => {
 });
 
 describe('StripeWebhookService.reprocess', () => {
-  it('skips an event another instance holds or already processed', async () => {
-    const { service, tx } = setup();
+  it('skips an event that is already processed without opening a transaction', async () => {
+    const { service, transaction, findFirst } = setup();
+
+    await expect(service.reprocess('evt_1')).resolves.toBe('skipped');
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: 'evt_1', processedAt: null },
+      select: { payload: true },
+    });
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('skips an event another instance holds', async () => {
+    const { service, tx } = setup({ pendingPayload: succeeded() });
     tx.$queryRaw.mockResolvedValueOnce([]);
 
     await expect(service.reprocess('evt_1')).resolves.toBe('skipped');
@@ -360,14 +418,29 @@ describe('StripeWebhookService.reprocess', () => {
   });
 
   it('applies a stored event and reports whether it was processed or deferred', async () => {
-    const { service, tx } = setup();
+    const { service, tx } = setup({ pendingPayload: succeeded() });
     tx.$queryRaw.mockResolvedValueOnce([{ payload: succeeded(), processedAt: null }]);
 
     await expect(service.reprocess('evt_1')).resolves.toBe('processed');
     expect(tx.ledgerEntry.create).toHaveBeenCalledOnce();
 
-    const pending = setup({ booking: null });
+    const pending = setup({ booking: null, pendingPayload: succeeded() });
     pending.tx.$queryRaw.mockResolvedValueOnce([{ payload: succeeded(), processedAt: null }]);
     await expect(pending.service.reprocess('evt_1')).resolves.toBe('deferred');
+  });
+
+  it('re-reads the account from Stripe before reapplying a stored account.updated', async () => {
+    const { service, tx, connect } = setup({ pendingPayload: accountUpdated() });
+    tx.$queryRaw.mockResolvedValueOnce([{ payload: accountUpdated(), processedAt: null }]);
+
+    await expect(service.reprocess('evt_a')).resolves.toBe('processed');
+    expect(connect.fetchAccount).toHaveBeenCalledWith('acct_1');
+    expect(connect.applyAccountUpdated).toHaveBeenCalledWith(tx, FRESH_ACCOUNT);
+
+    const failing = setup({ pendingPayload: accountUpdated() });
+    failing.connect.fetchAccount.mockRejectedValueOnce(new Error('stripe unavailable'));
+    failing.tx.$queryRaw.mockResolvedValueOnce([{ payload: accountUpdated(), processedAt: null }]);
+    await expect(failing.service.reprocess('evt_a')).resolves.toBe('deferred');
+    expect(failing.connect.applyAccountUpdated).not.toHaveBeenCalled();
   });
 });

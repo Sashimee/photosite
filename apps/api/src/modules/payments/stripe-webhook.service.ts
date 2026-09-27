@@ -8,6 +8,7 @@ import { IllegalBookingTransitionError, transitionBooking } from '../bookings/bo
 import { assertQuoteFeeMatches, PlatformFeeMismatchError } from '../bookings/create-booking.js';
 import { type AfterCommit, StripeConnectService } from './stripe-connect.service.js';
 import {
+  type ConnectedAccount,
   type GatewayEvent,
   isLiveSecretKey,
   parseConnectedAccount,
@@ -24,6 +25,15 @@ interface Outcome {
 }
 
 export type ReprocessResult = Outcome['status'] | 'skipped';
+
+// State read from Stripe before the transaction opens, so no network call
+// holds a database transaction. `account` is null when the event is not an
+// account.updated or the fetch failed.
+interface Prefetched {
+  account: ConnectedAccount | null;
+}
+
+const NOTHING_PREFETCHED: Prefetched = { account: null };
 
 const PROCESSED: Outcome = { status: 'processed', afterCommit: NOTHING_AFTER_COMMIT };
 const DEFERRED: Outcome = { status: 'deferred', afterCommit: NOTHING_AFTER_COMMIT };
@@ -76,6 +86,7 @@ export class StripeWebhookService {
       return;
     }
 
+    const prefetched = await this.prefetch(event);
     const afterCommit = await this.prisma.client.$transaction(async (tx) => {
       const inserted = await tx.stripeEvent.createMany({
         data: [{ id: event.id, type: event.type, payload: toStoredPayload(event) }],
@@ -92,7 +103,7 @@ export class StripeWebhookService {
           return NOTHING_AFTER_COMMIT;
         }
       }
-      return (await this.processLocked(tx, event)).afterCommit;
+      return (await this.processLocked(tx, event, prefetched)).afterCommit;
     });
     await afterCommit();
   }
@@ -100,6 +111,14 @@ export class StripeWebhookService {
   // `skipped` covers an event that is gone, already processed or locked by
   // another instance; SKIP LOCKED lets several API instances sweep at once.
   async reprocess(eventId: string): Promise<ReprocessResult> {
+    const pending = await this.prisma.client.stripeEvent.findFirst({
+      where: { id: eventId, processedAt: null },
+      select: { payload: true },
+    });
+    if (!pending) {
+      return 'skipped';
+    }
+    const prefetched = await this.prefetch(parseGatewayEvent(pending.payload));
     const outcome = await this.prisma.client.$transaction(async (tx) => {
       const [stored] = await tx.$queryRaw<{ payload: unknown; processedAt: Date | null }[]>`
         SELECT payload, "processedAt" FROM "StripeEvent" WHERE id = ${eventId}
@@ -107,7 +126,7 @@ export class StripeWebhookService {
       if (!stored || stored.processedAt) {
         return null;
       }
-      return this.processLocked(tx, parseGatewayEvent(stored.payload));
+      return this.processLocked(tx, parseGatewayEvent(stored.payload), prefetched);
     });
     if (!outcome) {
       return 'skipped';
@@ -116,8 +135,32 @@ export class StripeWebhookService {
     return outcome.status;
   }
 
-  private async processLocked(tx: Prisma.TransactionClient, event: GatewayEvent): Promise<Outcome> {
-    const outcome = await this.dispatch(tx, event);
+  private async prefetch(event: GatewayEvent): Promise<Prefetched> {
+    if (event.type !== 'account.updated') {
+      return NOTHING_PREFETCHED;
+    }
+    const accountId = parseConnectedAccount(event.data.object).id;
+    try {
+      return { account: await this.connect.fetchAccount(accountId) };
+    } catch (error) {
+      this.logger.error(
+        {
+          stripeEventId: event.id,
+          stripeAccountId: accountId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'stripe webhook: could not re-read the connected account from Stripe',
+      );
+      return NOTHING_PREFETCHED;
+    }
+  }
+
+  private async processLocked(
+    tx: Prisma.TransactionClient,
+    event: GatewayEvent,
+    prefetched: Prefetched,
+  ): Promise<Outcome> {
+    const outcome = await this.dispatch(tx, event, prefetched);
     if (outcome.status === 'deferred') {
       this.logger.warn(
         { stripeEventId: event.id, type: event.type },
@@ -129,19 +172,23 @@ export class StripeWebhookService {
     return outcome;
   }
 
-  private async dispatch(tx: Prisma.TransactionClient, event: GatewayEvent): Promise<Outcome> {
+  private async dispatch(
+    tx: Prisma.TransactionClient,
+    event: GatewayEvent,
+    prefetched: Prefetched,
+  ): Promise<Outcome> {
     switch (event.type) {
       case 'payment_intent.succeeded':
         return this.onPaymentIntentSucceeded(tx, event);
       case 'payment_intent.payment_failed':
         return this.onPaymentIntentFailed(tx, event);
       case 'account.updated':
+        if (!prefetched.account) {
+          return DEFERRED;
+        }
         return {
           status: 'processed',
-          afterCommit: await this.connect.applyAccountUpdated(
-            tx,
-            parseConnectedAccount(event.data.object),
-          ),
+          afterCommit: await this.connect.applyAccountUpdated(tx, prefetched.account),
         };
       default:
         this.logger.log(

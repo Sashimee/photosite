@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { FAKE_WEBHOOK_SECRET, FakeStripeGateway } from './fake-stripe-gateway.js';
+import { FakeStripeGateway } from './fake-stripe-gateway.js';
 
 const NOW = new Date('2026-09-27T10:00:00Z');
 const NOW_SECONDS = Math.floor(NOW.getTime() / 1000);
 
 function gateway() {
-  return new FakeStripeGateway(FAKE_WEBHOOK_SECRET, () => NOW);
+  return new FakeStripeGateway('whsec_unit', () => NOW);
 }
 
 async function accountOn(fake: FakeStripeGateway, key = 'profile_1_connect_account') {
@@ -70,6 +70,24 @@ describe('FakeStripeGateway', () => {
           idempotencyKey: 'link-1',
         }),
       ).rejects.toThrow(/no such account acct_missing/);
+    });
+  });
+
+  describe('retrieveAccount', () => {
+    it('returns the current state, including later updates', async () => {
+      const fake = gateway();
+      const account = await accountOn(fake);
+      fake.updateAccount(account.id, { payoutsEnabled: true });
+      await expect(fake.retrieveAccount(account.id)).resolves.toEqual({
+        ...account,
+        payoutsEnabled: true,
+      });
+    });
+
+    it('rejects an unknown account', async () => {
+      await expect(gateway().retrieveAccount('acct_missing')).rejects.toThrow(
+        /no such account acct_missing/,
+      );
     });
   });
 
@@ -217,6 +235,20 @@ describe('FakeStripeGateway', () => {
       const other = new FakeStripeGateway('whsec_other', () => NOW);
       expect(() => gateway().constructWebhookEvent(payload, other.signPayload(payload))).toThrow(
         /no signatures found/,
+      );
+    });
+
+    it('refuses to sign or verify without a webhook secret', () => {
+      const unset = new FakeStripeGateway(undefined, () => NOW);
+      const payload = JSON.stringify({
+        id: 'evt_1',
+        type: 'x',
+        livemode: false,
+        data: { object: {} },
+      });
+      expect(() => unset.signPayload(payload)).toThrow(/STRIPE_WEBHOOK_SECRET is not set/);
+      expect(() => unset.constructWebhookEvent(payload, gateway().signPayload(payload))).toThrow(
+        /STRIPE_WEBHOOK_SECRET is not set/,
       );
     });
 

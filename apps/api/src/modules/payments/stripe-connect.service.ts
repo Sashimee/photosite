@@ -190,7 +190,14 @@ export class StripeConnectService {
     return { url: link.url };
   }
 
-  async handleAccountUpdated(account: ConnectedAccount): Promise<void> {
+  // Webhook payloads can arrive out of order and replays carry an old
+  // snapshot, so account state is always re-read from Stripe before mirroring.
+  async fetchAccount(accountId: string): Promise<ConnectedAccount> {
+    return this.gateway.retrieveAccount(accountId);
+  }
+
+  async handleAccountUpdated(accountId: string): Promise<void> {
+    const account = await this.fetchAccount(accountId);
     const afterCommit = await this.prisma.client.$transaction((tx) =>
       this.applyAccountUpdated(tx, account),
     );
@@ -200,20 +207,24 @@ export class StripeConnectService {
   // Runs inside the caller's transaction so the webhook can record the
   // StripeEvent and the mirrored state atomically; the returned callback holds
   // the side effects that must only happen once that transaction commits.
+  // `account` must come from fetchAccount, not from the event payload.
   async applyAccountUpdated(
     tx: Prisma.TransactionClient,
     account: ConnectedAccount,
   ): Promise<AfterCommit> {
-    const profile = await tx.photographerProfile.findFirst({
-      where: { stripeAccountId: account.id },
-    });
-    if (!profile) {
+    // The row lock serialises concurrent account.updated handlers, so the
+    // before/after comparison below reads committed state.
+    const [locked] = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "PhotographerProfile" WHERE "stripeAccountId" = ${account.id}
+      ORDER BY id FOR UPDATE`;
+    if (!locked) {
       this.logger.warn(
         { stripeAccountId: account.id },
         'stripe connect: account.updated for an unknown account, ignoring',
       );
       return NOTHING_AFTER_COMMIT;
     }
+    const profile = await tx.photographerProfile.findUniqueOrThrow({ where: { id: locked.id } });
 
     const onboardingComplete = account.detailsSubmitted && account.chargesEnabled;
     const payoutsEnabled = account.payoutsEnabled;
@@ -260,6 +271,10 @@ export class StripeConnectService {
         ip: null,
       },
     });
+    const notificationId =
+      profile.stripePayoutsEnabled && !payoutsEnabled
+        ? await this.notifications.createNotification(tx, profile.userId, 'payouts_disabled', {})
+        : null;
 
     return async () => {
       this.logger.log(
@@ -269,11 +284,12 @@ export class StripeConnectService {
           onboardingComplete,
           payoutsEnabled,
           unpublished,
+          notificationId,
         },
         'stripe connect: account state mirrored',
       );
-      if (profile.stripePayoutsEnabled && !payoutsEnabled) {
-        await this.notifications.notify(profile.userId, 'payouts_disabled', {});
+      if (notificationId) {
+        await this.notifications.enqueue(notificationId);
       }
     };
   }

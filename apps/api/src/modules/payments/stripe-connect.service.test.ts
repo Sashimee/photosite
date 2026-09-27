@@ -41,10 +41,16 @@ function profileRow(overrides: Partial<ProfileRow> = {}): ProfileRow {
 function setup(options: { profile?: ProfileRow | null; env?: Partial<Env> } = {}) {
   let row = options.profile === undefined ? profileRow() : options.profile;
   const tx = {
+    $queryRaw: vi.fn((_query: TemplateStringsArray, stripeAccountId: string) =>
+      Promise.resolve(row?.stripeAccountId === stripeAccountId ? [{ id: row.id }] : []),
+    ),
     photographerProfile: {
-      findFirst: vi.fn(({ where }: { where: { stripeAccountId: string } }) =>
-        Promise.resolve(row?.stripeAccountId === where.stripeAccountId ? { ...row } : null),
-      ),
+      findUniqueOrThrow: vi.fn(({ where }: { where: { id: string } }) => {
+        if (row?.id !== where.id) {
+          throw new Error('no row');
+        }
+        return Promise.resolve({ ...row });
+      }),
       updateMany: vi.fn(
         ({ where, data }: { where: { stripeAccountId: null }; data: Partial<ProfileRow> }) => {
           if (row?.stripeAccountId !== where.stripeAccountId) {
@@ -75,8 +81,11 @@ function setup(options: { profile?: ProfileRow | null; env?: Partial<Env> } = {}
       $transaction: vi.fn((callback: (client: typeof tx) => Promise<unknown>) => callback(tx)),
     },
   };
-  const gateway = new FakeStripeGateway();
-  const notifications = { notify: vi.fn().mockResolvedValue(undefined) };
+  const gateway = new FakeStripeGateway('whsec_unit');
+  const notifications = {
+    createNotification: vi.fn().mockResolvedValue('notification-1'),
+    enqueue: vi.fn().mockResolvedValue(undefined),
+  };
   const rateLimit = {
     enforceCreateAccount: vi.fn().mockResolvedValue(undefined),
     enforceCreateAccountLink: vi.fn().mockResolvedValue(undefined),
@@ -301,13 +310,56 @@ describe('StripeConnectService.handleAccountUpdated', () => {
 
   let ctx: ReturnType<typeof setup>;
 
+  function mirror(account: typeof ENABLED) {
+    vi.spyOn(ctx.gateway, 'retrieveAccount').mockResolvedValueOnce(account);
+    return ctx.service.handleAccountUpdated(account.id);
+  }
+
+  it('mirrors the state Stripe returns now, not what the caller last saw', async () => {
+    ctx = setup();
+    const created = await ctx.gateway.createConnectedAccount({
+      country: 'LU',
+      metadata: {},
+      idempotencyKey: 'k',
+    });
+    ctx.setRow(profileRow({ stripeAccountId: created.id }));
+    ctx.gateway.updateAccount(created.id, { payoutsEnabled: true });
+
+    await ctx.service.handleAccountUpdated(created.id);
+
+    expect(ctx.current()).toMatchObject({
+      stripeOnboardingComplete: false,
+      stripePayoutsEnabled: true,
+    });
+  });
+
+  it('locks the profile row before reading it', async () => {
+    ctx = setup({ profile: profileRow({ stripeAccountId: 'acct_1' }) });
+    await mirror(ENABLED);
+
+    const [query] = ctx.tx.$queryRaw.mock.calls[0] ?? [];
+    expect(query?.join('?')).toMatch(/FROM "PhotographerProfile".*FOR UPDATE/s);
+    expect(ctx.tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      ctx.tx.photographerProfile.findUniqueOrThrow.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  it('propagates a Stripe fetch failure without touching the database', async () => {
+    ctx = setup({ profile: profileRow({ stripeAccountId: 'acct_1' }) });
+
+    await expect(ctx.service.handleAccountUpdated('acct_missing')).rejects.toThrow(
+      /no such account acct_missing/,
+    );
+    expect(ctx.prisma.client.$transaction).not.toHaveBeenCalled();
+  });
+
   describe('when onboarding completes', () => {
     beforeEach(() => {
       ctx = setup({ profile: profileRow({ stripeAccountId: 'acct_1' }) });
     });
 
     it('mirrors the flags, audits, and does not notify', async () => {
-      await ctx.service.handleAccountUpdated(ENABLED);
+      await mirror(ENABLED);
 
       expect(ctx.current()).toMatchObject({
         stripeOnboardingComplete: true,
@@ -334,19 +386,20 @@ describe('StripeConnectService.handleAccountUpdated', () => {
           },
         },
       });
-      expect(ctx.notifications.notify).not.toHaveBeenCalled();
+      expect(ctx.notifications.createNotification).not.toHaveBeenCalled();
+      expect(ctx.notifications.enqueue).not.toHaveBeenCalled();
     });
 
     it('treats a replay of the same state as a no-op', async () => {
-      await ctx.service.handleAccountUpdated(ENABLED);
-      await ctx.service.handleAccountUpdated(ENABLED);
+      await mirror(ENABLED);
+      await mirror(ENABLED);
 
       expect(ctx.tx.photographerProfile.update).toHaveBeenCalledOnce();
       expect(ctx.tx.auditLog.create).toHaveBeenCalledOnce();
     });
 
     it('requires both details submitted and charges enabled for onboarding complete', async () => {
-      await ctx.service.handleAccountUpdated({ ...ENABLED, chargesEnabled: false });
+      await mirror({ ...ENABLED, chargesEnabled: false });
       expect(ctx.current()).toMatchObject({
         stripeOnboardingComplete: false,
         stripePayoutsEnabled: true,
@@ -367,7 +420,7 @@ describe('StripeConnectService.handleAccountUpdated', () => {
     });
 
     it('unpublishes, audits the unpublish, and notifies the photographer', async () => {
-      await ctx.service.handleAccountUpdated({ ...ENABLED, payoutsEnabled: false });
+      await mirror({ ...ENABLED, payoutsEnabled: false });
 
       expect(ctx.current()).toMatchObject({ stripePayoutsEnabled: false, isPublished: false });
       expect(ctx.tx.auditLog.create.mock.lastCall?.[0]).toMatchObject({
@@ -376,36 +429,69 @@ describe('StripeConnectService.handleAccountUpdated', () => {
           after: { stripePayoutsEnabled: false, isPublished: false },
         },
       });
-      expect(ctx.notifications.notify).toHaveBeenCalledWith('user-1', 'payouts_disabled', {});
+      expect(ctx.notifications.createNotification).toHaveBeenCalledWith(
+        ctx.tx,
+        'user-1',
+        'payouts_disabled',
+        {},
+      );
+      expect(ctx.notifications.enqueue).toHaveBeenCalledWith('notification-1');
+    });
+
+    it('writes the notification row in the transaction and enqueues only after commit', async () => {
+      let committed = false;
+      ctx.prisma.client.$transaction.mockImplementationOnce(async (callback) => {
+        const result = await callback(ctx.tx);
+        expect(ctx.notifications.createNotification).toHaveBeenCalledOnce();
+        expect(ctx.notifications.enqueue).not.toHaveBeenCalled();
+        committed = true;
+        return result;
+      });
+      ctx.notifications.enqueue.mockImplementationOnce(() => {
+        expect(committed).toBe(true);
+        return Promise.resolve();
+      });
+
+      await mirror({ ...ENABLED, payoutsEnabled: false });
+
+      expect(ctx.notifications.enqueue).toHaveBeenCalledOnce();
+    });
+
+    it('does not enqueue when the transaction fails', async () => {
+      ctx.tx.auditLog.create.mockRejectedValueOnce(new Error('db down'));
+
+      await expect(mirror({ ...ENABLED, payoutsEnabled: false })).rejects.toThrow('db down');
+      expect(ctx.notifications.enqueue).not.toHaveBeenCalled();
     });
 
     it('notifies only once when the same disabled state is replayed', async () => {
       const disabled = { ...ENABLED, payoutsEnabled: false };
-      await ctx.service.handleAccountUpdated(disabled);
-      await ctx.service.handleAccountUpdated(disabled);
+      await mirror(disabled);
+      await mirror(disabled);
 
-      expect(ctx.notifications.notify).toHaveBeenCalledOnce();
+      expect(ctx.notifications.createNotification).toHaveBeenCalledOnce();
+      expect(ctx.notifications.enqueue).toHaveBeenCalledOnce();
       expect(ctx.tx.auditLog.create).toHaveBeenCalledOnce();
     });
 
     it('keeps the profile published when only onboarding flips', async () => {
-      await ctx.service.handleAccountUpdated({ ...ENABLED, detailsSubmitted: false });
+      await mirror({ ...ENABLED, detailsSubmitted: false });
 
       expect(ctx.current()).toMatchObject({ stripeOnboardingComplete: false, isPublished: true });
-      expect(ctx.notifications.notify).not.toHaveBeenCalled();
+      expect(ctx.notifications.createNotification).not.toHaveBeenCalled();
     });
   });
 
   it('logs and ignores an event for an unknown account', async () => {
     ctx = setup({ profile: profileRow({ stripeAccountId: 'acct_other' }) });
 
-    await ctx.service.handleAccountUpdated({ ...ENABLED, id: 'acct_unknown' });
+    await mirror({ ...ENABLED, id: 'acct_unknown' });
 
     expect(ctx.logger.warn).toHaveBeenCalledWith(
       { stripeAccountId: 'acct_unknown' },
       expect.stringContaining('unknown account'),
     );
     expect(ctx.tx.photographerProfile.update).not.toHaveBeenCalled();
-    expect(ctx.notifications.notify).not.toHaveBeenCalled();
+    expect(ctx.notifications.createNotification).not.toHaveBeenCalled();
   });
 });

@@ -134,6 +134,7 @@ const EnvSchema = z
     SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
     SENTRY_REQUIRED: BooleanFlagSchema,
 
+    STRIPE_FAKE: BooleanFlagSchema,
     STRIPE_SECRET_KEY: optionalPrefixedSecret(/^(sk|rk)_(test|live)_/, 'sk_ or rk_ (test or live)'),
     STRIPE_WEBHOOK_SECRET: optionalPrefixedSecret(/^whsec_/, 'whsec_'),
     STRIPE_CONNECT_REFRESH_URL: OptionalUrlSchema,
@@ -141,6 +142,13 @@ const EnvSchema = z
     STRIPE_EVENT_SWEEP_INTERVAL_MS: z.coerce.number().int().min(0).default(300_000),
   })
   .superRefine((value, ctx) => {
+    if (value.STRIPE_FAKE && value.STRIPE_SECRET_KEY !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['STRIPE_FAKE'],
+        message: 'set either STRIPE_FAKE=true or STRIPE_SECRET_KEY, not both',
+      });
+    }
     if (value.NODE_ENV !== 'production') {
       return;
     }
@@ -161,6 +169,13 @@ const EnvSchema = z
     // The in-memory FakeStripeGateway is a test double, never a production
     // fallback: without these the API would take bookings it cannot charge
     // or pay out (docs/steps/1A.8-payments.md).
+    if (value.STRIPE_FAKE) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['STRIPE_FAKE'],
+        message: 'the fake Stripe gateway is refused in production; unset STRIPE_FAKE',
+      });
+    }
     for (const key of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] as const) {
       if (value[key] === undefined) {
         ctx.addIssue({ code: 'custom', path: [key], message: `${key} is required in production` });
