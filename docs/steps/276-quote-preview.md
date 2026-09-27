@@ -12,7 +12,7 @@ Goal: before sending a quote, the photographer sees subtotal, platform fee and p
 
 - `POST /v1/quotes/preview`, same guards and photographer checks as `POST /v1/quotes`, no persistence, no AuditLog (nothing mutates).
 - Reuse `QuotesService.computeTotals()`; no new fee arithmetic, no cache on `PlatformSettingsService` (#193).
-- Tests: happy path matches create's totals for the same line items; caller without a photographer profile 403; zero total and over-max total 422 (same as create); invalid line items 400; nothing written.
+- Tests: happy path matches create's totals for the same line items; caller without a photographer profile 404 (matches create); zero total and over-max total 422 (same as create); invalid line items 400; nothing written.
 
 ## Web (apps/web, web-developer)
 
