@@ -8,9 +8,10 @@ import { PortfolioService } from './portfolio.service.js';
 import { ProfilesRateLimitService } from './profiles-rate-limit.service.js';
 import { ProfilesRepository } from './profiles.repository.js';
 import { ProfilesService } from './profiles.service.js';
+import { ProvenanceCheckQueueModule } from './provenance-check-queue.module.js';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, ProvenanceCheckQueueModule],
   controllers: [PhotographersController, MyPhotographerProfileController],
   providers: [
     ProfilesService,
