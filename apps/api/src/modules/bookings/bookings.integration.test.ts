@@ -8,6 +8,7 @@ import { createTestApp } from '../../testing/create-test-app.js';
 import { waitForLinkInEmail } from '../../testing/mailpit.js';
 import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
 import { TEST_ENV } from '../../testing/test-env.js';
+import { BookingReleaseService } from '../payments/booking-release.service.js';
 import { FakeStripeGateway } from '../payments/stripe/fake-stripe-gateway.js';
 import { STRIPE_GATEWAY } from '../payments/stripe/stripe-gateway.js';
 
@@ -464,6 +465,85 @@ describe('bookings integration', () => {
 
       expect(response.statusCode).toBe(409);
       expect(await prisma.delivery.count({ where: { bookingId } })).toBe(0);
+    });
+
+    it('releases at the fee snapshotted on the quote, not a later platform fee change', async () => {
+      const { client, photographer, bookingId, chargeId } = await paidBooking('fee-snapshot');
+      const delivered = await deliver(bookingId, photographer.token);
+      expect(delivered.statusCode).toBe(201);
+
+      const before = await prisma.platformSetting.findUniqueOrThrow({
+        where: { key: 'feePercent' },
+      });
+      await prisma.platformSetting.update({ where: { key: 'feePercent' }, data: { value: 10 } });
+      try {
+        const accepted = await acceptDelivery(bookingId, client.token);
+        expect(accepted.statusCode).toBe(200);
+        expect(accepted.json<BookingBody>()).toMatchObject({ id: bookingId, status: 'released' });
+      } finally {
+        await prisma.platformSetting.update({
+          where: { key: 'feePercent' },
+          data: { value: before.value as number },
+        });
+      }
+
+      const released = await prisma.booking.findUniqueOrThrow({ where: { id: bookingId } });
+      expect(released.status).toBe('released');
+      const ledger = await prisma.ledgerEntry.findMany({ where: { bookingId } });
+      const rows = ledger.map((entry) => [entry.type, entry.amountCents, entry.stripeObjectId]);
+      expect(rows).toEqual(
+        expect.arrayContaining([
+          ['charge', 25050, chargeId],
+          ['transfer', -23797, released.transferId],
+          ['platform_fee', -1253, released.transferId],
+        ]),
+      );
+      expect(ledger.reduce((sum, entry) => sum + entry.amountCents, 0)).toBe(0);
+    });
+
+    it('leaves the delivery accepted when the transfer fails, and the next sweep releases it', async () => {
+      const { client, photographer, bookingId } = await paidBooking('transfer-fail');
+      const delivered = await deliver(bookingId, photographer.token);
+      expect(delivered.statusCode).toBe(201);
+
+      const profile = await prisma.photographerProfile.findUniqueOrThrow({
+        where: { id: photographer.profileId },
+      });
+      const realAccountId = profile.stripeAccountId;
+      if (!realAccountId) {
+        throw new Error('fixture photographer has no Stripe account to restore');
+      }
+      await prisma.photographerProfile.update({
+        where: { id: photographer.profileId },
+        data: { stripeAccountId: 'acct_missing_it' },
+      });
+
+      const accepted = await acceptDelivery(bookingId, client.token);
+      expect(accepted.statusCode).toBe(200);
+      expect(accepted.json<BookingBody>()).toMatchObject({ id: bookingId, status: 'delivered' });
+
+      const stillHeld = await prisma.booking.findUniqueOrThrow({
+        where: { id: bookingId },
+        include: { delivery: true },
+      });
+      expect(stillHeld.status).toBe('delivered');
+      expect(stillHeld.transferId).toBeNull();
+      expect(stillHeld.delivery?.acceptedAt).not.toBeNull();
+
+      await prisma.photographerProfile.update({
+        where: { id: photographer.profileId },
+        data: { stripeAccountId: realAccountId },
+      });
+
+      const sweepResult = await app.get(BookingReleaseService).sweep();
+      expect(sweepResult.released).toBeGreaterThanOrEqual(1);
+
+      const released = await prisma.booking.findUniqueOrThrow({ where: { id: bookingId } });
+      expect(released.status).toBe('released');
+      expect(released.transferId).toMatch(/^tr_fake/);
+
+      const ledger = await prisma.ledgerEntry.findMany({ where: { bookingId } });
+      expect(ledger.reduce((sum, entry) => sum + entry.amountCents, 0)).toBe(0);
     });
   });
 

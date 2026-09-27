@@ -210,12 +210,17 @@ describe('BookingReleaseService.release', () => {
     expect(logger.warn).toHaveBeenCalled();
   });
 
-  it('rejects a booking that is not delivered with a 409 illegal transition', async () => {
-    const { service, createTransfer } = await setup({ status: 'paid_held' });
+  it.each(['paid_held', 'refunded', 'cancelled'])(
+    'rejects a %s booking with a 409 illegal transition',
+    async (status) => {
+      const { service, createTransfer } = await setup({ status });
 
-    await expect(service.release('booking-1', user, NOW)).rejects.toMatchObject({ status: 409 });
-    expect(createTransfer).not.toHaveBeenCalled();
-  });
+      await expect(service.release('booking-1', user, NOW)).rejects.toMatchObject({
+        status: 409,
+      });
+      expect(createTransfer).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects a delivery that is neither accepted nor due with a 409', async () => {
     const { service, createTransfer } = await setup({ releaseDueAt: FUTURE });
@@ -257,5 +262,17 @@ describe('BookingReleaseService.sweep', () => {
     const result = await service.sweep(NOW);
 
     expect(result).toEqual({ attempted: 3, released: 1, skipped: 1, failed: 1 });
+  });
+
+  it('running the sweep twice for the same due booking transfers and ledgers once', async () => {
+    const { service, ledger, createTransfer } = await setup();
+
+    const first = await service.sweep(NOW);
+    const second = await service.sweep(NOW);
+
+    expect(first).toEqual({ attempted: 1, released: 1, skipped: 0, failed: 0 });
+    expect(second).toEqual({ attempted: 1, released: 0, skipped: 1, failed: 0 });
+    expect(createTransfer).toHaveBeenCalledTimes(1);
+    expect(ledger).toHaveLength(3);
   });
 });
