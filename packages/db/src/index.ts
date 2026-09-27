@@ -8,3 +8,4 @@ export function createPrismaClient(databaseUrl: string): PrismaClient {
   const adapter = new PrismaPg({ connectionString: databaseUrl });
   return new PrismaClient({ adapter });
 }
+export { createKeyedLock, type KeyedLock, type KeyedLockResult } from './keyed-lock.js';

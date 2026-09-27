@@ -10,6 +10,7 @@ import { transitionBooking } from '../bookings/booking-state.js';
 import { assertSupportedCurrency } from '../bookings/create-booking.js';
 import { AdminBookingsService, type AdminBookingDto } from './admin-bookings.service.js';
 import { ledgerTotals, reversibleCents } from './booking-ledger.js';
+import { BookingMoneyLockService } from './booking-money-lock.service.js';
 import {
   STRIPE_GATEWAY,
   type Refund,
@@ -116,10 +117,49 @@ export class BookingRefundService {
     @Inject(STRIPE_GATEWAY) private readonly gateway: StripeGateway,
     @Inject(AdminAuditService) private readonly adminAudit: AdminAuditService,
     @Inject(AdminBookingsService) private readonly adminBookings: AdminBookingsService,
+    @Inject(BookingMoneyLockService) private readonly moneyLock: BookingMoneyLockService,
     @Inject(Logger) private readonly logger: Logger,
   ) {}
 
-  async refundAsClient(
+  refundAsClient(
+    user: Actor,
+    bookingId: string,
+    input: RefundInput,
+    ip: string | null,
+  ): Promise<ClientRefundDto> {
+    return this.underMoneyLock(bookingId, () => this.clientRefund(user, bookingId, input, ip));
+  }
+
+  refundAsAdmin(
+    admin: Actor,
+    bookingId: string,
+    input: { amountCents: number; reason: string },
+    ip: string | null,
+  ): Promise<AdminBookingDto> {
+    return this.underMoneyLock(bookingId, () => this.adminRefund(admin, bookingId, input, ip));
+  }
+
+  reverseTransferAsAdmin(
+    admin: Actor,
+    bookingId: string,
+    input: { reason: string },
+    ip: string | null,
+  ): Promise<AdminBookingDto> {
+    return this.underMoneyLock(bookingId, () =>
+      this.adminTransferReversal(admin, bookingId, input, ip),
+    );
+  }
+
+  private async underMoneyLock<T>(bookingId: string, fn: () => Promise<T>): Promise<T> {
+    const result = await this.moneyLock.tryRun(bookingId, fn);
+    if (!result.acquired) {
+      this.logger.warn({ bookingId }, 'booking refund: refused, booking money lock is held');
+      throw conflict('Another refund or release is in progress for this booking; retry shortly');
+    }
+    return result.value;
+  }
+
+  private async clientRefund(
     user: Actor,
     bookingId: string,
     input: RefundInput,
@@ -267,7 +307,7 @@ export class BookingRefundService {
     );
   }
 
-  async refundAsAdmin(
+  private async adminRefund(
     admin: Actor,
     bookingId: string,
     input: { amountCents: number; reason: string },
@@ -429,7 +469,7 @@ export class BookingRefundService {
     );
   }
 
-  async reverseTransferAsAdmin(
+  private async adminTransferReversal(
     admin: Actor,
     bookingId: string,
     input: { reason: string },

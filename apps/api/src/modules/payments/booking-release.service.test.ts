@@ -2,6 +2,7 @@ import { Prisma } from '@photoo/db';
 import type { Logger } from 'nestjs-pino';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
+import { InMemoryMoneyLock } from '../../testing/in-memory-money-lock.js';
 import { BookingReleaseService, transferIdempotencyKey } from './booking-release.service.js';
 import { FakeStripeGateway } from './stripe/fake-stripe-gateway.js';
 
@@ -167,9 +168,16 @@ async function setup(
     },
   } as unknown as PrismaService;
   const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
-  const service = new BookingReleaseService(prisma, gateway, logger as unknown as Logger);
+  const moneyLock = new InMemoryMoneyLock();
+  const service = new BookingReleaseService(
+    prisma,
+    gateway,
+    moneyLock.asService(),
+    logger as unknown as Logger,
+  );
   return {
     service,
+    moneyLock,
     row,
     ledger,
     audits,
@@ -425,6 +433,31 @@ describe('BookingReleaseService.release', () => {
       expect(createTransfer).not.toHaveBeenCalled();
     },
   );
+
+  it('skips without calling Stripe while a refund holds the booking money lock', async () => {
+    const { service, row, ledger, createTransfer, moneyLock } = await setup();
+    moneyLock.held.add('booking-1');
+
+    const outcome = await service.release('booking-1', user, NOW);
+
+    expect(outcome).toEqual({ status: 'skipped', reason: 'locked' });
+    expect(createTransfer).not.toHaveBeenCalled();
+    expect(row.status).toBe('delivered');
+    expect(ledger).toHaveLength(1);
+
+    moneyLock.held.delete('booking-1');
+    await expect(service.release('booking-1', user, NOW)).resolves.toMatchObject({
+      status: 'released',
+    });
+  });
+
+  it('frees the money lock after a failed release', async () => {
+    const { service, moneyLock } = await setup({ chargeId: null });
+
+    await expect(service.release('booking-1', user, NOW)).rejects.toThrow(/no chargeId/);
+
+    expect(moneyLock.held.size).toBe(0);
+  });
 
   it('rejects a delivery that is neither accepted nor due with a 409', async () => {
     const { service, createTransfer } = await setup({ releaseDueAt: FUTURE });

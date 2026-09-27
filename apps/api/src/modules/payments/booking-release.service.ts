@@ -9,6 +9,7 @@ import {
 } from '../bookings/booking-state.js';
 import { assertSupportedCurrency } from '../bookings/create-booking.js';
 import { ledgerTotals } from './booking-ledger.js';
+import { BookingMoneyLockService } from './booking-money-lock.service.js';
 import { transferGroupFor } from './booking-payments.service.js';
 import { STRIPE_GATEWAY, type StripeGateway, type Transfer } from './stripe/stripe-gateway.js';
 
@@ -19,7 +20,7 @@ export type ReleaseActor = BookingTransition['actor'];
 
 export type ReleaseOutcome =
   | { status: 'released'; transferId: string; amountCents: number }
-  | { status: 'skipped'; reason: 'disputed' | 'already_released' };
+  | { status: 'skipped'; reason: 'disputed' | 'already_released' | 'locked' };
 
 export interface ReleaseSweepResult {
   attempted: number;
@@ -47,6 +48,7 @@ export class BookingReleaseService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(STRIPE_GATEWAY) private readonly gateway: StripeGateway,
+    @Inject(BookingMoneyLockService) private readonly moneyLock: BookingMoneyLockService,
     @Inject(Logger) private readonly logger: Logger,
   ) {}
 
@@ -56,10 +58,26 @@ export class BookingReleaseService {
   // lock or outlives the transaction timeout. A transfer created by a run that
   // then failed is found again by its transfer group on the retry: Stripe
   // prunes idempotency keys after 24 hours, and the sweep may retry later.
+  // A booking whose money lock is held by a refund is left for the next sweep.
   async release(
     bookingId: string,
     actor: ReleaseActor,
     now: Date = new Date(),
+  ): Promise<ReleaseOutcome> {
+    const result = await this.moneyLock.tryRun(bookingId, () =>
+      this.releaseLocked(bookingId, actor, now),
+    );
+    if (!result.acquired) {
+      this.logger.log({ bookingId }, 'booking release: skipped, booking money lock is held');
+      return { status: 'skipped', reason: 'locked' };
+    }
+    return result.value;
+  }
+
+  private async releaseLocked(
+    bookingId: string,
+    actor: ReleaseActor,
+    now: Date,
   ): Promise<ReleaseOutcome> {
     const plan = await this.planRelease(bookingId, now);
     if ('status' in plan) {

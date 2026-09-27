@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createPrismaClient, type PrismaClient } from '@photoo/db';
 import { Redis } from 'ioredis';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createTestApp } from '../../testing/create-test-app.js';
 import { waitForLinkInEmail } from '../../testing/mailpit.js';
 import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
@@ -269,7 +269,7 @@ describe('stripe webhook integration', () => {
     return { ...booking, chargeId };
   }
 
-  async function releasedBooking(label: string) {
+  async function deliveredDueBooking(label: string) {
     const booking = await paidBooking(label);
     const account = await gateway().createConnectedAccount({
       country: 'LU',
@@ -284,6 +284,11 @@ describe('stripe webhook integration', () => {
       where: { id: booking.bookingId },
       data: { status: 'delivered', releaseDueAt: new Date(Date.now() - 60 * 1000) },
     });
+    return booking;
+  }
+
+  async function releasedBooking(label: string) {
+    const booking = await deliveredDueBooking(label);
     const outcome = await app
       .get(BookingReleaseService)
       .release(booking.bookingId, { type: 'system', id: null });
@@ -1064,6 +1069,126 @@ describe('stripe webhook integration', () => {
       const response = await refund(booking.bookingId, booking.client.token, {});
 
       expect(response.statusCode).toBe(409);
+    });
+  });
+
+  describe('refund and release concurrency', () => {
+    const ONE_WINS_TIMEOUT_MS = 5_000;
+
+    function clientRefund(bookingId: string, token: string, payload: Record<string, unknown>) {
+      return fastify().inject({
+        method: 'POST',
+        url: `/v1/bookings/${bookingId}/refund`,
+        remoteAddress: FAKE_IP,
+        headers: headers(token),
+        payload: { reason: 'Shoot cancelled', ...payload },
+      });
+    }
+
+    // Holds whichever contender reaches Stripe first inside its Stripe call
+    // until the other has settled, so the second one is guaranteed to arrive
+    // while the first still owns the booking. Without the lock both would
+    // reach the gate and the timeout would let them through together.
+    async function raceWithGatedStripe<A, B>(
+      first: () => Promise<A>,
+      second: () => Promise<B>,
+    ): Promise<[A, B]> {
+      let open!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        open = resolve;
+      });
+      const fake = gateway();
+      const createRefund = fake.createRefund.bind(fake);
+      const createTransfer = fake.createTransfer.bind(fake);
+      const refundSpy = vi.spyOn(fake, 'createRefund').mockImplementation(async (input) => {
+        await gate;
+        return createRefund(input);
+      });
+      const transferSpy = vi.spyOn(fake, 'createTransfer').mockImplementation(async (input) => {
+        await gate;
+        return createTransfer(input);
+      });
+      let timer: NodeJS.Timeout | undefined;
+      try {
+        const a = first();
+        const b = second();
+        const timeout = new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, ONE_WINS_TIMEOUT_MS);
+        });
+        await Promise.race([Promise.race([a, b]).then(() => undefined), timeout]);
+        open();
+        return await Promise.all([a, b]);
+      } finally {
+        clearTimeout(timer);
+        open();
+        refundSpy.mockRestore();
+        transferSpy.mockRestore();
+      }
+    }
+
+    async function moneyOf(bookingId: string) {
+      const ledger = await ledgerOf(bookingId);
+      const refunded = ledger
+        .filter((row) => row.type === 'refund')
+        .reduce((sum, row) => sum - row.amountCents, 0);
+      const transfers = ledger.filter((row) => row.type === 'transfer');
+      return { refunded, transfers };
+    }
+
+    it('lets only one of a parallel client refund and release move the money', async () => {
+      const booking = await deliveredDueBooking('race-refund-release');
+      const releaseService = app.get(BookingReleaseService);
+
+      const [refunded, released] = await raceWithGatedStripe(
+        () => clientRefund(booking.bookingId, booking.client.token, {}),
+        () => releaseService.release(booking.bookingId, { type: 'system', id: null }),
+      );
+
+      const refundWon = refunded.statusCode === 200;
+      const releaseWon = released.status === 'released';
+      expect([refundWon, releaseWon].filter(Boolean)).toHaveLength(1);
+      if (refundWon) {
+        expect(released).toEqual({ status: 'skipped', reason: 'locked' });
+      } else {
+        expect(refunded.statusCode).toBe(409);
+      }
+
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      const money = await moneyOf(booking.bookingId);
+      expect(money.refunded).toBeLessThanOrEqual(25050);
+      if (refundWon) {
+        expect(stored.status).toBe('refunded');
+        expect(stored.transferId).toBeNull();
+        expect(money.refunded).toBe(25050);
+        expect(money.transfers).toHaveLength(0);
+      } else {
+        expect(stored.status).toBe('released');
+        expect(money.refunded).toBe(0);
+        expect(money.transfers).toHaveLength(1);
+      }
+
+      const retried = await releaseService.release(booking.bookingId, { type: 'system', id: null });
+      expect(retried.status).toBe('skipped');
+      expect((await moneyOf(booking.bookingId)).transfers).toHaveLength(refundWon ? 0 : 1);
+    });
+
+    it('lets only one of two parallel client refunds through and never over-refunds', async () => {
+      const booking = await paidBooking('race-double-refund');
+
+      const [firstRefund, secondRefund] = await raceWithGatedStripe(
+        () => clientRefund(booking.bookingId, booking.client.token, { amountCents: 20000 }),
+        () => clientRefund(booking.bookingId, booking.client.token, { amountCents: 20000 }),
+      );
+
+      expect([firstRefund.statusCode, secondRefund.statusCode].sort()).toEqual([200, 409]);
+      const money = await moneyOf(booking.bookingId);
+      expect(money.refunded).toBe(20000);
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: booking.bookingId } });
+      expect(stored.status).toBe('paid_held');
+
+      const rest = await clientRefund(booking.bookingId, booking.client.token, {});
+      expect(rest.statusCode).toBe(200);
+      expect((await moneyOf(booking.bookingId)).refunded).toBe(25050);
     });
   });
 

@@ -6,6 +6,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
 import { AdminBookingsController } from './admin-bookings.controller.js';
 import { AdminBookingsService } from './admin-bookings.service.js';
 import { BookingMoneyEventsService } from './booking-money-events.service.js';
+import { BookingMoneyLockService } from './booking-money-lock.service.js';
 import { BookingPaymentsController } from './booking-payments.controller.js';
 import { BookingPaymentsService } from './booking-payments.service.js';
 import { BookingRefundService } from './booking-refund.service.js';
@@ -34,6 +35,7 @@ import { stripeGatewayProvider } from './stripe/stripe-gateway.provider.js';
     BookingReleaseQueueService,
     BookingRefundService,
     BookingMoneyEventsService,
+    BookingMoneyLockService,
     AdminBookingsService,
     StripeWebhookService,
     StripeEventSweepService,

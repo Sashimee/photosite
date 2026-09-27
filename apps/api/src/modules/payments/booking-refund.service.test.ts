@@ -2,6 +2,7 @@ import { HttpException } from '@nestjs/common';
 import type { Logger } from 'nestjs-pino';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
+import { InMemoryMoneyLock } from '../../testing/in-memory-money-lock.js';
 import { AdminAuditService } from '../admin/admin-audit.service.js';
 import type { AdminBookingsService } from './admin-bookings.service.js';
 import {
@@ -209,14 +210,26 @@ async function setup(overrides: Partial<BookingRow> = {}, options: { openDispute
     get: vi.fn((id: string) => Promise.resolve({ id, status: row.status })),
   } as unknown as AdminBookingsService;
   const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
+  const moneyLock = new InMemoryMoneyLock();
   const service = new BookingRefundService(
     prisma,
     gateway,
     new AdminAuditService(),
     adminBookings,
+    moneyLock.asService(),
     logger as unknown as Logger,
   );
-  return { service, row, ledger, audits, gateway, createRefund, reverseTransfer, release };
+  return {
+    service,
+    row,
+    ledger,
+    audits,
+    gateway,
+    createRefund,
+    reverseTransfer,
+    release,
+    moneyLock,
+  };
 }
 
 const client = { id: 'client-1' };
@@ -476,6 +489,46 @@ describe('BookingRefundService.refundAsAdmin', () => {
       ),
     ).resolves.toBe(409);
     expect(reverseTransfer).not.toHaveBeenCalled();
+  });
+});
+
+describe('booking money lock', () => {
+  it('returns 409 without calling Stripe while a release or refund holds the lock', async () => {
+    const { service, ledger, row, createRefund, reverseTransfer, moneyLock, release } =
+      await setup();
+    moneyLock.held.add('booking-1');
+
+    await expect(
+      httpStatus(service.refundAsClient(client, 'booking-1', { reason: 'r' }, null)),
+    ).resolves.toBe(409);
+    await expect(
+      httpStatus(
+        service.refundAsAdmin(admin, 'booking-1', { amountCents: 100, reason: 'r' }, null),
+      ),
+    ).resolves.toBe(409);
+    await release();
+    const ledgerBefore = ledger.length;
+    await expect(
+      httpStatus(service.reverseTransferAsAdmin(admin, 'booking-1', { reason: 'r' }, null)),
+    ).resolves.toBe(409);
+
+    expect(createRefund).not.toHaveBeenCalled();
+    expect(reverseTransfer).not.toHaveBeenCalled();
+    expect(ledger).toHaveLength(ledgerBefore);
+    expect(row.status).toBe('released');
+  });
+
+  it('frees the lock after a refund that fails', async () => {
+    const { service, moneyLock } = await setup();
+
+    await expect(
+      service.refundAsClient(client, 'booking-1', { amountCents: TOTAL + 1, reason: 'r' }, null),
+    ).rejects.toThrow();
+
+    expect(moneyLock.held.size).toBe(0);
+    await expect(
+      service.refundAsClient(client, 'booking-1', { reason: 'r' }, null),
+    ).resolves.toBeDefined();
   });
 });
 
