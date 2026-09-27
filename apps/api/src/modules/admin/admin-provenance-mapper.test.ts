@@ -15,7 +15,7 @@ function fakeCheck(
     portfolioImageId: '22222222-2222-4222-8222-222222222222',
     aiScore: '0.910',
     aiVendor: 'vendor-x',
-    reverseMatches: ['https://example.com/match'],
+    reverseMatches: [{ url: 'https://example.com/match', domain: 'example.com', similarity: 0.87 }],
     c2paValid: true,
     exifCamera: 'Canon EOS R5',
     exifCapturedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -110,5 +110,27 @@ describe('mapAdminProvenanceCheck', () => {
 
     expect(detail.aiScore).toBeNull();
     expect(detail.exifCapturedAt).toBeNull();
+  });
+
+  it('maps a null reverseMatches to null', () => {
+    const detail = mapAdminProvenanceCheck(fakeCheck({ reverseMatches: null }), BASE_URL);
+
+    expect(detail.reverseMatches).toBeNull();
+  });
+
+  it('drops malformed reverse match entries instead of trusting their shape', () => {
+    const detail = mapAdminProvenanceCheck(
+      fakeCheck({
+        reverseMatches: [
+          { url: 'https://example.com/a', domain: 'example.com', similarity: 0.5 },
+          { domain: 'no-url.example.com', similarity: 0.5 },
+          'https://not-an-object.example.com',
+          null,
+        ],
+      }),
+      BASE_URL,
+    );
+
+    expect(detail.reverseMatches).toEqual(['https://example.com/a']);
   });
 });

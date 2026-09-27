@@ -22,6 +22,22 @@ function requireThumbnailUrl(check: ProvenanceCheckWithRelations, baseUrl: strin
   return url;
 }
 
+// Stored as `{ url, domain, similarity }[]`; only the URL is admin-facing.
+function mapReverseMatches(reverseMatches: unknown): string[] | null {
+  if (!Array.isArray(reverseMatches)) {
+    return null;
+  }
+  return reverseMatches
+    .map((match) =>
+      typeof match === 'object' &&
+      match !== null &&
+      typeof (match as { url?: unknown }).url === 'string'
+        ? (match as { url: string }).url
+        : null,
+    )
+    .filter((url): url is string => url !== null);
+}
+
 export function mapAdminProvenanceCheckSummary(
   check: ProvenanceCheckWithRelations,
   baseUrl: string,
@@ -52,7 +68,7 @@ export function mapAdminProvenanceCheck(
     ...summary,
     aiScore: check.aiScore !== null ? Number(check.aiScore) : null,
     aiVendor: check.aiVendor,
-    reverseMatches: check.reverseMatches as string[] | null,
+    reverseMatches: mapReverseMatches(check.reverseMatches),
     c2paValid: check.c2paValid,
     exifCamera: check.exifCamera,
     exifCapturedAt: check.exifCapturedAt?.toISOString() ?? null,
