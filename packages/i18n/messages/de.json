@@ -1,1 +1,42 @@
-{}
+{
+  "web": {
+    "dashboard": {
+      "requests": {
+        "sendQuote": {
+          "triggerCta": "Angebot senden",
+          "formTitle": "Angebot senden",
+          "formDescription": "Fügen Sie jede angebotene Leistung und ihren Preis hinzu. Sie überprüfen die Gesamtsumme vor dem Versand.",
+          "lineItemsHeading": "Was ist enthalten",
+          "lineItemLabelLabel": "Leistung",
+          "lineItemQtyLabel": "Menge",
+          "lineItemPriceLabel": "Einzelpreis ({currency})",
+          "removeLineItemCta": "Leistung entfernen",
+          "addLineItemCta": "Leistung hinzufügen",
+          "validUntilLabel": "Gültig bis",
+          "messageLabel": "Nachricht (optional)",
+          "cancelCta": "Abbrechen",
+          "reviewCta": "Angebot überprüfen",
+          "invalidForm": "Überprüfen Sie die markierten Felder und versuchen Sie es erneut.",
+          "reviewTitle": "Vor dem Versand überprüfen",
+          "reviewDescription": "Das ist, was der Kunde bezahlt. Die Plattformgebühr wird beim Versand des Angebots berechnet.",
+          "totalLabel": "Gesamt",
+          "feeLabel": "Plattformgebühr",
+          "payoutLabel": "Ihre Auszahlung",
+          "previewLoading": "Ihre Auszahlung wird berechnet…",
+          "previewError": "Ihre Auszahlung kann derzeit nicht berechnet werden. Sie können dieses Angebot trotzdem senden.",
+          "feeNotice": "Eine Plattformgebühr wird bei der Freigabe von Ihrer Auszahlung abgezogen; sie wird nicht auf diese Summe aufgeschlagen.",
+          "backCta": "Zurück",
+          "confirmSendCta": "Angebot senden",
+          "sending": "Wird gesendet…",
+          "errors": {
+            "generic": "Bei der Angebotssendung ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+            "conflict": "Diese Anfrage akzeptiert keine Angebote mehr.",
+            "invalid": "Dieses Angebot kann so nicht gesendet werden. Laden Sie die Anfrage neu und versuchen Sie es erneut.",
+            "tooManyRequests": "Sie senden Angebote zu schnell. Verlangsamen Sie sich und versuchen Sie es erneut.",
+            "tooManyRequestsWithRetry": "Sie senden Angebote zu schnell. Versuchen Sie es in {seconds, plural, one {# Sekunde} other {# Sekunden}} erneut."
+          }
+        }
+      }
+    }
+  }
+}

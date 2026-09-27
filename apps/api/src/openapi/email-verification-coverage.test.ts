@@ -84,6 +84,7 @@ describe('email verification coverage', () => {
       new Set([
         'POST /v1/requests',
         'POST /v1/quotes',
+        'POST /v1/quotes/preview',
         'POST /v1/photographers/{slug}/products/{productId}/quotes',
         'POST /v1/me/professional-profile',
         'POST /v1/me/job-offers/{id}/publish',

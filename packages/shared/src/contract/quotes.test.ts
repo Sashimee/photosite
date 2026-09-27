@@ -4,6 +4,8 @@ import {
   DirectQuoteRequestSchema,
   LineItemSchema,
   QuotePhotographerSchema,
+  QuotePreviewRequestSchema,
+  QuotePreviewSchema,
   QuoteSchema,
 } from './quotes.js';
 
@@ -201,5 +203,45 @@ describe('DirectQuoteRequestSchema', () => {
 
   it('rejects a client-supplied price', () => {
     expect(DirectQuoteRequestSchema.safeParse({ ...valid, unitCents: 15000 }).success).toBe(false);
+  });
+});
+
+const validLineItems = [{ label: 'Half day', qty: 2, unitCents: 12525 }];
+
+const validPreviewRequest = { lineItems: validLineItems };
+
+const validPreview = {
+  subtotal: { amountCents: 25050, currency: 'EUR' },
+  platformFee: { amountCents: 1253, currency: 'EUR' },
+  total: { amountCents: 25050, currency: 'EUR' },
+};
+
+describe('QuotePreviewRequestSchema', () => {
+  it('accepts a well-formed request', () => {
+    expect(QuotePreviewRequestSchema.safeParse(validPreviewRequest).success).toBe(true);
+  });
+
+  it('rejects empty lineItems', () => {
+    expect(QuotePreviewRequestSchema.safeParse({ lineItems: [] }).success).toBe(false);
+  });
+
+  it('rejects unknown keys', () => {
+    expect(
+      QuotePreviewRequestSchema.safeParse({ ...validPreviewRequest, requestId: 'x' }).success,
+    ).toBe(false);
+  });
+});
+
+describe('QuotePreviewSchema', () => {
+  it('accepts a well-formed preview', () => {
+    expect(QuotePreviewSchema.safeParse(validPreview).success).toBe(true);
+  });
+
+  it('rejects a feePercent field', () => {
+    expect(QuotePreviewSchema.safeParse({ ...validPreview, feePercent: 5 }).success).toBe(false);
+  });
+
+  it('rejects unknown keys', () => {
+    expect(QuotePreviewSchema.safeParse({ ...validPreview, extra: 'x' }).success).toBe(false);
   });
 });

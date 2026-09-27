@@ -6,6 +6,8 @@ import {
   type CursorPaginationQuerySchema,
   type DirectQuoteRequestSchema,
   type LineItem,
+  type QuotePreviewRequestSchema,
+  type QuotePreviewSchema,
   type QuotesMineQuerySchema,
   type QuoteSchema,
 } from '@photoo/shared';
@@ -37,6 +39,8 @@ type DirectQuoteInput = z.infer<typeof DirectQuoteRequestSchema>;
 type MineQuery = z.infer<typeof QuotesMineQuerySchema>;
 type ListQuery = z.infer<typeof CursorPaginationQuerySchema>;
 type QuoteDto = z.infer<typeof QuoteSchema>;
+type PreviewInput = z.infer<typeof QuotePreviewRequestSchema>;
+type QuotePreviewDto = z.infer<typeof QuotePreviewSchema>;
 
 const MAX_TOTAL_CENTS = 99_999_999;
 
@@ -271,6 +275,24 @@ export class QuotesService {
     await this.events.onCreated(created);
 
     return this.mapWithPhotographer(created);
+  }
+
+  async preview(user: SessionUser, input: PreviewInput): Promise<QuotePreviewDto> {
+    requireVerifiedEmail(user);
+
+    const profile = await this.findCallerProfile(user.id);
+    if (!profile) {
+      throw notFound('Photographer profile not found');
+    }
+
+    const currency = await this.requireProfileCurrency(profile.countryCode);
+    const totals = await this.computeTotals(input.lineItems);
+
+    return {
+      subtotal: { amountCents: totals.subtotalCents, currency },
+      platformFee: { amountCents: totals.platformFeeCents, currency },
+      total: { amountCents: totals.totalCents, currency },
+    };
   }
 
   async mine(
