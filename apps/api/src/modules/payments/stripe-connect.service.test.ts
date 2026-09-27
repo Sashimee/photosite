@@ -8,8 +8,10 @@ import type { PaymentsRateLimitService } from './payments-rate-limit.service.js'
 import { StripeConnectService } from './stripe-connect.service.js';
 import { FakeStripeGateway } from './stripe/fake-stripe-gateway.js';
 
-const PHOTOGRAPHER = { id: 'user-1', roles: ['photographer'] };
-const CLIENT = { id: 'user-2', roles: ['client'] };
+const VERIFIED_AT = new Date('2026-01-01T00:00:00Z');
+const PHOTOGRAPHER = { id: 'user-1', roles: ['photographer'], emailVerifiedAt: VERIFIED_AT };
+const UNVERIFIED_PHOTOGRAPHER = { ...PHOTOGRAPHER, emailVerifiedAt: null };
+const CLIENT = { id: 'user-2', roles: ['client'], emailVerifiedAt: VERIFIED_AT };
 
 interface ProfileRow {
   id: string;
@@ -184,6 +186,21 @@ describe('StripeConnectService.createAccount', () => {
     expect(createSpy).not.toHaveBeenCalled();
   });
 
+  it('rejects an unverified photographer with EMAIL_NOT_VERIFIED before any rate limit, read or Stripe call', async () => {
+    const ctx = setup();
+    const createSpy = vi.spyOn(ctx.gateway, 'createConnectedAccount');
+    await expectHttpError(
+      ctx.service.createAccount(UNVERIFIED_PHOTOGRAPHER, undefined),
+      403,
+      'EMAIL_NOT_VERIFIED',
+    );
+    expect(ctx.rateLimit.enforceCreateAccount).not.toHaveBeenCalled();
+    expect(ctx.prisma.client.photographerProfile.findUnique).not.toHaveBeenCalled();
+    expect(ctx.prisma.client.$transaction).not.toHaveBeenCalled();
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(ctx.current()?.stripeAccountId).toBeNull();
+  });
+
   it('returns 404 when the photographer has no profile yet', async () => {
     const ctx = setup({ profile: null });
     await expectHttpError(ctx.service.createAccount(PHOTOGRAPHER, undefined), 404, 'NOT_FOUND');
@@ -246,6 +263,19 @@ describe('StripeConnectService.createAccountLink', () => {
   it('returns 409 before an account exists', async () => {
     const ctx = setup();
     await expectHttpError(ctx.service.createAccountLink(PHOTOGRAPHER), 409, 'CONFLICT');
+  });
+
+  it('rejects an unverified photographer with EMAIL_NOT_VERIFIED before any rate limit, read or Stripe call', async () => {
+    const ctx = setup({ profile: profileRow({ stripeAccountId: 'acct_existing' }) });
+    const linkSpy = vi.spyOn(ctx.gateway, 'createAccountLink');
+    await expectHttpError(
+      ctx.service.createAccountLink(UNVERIFIED_PHOTOGRAPHER),
+      403,
+      'EMAIL_NOT_VERIFIED',
+    );
+    expect(ctx.rateLimit.enforceCreateAccountLink).not.toHaveBeenCalled();
+    expect(ctx.prisma.client.photographerProfile.findUnique).not.toHaveBeenCalled();
+    expect(linkSpy).not.toHaveBeenCalled();
   });
 
   it('returns 403 for a non-photographer and 404 without a profile', async () => {

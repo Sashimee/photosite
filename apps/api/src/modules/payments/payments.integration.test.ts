@@ -105,6 +105,12 @@ describe('payments (Stripe Connect onboarding) integration', () => {
     return { ...user, profileId: response.json<{ id: string }>().id };
   }
 
+  // Password sign-in is blocked until the email is verified, so the gate is
+  // exercised by clearing the flag on an already-signed-in user's row.
+  async function unverifyEmail(userId: string): Promise<void> {
+    await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: null } });
+  }
+
   function createAccount(token: string) {
     return fastify().inject({
       method: 'POST',
@@ -188,6 +194,26 @@ describe('payments (Stripe Connect onboarding) integration', () => {
       expect(response.json<ApiErrorBody>().code).toBe('FORBIDDEN');
     });
 
+    it('rejects an unverified photographer with EMAIL_NOT_VERIFIED and creates no account', async () => {
+      const photographer = await createPhotographer('unverified-create');
+      await unverifyEmail(photographer.id);
+
+      const response = await createAccount(photographer.token);
+      expect(response.statusCode).toBe(403);
+      expect(response.json<ApiErrorBody>().code).toBe('EMAIL_NOT_VERIFIED');
+
+      const profile = await prisma.photographerProfile.findUniqueOrThrow({
+        where: { id: photographer.profileId },
+      });
+      expect(profile.stripeAccountId).toBeNull();
+      expect(
+        await prisma.auditLog.count({
+          where: { action: 'stripe_account.created', targetId: photographer.profileId },
+        }),
+      ).toBe(0);
+      expect(await redis.keys(`rate-limit:payments:*:${photographer.id}`)).toEqual([]);
+    });
+
     it('returns 404 for a photographer without a profile', async () => {
       const photographer = await signUpAndSignIn('no-profile', ['photographer']);
       const response = await createAccount(photographer.token);
@@ -258,6 +284,23 @@ describe('payments (Stripe Connect onboarding) integration', () => {
       const after = await createAccountLink(photographer.token);
       expect(after.statusCode).toBe(200);
       expect(after.json<{ url: string }>().url).toMatch(/^https:\/\//);
+    });
+
+    it('rejects an unverified photographer with EMAIL_NOT_VERIFIED', async () => {
+      const photographer = await createPhotographer('unverified-link');
+      const account = (await createAccount(photographer.token)).json<StripeAccountBody>();
+      await unverifyEmail(photographer.id);
+      await clearRateLimitKeys();
+
+      const response = await createAccountLink(photographer.token);
+      expect(response.statusCode).toBe(403);
+      expect(response.json<ApiErrorBody>().code).toBe('EMAIL_NOT_VERIFIED');
+      expect(await redis.keys(`rate-limit:payments:*:${photographer.id}`)).toEqual([]);
+
+      const profile = await prisma.photographerProfile.findUniqueOrThrow({
+        where: { id: photographer.profileId },
+      });
+      expect(profile.stripeAccountId).toBe(account.stripeAccountId);
     });
 
     it('returns 403 for a client', async () => {

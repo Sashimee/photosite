@@ -4,6 +4,7 @@ import type { StripeAccountLinkResponseSchema, StripeAccountResponseSchema } fro
 import { Logger } from 'nestjs-pino';
 import type { z } from 'zod';
 import { requireRole } from '../../common/auth/require-role.js';
+import { requireVerifiedEmail } from '../../common/auth/require-verified-email.js';
 import { PublishPolicy } from '../../common/publish/publish-policy.js';
 import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -18,6 +19,7 @@ import {
 interface SessionUser {
   id: string;
   roles: string[];
+  emailVerifiedAt?: string | Date | null;
 }
 
 type StripeAccountDto = z.infer<typeof StripeAccountResponseSchema>;
@@ -67,6 +69,7 @@ export class StripeConnectService {
   ) {}
 
   async createAccount(user: SessionUser, ip: string | undefined): Promise<CreateAccountResult> {
+    requireVerifiedEmail(user);
     requireRole(user, 'photographer');
     await this.rateLimit.enforceCreateAccount(user.id);
 
@@ -151,6 +154,7 @@ export class StripeConnectService {
   }
 
   async createAccountLink(user: SessionUser): Promise<StripeAccountLinkDto> {
+    requireVerifiedEmail(user);
     requireRole(user, 'photographer');
     await this.rateLimit.enforceCreateAccountLink(user.id);
 
