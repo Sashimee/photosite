@@ -589,8 +589,11 @@ describe('admin provenance integration', () => {
       expect(auditRow?.after).toEqual({ portfolioImageId: check.portfolioImageId });
       expect(auditRow?.ip).toBe(FAKE_IP);
 
-      const enqueuedJob = await provenanceQueue.getJob(check.portfolioImageId);
-      expect(enqueuedJob).not.toBeNull();
+      const waitingJobs = await provenanceQueue.getJobs(['waiting', 'delayed', 'active']);
+      const enqueuedJob = waitingJobs.find((job) =>
+        job.id?.startsWith(`${check.portfolioImageId}:recheck:`),
+      );
+      expect(enqueuedJob).not.toBeUndefined();
       expect(enqueuedJob?.data).toEqual({ portfolioImageId: check.portfolioImageId, force: true });
     });
   });
