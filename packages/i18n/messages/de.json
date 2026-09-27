@@ -38,5 +38,21 @@
         }
       }
     }
+  },
+  "push": {
+    "notifications": {
+      "payoutsDisabled": {
+        "title": "Auszahlungen pausiert",
+        "body": "Ihr Profil ist verborgen, bis Ihre Zahlungsangaben vollständig sind"
+      }
+    }
+  },
+  "email": {
+    "notifications": {
+      "payoutsDisabled": {
+        "subject": "Auszahlungen sind auf Ihrem Konto pausiert",
+        "body": "Stripe hat Auszahlungen auf Ihrem verbundenen Konto pausiert, daher ist Ihr Profil in der Suche verborgen, bis dies behoben ist. Füllen Sie die von Stripe angeforderten Angaben hier aus: {url}"
+      }
+    }
   }
 }

@@ -38,5 +38,21 @@
         }
       }
     }
+  },
+  "push": {
+    "notifications": {
+      "payoutsDisabled": {
+        "title": "Pagos pausados",
+        "body": "Tu perfil está oculto hasta que completes los datos de pago"
+      }
+    }
+  },
+  "email": {
+    "notifications": {
+      "payoutsDisabled": {
+        "subject": "Los pagos están pausados en tu cuenta",
+        "body": "Stripe ha pausado los pagos en tu cuenta conectada, por lo que tu perfil está oculto en la búsqueda hasta que se resuelva. Completa los datos que Stripe solicita aquí: {url}"
+      }
+    }
   }
 }

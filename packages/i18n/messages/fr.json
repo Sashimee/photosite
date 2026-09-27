@@ -38,5 +38,21 @@
         }
       }
     }
+  },
+  "push": {
+    "notifications": {
+      "payoutsDisabled": {
+        "title": "Versements en pause",
+        "body": "Votre profil est caché jusqu'à ce que les informations de paiement soient complètes"
+      }
+    }
+  },
+  "email": {
+    "notifications": {
+      "payoutsDisabled": {
+        "subject": "Les versements sont en pause sur votre compte",
+        "body": "Stripe a mis en pause les versements sur votre compte connecté. Votre profil est donc caché de la recherche jusqu'à ce que ce problème soit résolu. Complétez les informations demandées par Stripe ici : {url}"
+      }
+    }
   }
 }
