@@ -40,8 +40,9 @@ function formatExifCamera(
   }
   const label = [camera.make, camera.model]
     .filter((part): part is string => Boolean(part))
+    .map((part) => part.slice(0, 60))
     .join(' ');
-  return label.length > 0 ? label : null;
+  return label.trim().slice(0, 120) || null;
 }
 
 function parseExifCapturedAt(capturedAt: string | null | undefined): Date | null {

@@ -340,6 +340,29 @@ describe('createProvenanceCheckProcessor', () => {
     );
   });
 
+  it('caps an oversized EXIF make/model at 60 chars each and 120 chars overall', async () => {
+    const { deps, provenanceCheckCreate } = fakeDeps({
+      upload: {
+        ...BASE_UPLOAD,
+        exif: {
+          camera: { make: 'M'.repeat(80), model: 'D'.repeat(80) },
+          capturedAt: '2024-01-01T00:00:00.000Z',
+          gps: null,
+        },
+      },
+    });
+
+    await createProvenanceCheckProcessor(deps)(fakeJob(), undefined, undefined);
+
+    expect(provenanceCheckCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          exifCamera: `${'M'.repeat(60)} ${'D'.repeat(59)}`,
+        }) as unknown,
+      }),
+    );
+  });
+
   it('persists the full reverse-match objects, not just the domains used for scoring', async () => {
     const matches = [
       { url: 'https://stolen.example/photo.jpg', domain: 'stolen.example', similarity: 0.97 },
