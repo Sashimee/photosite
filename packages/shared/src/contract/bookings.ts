@@ -1,6 +1,7 @@
 import { BOOKING_STATUSES } from '../enums.js';
 import {
   CursorPaginationQuerySchema,
+  HttpUrlSchema,
   IdSchema,
   IsoDateTimeSchema,
   LatLngSchema,
@@ -35,7 +36,7 @@ export const DeliverySchema = z
     bookingId: IdSchema,
     message: z.string().max(2000),
     fileIds: z.array(IdSchema).nullable(),
-    externalLink: z.url().nullable(),
+    externalLink: HttpUrlSchema.nullable(),
     deliveredAt: IsoDateTimeSchema,
     acceptedAt: IsoDateTimeSchema.nullable(),
   })
@@ -55,7 +56,7 @@ export const CreateDeliveryRequestSchema = z
   .object({
     message: z.string().min(1).max(2000),
     fileIds: z.array(IdSchema).min(1).optional(),
-    externalLink: z.url().optional(),
+    externalLink: HttpUrlSchema.optional(),
   })
   .strict()
   .refine(exactlyOneDeliveryPayload, {

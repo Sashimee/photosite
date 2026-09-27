@@ -4,14 +4,19 @@ import { calculatePlatformFee } from '@photoo/shared';
 
 export const SUPPORTED_BOOKING_CURRENCY = 'EUR';
 
-export class PlatformFeeMismatchError extends Error {
+export class PlatformFeeMismatchError extends HttpException {
   constructor(
     readonly quoteId: string,
     readonly storedFeeCents: number,
     readonly recomputedFeeCents: number,
   ) {
     super(
-      `booking: quote ${quoteId} platform fee ${String(storedFeeCents)} does not match the recomputed ${String(recomputedFeeCents)}; the quote snapshot is corrupt and must be investigated before it can be booked`,
+      {
+        code: 'CONFLICT',
+        message:
+          'The platform fee stored on this quote does not match the current fee rules; the quote cannot be booked or paid until it is investigated',
+      },
+      409,
     );
   }
 }

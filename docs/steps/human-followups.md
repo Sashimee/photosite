@@ -2,7 +2,7 @@
 
 Work in `docs/PLAN.md` that needs Alex. The /loop run skips these and keeps building around them. Each entry says what is needed, what it unblocks and what happens meanwhile.
 
-Last updated: 2026-09-25.
+Last updated: 2026-09-27.
 
 ## Open decisions (`docs/DECISIONS.md`)
 
@@ -105,6 +105,10 @@ Last updated: 2026-09-25.
 | Once test-mode keys exist, a short live checklist has to be run | Connect Express onboarding with a test account; `stripe listen` webhook replay against a real signature; a 3-D Secure test card through the Payment Element; a partial refund; a transfer reversal | Confidence that the fake matched reality | The checklist is written down in the step plan so it is a scheduled verification, not an unknown |
 | Accountant: VAT on the platform fee for Luxembourg photographers (17 %), whether the platform issues the fee invoice itself, and DAC7 applicability plus the exact seller fields to collect | Answers from the accountant | Correct invoicing and the yearly DAC7 export (Phase 3) | The shared fee helper takes a VAT-on-fee flag driven by `Country.vatRate`, defaulting to off |
 | Stripe Radar rules, and whether 3-D Secure is forced on every payment | A decision once the account exists | Fraud posture at launch | Automatic payment methods decide, which is Stripe's default |
+| Privacy policy text for bookings (1A.8d, #471, #472, #475) | With the 0.7 lawyer: how long bookings, deliveries, delivered files and cancel reasons are kept, and that a cancel reason is shown to the other party | Accurate privacy policy before real bookings | Data is kept; retention and export gaps are tracked in #471/#472 |
+| `AuditLog.ip` retention and legal basis (1A.8d, #474) | With the 0.7 lawyer: a retention period for stored IPs and confirmation that legitimate interest (fraud and dispute evidence) is the basis | #474 retention rule | IPs are stored with no expiry |
+| Photographer agreement terms (1A.8d, #473) | With the 0.7 lawyer and accountant: DAC7 data collection and reporting, payouts withheld while that data is missing, and automatic release of funds after `autoReleaseDays` | #473 payout gate, launch | Release does not yet gate on DAC7 data |
+| Client terms (1A.8d) | With the 0.7 lawyer: funds are released automatically if the client neither accepts nor disputes a delivery within `autoReleaseDays`, and how to open a dispute | Launch | Auto-release runs as built; the dispute route arrives in 1A.8d-2 |
 
 ## Security follow-ups
 

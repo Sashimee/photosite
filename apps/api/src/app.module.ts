@@ -8,6 +8,7 @@ import { EnvModule } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { BookingsModule } from './modules/bookings/bookings.module.js';
 import { ChatModule } from './modules/chat/chat.module.js';
 import { CitiesModule } from './modules/cities/cities.module.js';
 import { CountriesModule } from './modules/countries/countries.module.js';
@@ -54,6 +55,7 @@ import { StorageModule } from './storage/storage.module.js';
     ProfessionalsModule,
     JobBoardModule,
     PaymentsModule,
+    BookingsModule,
     OpenapiModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],

@@ -38,21 +38,26 @@ describe('stripe event sweep age window integration', () => {
     await app.close();
   });
 
-  async function storeUnhandledEvent(id: string, receivedAt: Date): Promise<void> {
+  async function storeEvent(id: string, receivedAt: Date, type: string, account?: string) {
     eventIds.push(id);
     await prisma.stripeEvent.create({
       data: {
         id,
-        type: 'customer.created',
+        type,
         receivedAt,
         payload: {
           id,
-          type: 'customer.created',
+          type,
           livemode: false,
-          data: { object: { id: `cus_${id}`, object: 'customer' } },
+          ...(account === undefined ? {} : { account }),
+          data: { object: { id: `pi_${id}`, object: 'payment_intent' } },
         },
       },
     });
+  }
+
+  async function storeConnectedAccountEvent(id: string, receivedAt: Date): Promise<void> {
+    await storeEvent(id, receivedAt, 'payment_intent.payment_failed', 'acct_sweep');
   }
 
   async function processedAt(id: string): Promise<Date | null> {
@@ -64,8 +69,11 @@ describe('stripe event sweep age window integration', () => {
     const now = new Date();
     const atBoundary = `evt_sweep_min_${randomUUID()}`;
     const justOlder = `evt_sweep_min_older_${randomUUID()}`;
-    await storeUnhandledEvent(atBoundary, new Date(now.getTime() - STUCK_EVENT_MIN_AGE_MS));
-    await storeUnhandledEvent(justOlder, new Date(now.getTime() - STUCK_EVENT_MIN_AGE_MS - 1));
+    await storeConnectedAccountEvent(atBoundary, new Date(now.getTime() - STUCK_EVENT_MIN_AGE_MS));
+    await storeConnectedAccountEvent(
+      justOlder,
+      new Date(now.getTime() - STUCK_EVENT_MIN_AGE_MS - 1),
+    );
 
     await app.get(StripeEventSweepService).sweep(now);
 
@@ -77,12 +85,29 @@ describe('stripe event sweep age window integration', () => {
     const now = new Date();
     const atBoundary = `evt_sweep_max_${randomUUID()}`;
     const justYounger = `evt_sweep_max_younger_${randomUUID()}`;
-    await storeUnhandledEvent(atBoundary, new Date(now.getTime() - STUCK_EVENT_MAX_AGE_MS));
-    await storeUnhandledEvent(justYounger, new Date(now.getTime() - STUCK_EVENT_MAX_AGE_MS + 1));
+    await storeConnectedAccountEvent(atBoundary, new Date(now.getTime() - STUCK_EVENT_MAX_AGE_MS));
+    await storeConnectedAccountEvent(
+      justYounger,
+      new Date(now.getTime() - STUCK_EVENT_MAX_AGE_MS + 1),
+    );
 
     await app.get(StripeEventSweepService).sweep(now);
 
     expect(await processedAt(atBoundary)).toBeNull();
     expect(await processedAt(justYounger)).not.toBeNull();
+  });
+
+  it('never picks up an event type the webhook does not handle', async () => {
+    const now = new Date();
+    const unhandled = `evt_sweep_unhandled_${randomUUID()}`;
+    await storeEvent(
+      unhandled,
+      new Date(now.getTime() - STUCK_EVENT_MIN_AGE_MS - 1),
+      'customer.created',
+    );
+
+    await app.get(StripeEventSweepService).sweep(now);
+
+    expect(await processedAt(unhandled)).toBeNull();
   });
 });

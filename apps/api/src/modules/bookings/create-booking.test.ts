@@ -65,6 +65,16 @@ describe('assertQuoteFeeMatches', () => {
     }).toThrow(PlatformFeeMismatchError);
   });
 
+  it('surfaces a mismatch as a 409, not a 500', () => {
+    try {
+      assertQuoteFeeMatches(quote(25050, 1252));
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getStatus()).toBe(409);
+    }
+  });
+
   it('uses the fee percent stored on the quote, not the current default', () => {
     expect(() => {
       assertQuoteFeeMatches(quote(10000, 700, '7.00'));

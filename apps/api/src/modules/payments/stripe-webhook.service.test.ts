@@ -6,7 +6,13 @@ import type { PrismaService } from '../../prisma/prisma.service.js';
 import { TEST_ENV } from '../../testing/test-env.js';
 import type { StripeConnectService } from './stripe-connect.service.js';
 import { StripeWebhookService } from './stripe-webhook.service.js';
-import type { ConnectedAccount, GatewayEvent } from './stripe/stripe-gateway.js';
+import type {
+  ConnectedAccount,
+  CreateRefundInput,
+  GatewayEvent,
+  Refund,
+  StripeGateway,
+} from './stripe/stripe-gateway.js';
 
 interface BookingRow {
   id: string;
@@ -84,7 +90,10 @@ function setup(
       ),
     },
     auditLog: { create: vi.fn(() => Promise.resolve({})) },
-    ledgerEntry: { create: vi.fn(() => Promise.resolve({})) },
+    ledgerEntry: {
+      create: vi.fn(() => Promise.resolve({})),
+      createMany: vi.fn(() => Promise.resolve({ count: 1 })),
+    },
   };
   const transaction = vi.fn((fn: (client: typeof tx) => Promise<unknown>) => fn(tx));
   const findFirst = vi.fn(() =>
@@ -100,14 +109,20 @@ function setup(
     ),
     applyAccountUpdated: vi.fn(() => Promise.resolve(accountAfterCommit)),
   };
+  const gateway = {
+    createRefund: vi.fn((input: CreateRefundInput): Promise<Refund> =>
+      Promise.resolve({ id: 're_1', amountCents: input.amountCents ?? 25050, status: 'succeeded' }),
+    ),
+  };
   const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
   const service = new StripeWebhookService(
     prisma,
     connect as unknown as StripeConnectService,
+    gateway as unknown as StripeGateway,
     { ...TEST_ENV, ...options.env },
     logger as unknown as Logger,
   );
-  return { service, tx, transaction, findFirst, connect, accountAfterCommit, logger };
+  return { service, tx, transaction, findFirst, connect, gateway, accountAfterCommit, logger };
 }
 
 const FRESH_ACCOUNT: ConnectedAccount = {
@@ -246,10 +261,35 @@ describe('StripeWebhookService.receive', () => {
     );
   });
 
-  it('defers when the stored quote fee does not match the shared helper', async () => {
+  it('locks the booking row before reading it', async () => {
+    const { service, tx } = setup();
+
+    await service.receive(succeeded());
+
+    const lock = tx.$queryRaw.mock.calls[0] as unknown as [TemplateStringsArray, ...unknown[]];
+    expect(lock[0].join('?')).toContain('FOR UPDATE');
+    expect(lock.slice(1)).toEqual(['pi_1']);
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.booking.findUnique.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  it('pays against the stored fee snapshot without recomputing it from the fee percent', async () => {
+    const base = bookingRow();
+    const { service, tx } = setup({
+      booking: { ...base, quote: { ...base.quote, feePercent: new Prisma.Decimal('7.00') } },
+    });
+
+    await service.receive(succeeded());
+
+    expect(tx.booking.updateMany).toHaveBeenCalledOnce();
+    expect(tx.stripeEvent.update).toHaveBeenCalledOnce();
+  });
+
+  it.each([-1, 25051])('defers when the stored fee %i is outside 0..subtotal', async (fee) => {
     const base = bookingRow();
     const { service, tx, logger } = setup({
-      booking: { ...base, quote: { ...base.quote, platformFeeCents: 1252 } },
+      booking: { ...base, quote: { ...base.quote, platformFeeCents: fee } },
     });
 
     await service.receive(succeeded());
@@ -262,18 +302,127 @@ describe('StripeWebhookService.receive', () => {
     );
   });
 
-  it('treats an illegal transition as a logged no-op and still marks the event processed', async () => {
-    const { service, tx, logger } = setup({ booking: bookingRow({ status: 'cancelled' }) });
+  it('records, audits and fully refunds a payment that lands on a cancelled booking', async () => {
+    const { service, tx, transaction, gateway } = setup({
+      booking: bookingRow({ status: 'cancelled' }),
+    });
 
     await service.receive(succeeded());
 
     expect(tx.booking.updateMany).not.toHaveBeenCalled();
-    expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
-    expect(tx.stripeEvent.update).toHaveBeenCalledOnce();
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.objectContaining({ bookingId: 'booking-1', status: 'cancelled', chargeId: 'ch_1' }),
-      expect.stringContaining('manual refund'),
+    expect(tx.ledgerEntry.createMany).toHaveBeenNthCalledWith(1, {
+      data: [
+        {
+          bookingId: 'booking-1',
+          type: 'charge',
+          amountCents: 25050,
+          currency: 'EUR',
+          stripeObjectId: 'ch_1',
+        },
+      ],
+      skipDuplicates: true,
+    });
+    expect(tx.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        actorType: 'system',
+        actorId: null,
+        action: 'booking.paid_after_terminal',
+        targetType: 'Booking',
+        targetId: 'booking-1',
+        before: { status: 'cancelled' },
+        after: {
+          status: 'cancelled',
+          paymentIntentId: 'pi_1',
+          chargeId: 'ch_1',
+          stripeEventId: 'evt_1',
+        },
+        ip: null,
+      },
+    });
+    expect(gateway.createRefund).toHaveBeenCalledWith({
+      paymentIntentId: 'pi_1',
+      metadata: { bookingId: 'booking-1', reason: 'late_payment' },
+      idempotencyKey: 'refund_booking-1_late',
+    });
+    expect(gateway.createRefund.mock.invocationCallOrder[0]).toBeGreaterThan(
+      tx.auditLog.create.mock.invocationCallOrder[0] ?? Infinity,
     );
+    expect(transaction).toHaveBeenCalledTimes(2);
+    expect(tx.ledgerEntry.createMany).toHaveBeenNthCalledWith(2, {
+      data: [
+        {
+          bookingId: 'booking-1',
+          type: 'refund',
+          amountCents: -25050,
+          currency: 'EUR',
+          stripeObjectId: 're_1',
+        },
+      ],
+      skipDuplicates: true,
+    });
+    expect(tx.auditLog.create).toHaveBeenLastCalledWith({
+      data: {
+        actorType: 'system',
+        actorId: null,
+        action: 'booking.late_payment_refunded',
+        targetType: 'Booking',
+        targetId: 'booking-1',
+        before: { status: 'cancelled' },
+        after: { status: 'cancelled', refundId: 're_1', amountCents: 25050 },
+        ip: null,
+      },
+    });
+    expect(tx.auditLog.create).toHaveBeenCalledTimes(2);
+    expect(tx.stripeEvent.update).toHaveBeenCalledOnce();
+    expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
+  });
+
+  it('leaves a late payment unprocessed for the sweep when the refund call fails', async () => {
+    const { service, tx, gateway } = setup({ booking: bookingRow({ status: 'cancelled' }) });
+    gateway.createRefund.mockRejectedValueOnce(new Error('stripe unavailable'));
+
+    await expect(service.receive(succeeded())).rejects.toThrow('stripe unavailable');
+
+    expect(tx.ledgerEntry.createMany).toHaveBeenCalledOnce();
+    expect(tx.stripeEvent.update).not.toHaveBeenCalled();
+  });
+
+  it('does not audit a replayed late payment twice but still settles the refund', async () => {
+    const { service, tx, gateway } = setup({ booking: bookingRow({ status: 'cancelled' }) });
+    tx.ledgerEntry.createMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 0 });
+
+    await service.receive(succeeded());
+
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+    expect(gateway.createRefund).toHaveBeenCalledOnce();
+    expect(tx.stripeEvent.update).toHaveBeenCalledOnce();
+  });
+
+  it('audits the refund of a late payment whose charge was recorded by an earlier attempt', async () => {
+    const { service, tx } = setup({ booking: bookingRow({ status: 'cancelled' }) });
+    tx.ledgerEntry.createMany.mockResolvedValueOnce({ count: 0 });
+
+    await service.receive(succeeded());
+
+    expect(tx.auditLog.create).toHaveBeenCalledOnce();
+    expect(tx.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: 'booking.late_payment_refunded',
+        after: { status: 'cancelled', refundId: 're_1', amountCents: 25050 },
+      }) as unknown,
+    });
+  });
+
+  it('refunds a second charge on a booking already paid by another charge', async () => {
+    const { service, gateway } = setup({
+      booking: bookingRow({ status: 'paid_held', chargeId: 'ch_0' }),
+    });
+
+    await service.receive(succeeded());
+
+    expect(gateway.createRefund).toHaveBeenCalledOnce();
   });
 
   it('warns only when a second event reports the charge the booking already holds', async () => {
@@ -284,6 +433,7 @@ describe('StripeWebhookService.receive', () => {
     await service.receive(succeeded({}, 'evt_2'));
 
     expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
+    expect(tx.ledgerEntry.createMany).not.toHaveBeenCalled();
     expect(logger.error).not.toHaveBeenCalled();
     expect(logger.warn).toHaveBeenCalledOnce();
   });
@@ -381,7 +531,7 @@ describe('StripeWebhookService.receive', () => {
     );
   });
 
-  it('records and acks an event type it does not handle', async () => {
+  it('records an event type it does not handle but leaves it replayable', async () => {
     const { service, tx } = setup();
 
     await service.receive({
@@ -392,7 +542,7 @@ describe('StripeWebhookService.receive', () => {
     });
 
     expect(tx.stripeEvent.createMany).toHaveBeenCalledOnce();
-    expect(tx.stripeEvent.update).toHaveBeenCalledOnce();
+    expect(tx.stripeEvent.update).not.toHaveBeenCalled();
     expect(tx.booking.findUnique).not.toHaveBeenCalled();
   });
 });
@@ -427,6 +577,32 @@ describe('StripeWebhookService.reprocess', () => {
     const pending = setup({ booking: null, pendingPayload: succeeded() });
     pending.tx.$queryRaw.mockResolvedValueOnce([{ payload: succeeded(), processedAt: null }]);
     await expect(pending.service.reprocess('evt_1')).resolves.toBe('deferred');
+  });
+
+  it('reports a stored late payment as processed once its refund is recorded', async () => {
+    const { service, tx, gateway } = setup({
+      booking: bookingRow({ status: 'cancelled' }),
+      pendingPayload: succeeded(),
+    });
+    tx.$queryRaw.mockResolvedValueOnce([{ payload: succeeded(), processedAt: null }]);
+
+    await expect(service.reprocess('evt_1')).resolves.toBe('processed');
+    expect(gateway.createRefund).toHaveBeenCalledOnce();
+    expect(tx.stripeEvent.update).toHaveBeenCalledOnce();
+  });
+
+  it('skips a stored event of a type it does not handle', async () => {
+    const unhandled: GatewayEvent = {
+      id: 'evt_u',
+      type: 'customer.created',
+      livemode: false,
+      data: { object: { id: 'cus_1' } },
+    };
+    const { service, tx } = setup({ pendingPayload: unhandled });
+    tx.$queryRaw.mockResolvedValueOnce([{ payload: unhandled, processedAt: null }]);
+
+    await expect(service.reprocess('evt_u')).resolves.toBe('skipped');
+    expect(tx.stripeEvent.update).not.toHaveBeenCalled();
   });
 
   it('re-reads the account from Stripe before reapplying a stored account.updated', async () => {

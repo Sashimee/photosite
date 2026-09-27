@@ -4,6 +4,8 @@ import { OriginGuard } from '../auth/origin-guard.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { BookingPaymentsController } from './booking-payments.controller.js';
 import { BookingPaymentsService } from './booking-payments.service.js';
+import { BookingReleaseQueueService } from './booking-release-queue.service.js';
+import { BookingReleaseService } from './booking-release.service.js';
 import { MyStripeController } from './my-stripe.controller.js';
 import { PaymentsRateLimitService } from './payments-rate-limit.service.js';
 import { StripeConnectService } from './stripe-connect.service.js';
@@ -18,12 +20,14 @@ import { stripeGatewayProvider } from './stripe/stripe-gateway.provider.js';
   providers: [
     StripeConnectService,
     BookingPaymentsService,
+    BookingReleaseService,
+    BookingReleaseQueueService,
     StripeWebhookService,
     StripeEventSweepService,
     PaymentsRateLimitService,
     stripeGatewayProvider,
     OriginGuard,
   ],
-  exports: [StripeConnectService],
+  exports: [StripeConnectService, BookingReleaseService],
 })
 export class PaymentsModule {}

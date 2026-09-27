@@ -105,6 +105,7 @@ export interface StripeGateway {
   createPaymentIntent(input: CreatePaymentIntentInput): Promise<PaymentIntent>;
   retrievePaymentIntent(paymentIntentId: string): Promise<PaymentIntent>;
   createTransfer(input: CreateTransferInput): Promise<Transfer>;
+  findTransfer(transferGroup: string, bookingId: string): Promise<Transfer | null>;
   createRefund(input: CreateRefundInput): Promise<Refund>;
   reverseTransfer(input: ReverseTransferInput): Promise<TransferReversal>;
   retrieveEvent(eventId: string): Promise<GatewayEvent>;

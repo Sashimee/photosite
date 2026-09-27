@@ -8,8 +8,18 @@ export interface PlatformSettings {
 
 const DEFAULT_AUTO_RELEASE_DAYS = 7;
 
+// Quote.feePercent is Decimal(5,2); a third decimal would be rounded away in
+// the snapshot and no longer reproduce the stored fee.
+function hasAtMostTwoDecimals(value: number): boolean {
+  return Math.abs(value * 100 - Math.round(value * 100)) < 1e-6;
+}
+
 function parseFeePercent(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100
+  return typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= 100 &&
+    hasAtMostTwoDecimals(value)
     ? value
     : null;
 }

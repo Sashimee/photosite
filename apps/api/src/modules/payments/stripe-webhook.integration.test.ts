@@ -372,8 +372,8 @@ describe('stripe webhook integration', () => {
       expect(booking.status).toBe('pending_payment');
     });
 
-    it('records a payment for a booking that cannot become paid_held without changing it', async () => {
-      const { bookingId, paymentIntentId } = await paymentIntentFor('cancelled');
+    it('records, audits and refunds a late payment on a cancelled booking, once', async () => {
+      const { bookingId, paymentIntentId, quote } = await paymentIntentFor('cancelled');
       await prisma.booking.update({ where: { id: bookingId }, data: { status: 'cancelled' } });
       const event = paymentIntentEvent('payment_intent.succeeded', paymentIntentId);
 
@@ -383,11 +383,37 @@ describe('stripe webhook integration', () => {
       const booking = await prisma.booking.findUniqueOrThrow({ where: { id: bookingId } });
       expect(booking.status).toBe('cancelled');
       expect(booking.chargeId).toBeNull();
-      expect(await prisma.ledgerEntry.count({ where: { bookingId } })).toBe(0);
+      const ledger = await prisma.ledgerEntry.findMany({
+        where: { bookingId },
+        orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
+      });
+      expect(ledger.map((entry) => [entry.type, entry.amountCents])).toEqual([
+        ['charge', quote.total.amountCents],
+        ['refund', -quote.total.amountCents],
+      ]);
+      expect(ledger.reduce((sum, entry) => sum + entry.amountCents, 0)).toBe(0);
+      const auditWhere = {
+        targetType: 'Booking',
+        targetId: bookingId,
+        action: 'booking.paid_after_terminal',
+      };
+      expect(await prisma.auditLog.count({ where: auditWhere })).toBe(1);
+      const refundAuditWhere = { ...auditWhere, action: 'booking.late_payment_refunded' };
+      const refundAudit = await prisma.auditLog.findFirstOrThrow({ where: refundAuditWhere });
+      expect(refundAudit.after).toEqual({
+        status: 'cancelled',
+        refundId: ledger[1]?.stripeObjectId,
+        amountCents: quote.total.amountCents,
+      });
       expect((await storedEvent(event.id))?.processedAt).not.toBeNull();
+
+      await sendEvent(event);
+      expect(await prisma.ledgerEntry.count({ where: { bookingId } })).toBe(2);
+      expect(await prisma.auditLog.count({ where: auditWhere })).toBe(1);
+      expect(await prisma.auditLog.count({ where: refundAuditWhere })).toBe(1);
     });
 
-    it('leaves the booking pending and the event unprocessed when the quote fee is off', async () => {
+    it('pays against the stored fee snapshot even when it differs from the current rate', async () => {
       const { bookingId, paymentIntentId, quote } = await paymentIntentFor('fee');
       await prisma.quote.update({ where: { id: quote.id }, data: { platformFeeCents: 1252 } });
       const event = paymentIntentEvent('payment_intent.succeeded', paymentIntentId);
@@ -396,11 +422,8 @@ describe('stripe webhook integration', () => {
 
       expect(response.statusCode).toBe(200);
       const booking = await prisma.booking.findUniqueOrThrow({ where: { id: bookingId } });
-      expect(booking.status).toBe('pending_payment');
-      expect(await prisma.ledgerEntry.count({ where: { bookingId } })).toBe(0);
-      const stored = await storedEvent(event.id);
-      expect(stored).not.toBeNull();
-      expect(stored?.processedAt).toBeNull();
+      expect(booking.status).toBe('paid_held');
+      expect((await storedEvent(event.id))?.processedAt).not.toBeNull();
     });
 
     it('leaves the booking pending when the paid amount differs from the quote', async () => {
@@ -463,7 +486,7 @@ describe('stripe webhook integration', () => {
       expect((await storedEvent(event.id))?.processedAt).not.toBeNull();
     });
 
-    it('records and acks an event type it does not handle', async () => {
+    it('records and acks an event type it does not handle, leaving it replayable', async () => {
       const event = {
         id: `evt_it_${randomUUID()}`,
         object: 'event',
@@ -477,7 +500,7 @@ describe('stripe webhook integration', () => {
       expect(response.statusCode).toBe(200);
       const stored = await storedEvent(event.id);
       expect(stored?.type).toBe('customer.created');
-      expect(stored?.processedAt).not.toBeNull();
+      expect(stored?.processedAt).toBeNull();
     });
   });
 });

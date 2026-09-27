@@ -44,6 +44,7 @@ function stripeMock() {
         destination: { id: 'acct_1' },
       }),
       createReversal: vi.fn().mockResolvedValue({ id: 'trr_1', transfer: 'tr_1', amount: 500 }),
+      list: vi.fn().mockResolvedValue({ data: [], has_more: false }),
     },
     refunds: {
       create: vi.fn().mockResolvedValue({ id: 're_1', amount: 10_500, status: 'succeeded' }),
@@ -193,6 +194,64 @@ describe('LiveStripeGateway', () => {
     expect(stripe.transfers.create).toHaveBeenCalledWith(
       expect.objectContaining({ destination: 'acct_1', source_transaction: 'ch_1' }),
       { idempotencyKey: 'booking_1_transfer' },
+    );
+  });
+
+  it('finds the transfer of a booking in its transfer group', async () => {
+    const { stripe, gateway } = build();
+    stripe.transfers.list.mockResolvedValueOnce({
+      data: [
+        { id: 'tr_other', amount: 1, currency: 'eur', destination: 'acct_1', metadata: {} },
+        {
+          id: 'tr_1',
+          amount: 10_000,
+          currency: 'eur',
+          destination: 'acct_1',
+          metadata: { bookingId: 'b1' },
+        },
+      ],
+      has_more: false,
+    });
+
+    await expect(gateway.findTransfer('booking_b1', 'b1')).resolves.toEqual({
+      id: 'tr_1',
+      amountCents: 10_000,
+      currency: 'EUR',
+      destinationAccountId: 'acct_1',
+    });
+    expect(stripe.transfers.list).toHaveBeenCalledWith({ transfer_group: 'booking_b1', limit: 10 });
+  });
+
+  it('returns null when the transfer group holds no transfer for the booking', async () => {
+    const { gateway } = build();
+    await expect(gateway.findTransfer('booking_b1', 'b1')).resolves.toBeNull();
+  });
+
+  it('refuses to pick between several transfers of one booking', async () => {
+    const { stripe, gateway } = build();
+    const transfer = {
+      amount: 1,
+      currency: 'eur',
+      destination: 'acct_1',
+      metadata: { bookingId: 'b1' },
+    };
+    stripe.transfers.list.mockResolvedValueOnce({
+      data: [
+        { id: 'tr_1', ...transfer },
+        { id: 'tr_2', ...transfer },
+      ],
+      has_more: false,
+    });
+    await expect(gateway.findTransfer('booking_b1', 'b1')).rejects.toThrow(
+      /2 transfers for booking b1/,
+    );
+  });
+
+  it('refuses a transfer group with more transfers than one page', async () => {
+    const { stripe, gateway } = build();
+    stripe.transfers.list.mockResolvedValueOnce({ data: [], has_more: true });
+    await expect(gateway.findTransfer('booking_b1', 'b1')).rejects.toThrow(
+      /more than 10 transfers/,
     );
   });
 

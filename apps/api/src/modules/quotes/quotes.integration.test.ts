@@ -1266,7 +1266,7 @@ describe('quotes integration', () => {
       expect(await prisma.booking.count({ where: { quoteId: quote.id } })).toBe(0);
     });
 
-    it('fails loudly on a stored platform fee that does not match the recomputed one', async () => {
+    it('refuses a stored platform fee that does not match the recomputed one with a 409', async () => {
       const client = await signUpAndSignIn(['client']);
       const request = await createRequestAs(client.token);
       const photographer = await createPublishedPhotographer('booking-fee-mismatch');
@@ -1277,7 +1277,7 @@ describe('quotes integration', () => {
       });
 
       const response = await accept(client.token, quote.id);
-      expect(response.statusCode).toBe(500);
+      expect(response.statusCode).toBe(409);
 
       const after = await prisma.quote.findUniqueOrThrow({ where: { id: quote.id } });
       expect(after.status).toBe('sent');

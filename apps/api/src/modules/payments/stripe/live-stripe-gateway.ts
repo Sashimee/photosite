@@ -17,6 +17,8 @@ import type {
   TransferReversal,
 } from './stripe-gateway.js';
 
+const TRANSFER_LOOKUP_LIMIT = 10;
+
 function toConnectedAccount(account: Stripe.Account): ConnectedAccount {
   return {
     id: account.id,
@@ -46,6 +48,15 @@ function toGatewayEvent(event: Stripe.Event): GatewayEvent {
     ...(event.account ? { account: event.account } : {}),
     livemode: event.livemode,
     data: { object: event.data.object as unknown as Record<string, unknown> },
+  };
+}
+
+function toTransfer(transfer: Stripe.Transfer): Transfer {
+  return {
+    id: transfer.id,
+    amountCents: transfer.amount,
+    currency: transfer.currency.toUpperCase(),
+    destinationAccountId: idOf(transfer.destination),
   };
 }
 
@@ -127,12 +138,27 @@ export class LiveStripeGateway implements StripeGateway {
       { idempotencyKey: input.idempotencyKey },
     );
     this.logger.log({ transferId: transfer.id }, 'stripe: transfer created');
-    return {
-      id: transfer.id,
-      amountCents: transfer.amount,
-      currency: transfer.currency.toUpperCase(),
-      destinationAccountId: idOf(transfer.destination),
-    };
+    return toTransfer(transfer);
+  }
+
+  async findTransfer(transferGroup: string, bookingId: string): Promise<Transfer | null> {
+    const page = await this.stripe.transfers.list({
+      transfer_group: transferGroup,
+      limit: TRANSFER_LOOKUP_LIMIT,
+    });
+    if (page.has_more) {
+      throw new Error(
+        `stripe gateway: more than ${String(TRANSFER_LOOKUP_LIMIT)} transfers in group ${transferGroup}; reconcile it by hand`,
+      );
+    }
+    const matches = page.data.filter((transfer) => transfer.metadata.bookingId === bookingId);
+    if (matches.length > 1) {
+      throw new Error(
+        `stripe gateway: ${String(matches.length)} transfers for booking ${bookingId} in group ${transferGroup}; reconcile them by hand`,
+      );
+    }
+    const [match] = matches;
+    return match ? toTransfer(match) : null;
   }
 
   async createRefund(input: CreateRefundInput): Promise<Refund> {

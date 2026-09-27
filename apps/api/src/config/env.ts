@@ -140,6 +140,7 @@ const EnvSchema = z
     STRIPE_CONNECT_REFRESH_URL: OptionalUrlSchema,
     STRIPE_CONNECT_RETURN_URL: OptionalUrlSchema,
     STRIPE_EVENT_SWEEP_INTERVAL_MS: z.coerce.number().int().min(0).default(300_000),
+    BOOKING_RELEASE_INTERVAL_MS: z.coerce.number().int().min(0).default(900_000),
   })
   .superRefine((value, ctx) => {
     if (value.STRIPE_FAKE && value.STRIPE_SECRET_KEY !== undefined) {

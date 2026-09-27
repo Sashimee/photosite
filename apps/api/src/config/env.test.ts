@@ -342,6 +342,16 @@ describe('loadEnv', () => {
     );
   });
 
+  it('defaults the booking release job to every 15 minutes and allows 0 to disable it', () => {
+    expect(loadEnv(validEnv).BOOKING_RELEASE_INTERVAL_MS).toBe(900_000);
+    expect(
+      loadEnv({ ...validEnv, BOOKING_RELEASE_INTERVAL_MS: '0' }).BOOKING_RELEASE_INTERVAL_MS,
+    ).toBe(0);
+    expect(() => loadEnv({ ...validEnv, BOOKING_RELEASE_INTERVAL_MS: '-1' })).toThrow(
+      /BOOKING_RELEASE_INTERVAL_MS/,
+    );
+  });
+
   it('accepts STRIPE_FAKE=true outside production', () => {
     expect(loadEnv({ ...validEnv, STRIPE_FAKE: 'true' }).STRIPE_FAKE).toBe(true);
   });

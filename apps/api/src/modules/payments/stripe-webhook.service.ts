@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { IllegalBookingTransitionError, transitionBooking } from '../bookings/booking-state.js';
-import { assertQuoteFeeMatches, PlatformFeeMismatchError } from '../bookings/create-booking.js';
 import { type AfterCommit, StripeConnectService } from './stripe-connect.service.js';
 import {
   type ConnectedAccount,
@@ -13,6 +12,8 @@ import {
   isLiveSecretKey,
   parseConnectedAccount,
   parseGatewayEvent,
+  STRIPE_GATEWAY,
+  type StripeGateway,
 } from './stripe/stripe-gateway.js';
 
 const NOTHING_AFTER_COMMIT: AfterCommit = () => Promise.resolve();
@@ -20,11 +21,20 @@ const NOTHING_AFTER_COMMIT: AfterCommit = () => Promise.resolve();
 interface Outcome {
   // `deferred` leaves StripeEvent.processedAt null so the stuck-event sweep
   // retries it, e.g. when the event reached us before the booking it refers to.
-  status: 'processed' | 'deferred';
+  // `settling` also leaves it null; its afterCommit makes a Stripe call and
+  // marks the event processed only once that call's result is recorded.
+  // `ignored` leaves it null too, so a type handled later can still be replayed.
+  status: 'processed' | 'deferred' | 'settling' | 'ignored';
   afterCommit: AfterCommit;
 }
 
-export type ReprocessResult = Outcome['status'] | 'skipped';
+export const HANDLED_EVENT_TYPES = [
+  'payment_intent.succeeded',
+  'payment_intent.payment_failed',
+  'account.updated',
+] as const;
+
+export type ReprocessResult = 'processed' | 'deferred' | 'skipped';
 
 // State read from Stripe before the transaction opens, so no network call
 // holds a database transaction. `account` is null when the event is not an
@@ -37,6 +47,7 @@ const NOTHING_PREFETCHED: Prefetched = { account: null };
 
 const PROCESSED: Outcome = { status: 'processed', afterCommit: NOTHING_AFTER_COMMIT };
 const DEFERRED: Outcome = { status: 'deferred', afterCommit: NOTHING_AFTER_COMMIT };
+const IGNORED: Outcome = { status: 'ignored', afterCommit: NOTHING_AFTER_COMMIT };
 
 const PaymentIntentObjectSchema = z.object({
   id: z.string().startsWith('pi_'),
@@ -71,6 +82,7 @@ export class StripeWebhookService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(StripeConnectService) private readonly connect: StripeConnectService,
+    @Inject(STRIPE_GATEWAY) private readonly gateway: StripeGateway,
     @Inject(APP_CONFIG) env: Env,
     @Inject(Logger) private readonly logger: Logger,
   ) {
@@ -128,11 +140,11 @@ export class StripeWebhookService {
       }
       return this.processLocked(tx, parseGatewayEvent(stored.payload), prefetched);
     });
-    if (!outcome) {
+    if (!outcome || outcome.status === 'ignored') {
       return 'skipped';
     }
     await outcome.afterCommit();
-    return outcome.status;
+    return outcome.status === 'settling' ? 'processed' : outcome.status;
   }
 
   private async prefetch(event: GatewayEvent): Promise<Prefetched> {
@@ -168,7 +180,9 @@ export class StripeWebhookService {
       );
       return DEFERRED;
     }
-    await tx.stripeEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } });
+    if (outcome.status === 'processed') {
+      await tx.stripeEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } });
+    }
     return outcome;
   }
 
@@ -195,7 +209,7 @@ export class StripeWebhookService {
           { stripeEventId: event.id, type: event.type },
           'stripe webhook: event type not handled, recorded only',
         );
-        return PROCESSED;
+        return IGNORED;
     }
   }
 
@@ -219,6 +233,7 @@ export class StripeWebhookService {
       return PROCESSED;
     }
     const ids = { stripeEventId: event.id, paymentIntentId: intent.id };
+    await tx.$queryRaw`SELECT id FROM "Booking" WHERE "paymentIntentId" = ${intent.id} FOR UPDATE`;
     const booking = await tx.booking.findUnique({
       where: { paymentIntentId: intent.id },
       include: { quote: true },
@@ -237,17 +252,15 @@ export class StripeWebhookService {
       );
       return DEFERRED;
     }
-    try {
-      assertQuoteFeeMatches(quote);
-    } catch (error) {
-      if (error instanceof PlatformFeeMismatchError) {
-        this.logger.error(
-          { ...logIds, quoteId: quote.id },
-          'stripe webhook: quote platform fee does not match the shared helper; investigate before the booking can proceed',
-        );
-        return DEFERRED;
-      }
-      throw error;
+    // The fee was checked against the shared helper when the booking and the
+    // payment intent were created; the snapshot is what gets charged and
+    // transferred, so only its internal consistency matters here.
+    if (quote.platformFeeCents < 0 || quote.platformFeeCents > quote.subtotalCents) {
+      this.logger.error(
+        { ...logIds, quoteId: quote.id },
+        'stripe webhook: quote platform fee is outside 0..subtotal; investigate before the booking can proceed',
+      );
+      return DEFERRED;
     }
     const chargeId = intent.latest_charge;
     if (!chargeId) {
@@ -266,16 +279,21 @@ export class StripeWebhookService {
       });
     } catch (error) {
       if (error instanceof IllegalBookingTransitionError) {
-        const log = { ...logIds, chargeId, status: booking.status };
-        if (booking.status === 'paid_held' && booking.chargeId === chargeId) {
-          this.logger.warn(log, 'stripe webhook: booking already paid for this charge');
-        } else {
-          this.logger.error(
-            log,
-            'stripe webhook: payment succeeded for a booking that cannot become paid_held; it needs a manual refund decision',
+        if (booking.chargeId === chargeId) {
+          this.logger.warn(
+            { ...logIds, chargeId, status: booking.status },
+            'stripe webhook: booking already paid for this charge',
           );
+          return PROCESSED;
         }
-        return PROCESSED;
+        return this.refundLatePayment(tx, event, {
+          bookingId: booking.id,
+          status: booking.status,
+          paymentIntentId: intent.id,
+          chargeId,
+          totalCents: quote.totalCents,
+          currency: quote.currency,
+        });
       }
       throw error;
     }
@@ -294,6 +312,111 @@ export class StripeWebhookService {
       afterCommit: () => {
         this.logger.log({ ...logIds, chargeId }, 'stripe webhook: booking paid and held');
         return Promise.resolve();
+      },
+    };
+  }
+
+  // A payment that lands after the booking was cancelled (or on a booking
+  // already paid by another charge) is kept on the platform account and
+  // refunded in full; the refund never touches a connected account.
+  private async refundLatePayment(
+    tx: Prisma.TransactionClient,
+    event: GatewayEvent,
+    late: {
+      bookingId: string;
+      status: string;
+      paymentIntentId: string;
+      chargeId: string;
+      totalCents: number;
+      currency: string;
+    },
+  ): Promise<Outcome> {
+    const ids = {
+      stripeEventId: event.id,
+      bookingId: late.bookingId,
+      paymentIntentId: late.paymentIntentId,
+      chargeId: late.chargeId,
+    };
+    const charge = await tx.ledgerEntry.createMany({
+      data: [
+        {
+          bookingId: late.bookingId,
+          type: 'charge',
+          amountCents: late.totalCents,
+          currency: late.currency,
+          stripeObjectId: late.chargeId,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    if (charge.count > 0) {
+      await tx.auditLog.create({
+        data: {
+          actorType: 'system',
+          actorId: null,
+          action: 'booking.paid_after_terminal',
+          targetType: 'Booking',
+          targetId: late.bookingId,
+          before: { status: late.status },
+          after: {
+            status: late.status,
+            paymentIntentId: late.paymentIntentId,
+            chargeId: late.chargeId,
+            stripeEventId: event.id,
+          },
+          ip: null,
+        },
+      });
+    }
+    this.logger.error(
+      { ...ids, status: late.status },
+      'stripe webhook: payment succeeded for a booking that cannot become paid_held; refunding it in full',
+    );
+    return {
+      status: 'settling',
+      afterCommit: async () => {
+        const refund = await this.gateway.createRefund({
+          paymentIntentId: late.paymentIntentId,
+          metadata: { bookingId: late.bookingId, reason: 'late_payment' },
+          idempotencyKey: `refund_${late.bookingId}_late`,
+        });
+        await this.prisma.client.$transaction(async (settle) => {
+          const recorded = await settle.ledgerEntry.createMany({
+            data: [
+              {
+                bookingId: late.bookingId,
+                type: 'refund',
+                amountCents: -refund.amountCents,
+                currency: late.currency,
+                stripeObjectId: refund.id,
+              },
+            ],
+            skipDuplicates: true,
+          });
+          if (recorded.count > 0) {
+            await settle.auditLog.create({
+              data: {
+                actorType: 'system',
+                actorId: null,
+                action: 'booking.late_payment_refunded',
+                targetType: 'Booking',
+                targetId: late.bookingId,
+                before: { status: late.status },
+                after: {
+                  status: late.status,
+                  refundId: refund.id,
+                  amountCents: refund.amountCents,
+                },
+                ip: null,
+              },
+            });
+          }
+          await settle.stripeEvent.update({
+            where: { id: event.id },
+            data: { processedAt: new Date() },
+          });
+        });
+        this.logger.log({ ...ids, refundId: refund.id }, 'stripe webhook: late payment refunded');
       },
     };
   }

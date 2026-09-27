@@ -79,6 +79,7 @@ export {
 
 export {
   calculatePlatformFee,
+  payoutAmount,
   quoteTotals,
   type LineItem,
   type PlatformFeeOptions,
@@ -129,6 +130,8 @@ export { buildOpenApiDocument, OPENAPI_INFO_VERSION } from './contract/generate.
 export { HealthResponseSchema, ReadyResponseSchema } from './contract/health.js';
 
 export {
+  BOOKING_RELEASE_QUEUE_NAME,
+  BookingReleaseJobSchema,
   EMAIL_QUEUE_NAME,
   EmailJobSchema,
   FILE_SCAN_QUEUE_NAME,
@@ -163,6 +166,7 @@ export {
   QuoteExpiryJobSchema,
   UPLOADS_CLEANUP_QUEUE_NAME,
   UploadsCleanupJobSchema,
+  type BookingReleaseJob,
   type EmailJob,
   type FileScanJob,
   type GdprExportJob,

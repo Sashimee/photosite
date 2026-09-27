@@ -6,6 +6,8 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { assertQuoteFeeMatches, assertSupportedCurrency } from '../bookings/create-booking.js';
 import { STRIPE_GATEWAY, type PaymentIntent, type StripeGateway } from './stripe/stripe-gateway.js';
 
+const PAYMENT_INTENT_TRANSACTION_TIMEOUT_MS = 15_000;
+
 type PaymentIntentDto = z.infer<typeof PaymentIntentResponseSchema>;
 
 interface SessionUser {
@@ -33,79 +35,60 @@ export class BookingPaymentsService {
   ) {}
 
   async createPaymentIntent(user: SessionUser, bookingId: string): Promise<PaymentIntentDto> {
-    const booking = await this.prisma.client.booking.findUnique({
-      where: { id: bookingId },
-      include: { quote: true },
-    });
-    if (booking?.clientId !== user.id) {
-      throw bookingNotFound();
-    }
-    if (booking.status !== 'pending_payment') {
-      throw new HttpException(
-        {
-          code: 'CONFLICT',
-          message: `Booking is ${booking.status}, only a booking awaiting payment can be paid`,
-        },
-        409,
-      );
-    }
+    // The row lock makes a concurrent cancel or second pay call wait for the stored
+    // paymentIntentId; the timeout covers the idempotent Stripe call made under it.
+    const locked = await this.prisma.client.$transaction(
+      async (tx) => {
+        const [locked] = await tx.$queryRaw<{ id: string }[]>`
+          SELECT id FROM "Booking" WHERE id = ${bookingId} AND "clientId" = ${user.id} FOR UPDATE`;
+        if (!locked) {
+          throw bookingNotFound();
+        }
+        const booking = await tx.booking.findUniqueOrThrow({
+          where: { id: locked.id },
+          include: { quote: true },
+        });
+        if (booking.status !== 'pending_payment') {
+          throw new HttpException(
+            {
+              code: 'CONFLICT',
+              message: `Booking is ${booking.status}, only a booking awaiting payment can be paid`,
+            },
+            409,
+          );
+        }
 
-    const { quote } = booking;
-    assertSupportedCurrency(quote.currency);
-    assertQuoteFeeMatches(quote);
-    const amount = { amountCents: quote.totalCents, currency: quote.currency };
-
-    const intent =
-      booking.paymentIntentId === null
-        ? await this.createAndStore(booking.id, amount)
-        : await this.gateway.retrievePaymentIntent(booking.paymentIntentId);
-
-    this.assertIntentMatches(booking.id, intent, amount);
-    return { clientSecret: intent.clientSecret, amount };
-  }
-
-  private async createAndStore(
-    bookingId: string,
-    amount: { amountCents: number; currency: string },
-  ): Promise<PaymentIntent> {
-    const created = await this.gateway.createPaymentIntent({
-      amountCents: amount.amountCents,
-      currency: amount.currency,
-      transferGroup: transferGroupFor(bookingId),
-      metadata: { bookingId },
-      idempotencyKey: paymentIntentIdempotencyKey(bookingId),
-    });
-
-    const stored = await this.prisma.client.booking.updateMany({
-      where: { id: bookingId, paymentIntentId: null },
-      data: { paymentIntentId: created.id },
-    });
-    if (stored.count === 1) {
-      this.logger.log(
-        { bookingId, paymentIntentId: created.id },
-        'payments: payment intent stored on booking',
-      );
-      return created;
-    }
-
-    // A concurrent call stored its intent first (possible once the 24h Stripe
-    // idempotency window has passed); the stored one is the one to confirm.
-    const current = await this.prisma.client.booking.findUniqueOrThrow({
-      where: { id: bookingId },
-      select: { paymentIntentId: true },
-    });
-    if (current.paymentIntentId === null) {
-      throw new Error(
-        `payments: booking ${bookingId} lost its payment intent while storing ${created.id}`,
-      );
-    }
-    this.logger.warn(
-      { bookingId, paymentIntentId: current.paymentIntentId, discardedPaymentIntentId: created.id },
-      'payments: concurrent payment intent creation, reusing the stored one',
+        const { quote } = booking;
+        assertSupportedCurrency(quote.currency);
+        assertQuoteFeeMatches(quote);
+        const quoted = { amountCents: quote.totalCents, currency: quote.currency };
+        if (booking.paymentIntentId !== null) {
+          return { intent: null, storedId: booking.paymentIntentId, amount: quoted };
+        }
+        const created = await this.gateway.createPaymentIntent({
+          amountCents: quoted.amountCents,
+          currency: quoted.currency,
+          transferGroup: transferGroupFor(booking.id),
+          metadata: { bookingId: booking.id },
+          idempotencyKey: paymentIntentIdempotencyKey(booking.id),
+        });
+        await tx.booking.update({
+          where: { id: booking.id },
+          data: { paymentIntentId: created.id },
+        });
+        this.logger.log(
+          { bookingId: booking.id, paymentIntentId: created.id },
+          'payments: payment intent stored on booking',
+        );
+        return { intent: created, storedId: created.id, amount: quoted };
+      },
+      { timeout: PAYMENT_INTENT_TRANSACTION_TIMEOUT_MS },
     );
-    return current.paymentIntentId === created.id
-      ? created
-      : this.gateway.retrievePaymentIntent(current.paymentIntentId);
+
+    const { amount } = locked;
+    const intent = locked.intent ?? (await this.gateway.retrievePaymentIntent(locked.storedId));
+    this.assertIntentMatches(bookingId, intent, amount);
+    return { clientSecret: intent.clientSecret, amount };
   }
 
   private assertIntentMatches(

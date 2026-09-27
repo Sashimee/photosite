@@ -29,7 +29,7 @@ function setup(results: Record<string, ReprocessResult | Error>) {
 }
 
 describe('StripeEventSweepService.sweep', () => {
-  it('only picks unprocessed events inside the retry window, oldest first', async () => {
+  it('only picks unprocessed events of a handled type inside the retry window, oldest first', async () => {
     const { service, findMany } = setup({});
     const now = new Date('2026-09-27T12:00:00Z');
 
@@ -38,6 +38,9 @@ describe('StripeEventSweepService.sweep', () => {
     expect(findMany).toHaveBeenCalledWith({
       where: {
         processedAt: null,
+        type: {
+          in: ['payment_intent.succeeded', 'payment_intent.payment_failed', 'account.updated'],
+        },
         receivedAt: {
           lt: new Date(now.getTime() - STUCK_EVENT_MIN_AGE_MS),
           gt: new Date(now.getTime() - STUCK_EVENT_MAX_AGE_MS),
