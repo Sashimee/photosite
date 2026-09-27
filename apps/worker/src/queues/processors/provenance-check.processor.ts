@@ -79,7 +79,7 @@ export interface ProvenanceCheckRow {
 export interface ProvenanceCheckTransactionClient {
   portfolioImage: {
     updateMany(args: {
-      where: { id: string; status: string };
+      where: { id: string; status: 'pending_review' };
       data: Record<string, unknown>;
     }): Promise<{ count: number }>;
   };
