@@ -8,6 +8,7 @@ const ONE_HOUR = 60 * 60;
 
 const CREATE_ACCOUNT_RULE: RateLimitRule = { windowSeconds: ONE_HOUR, max: 10 };
 const CREATE_ACCOUNT_LINK_RULE: RateLimitRule = { windowSeconds: ONE_HOUR, max: 30 };
+const REFUND_RULE: RateLimitRule = { windowSeconds: ONE_HOUR, max: 10 };
 
 @Injectable()
 export class PaymentsRateLimitService {
@@ -28,6 +29,15 @@ export class PaymentsRateLimitService {
       userId,
       CREATE_ACCOUNT_LINK_RULE,
       'Too many onboarding links requested. Try again later.',
+    );
+  }
+
+  async enforceRefund(userId: string): Promise<void> {
+    await this.enforce(
+      'payments:booking-refund:account',
+      userId,
+      REFUND_RULE,
+      'Too many refund requests. Try again later.',
     );
   }
 

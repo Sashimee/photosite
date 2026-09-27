@@ -16,6 +16,7 @@ describe('PaymentsRateLimitService', () => {
     const { consume, rateLimit } = service(true);
     await rateLimit.enforceCreateAccount('user-1');
     await rateLimit.enforceCreateAccountLink('user-1');
+    await rateLimit.enforceRefund('user-1');
     expect(consume).toHaveBeenNthCalledWith(
       1,
       'payments:stripe-account-create:account',
@@ -28,9 +29,15 @@ describe('PaymentsRateLimitService', () => {
       'user-1',
       expect.objectContaining({ max: 30 }),
     );
+    expect(consume).toHaveBeenNthCalledWith(
+      3,
+      'payments:booking-refund:account',
+      'user-1',
+      expect.objectContaining({ max: 10 }),
+    );
   });
 
-  it.each(['enforceCreateAccount', 'enforceCreateAccountLink'] as const)(
+  it.each(['enforceCreateAccount', 'enforceCreateAccountLink', 'enforceRefund'] as const)(
     '%s throws 429 with retryAfterSeconds when the limit is hit',
     async (method) => {
       const { rateLimit } = service(false);
