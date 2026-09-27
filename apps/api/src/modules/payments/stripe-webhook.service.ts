@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { IllegalBookingTransitionError, transitionBooking } from '../bookings/booking-state.js';
+import { BookingMoneyEventsService } from './booking-money-events.service.js';
 import { type AfterCommit, StripeConnectService } from './stripe-connect.service.js';
 import {
   type ConnectedAccount,
@@ -32,6 +33,10 @@ export const HANDLED_EVENT_TYPES = [
   'payment_intent.succeeded',
   'payment_intent.payment_failed',
   'account.updated',
+  'charge.refunded',
+  'transfer.reversed',
+  'charge.dispute.created',
+  'charge.dispute.closed',
 ] as const;
 
 export type ReprocessResult = 'processed' | 'deferred' | 'skipped';
@@ -85,6 +90,7 @@ export class StripeWebhookService {
     @Inject(STRIPE_GATEWAY) private readonly gateway: StripeGateway,
     @Inject(APP_CONFIG) env: Env,
     @Inject(Logger) private readonly logger: Logger,
+    @Inject(BookingMoneyEventsService) private readonly moneyEvents: BookingMoneyEventsService,
   ) {
     this.live = isLiveSecretKey(env.STRIPE_SECRET_KEY);
   }
@@ -204,6 +210,16 @@ export class StripeWebhookService {
           status: 'processed',
           afterCommit: await this.connect.applyAccountUpdated(tx, prefetched.account),
         };
+      case 'charge.refunded':
+        return this.fromPlatform(event) ? this.moneyEvents.onChargeRefunded(tx, event) : PROCESSED;
+      case 'transfer.reversed':
+        return this.fromPlatform(event)
+          ? this.moneyEvents.onTransferReversed(tx, event)
+          : PROCESSED;
+      case 'charge.dispute.created':
+        return this.fromPlatform(event) ? this.moneyEvents.onDisputeCreated(tx, event) : PROCESSED;
+      case 'charge.dispute.closed':
+        return this.fromPlatform(event) ? this.moneyEvents.onDisputeClosed(tx, event) : PROCESSED;
       default:
         this.logger.log(
           { stripeEventId: event.id, type: event.type },
@@ -211,6 +227,17 @@ export class StripeWebhookService {
         );
         return IGNORED;
     }
+  }
+
+  private fromPlatform(event: GatewayEvent): boolean {
+    if (event.account === undefined) {
+      return true;
+    }
+    this.logger.warn(
+      { stripeEventId: event.id, type: event.type, stripeAccountId: event.account },
+      'stripe webhook: money event from a connected account, ignoring',
+    );
+    return false;
   }
 
   private parsePaymentIntent(event: GatewayEvent): PaymentIntentObject | null {

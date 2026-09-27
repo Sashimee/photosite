@@ -4,6 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Env } from '../../config/env.js';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import { TEST_ENV } from '../../testing/test-env.js';
+import type {
+  BookingMoneyEventsService,
+  MoneyEventOutcome,
+} from './booking-money-events.service.js';
 import type { StripeConnectService } from './stripe-connect.service.js';
 import { StripeWebhookService } from './stripe-webhook.service.js';
 import type {
@@ -115,14 +119,35 @@ function setup(
     ),
   };
   const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
+  const moneyAfterCommit = vi.fn(() => Promise.resolve());
+  const moneyOutcome = (): Promise<MoneyEventOutcome> =>
+    Promise.resolve({ status: 'processed', afterCommit: moneyAfterCommit });
+  const moneyEvents = {
+    onChargeRefunded: vi.fn(moneyOutcome),
+    onTransferReversed: vi.fn(moneyOutcome),
+    onDisputeCreated: vi.fn(moneyOutcome),
+    onDisputeClosed: vi.fn(moneyOutcome),
+  };
   const service = new StripeWebhookService(
     prisma,
     connect as unknown as StripeConnectService,
     gateway as unknown as StripeGateway,
     { ...TEST_ENV, ...options.env },
     logger as unknown as Logger,
+    moneyEvents as unknown as BookingMoneyEventsService,
   );
-  return { service, tx, transaction, findFirst, connect, gateway, accountAfterCommit, logger };
+  return {
+    service,
+    tx,
+    transaction,
+    findFirst,
+    connect,
+    gateway,
+    accountAfterCommit,
+    logger,
+    moneyEvents,
+    moneyAfterCommit,
+  };
 }
 
 const FRESH_ACCOUNT: ConnectedAccount = {
@@ -544,6 +569,68 @@ describe('StripeWebhookService.receive', () => {
     expect(tx.stripeEvent.createMany).toHaveBeenCalledOnce();
     expect(tx.stripeEvent.update).not.toHaveBeenCalled();
     expect(tx.booking.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+describe('StripeWebhookService money events', () => {
+  const cases = [
+    ['charge.refunded', 'onChargeRefunded', { id: 'ch_1' }],
+    ['transfer.reversed', 'onTransferReversed', { id: 'tr_1' }],
+    ['charge.dispute.created', 'onDisputeCreated', { id: 'dp_1' }],
+    ['charge.dispute.closed', 'onDisputeClosed', { id: 'dp_1' }],
+  ] as const;
+
+  it.each(cases)(
+    'hands %s to the money events service, marks it processed and runs its side effects after commit',
+    async (type, handler, object) => {
+      const { service, tx, moneyEvents, moneyAfterCommit, transaction } = setup();
+      moneyAfterCommit.mockImplementation(() => {
+        expect(transaction).toHaveBeenCalledOnce();
+        return Promise.resolve();
+      });
+
+      await service.receive({ id: 'evt_m', type, livemode: false, data: { object } });
+
+      expect(moneyEvents[handler]).toHaveBeenCalledOnce();
+      expect(tx.stripeEvent.update).toHaveBeenCalledOnce();
+      expect(moneyAfterCommit).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each(cases)('ignores %s sent from a connected account', async (type, handler, object) => {
+    const { service, tx, moneyEvents, logger } = setup();
+
+    await service.receive({
+      id: 'evt_m',
+      type,
+      livemode: false,
+      account: 'acct_1',
+      data: { object },
+    });
+
+    expect(moneyEvents[handler]).not.toHaveBeenCalled();
+    expect(tx.stripeEvent.update).toHaveBeenCalledOnce();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ stripeAccountId: 'acct_1' }),
+      expect.any(String),
+    );
+  });
+
+  it('leaves a deferred money event unprocessed for the sweep', async () => {
+    const { service, tx, moneyEvents } = setup();
+    moneyEvents.onDisputeCreated.mockResolvedValueOnce({
+      status: 'deferred',
+      afterCommit: () => Promise.resolve(),
+    });
+
+    await service.receive({
+      id: 'evt_m',
+      type: 'charge.dispute.created',
+      livemode: false,
+      data: { object: { id: 'dp_1' } },
+    });
+
+    expect(tx.stripeEvent.update).not.toHaveBeenCalled();
   });
 });
 
