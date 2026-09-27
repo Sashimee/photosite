@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CreateRefundRequestSchema,
+  CreateRefundResponseSchema,
   StripeAccountLinkResponseSchema,
   StripeAccountResponseSchema,
   StripeWebhookEventSchema,
@@ -106,5 +107,53 @@ describe('StripeWebhookEventSchema', () => {
 
   it('rejects a missing data.object', () => {
     expect(StripeWebhookEventSchema.safeParse({ ...validEvent, data: {} }).success).toBe(false);
+  });
+});
+
+describe('CreateRefundResponseSchema', () => {
+  const booking = {
+    id: '0190a0b2-0000-7000-8000-000000000001',
+    quoteId: '0190a0b2-0000-7000-8000-000000000002',
+    clientId: '0190a0b2-0000-7000-8000-000000000003',
+    photographerId: '0190a0b2-0000-7000-8000-000000000004',
+    scheduledAt: '2026-10-01T10:00:00.000Z',
+    location: null,
+    total: { amountCents: 150000, currency: 'EUR' },
+    status: 'paid_held',
+    releaseDueAt: null,
+    deliveredAt: null,
+    releasedAt: null,
+    cancelledAt: null,
+    cancellationReason: null,
+  };
+  const partial = {
+    status: 'partially_refunded',
+    amount: { amountCents: 5000, currency: 'EUR' },
+    refundedTotal: { amountCents: 5000, currency: 'EUR' },
+    booking,
+  };
+
+  it('accepts a partial refund that keeps the booking state', () => {
+    expect(CreateRefundResponseSchema.safeParse(partial).success).toBe(true);
+  });
+
+  it('accepts a full refund of a refunded booking', () => {
+    expect(
+      CreateRefundResponseSchema.safeParse({
+        ...partial,
+        status: 'refunded',
+        refundedTotal: { amountCents: 150000, currency: 'EUR' },
+        booking: { ...booking, status: 'refunded' },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects an unknown status and unknown keys', () => {
+    expect(CreateRefundResponseSchema.safeParse({ ...partial, status: 'pending' }).success).toBe(
+      false,
+    );
+    expect(CreateRefundResponseSchema.safeParse({ ...partial, refundId: 're_123' }).success).toBe(
+      false,
+    );
   });
 });

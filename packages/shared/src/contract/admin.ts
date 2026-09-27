@@ -3,6 +3,7 @@ import {
   DATA_REQUEST_CHANNELS,
   DATA_REQUEST_STATUSES,
   DATA_REQUEST_TYPES,
+  DISPUTE_STATUSES,
   FEATURE_FLAG_KEYS,
   NOTIFICATION_TYPES,
   PORTFOLIO_IMAGE_STATUSES,
@@ -259,10 +260,16 @@ export const DirectTakedownRequestSchema = z
 // moderator-initiated entry apart from a public one without a schema change.
 export const MODERATOR_INITIATED_REPORT_REASON = 'Found by a moderator; no report was filed.';
 
+// `refundedCents` and `reversedCents` are ledger sums (always >= 0), in the
+// booking's currency; `disputeStatus` is the latest Dispute's status, null
+// when the booking was never disputed.
 export const AdminBookingSchema = BookingBaseSchema.extend({
   paymentIntentId: z.string().nullable(),
   chargeId: z.string().nullable(),
   transferId: z.string().nullable(),
+  refundedCents: z.int().nonnegative(),
+  reversedCents: z.int().nonnegative(),
+  disputeStatus: z.enum(DISPUTE_STATUSES).nullable(),
 })
   .strict()
   .openapi('AdminBooking');
@@ -895,7 +902,9 @@ registry.registerPath({
 registry.registerPath({
   method: 'post',
   path: apiPath('/admin/bookings/{id}/refund'),
-  summary: 'Refund a booking',
+  summary: 'Refund a booking after release',
+  description:
+    'Released bookings only, otherwise 409. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. Subject to the admin mutation rate limit (429).',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('finance', { requires2fa: true }),
@@ -908,7 +917,7 @@ registry.registerPath({
       description: 'Booking refunded',
       content: { 'application/json': { schema: AdminBookingSchema } },
     },
-    ...errorResponses([400, 401, 403, 404, 409, 422]),
+    ...errorResponses([400, 401, 403, 404, 409, 422, 429]),
   },
 });
 
@@ -916,6 +925,8 @@ registry.registerPath({
   method: 'post',
   path: apiPath('/admin/bookings/{id}/reverse-transfer'),
   summary: 'Reverse the payout transfer for a booking',
+  description:
+    'After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. The booking keeps its status. Subject to the admin mutation rate limit (429).',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('finance', { requires2fa: true }),
@@ -928,7 +939,7 @@ registry.registerPath({
       description: 'Transfer reversed',
       content: { 'application/json': { schema: AdminBookingSchema } },
     },
-    ...errorResponses([400, 401, 403, 404, 409, 422]),
+    ...errorResponses([400, 401, 403, 404, 409, 422, 429]),
   },
 });
 

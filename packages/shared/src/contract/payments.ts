@@ -1,4 +1,5 @@
-import { IdSchema, errorResponses, requiresVerifiedEmail } from './common.js';
+import { BookingSchema } from './bookings.js';
+import { IdSchema, MoneySchema, errorResponses, requiresVerifiedEmail } from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
 
@@ -58,9 +59,14 @@ export const StripeWebhookAckResponseSchema = z
   .strict()
   .openapi('StripeWebhookAckResponse');
 
+// `refundedTotal` is the cumulative amount refunded on the booking so far,
+// this refund included; the booking is `refunded` once it reaches the total.
 export const CreateRefundResponseSchema = z
   .object({
-    status: z.literal('refunded'),
+    status: z.enum(['refunded', 'partially_refunded']),
+    amount: MoneySchema,
+    refundedTotal: MoneySchema,
+    booking: BookingSchema,
   })
   .strict()
   .openapi('CreateRefundResponse');
@@ -70,7 +76,7 @@ registry.registerPath({
   path: apiPath('/bookings/{id}/refund'),
   summary: 'Request a refund for a booking before release',
   description:
-    'Self-service, before release only. After release a refund requires a transfer reversal and is admin-only (POST /v1/admin/bookings/{id}/refund).',
+    'Client only, before release (paid_held, in_progress or delivered), otherwise 409. `amountCents` omitted refunds whatever is left; a cumulative refund above the charged total is 422. A full refund moves the booking to `refunded`, a partial one keeps its state. After release a refund requires a transfer reversal and is admin-only (POST /v1/admin/bookings/{id}/refund).',
   tags: ['payments'],
   security: AUTH_SECURITY,
   request: {
@@ -79,10 +85,10 @@ registry.registerPath({
   },
   responses: {
     '200': {
-      description: 'Refund requested',
+      description: 'Refund created',
       content: { 'application/json': { schema: CreateRefundResponseSchema } },
     },
-    ...errorResponses([400, 401, 403, 404, 409, 422]),
+    ...errorResponses([400, 401, 403, 404, 409, 422, 429]),
   },
 });
 
