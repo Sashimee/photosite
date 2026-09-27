@@ -39,6 +39,7 @@ export class FakeStripeGateway implements StripeGateway {
     string,
     Transfer & { reversedCents: number; transferGroup: string; metadata: Record<string, string> }
   >();
+  private readonly refundedCents = new Map<string, number>();
   private readonly events = new Map<string, GatewayEvent>();
 
   constructor(
@@ -148,11 +149,14 @@ export class FakeStripeGateway implements StripeGateway {
       if (!intent) {
         throw new Error(`fake stripe: no such payment_intent ${input.paymentIntentId}`);
       }
-      return {
-        id: this.nextId('re_fake'),
-        amountCents: input.amountCents ?? intent.amountCents,
-        status: 'succeeded',
-      };
+      const refunded = this.refundedCents.get(intent.id) ?? 0;
+      const remaining = intent.amountCents - refunded;
+      const amountCents = input.amountCents ?? remaining;
+      if (amountCents <= 0 || amountCents > remaining) {
+        throw new Error(`fake stripe: refund exceeds the unrefunded amount of ${intent.id}`);
+      }
+      this.refundedCents.set(intent.id, refunded + amountCents);
+      return { id: this.nextId('re_fake'), amountCents, status: 'succeeded' };
     });
   }
 

@@ -145,6 +145,54 @@ describe('FakeStripeGateway', () => {
       ).rejects.toThrow(/no such payment_intent/);
     });
 
+    it('refunds at most the unrefunded amount across partial refunds', async () => {
+      const fake = gateway();
+      const intent = await fake.createPaymentIntent({
+        amountCents: 10_000,
+        currency: 'EUR',
+        transferGroup: 'booking_2',
+        metadata: {},
+        idempotencyKey: 'booking_2_pi',
+      });
+      const first = await fake.createRefund({
+        paymentIntentId: intent.id,
+        amountCents: 3_000,
+        metadata: {},
+        idempotencyKey: 'refund_2_0',
+      });
+      expect(first.amountCents).toBe(3_000);
+      await expect(
+        fake.createRefund({
+          paymentIntentId: intent.id,
+          amountCents: 7_001,
+          metadata: {},
+          idempotencyKey: 'refund_2_1',
+        }),
+      ).rejects.toThrow(/exceeds the unrefunded amount/);
+
+      const rest = await fake.createRefund({
+        paymentIntentId: intent.id,
+        metadata: {},
+        idempotencyKey: 'refund_2_2',
+      });
+      expect(rest.amountCents).toBe(7_000);
+      await expect(
+        fake.createRefund({
+          paymentIntentId: intent.id,
+          metadata: {},
+          idempotencyKey: 'refund_2_3',
+        }),
+      ).rejects.toThrow(/exceeds the unrefunded amount/);
+
+      const replayed = await fake.createRefund({
+        paymentIntentId: intent.id,
+        amountCents: 3_000,
+        metadata: {},
+        idempotencyKey: 'refund_2_0',
+      });
+      expect(replayed).toEqual(first);
+    });
+
     it('transfers to a known account and reverses at most the unreversed amount', async () => {
       const fake = gateway();
       const account = await accountOn(fake);
