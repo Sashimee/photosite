@@ -24,13 +24,18 @@ export class ProvenanceCheckQueueService implements OnApplicationShutdown {
     });
   }
 
-  // `jobId = portfolioImageId` so an admin recheck re-adds under the same
-  // id; with `removeOnComplete: true` the id is freed once the prior run
-  // finishes, so the re-add is never blocked by a stale terminal job.
+  // `jobId = portfolioImageId` dedupes the normal (non-forced) enqueue so an
+  // upload only ever gets one pending check. A forced recheck must not
+  // reuse that id: with `removeOnFail: 100` a failed job can still be
+  // sitting under it, which would silently block the re-add, so force uses
+  // a distinct, timestamped id instead.
   async enqueue(job: ProvenanceCheckJob): Promise<void> {
     const validated = ProvenanceCheckJobSchema.parse(job);
+    const jobId = validated.force
+      ? `${validated.portfolioImageId}:recheck:${String(Date.now())}`
+      : validated.portfolioImageId;
     await this.queue.add('provenance-check', validated, {
-      jobId: validated.portfolioImageId,
+      jobId,
       removeOnComplete: true,
       removeOnFail: 100,
       attempts: 3,
