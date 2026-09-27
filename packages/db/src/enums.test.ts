@@ -7,6 +7,7 @@ import {
   NOTIFICATION_CHANNELS,
   PHOTOGRAPHER_CATEGORIES,
   PORTFOLIO_IMAGE_STATUSES,
+  PROVENANCE_DECISION_REASONS,
   QUOTE_STATUSES,
   REQUEST_STATUSES,
   SUPPORTED_LOCALES,
@@ -29,6 +30,7 @@ import {
   NotificationChannel,
   PhotographerCategory,
   PortfolioImageStatus,
+  ProvenanceDecisionReason,
   QuoteStatus,
   RequestStatus,
   UploadPurpose,
@@ -96,6 +98,12 @@ describe('Prisma enums mirror packages/shared enums', () => {
   it('PortfolioImageStatus matches PORTFOLIO_IMAGE_STATUSES', () => {
     expect(Object.values(PortfolioImageStatus).sort()).toEqual(
       [...PORTFOLIO_IMAGE_STATUSES].sort(),
+    );
+  });
+
+  it('ProvenanceDecisionReason matches PROVENANCE_DECISION_REASONS', () => {
+    expect(Object.values(ProvenanceDecisionReason).sort()).toEqual(
+      [...PROVENANCE_DECISION_REASONS].sort(),
     );
   });
 
