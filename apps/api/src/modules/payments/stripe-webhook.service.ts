@@ -381,7 +381,7 @@ export class StripeWebhookService {
           idempotencyKey: `refund_${late.bookingId}_late`,
         });
         await this.prisma.client.$transaction(async (settle) => {
-          await settle.ledgerEntry.createMany({
+          const recorded = await settle.ledgerEntry.createMany({
             data: [
               {
                 bookingId: late.bookingId,
@@ -393,6 +393,24 @@ export class StripeWebhookService {
             ],
             skipDuplicates: true,
           });
+          if (recorded.count > 0) {
+            await settle.auditLog.create({
+              data: {
+                actorType: 'system',
+                actorId: null,
+                action: 'booking.late_payment_refunded',
+                targetType: 'Booking',
+                targetId: late.bookingId,
+                before: { status: late.status },
+                after: {
+                  status: late.status,
+                  refundId: refund.id,
+                  amountCents: refund.amountCents,
+                },
+                ip: null,
+              },
+            });
+          }
           await settle.stripeEvent.update({
             where: { id: event.id },
             data: { processedAt: new Date() },

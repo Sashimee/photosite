@@ -398,11 +398,19 @@ describe('stripe webhook integration', () => {
         action: 'booking.paid_after_terminal',
       };
       expect(await prisma.auditLog.count({ where: auditWhere })).toBe(1);
+      const refundAuditWhere = { ...auditWhere, action: 'booking.late_payment_refunded' };
+      const refundAudit = await prisma.auditLog.findFirstOrThrow({ where: refundAuditWhere });
+      expect(refundAudit.after).toEqual({
+        status: 'cancelled',
+        refundId: ledger[1]?.stripeObjectId,
+        amountCents: quote.total.amountCents,
+      });
       expect((await storedEvent(event.id))?.processedAt).not.toBeNull();
 
       await sendEvent(event);
       expect(await prisma.ledgerEntry.count({ where: { bookingId } })).toBe(2);
       expect(await prisma.auditLog.count({ where: auditWhere })).toBe(1);
+      expect(await prisma.auditLog.count({ where: refundAuditWhere })).toBe(1);
     });
 
     it('pays against the stored fee snapshot even when it differs from the current rate', async () => {

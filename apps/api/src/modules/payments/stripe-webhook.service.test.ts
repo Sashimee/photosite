@@ -360,6 +360,19 @@ describe('StripeWebhookService.receive', () => {
       ],
       skipDuplicates: true,
     });
+    expect(tx.auditLog.create).toHaveBeenLastCalledWith({
+      data: {
+        actorType: 'system',
+        actorId: null,
+        action: 'booking.late_payment_refunded',
+        targetType: 'Booking',
+        targetId: 'booking-1',
+        before: { status: 'cancelled' },
+        after: { status: 'cancelled', refundId: 're_1', amountCents: 25050 },
+        ip: null,
+      },
+    });
+    expect(tx.auditLog.create).toHaveBeenCalledTimes(2);
     expect(tx.stripeEvent.update).toHaveBeenCalledOnce();
     expect(tx.ledgerEntry.create).not.toHaveBeenCalled();
   });
@@ -376,13 +389,30 @@ describe('StripeWebhookService.receive', () => {
 
   it('does not audit a replayed late payment twice but still settles the refund', async () => {
     const { service, tx, gateway } = setup({ booking: bookingRow({ status: 'cancelled' }) });
-    tx.ledgerEntry.createMany.mockResolvedValueOnce({ count: 0 });
+    tx.ledgerEntry.createMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 0 });
 
     await service.receive(succeeded());
 
     expect(tx.auditLog.create).not.toHaveBeenCalled();
     expect(gateway.createRefund).toHaveBeenCalledOnce();
     expect(tx.stripeEvent.update).toHaveBeenCalledOnce();
+  });
+
+  it('audits the refund of a late payment whose charge was recorded by an earlier attempt', async () => {
+    const { service, tx } = setup({ booking: bookingRow({ status: 'cancelled' }) });
+    tx.ledgerEntry.createMany.mockResolvedValueOnce({ count: 0 });
+
+    await service.receive(succeeded());
+
+    expect(tx.auditLog.create).toHaveBeenCalledOnce();
+    expect(tx.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: 'booking.late_payment_refunded',
+        after: { status: 'cancelled', refundId: 're_1', amountCents: 25050 },
+      }) as unknown,
+    });
   });
 
   it('refunds a second charge on a booking already paid by another charge', async () => {
