@@ -15,12 +15,10 @@ function stripeMock() {
       }),
     },
     accountLinks: {
-      create: vi
-        .fn()
-        .mockResolvedValue({
-          url: 'https://connect.stripe.com/setup/x',
-          expires_at: 1_800_000_000,
-        }),
+      create: vi.fn().mockResolvedValue({
+        url: 'https://connect.stripe.com/setup/x',
+        expires_at: 1_800_000_000,
+      }),
     },
     paymentIntents: {
       create: vi.fn().mockResolvedValue({
