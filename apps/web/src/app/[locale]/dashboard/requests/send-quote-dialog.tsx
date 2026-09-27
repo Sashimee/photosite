@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 
 import type { components } from '@photoo/api-client';
@@ -23,7 +23,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { fieldErrorMessage } from '@/lib/form-errors';
-import { formatMoney } from '@/lib/money';
+import { formatMoney, payoutAmount, requireMoney } from '@/lib/money';
 import { requestErrorMessage } from '@/lib/request-errors';
 
 import {
@@ -43,6 +43,7 @@ import {
 const VALID_UNTIL_AFTER_REQUEST_EXPIRY_MESSAGE = 'validUntil must not be after the request expires';
 
 type RequestSummary = components['schemas']['RequestSummary'];
+type QuotePreview = components['schemas']['QuotePreview'];
 // Deliberately typed from `buildSendQuotePayload`, not from
 // `CreateQuoteRequestSchema`'s own inferred output: zod's `.optional()`
 // widens `message` to `string | undefined`, which `exactOptionalPropertyTypes`
@@ -72,6 +73,8 @@ export function SendQuoteDialog({ request, locale }: { request: RequestSummary; 
   const [formError, setFormError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [preview, setPreview] = useState<QuotePreview | null>(null);
+  const [previewStatus, setPreviewStatus] = useState<'idle' | 'loading' | 'error'>('idle');
 
   const {
     register,
@@ -86,6 +89,40 @@ export function SendQuoteDialog({ request, locale }: { request: RequestSummary; 
   });
   const lineItems = useFieldArray({ control, name: 'lineItems' });
 
+  // Fires every time `reviewPayload` gets a new object, which is exactly
+  // every time the photographer reaches the review step (including
+  // re-entering it after going back and changing line items) - the totals
+  // shown here are estimates only, `confirmSend` never reads `preview`.
+  useEffect(() => {
+    if (step !== 'review' || !reviewPayload) {
+      return;
+    }
+    let cancelled = false;
+    setPreview(null);
+    setPreviewStatus('loading');
+    api
+      .POST('/v1/quotes/preview', { body: { lineItems: reviewPayload.lineItems } })
+      .then(({ data, error }) => {
+        if (cancelled) {
+          return;
+        }
+        if (error) {
+          setPreviewStatus('error');
+          return;
+        }
+        setPreview(data);
+        setPreviewStatus('idle');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPreviewStatus('error');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [step, reviewPayload]);
+
   function handleOpenChange(next: boolean) {
     if (pending) {
       return;
@@ -95,6 +132,8 @@ export function SendQuoteDialog({ request, locale }: { request: RequestSummary; 
     setReviewPayload(null);
     setFormError(null);
     setSubmitError(null);
+    setPreview(null);
+    setPreviewStatus('idle');
     clearErrors();
     // Recomputed on every open, not just on close: a photographer who opens
     // the dialog well after page load would otherwise see a default
@@ -176,6 +215,11 @@ export function SendQuoteDialog({ request, locale }: { request: RequestSummary; 
   const reviewSubtotal = reviewPayload
     ? { amountCents: lineItemsSubtotalCents(reviewPayload.lineItems), currency }
     : null;
+
+  const previewPlatformFee = preview
+    ? requireMoney(preview.platformFee, 'quote preview platform fee')
+    : null;
+  const previewSubtotal = preview ? requireMoney(preview.subtotal, 'quote preview subtotal') : null;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -352,6 +396,26 @@ export function SendQuoteDialog({ request, locale }: { request: RequestSummary; 
                   <span>{t('totalLabel')}</span>
                   <span>{formatMoney(reviewSubtotal, locale)}</span>
                 </div>
+                {previewStatus === 'loading' ? (
+                  <p className="text-sm text-muted-foreground">{t('previewLoading')}</p>
+                ) : null}
+                {previewStatus === 'error' ? (
+                  <p className="text-sm text-muted-foreground">{t('previewError')}</p>
+                ) : null}
+                {previewSubtotal && previewPlatformFee ? (
+                  <>
+                    <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                      <span>{t('feeLabel')}</span>
+                      <span>−{formatMoney(previewPlatformFee, locale)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                      <span>{t('payoutLabel')}</span>
+                      <span>
+                        {formatMoney(payoutAmount(previewSubtotal, previewPlatformFee), locale)}
+                      </span>
+                    </div>
+                  </>
+                ) : null}
                 <p className="text-sm text-muted-foreground">{t('feeNotice')}</p>
               </div>
             ) : null}
