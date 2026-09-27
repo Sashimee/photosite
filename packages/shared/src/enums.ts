@@ -63,6 +63,12 @@ export const BOOKING_STATUSES = [
 
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
+// The client downloads the receipt, the photographer the platform-fee invoice
+// (docs/PAYMENTS.md "Fees, tax and invoices").
+export const BOOKING_DOCUMENTS = ['receipt', 'fee-invoice'] as const;
+
+export type BookingDocument = (typeof BOOKING_DOCUMENTS)[number];
+
 export const LEDGER_ENTRY_TYPES = [
   'charge',
   'platform_fee',
