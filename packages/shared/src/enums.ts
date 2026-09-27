@@ -203,6 +203,7 @@ export const NOTIFICATION_TYPES = [
   'report_decision',
   'moderation_action',
   'provenance_decision',
+  'payouts_disabled',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

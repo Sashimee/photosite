@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CreateRefundRequestSchema,
   StripeAccountLinkResponseSchema,
+  StripeAccountResponseSchema,
   StripeWebhookEventSchema,
 } from './payments.js';
 
@@ -48,6 +49,24 @@ describe('StripeAccountLinkResponseSchema', () => {
 
   it('rejects a non-url', () => {
     expect(StripeAccountLinkResponseSchema.safeParse({ url: 'not-a-url' }).success).toBe(false);
+  });
+});
+
+describe('StripeAccountResponseSchema', () => {
+  it('accepts a connected account summary', () => {
+    expect(
+      StripeAccountResponseSchema.safeParse({
+        stripeAccountId: 'acct_1P000000000000000',
+        onboardingComplete: false,
+        payoutsEnabled: false,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a missing status flag', () => {
+    expect(
+      StripeAccountResponseSchema.safeParse({ stripeAccountId: 'acct_1P000000000000000' }).success,
+    ).toBe(false);
   });
 });
 

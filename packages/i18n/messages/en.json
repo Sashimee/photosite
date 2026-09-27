@@ -894,6 +894,10 @@
         "not_own_work": "it does not appear to be your own work",
         "manipulated_metadata": "its metadata appears to have been manipulated",
         "other": "other"
+      },
+      "payoutsDisabled": {
+        "subject": "Payouts are paused on your account",
+        "body": "Stripe has paused payouts on your connected account, so your profile is hidden from search until this is resolved. Complete the details Stripe asks for here: {url}"
       }
     }
   },
@@ -1112,6 +1116,10 @@
           "title": "One of your portfolio images was rejected",
           "body": "See the details by email"
         }
+      },
+      "payoutsDisabled": {
+        "title": "Payouts paused",
+        "body": "Your profile is hidden until your payout details are complete"
       }
     }
   },

@@ -302,6 +302,7 @@ export {
   CreateRefundRequestSchema,
   CreateRefundResponseSchema,
   StripeAccountLinkResponseSchema,
+  StripeAccountResponseSchema,
   StripeWebhookAckResponseSchema,
   StripeWebhookEventSchema,
 } from './contract/payments.js';

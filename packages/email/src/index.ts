@@ -3,6 +3,7 @@ export { escapeHtml } from './html.js';
 export type { MailMessage } from './mail-message.js';
 export { renderAuthEmail } from './templates/auth-email.js';
 export {
+  buildAccountPath,
   buildConversationPath,
   buildJobApplicationsPath,
   buildJobOfferApplicationsPath,

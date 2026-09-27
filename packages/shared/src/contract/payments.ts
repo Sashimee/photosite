@@ -14,8 +14,18 @@ export const CreateRefundRequestSchema = z
   .strict()
   .openapi('CreateRefundRequest');
 
-// Returned by the Connect onboarding link endpoint (1A.8b implements it):
-// a Stripe-hosted URL the client redirects the photographer to.
+// Mirrors the caller's PhotographerProfile Stripe fields. Onboarding state is
+// only ever changed by the `account.updated` webhook, never by this endpoint.
+export const StripeAccountResponseSchema = z
+  .object({
+    stripeAccountId: z.string().min(1).openapi({ example: 'acct_1P000000000000000' }),
+    onboardingComplete: z.boolean(),
+    payoutsEnabled: z.boolean(),
+  })
+  .strict()
+  .openapi('StripeAccountResponse');
+
+// A Stripe-hosted URL the client redirects the photographer to.
 export const StripeAccountLinkResponseSchema = z
   .object({
     url: z.url().openapi({ example: 'https://connect.stripe.com/setup/e/acct_1P/abc123' }),
@@ -78,10 +88,31 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'post',
+  path: apiPath('/me/stripe/account'),
+  summary: "Create the caller's Stripe Connect Express account",
+  description:
+    'Photographer only. Idempotent: the first call creates the Express account and returns 201; later calls return the existing account with 200.',
+  tags: ['payments'],
+  security: AUTH_SECURITY,
+  responses: {
+    '200': {
+      description: 'Connected account already existed',
+      content: { 'application/json': { schema: StripeAccountResponseSchema } },
+    },
+    '201': {
+      description: 'Connected account created',
+      content: { 'application/json': { schema: StripeAccountResponseSchema } },
+    },
+    ...errorResponses([401, 403, 404, 429]),
+  },
+});
+
+registry.registerPath({
+  method: 'post',
   path: apiPath('/me/stripe/account-link'),
   summary: "Create a Stripe Connect Express onboarding link for the caller's account",
   description:
-    'Requires a connected account to already exist (POST /v1/me/stripe/account, 1A.8b). Returns a short-lived, Stripe-hosted onboarding URL.',
+    'Photographer only. Requires a connected account to already exist (POST /v1/me/stripe/account), otherwise 409. Returns a short-lived, Stripe-hosted onboarding URL.',
   tags: ['payments'],
   security: AUTH_SECURITY,
   responses: {
@@ -89,7 +120,7 @@ registry.registerPath({
       description: 'Onboarding link created',
       content: { 'application/json': { schema: StripeAccountLinkResponseSchema } },
     },
-    ...errorResponses([401, 403, 404, 422]),
+    ...errorResponses([401, 403, 404, 409, 429]),
   },
 });
 
