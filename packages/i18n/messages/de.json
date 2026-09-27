@@ -44,6 +44,10 @@
       "payoutsDisabled": {
         "title": "Auszahlungen pausiert",
         "body": "Ihr Profil ist verborgen, bis Ihre Zahlungsangaben vollständig sind"
+      },
+      "disputeOpened": {
+        "title": "Zahlung angefochten",
+        "body": "Eine Buchung ist bis zur Prüfung durch die Finanzabteilung eingefroren"
       }
     }
   },
@@ -52,6 +56,10 @@
       "payoutsDisabled": {
         "subject": "Auszahlungen sind auf Ihrem Konto pausiert",
         "body": "Stripe hat Auszahlungen auf Ihrem verbundenen Konto pausiert, daher ist Ihr Profil in der Suche verborgen, bis dies behoben ist. Füllen Sie die von Stripe angeforderten Angaben hier aus: {url}"
+      },
+      "disputeOpened": {
+        "subject": "Eine Buchungszahlung wurde angefochten",
+        "body": "Ein Kunde hat eine Buchungszahlung von {total} bei seiner Bank angefochten. Die Buchung ist eingefroren und wird erst freigegeben, nachdem ein Finanz-Admin sie im Admin-Backend geprüft hat. Details: {url}"
       }
     }
   }

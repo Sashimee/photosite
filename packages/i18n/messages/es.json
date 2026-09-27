@@ -44,6 +44,10 @@
       "payoutsDisabled": {
         "title": "Pagos pausados",
         "body": "Tu perfil está oculto hasta que completes los datos de pago"
+      },
+      "disputeOpened": {
+        "title": "Pago disputado",
+        "body": "Una reserva está congelada hasta la revisión de finanzas"
       }
     }
   },
@@ -52,6 +56,10 @@
       "payoutsDisabled": {
         "subject": "Los pagos están pausados en tu cuenta",
         "body": "Stripe ha pausado los pagos en tu cuenta conectada, por lo que tu perfil está oculto en la búsqueda hasta que se resuelva. Completa los datos que Stripe solicita aquí: {url}"
+      },
+      "disputeOpened": {
+        "subject": "Se ha disputado el pago de una reserva",
+        "body": "Un cliente ha disputado ante su banco un pago de reserva de {total}. La reserva está congelada y no se liberará hasta que un administrador de finanzas la revise en el panel de administración. Detalles: {url}"
       }
     }
   }

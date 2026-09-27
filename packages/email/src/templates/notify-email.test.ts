@@ -237,6 +237,20 @@ describe('renderNotifyEmail', () => {
     expect(message.html).toContain('<a href="https://photoo.lu/en/account">');
   });
 
+  it('renders dispute_opened with the disputed total and an account deep link', () => {
+    const message = renderNotifyEmail(
+      'dispute_opened',
+      { total: { amountCents: 150000, currency: 'EUR' } },
+      'en',
+      'finance@example.com',
+      'https://photoo.lu',
+    );
+    expect(message.subject).toBe('A booking payment was disputed');
+    expect(message.text).toContain('€1,500.00');
+    expect(message.text).toContain('https://photoo.lu/en/account\n');
+    expect(message.html).toContain('<a href="https://photoo.lu/en/account">');
+  });
+
   it('renders job_application_status_changed with a fallback job offer title when absent', () => {
     const message = renderNotifyEmail(
       'job_application_status_changed',

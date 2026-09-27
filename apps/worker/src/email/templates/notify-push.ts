@@ -67,6 +67,7 @@ export function renderNotifyPush(
     job_application_received: t.jobApplicationReceived,
     job_application_status_changed: t.jobApplicationStatusChanged,
     payouts_disabled: t.payoutsDisabled,
+    dispute_opened: t.disputeOpened,
   };
   const template = templates[type];
   const fallback = PHOTOGRAPHER_FACING_TYPES.has(type)
@@ -84,7 +85,7 @@ export function renderNotifyPush(
           ? buildJobOfferApplicationsPath(locale, requireJobOfferId(type, payload))
           : type === 'job_application_status_changed'
             ? buildJobApplicationsPath(locale)
-            : type === 'payouts_disabled'
+            : type === 'payouts_disabled' || type === 'dispute_opened'
               ? buildAccountPath(locale)
               : buildNotificationPath(locale, requireQuoteId(type, payload));
 

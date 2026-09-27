@@ -1,7 +1,11 @@
 {
   "fr": [
+    "email.notifications.disputeOpened.body",
+    "email.notifications.disputeOpened.subject",
     "email.notifications.payoutsDisabled.body",
     "email.notifications.payoutsDisabled.subject",
+    "push.notifications.disputeOpened.body",
+    "push.notifications.disputeOpened.title",
     "push.notifications.payoutsDisabled.body",
     "push.notifications.payoutsDisabled.title",
     "web.dashboard.requests.sendQuote.addLineItemCta",
@@ -36,8 +40,12 @@
     "web.dashboard.requests.sendQuote.validUntilLabel"
   ],
   "de": [
+    "email.notifications.disputeOpened.body",
+    "email.notifications.disputeOpened.subject",
     "email.notifications.payoutsDisabled.body",
     "email.notifications.payoutsDisabled.subject",
+    "push.notifications.disputeOpened.body",
+    "push.notifications.disputeOpened.title",
     "push.notifications.payoutsDisabled.body",
     "push.notifications.payoutsDisabled.title",
     "web.dashboard.requests.sendQuote.addLineItemCta",
@@ -72,8 +80,12 @@
     "web.dashboard.requests.sendQuote.validUntilLabel"
   ],
   "pt": [
+    "email.notifications.disputeOpened.body",
+    "email.notifications.disputeOpened.subject",
     "email.notifications.payoutsDisabled.body",
     "email.notifications.payoutsDisabled.subject",
+    "push.notifications.disputeOpened.body",
+    "push.notifications.disputeOpened.title",
     "push.notifications.payoutsDisabled.body",
     "push.notifications.payoutsDisabled.title",
     "web.dashboard.requests.sendQuote.addLineItemCta",
@@ -108,8 +120,12 @@
     "web.dashboard.requests.sendQuote.validUntilLabel"
   ],
   "es": [
+    "email.notifications.disputeOpened.body",
+    "email.notifications.disputeOpened.subject",
     "email.notifications.payoutsDisabled.body",
     "email.notifications.payoutsDisabled.subject",
+    "push.notifications.disputeOpened.body",
+    "push.notifications.disputeOpened.title",
     "push.notifications.payoutsDisabled.body",
     "push.notifications.payoutsDisabled.title",
     "web.dashboard.requests.sendQuote.addLineItemCta",
