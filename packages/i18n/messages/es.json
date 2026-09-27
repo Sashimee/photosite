@@ -62,5 +62,38 @@
         "body": "Un cliente ha disputado ante su banco un pago de reserva de {total}. La reserva está congelada y no se liberará hasta que un administrador de finanzas la revise en el panel de administración. Detalles: {url}"
       }
     }
+  },
+  "documents": {
+    "common": {
+      "reference": "Referencia de la reserva: {reference}",
+      "issuedOn": "Fecha: {date}",
+      "contact": "photoo.lu · hello@photoo.lu",
+      "page": "Página {page} de {pages}"
+    },
+    "receipt": {
+      "title": "Recibo de la reserva",
+      "sellerHeading": "Fotógrafo (vendedor)",
+      "buyerHeading": "Cliente",
+      "itemsHeading": "Servicios",
+      "lineItem": "{qty} × {label}",
+      "totalPaid": "Total pagado",
+      "refunded": "Reembolsado",
+      "netPaid": "Importe neto pagado",
+      "sellerNotice": "Este recibo confirma un pago realizado a través de {appName}. {appName} no es el vendedor de estos servicios: lo es el fotógrafo, que sigue siendo responsable de emitir cualquier factura exigida por la ley."
+    },
+    "feeInvoice": {
+      "title": "Factura de la comisión de la plataforma",
+      "issuerHeading": "Emitida por",
+      "recipientHeading": "Emitida a",
+      "bookingAmount": "Importe de la reserva pagado por el cliente",
+      "refundedToClient": "Reembolsado al cliente",
+      "platformFee": "Comisión de la plataforma ({percent})",
+      "vatOnFee": "IVA sobre la comisión de la plataforma ({rate})",
+      "totalFee": "Total de la comisión de la plataforma",
+      "transferred": "Transferido a ti",
+      "reversed": "Revertido de tu transferencia",
+      "payout": "Tu pago",
+      "payoutNotice": "Tu pago se transfiere a tu cuenta de Stripe conectada. Sigues siendo responsable de facturar a tu cliente y de declarar estos ingresos."
+    }
   }
 }

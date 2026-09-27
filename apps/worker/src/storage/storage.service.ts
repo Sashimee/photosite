@@ -2,6 +2,8 @@ import type { Readable } from 'node:stream';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
+  NotFound,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -47,6 +49,18 @@ export class StorageService {
       chunks.push(chunk as Buffer);
     }
     return Buffer.concat(chunks);
+  }
+
+  async headObject(bucket: string, key: string): Promise<{ sizeBytes: number } | null> {
+    try {
+      const result = await this.client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+      return { sizeBytes: result.ContentLength ?? 0 };
+    } catch (error) {
+      if (error instanceof NotFound) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   async putObject(input: PutObjectInput): Promise<void> {
