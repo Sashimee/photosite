@@ -547,6 +547,21 @@ describe('bookings integration', () => {
     });
   });
 
+  describe('GET /v1/bookings/:id/documents/:document', () => {
+    it('rejects an invalid document type before touching the booking', async () => {
+      const client = await signUpAndSignIn('doc-invalid', ['client']);
+
+      const response = await fastify().inject({
+        method: 'GET',
+        url: `/v1/bookings/${randomUUID()}/documents/not-a-real-document`,
+        remoteAddress: FAKE_IP,
+        headers: headers(client.token),
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+  });
+
   describe('POST /v1/bookings/:id/cancel', () => {
     it('cancels an unpaid booking and stores the reason', async () => {
       const { client, bookingId } = await pendingBooking('cancel');
