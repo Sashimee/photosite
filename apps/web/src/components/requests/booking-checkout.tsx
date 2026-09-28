@@ -3,6 +3,7 @@
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import type { Stripe, StripeElements } from '@stripe/stripe-js';
 import { useTranslations } from 'next-intl';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -11,11 +12,16 @@ import { api } from '@/lib/api';
 import { requestErrorMessage } from '@/lib/request-errors';
 import { getStripe } from '@/lib/stripe';
 
+const IN_FLIGHT_PAYMENT_INTENT_STATUSES = new Set(['processing', 'succeeded', 'requires_capture']);
+const POLL_DELAYS_MS = [2000, 4000, 8000, 16000, 32000];
+
 type CheckoutState =
   | { status: 'loading' }
   | { status: 'unavailable' }
   | { status: 'error'; message: string }
-  | { status: 'ready'; clientSecret: string };
+  | { status: 'ready'; clientSecret: string }
+  | { status: 'processing' }
+  | { status: 'processingTimedOut' };
 
 function PayForm({ returnUrl }: { returnUrl: string }) {
   const t = useTranslations('web.bookings.detail');
@@ -64,12 +70,45 @@ export function BookingCheckout({
 }) {
   const t = useTranslations('web.bookings.detail');
   const tErrors = useTranslations('web.bookings');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [state, setState] = useState<CheckoutState>({ status: 'loading' });
+  const [returnError, setReturnError] = useState<string | null>(null);
+
+  const returnClientSecret = searchParams.get('payment_intent_client_secret');
+
+  useEffect(() => {
+    if (!returnClientSecret) {
+      return;
+    }
+    const params = new URLSearchParams(searchParams);
+    params.delete('payment_intent_client_secret');
+    params.delete('payment_intent');
+    params.delete('redirect_status');
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [returnClientSecret, pathname, router, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    async function start() {
+    function poll(attempt: number) {
+      if (attempt >= POLL_DELAYS_MS.length) {
+        setState({ status: 'processingTimedOut' });
+        return;
+      }
+      timeoutId = setTimeout(() => {
+        if (cancelled) {
+          return;
+        }
+        router.refresh();
+        poll(attempt + 1);
+      }, POLL_DELAYS_MS[attempt]);
+    }
+
+    async function loadPaymentIntent() {
       const stripe = await getStripe();
       if (!stripe) {
         if (!cancelled) {
@@ -96,11 +135,41 @@ export function BookingCheckout({
       }
     }
 
+    async function start() {
+      if (!returnClientSecret) {
+        await loadPaymentIntent();
+        return;
+      }
+      const stripe = await getStripe();
+      if (!stripe) {
+        if (!cancelled) {
+          setState({ status: 'unavailable' });
+        }
+        return;
+      }
+      const { paymentIntent } = await stripe.retrievePaymentIntent(returnClientSecret);
+      if (cancelled) {
+        return;
+      }
+      if (paymentIntent && IN_FLIGHT_PAYMENT_INTENT_STATUSES.has(paymentIntent.status)) {
+        setState({ status: 'processing' });
+        poll(0);
+        return;
+      }
+      if (paymentIntent?.status === 'requires_payment_method') {
+        setReturnError(t('checkout.paymentFailed'));
+      }
+      await loadPaymentIntent();
+    }
+
     void start();
     return () => {
       cancelled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
-  }, [bookingId, t, tErrors]);
+  }, [bookingId, returnClientSecret, router, t, tErrors]);
 
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-border p-4">
@@ -109,6 +178,8 @@ export function BookingCheckout({
         <p className="text-sm text-muted-foreground">{t('checkout.description')}</p>
       </div>
 
+      {returnError ? <FormNotice tone="error">{returnError}</FormNotice> : null}
+
       {state.status === 'loading' ? (
         <FormNotice tone="info">{t('checkout.processing')}</FormNotice>
       ) : null}
@@ -116,6 +187,12 @@ export function BookingCheckout({
         <FormNotice tone="info">{t('checkout.unavailable')}</FormNotice>
       ) : null}
       {state.status === 'error' ? <FormNotice tone="error">{state.message}</FormNotice> : null}
+      {state.status === 'processing' ? (
+        <FormNotice tone="info">{t('checkout.processingReturn')}</FormNotice>
+      ) : null}
+      {state.status === 'processingTimedOut' ? (
+        <FormNotice tone="info">{t('checkout.processingTimeout')}</FormNotice>
+      ) : null}
       {state.status === 'ready' ? (
         <Elements stripe={getStripe()} options={{ clientSecret: state.clientSecret }}>
           <PayForm returnUrl={returnUrl} />

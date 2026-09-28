@@ -1689,7 +1689,10 @@
           "payCta": "Pay now",
           "processing": "Processing your payment…",
           "unavailable": "Payment is not available in this environment.",
-          "loadError": "We couldn't start the payment. Try again."
+          "loadError": "We couldn't start the payment. Try again.",
+          "processingReturn": "We're confirming your payment. This page will update automatically.",
+          "processingTimeout": "This is taking longer than expected. Reload the page to check the latest status.",
+          "paymentFailed": "Your payment didn't go through. You can try again below."
         },
         "notFound": {
           "title": "Booking not found",
