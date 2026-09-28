@@ -5,8 +5,13 @@ import type { Locale } from '@photoo/shared';
 
 import { formatMoney } from '@/lib/money';
 
+import { BookingAcceptDeliveryButton } from './booking-accept-delivery-button';
 import type { Booking } from './booking-card';
+import { BookingCancelDialog } from './booking-cancel-dialog';
 import { BookingCheckout } from './booking-checkout';
+import { BookingDeliveryForm } from './booking-delivery-form';
+import { BookingDocumentButton } from './booking-document-button';
+import { BookingRefundDialog } from './booking-refund-dialog';
 import { BookingStatusTimeline } from './booking-status-timeline';
 import { FormattedDateTime } from './formatted-date-time';
 
@@ -16,12 +21,14 @@ export async function BookingDetail({
   backHref,
   backLabel,
   checkoutReturnUrl,
+  viewerRole,
 }: {
   booking: Booking;
   locale: Locale;
   backHref: string;
   backLabel: string;
   checkoutReturnUrl?: string;
+  viewerRole: 'client' | 'photographer';
 }) {
   const t = await getTranslations({ locale, namespace: 'web.bookings.detail' });
   const total = formatMoney(booking.total, locale);
@@ -65,6 +72,19 @@ export async function BookingDetail({
       {checkoutReturnUrl && booking.status === 'pending_payment' ? (
         <BookingCheckout bookingId={booking.id} returnUrl={checkoutReturnUrl} />
       ) : null}
+
+      <div className="flex flex-wrap gap-3">
+        {viewerRole === 'photographer' ? <BookingDeliveryForm booking={booking} /> : null}
+        {viewerRole === 'client' ? <BookingAcceptDeliveryButton booking={booking} /> : null}
+        {viewerRole === 'client' ? <BookingRefundDialog booking={booking} /> : null}
+        <BookingCancelDialog booking={booking} />
+        {viewerRole === 'client' ? (
+          <BookingDocumentButton booking={booking} document="receipt" />
+        ) : null}
+        {viewerRole === 'photographer' ? (
+          <BookingDocumentButton booking={booking} document="fee-invoice" />
+        ) : null}
+      </div>
     </section>
   );
 }
