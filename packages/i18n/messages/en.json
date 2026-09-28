@@ -1359,6 +1359,7 @@
         "account": "Account",
         "myRequests": "My requests",
         "quotes": "Quotes",
+        "bookings": "Bookings",
         "messages": "Messages",
         "signOut": "Sign out",
         "dashboard": "Dashboard"
@@ -1662,6 +1663,59 @@
         "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
       }
     },
+    "bookings": {
+      "list": {
+        "metaTitle": "Bookings",
+        "title": "Bookings",
+        "intro": "Bookings from quotes you've accepted.",
+        "empty": "You don't have any bookings yet.",
+        "loadMore": "Next page"
+      },
+      "detail": {
+        "metaTitle": "Booking",
+        "backToList": "Back to bookings",
+        "totalLabel": "Total",
+        "scheduleLabel": "Scheduled for",
+        "notScheduled": "Not scheduled yet",
+        "locationLabel": "Location",
+        "noLocation": "No location set",
+        "coordinates": "{lat}, {lng}",
+        "statusTimelineLabel": "Booking status",
+        "statusTimelineExited": "This booking left the normal process:",
+        "checkout": {
+          "title": "Pay for this booking",
+          "description": "Your payment is held securely until the booking is delivered and released.",
+          "payCta": "Pay now",
+          "processing": "Processing your payment…",
+          "unavailable": "Payment is not available in this environment.",
+          "loadError": "We couldn't start the payment. Try again."
+        },
+        "notFound": {
+          "title": "Booking not found",
+          "description": "This booking doesn't exist, or it isn't yours.",
+          "backCta": "Back to bookings"
+        }
+      },
+      "status": {
+        "pending_payment": "Awaiting payment",
+        "paid_held": "Paid, held in escrow",
+        "in_progress": "In progress",
+        "delivered": "Delivered",
+        "released": "Released",
+        "refunded": "Refunded",
+        "disputed": "Disputed",
+        "cancelled": "Cancelled"
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "conflict": "This booking can't be changed right now.",
+        "invalid": "Check the highlighted fields and try again.",
+        "forbidden": "You don't have access to this booking.",
+        "notFound": "This booking could not be found.",
+        "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      }
+    },
     "messages": {
       "list": {
         "metaTitle": "Messages",
@@ -1730,7 +1784,8 @@
         "products": "Packages",
         "verification": "Verification",
         "requests": "Requests",
-        "quotes": "Quotes"
+        "quotes": "Quotes",
+        "bookings": "Bookings"
       },
       "needsRole": {
         "title": "Photographer dashboard",
@@ -2097,6 +2152,14 @@
         "empty": "You haven't sent any quotes yet.",
         "payoutLabel": "Your payout",
         "validUntilLabel": "Valid until",
+        "loadMore": "Next page"
+      },
+      "bookings": {
+        "metaTitle": "Your bookings",
+        "title": "Your bookings",
+        "backToOverview": "Back to overview",
+        "intro": "Bookings from quotes clients have accepted.",
+        "empty": "You don't have any bookings yet.",
         "loadMore": "Next page"
       }
     },

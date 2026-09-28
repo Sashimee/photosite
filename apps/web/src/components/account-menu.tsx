@@ -52,6 +52,9 @@ export function AccountMenu({ locale, user }: { locale: Locale; user: SessionUse
           <Link href={`/${locale}/quotes`}>{t('quotes')}</Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
+          <Link href={`/${locale}/bookings`}>{t('bookings')}</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
           <Link href={`/${locale}/messages`}>{t('messages')}</Link>
         </DropdownMenuItem>
         <DropdownMenuItem
