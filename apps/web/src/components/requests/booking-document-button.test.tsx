@@ -47,10 +47,24 @@ async function loadBookingDocumentButton() {
   return BookingDocumentButton;
 }
 
+const originalLocation = window.location;
+
+function stubLocationAssign() {
+  const assign = vi.fn();
+  const location = Object.create(originalLocation) as Location;
+  Object.defineProperty(location, 'assign', { configurable: true, value: assign });
+  Object.defineProperty(window, 'location', { configurable: true, value: location });
+  return assign;
+}
+
 describe('BookingDocumentButton', () => {
   afterEach(() => {
     apiGetMock.mockReset();
     vi.restoreAllMocks();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation,
+    });
   });
 
   it.each([
@@ -69,11 +83,12 @@ describe('BookingDocumentButton', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('fetches the presigned url and opens it for the receipt', async () => {
+  it('fetches the presigned url and navigates to it for the receipt', async () => {
     apiGetMock.mockResolvedValue({
       data: { url: 'https://cdn.photoo.lu/receipt.pdf' },
       error: undefined,
     });
+    const assignSpy = stubLocationAssign();
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     const BookingDocumentButton = await loadBookingDocumentButton();
     const user = userEvent.setup();
@@ -89,11 +104,8 @@ describe('BookingDocumentButton', () => {
     expect(apiGetMock).toHaveBeenCalledWith('/v1/bookings/{id}/documents/{document}', {
       params: { path: { id: BOOKING_ID, document: 'receipt' } },
     });
-    expect(openSpy).toHaveBeenCalledWith(
-      'https://cdn.photoo.lu/receipt.pdf',
-      '_blank',
-      'noopener,noreferrer',
-    );
+    expect(assignSpy).toHaveBeenCalledWith('https://cdn.photoo.lu/receipt.pdf');
+    expect(openSpy).not.toHaveBeenCalled();
   });
 
   it('fetches the fee invoice document', async () => {
@@ -101,7 +113,7 @@ describe('BookingDocumentButton', () => {
       data: { url: 'https://cdn.photoo.lu/invoice.pdf' },
       error: undefined,
     });
-    vi.spyOn(window, 'open').mockImplementation(() => null);
+    stubLocationAssign();
     const BookingDocumentButton = await loadBookingDocumentButton();
     const user = userEvent.setup();
 
@@ -118,8 +130,9 @@ describe('BookingDocumentButton', () => {
     });
   });
 
-  it('shows the preparing message on a conflict instead of the generic error', async () => {
+  it('shows the preparing message on a conflict instead of navigating', async () => {
     apiGetMock.mockResolvedValue({ data: undefined, error: { code: 'CONFLICT' } });
+    const assignSpy = stubLocationAssign();
     const BookingDocumentButton = await loadBookingDocumentButton();
     const user = userEvent.setup();
 
@@ -134,10 +147,12 @@ describe('BookingDocumentButton', () => {
     expect(
       await screen.findByText(translate('web.bookings.detail.documents', 'preparing')),
     ).toBeInTheDocument();
+    expect(assignSpy).not.toHaveBeenCalled();
   });
 
-  it('shows a mapped error for other failures', async () => {
+  it('shows a mapped error for other failures without navigating', async () => {
     apiGetMock.mockResolvedValue({ data: undefined, error: { code: 'FORBIDDEN' } });
+    const assignSpy = stubLocationAssign();
     const BookingDocumentButton = await loadBookingDocumentButton();
     const user = userEvent.setup();
 
@@ -152,5 +167,6 @@ describe('BookingDocumentButton', () => {
     expect(
       await screen.findByText(translate('web.bookings', 'errors.forbidden')),
     ).toBeInTheDocument();
+    expect(assignSpy).not.toHaveBeenCalled();
   });
 });

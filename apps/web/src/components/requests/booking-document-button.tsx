@@ -38,7 +38,7 @@ export function BookingDocumentButton({
         );
         return;
       }
-      window.open(data.url, '_blank', 'noopener,noreferrer');
+      window.location.assign(data.url);
     } catch {
       setError(requestErrorMessage(tErrors, undefined));
     } finally {
