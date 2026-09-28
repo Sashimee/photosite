@@ -73,6 +73,11 @@ describe('env', () => {
     expect(env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY).toBe('pk_test_abc123');
   });
 
+  it('accepts a live-mode Stripe publishable key', async () => {
+    const env = await loadEnv({ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_live_abc123' });
+    expect(env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY).toBe('pk_live_abc123');
+  });
+
   it('rejects a malformed Stripe publishable key', async () => {
     await expect(loadEnv({ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'sk_live_abc123' })).rejects.toThrow(
       /NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY/,

@@ -60,4 +60,50 @@ describe('BookingStatusTimeline', () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it.each([
+    ['paid_held', 1],
+    ['delivered', 3],
+    ['released', 4],
+  ] as const)('marks %s as the current step at index %i', async (status, index) => {
+    const { BookingStatusTimeline } = await import('./booking-status-timeline');
+    const element = await BookingStatusTimeline({ status, locale: 'en' });
+    render(element);
+
+    const list = screen.getByRole('list', {
+      name: translate('web.bookings.detail', 'statusTimelineLabel'),
+    });
+    const steps = Array.from(list.children).map((child) => child.querySelector('span'));
+
+    steps.forEach((step, stepIndex) => {
+      if (stepIndex === index) {
+        expect(step).toHaveAttribute('aria-current', 'step');
+      } else {
+        expect(step).not.toHaveAttribute('aria-current', 'step');
+      }
+    });
+  });
+
+  it.each(['cancelled', 'disputed'] as const)(
+    'renders every main step struck through plus an exit message for %s',
+    async (status) => {
+      const { BookingStatusTimeline } = await import('./booking-status-timeline');
+      const element = await BookingStatusTimeline({ status, locale: 'en' });
+      render(element);
+
+      const list = screen.getByRole('list', {
+        name: translate('web.bookings.detail', 'statusTimelineLabel'),
+      });
+      expect(list.children).toHaveLength(5);
+      for (const child of Array.from(list.children)) {
+        expect(child).toHaveClass('line-through');
+      }
+
+      expect(
+        screen.getByText(
+          `${translate('web.bookings.detail', 'statusTimelineExited')} ${translate('web.bookings.status', status)}`,
+        ),
+      ).toBeInTheDocument();
+    },
+  );
 });

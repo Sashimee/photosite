@@ -63,6 +63,47 @@ describe('BookingCheckout', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows a mapped error when the payment intent request is rejected as invalid', async () => {
+    getStripeMock.mockResolvedValue(stripeClientMock);
+    apiPostMock.mockResolvedValue({ data: undefined, error: { code: 'UNPROCESSABLE_ENTITY' } });
+    const BookingCheckout = await loadBookingCheckout();
+
+    render(<BookingCheckout bookingId={BOOKING_ID} returnUrl={RETURN_URL} />);
+
+    expect(
+      await screen.findByText(translate('web.bookings', 'errors.invalid')),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a mapped error when the payment intent request is rate-limited', async () => {
+    getStripeMock.mockResolvedValue(stripeClientMock);
+    apiPostMock.mockResolvedValue({ data: undefined, error: { code: 'TOO_MANY_REQUESTS' } });
+    const BookingCheckout = await loadBookingCheckout();
+
+    render(<BookingCheckout bookingId={BOOKING_ID} returnUrl={RETURN_URL} />);
+
+    expect(
+      await screen.findByText(translate('web.bookings', 'errors.tooManyRequests')),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a mapped error with a retry delay when the payment intent request is rate-limited with a retry-after', async () => {
+    getStripeMock.mockResolvedValue(stripeClientMock);
+    apiPostMock.mockResolvedValue({
+      data: undefined,
+      error: { code: 'TOO_MANY_REQUESTS', details: { retryAfterSeconds: 30 } },
+    });
+    const BookingCheckout = await loadBookingCheckout();
+
+    render(<BookingCheckout bookingId={BOOKING_ID} returnUrl={RETURN_URL} />);
+
+    expect(
+      await screen.findByText(
+        translate('web.bookings', 'errors.tooManyRequestsWithRetry', { seconds: 30 }),
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('shows a load-error message when the payment intent request throws', async () => {
     getStripeMock.mockResolvedValue(stripeClientMock);
     apiPostMock.mockRejectedValue(new TypeError('Failed to fetch'));

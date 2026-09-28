@@ -84,6 +84,23 @@ describe('BookingDetail', () => {
     expect(screen.queryByTestId('booking-checkout')).not.toBeInTheDocument();
   });
 
+  it.each(['in_progress', 'delivered', 'released', 'cancelled', 'refunded', 'disputed'] as const)(
+    'does not render the checkout when the booking is %s, even with a return url',
+    async (status) => {
+      const { BookingDetail } = await import('./booking-detail');
+      const element = await BookingDetail({
+        booking: { ...baseBooking, status },
+        locale: 'en',
+        backHref: '/en/bookings',
+        backLabel: 'Back to bookings',
+        checkoutReturnUrl: 'https://photoo.lu/en/bookings/return',
+      });
+      render(element);
+
+      expect(screen.queryByTestId('booking-checkout')).not.toBeInTheDocument();
+    },
+  );
+
   it('does not render the checkout without a return url and not pending payment', async () => {
     const { BookingDetail } = await import('./booking-detail');
     const element = await BookingDetail({
