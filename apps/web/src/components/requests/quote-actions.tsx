@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import type { components } from '@photoo/api-client';
+import type { Locale } from '@photoo/shared';
 
 import { api } from '@/lib/api';
 import { requestErrorMessage } from '@/lib/request-errors';
@@ -13,7 +14,15 @@ import { ConfirmActionButton } from './confirm-action-button';
 
 type Quote = components['schemas']['Quote'];
 
-export function QuoteActions({ quote, currentUserId }: { quote: Quote; currentUserId: string }) {
+export function QuoteActions({
+  quote,
+  currentUserId,
+  locale,
+}: {
+  quote: Quote;
+  currentUserId: string;
+  locale: Locale;
+}) {
   const t = useTranslations('web.quotes.detail');
   const tErrors = useTranslations('web.quotes');
   const router = useRouter();
@@ -33,14 +42,18 @@ export function QuoteActions({ quote, currentUserId }: { quote: Quote; currentUs
     setAcceptPending(true);
     setAcceptError(null);
     try {
-      const { error } = await api.POST('/v1/quotes/{id}/accept', {
+      const { data, error } = await api.POST('/v1/quotes/{id}/accept', {
         params: { path: { id: quote.id } },
       });
       if (error) {
         setAcceptError(requestErrorMessage(tErrors, error));
         return false;
       }
-      router.refresh();
+      if (data.bookingId) {
+        router.push(`/${locale}/bookings/${data.bookingId}`);
+      } else {
+        router.refresh();
+      }
       return true;
     } catch {
       setAcceptError(requestErrorMessage(tErrors, undefined));
@@ -72,39 +85,41 @@ export function QuoteActions({ quote, currentUserId }: { quote: Quote; currentUs
   }
 
   return (
-    <div className="flex flex-wrap gap-3">
-      <ConfirmActionButton
-        triggerLabel={t('acceptCta')}
-        title={t('acceptConfirmTitle')}
-        description={t('acceptConfirmDescription')}
-        confirmLabel={t('acceptConfirmCta')}
-        pendingLabel={t('acceptPending')}
-        cancelLabel={t('acceptDismissCta')}
-        hidden={!isSent}
-        disabled={isExpired}
-        pending={acceptPending}
-        error={acceptError}
-        onOpen={() => {
-          setAcceptError(null);
-        }}
-        onConfirm={accept}
-      />
-      <ConfirmActionButton
-        triggerLabel={t('declineCta')}
-        triggerVariant="outline"
-        title={t('declineConfirmTitle')}
-        description={t('declineConfirmDescription')}
-        confirmLabel={t('declineConfirmCta')}
-        pendingLabel={t('declinePending')}
-        cancelLabel={t('declineDismissCta')}
-        hidden={!isSent}
-        pending={declinePending}
-        error={declineError}
-        onOpen={() => {
-          setDeclineError(null);
-        }}
-        onConfirm={decline}
-      />
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap gap-3">
+        <ConfirmActionButton
+          triggerLabel={t('acceptCta')}
+          title={t('acceptConfirmTitle')}
+          description={t('acceptConfirmDescription')}
+          confirmLabel={t('acceptConfirmCta')}
+          pendingLabel={t('acceptPending')}
+          cancelLabel={t('acceptDismissCta')}
+          hidden={!isSent}
+          disabled={isExpired}
+          pending={acceptPending}
+          error={acceptError}
+          onOpen={() => {
+            setAcceptError(null);
+          }}
+          onConfirm={accept}
+        />
+        <ConfirmActionButton
+          triggerLabel={t('declineCta')}
+          triggerVariant="outline"
+          title={t('declineConfirmTitle')}
+          description={t('declineConfirmDescription')}
+          confirmLabel={t('declineConfirmCta')}
+          pendingLabel={t('declinePending')}
+          cancelLabel={t('declineDismissCta')}
+          hidden={!isSent}
+          pending={declinePending}
+          error={declineError}
+          onOpen={() => {
+            setDeclineError(null);
+          }}
+          onConfirm={decline}
+        />
+      </div>
     </div>
   );
 }

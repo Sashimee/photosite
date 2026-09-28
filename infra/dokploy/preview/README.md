@@ -79,6 +79,12 @@ one is the "why".
    - `NEXT_PUBLIC_ALLOW_INDEXING` = `false`
    - Optionally `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_REQUIRED` once Sentry
      exists (`docs/steps/human-followups.md`).
+   - Optionally `PREVIEW_STRIPE_PUBLISHABLE_KEY` = a Stripe **test-mode**
+     publishable key (`pk_test_…`) once one exists
+     (`docs/steps/human-followups.md`) - baked into the web image as
+     `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`. Missing: the booking checkout
+     page shows "payment is not available in this environment" instead of
+     failing the build.
 9. **DNS.** Confirm `footoo.bas.lu` resolves to the VPS (it already did as
    of 2026-09-17: `dok.seil.pro` and `footoo.bas.lu` both point at
    `57.131.136.250`). Traefik requests its own Let's Encrypt certificate

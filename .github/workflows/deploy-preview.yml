@@ -126,6 +126,7 @@ jobs:
             NEXT_PUBLIC_MEDIA_BASE_URL=${{ vars.NEXT_PUBLIC_MEDIA_BASE_URL || 'https://footoo.bas.lu/photoo-public' }}
             NEXT_PUBLIC_STORAGE_ORIGIN=${{ vars.NEXT_PUBLIC_STORAGE_ORIGIN }}
             NEXT_PUBLIC_ALLOW_INDEXING=${{ vars.NEXT_PUBLIC_ALLOW_INDEXING || 'false' }}
+            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ vars.PREVIEW_STRIPE_PUBLISHABLE_KEY }}
             NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
             SENTRY_REQUIRED=${{ vars.SENTRY_REQUIRED }}
             REVISION=${{ github.event.workflow_run.head_sha }}

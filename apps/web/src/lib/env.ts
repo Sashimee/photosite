@@ -33,6 +33,12 @@ const EnvSchema = z.object({
   NEXT_PUBLIC_STORAGE_ORIGIN: optional(z.url()),
   NEXT_PUBLIC_SENTRY_DSN: optional(z.url()),
   SENTRY_REQUIRED: optional(z.enum(['true', 'false'])),
+  // Baked in at build time (it's inlined into the client bundle), so it's a
+  // Docker build arg, not a runtime env var. Unset shows "payment is not
+  // available in this environment" instead of mounting the Payment Element
+  // (docs/steps/1B.7-checkout.md) - the local stack's STRIPE_FAKE gateway and
+  // CI both run without it.
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: optional(z.string().regex(/^pk_(test|live)_/)),
   NEXT_PUBLIC_ALLOW_INDEXING: z
     .string()
     .optional()
@@ -61,6 +67,7 @@ function loadEnv() {
     NEXT_PUBLIC_MEDIA_BASE_URL: process.env.NEXT_PUBLIC_MEDIA_BASE_URL,
     NEXT_PUBLIC_STORAGE_ORIGIN: process.env.NEXT_PUBLIC_STORAGE_ORIGIN,
     NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
     NEXT_PUBLIC_ALLOW_INDEXING: process.env.NEXT_PUBLIC_ALLOW_INDEXING,
     SENTRY_REQUIRED: process.env.SENTRY_REQUIRED,
     API_INTERNAL_URL: process.env.API_INTERNAL_URL,

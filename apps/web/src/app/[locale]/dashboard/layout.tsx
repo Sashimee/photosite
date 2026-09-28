@@ -55,6 +55,7 @@ export default async function DashboardLayout({
     { href: `/${locale}/dashboard/verification`, label: t('nav.verification') },
     { href: `/${locale}/dashboard/requests`, label: t('nav.requests') },
     { href: `/${locale}/dashboard/quotes`, label: t('nav.quotes') },
+    { href: `/${locale}/dashboard/bookings`, label: t('nav.bookings') },
   ];
 
   return (
