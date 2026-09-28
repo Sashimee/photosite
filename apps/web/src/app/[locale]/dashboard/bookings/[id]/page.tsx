@@ -42,22 +42,28 @@ export default async function DashboardBookingDetailPage({
   }
   const api = await serverApi();
 
-  const [t, result] = await Promise.all([
+  const [t, profileResult, result] = await Promise.all([
     getTranslations({ locale, namespace: 'web.bookings.detail' }),
+    api.GET('/v1/me/photographer-profile', { cache: 'no-store' }),
     api.GET('/v1/bookings/{id}', { params: { path: { id } }, cache: 'no-store' }),
   ]);
 
-  if (result.response.status === 401) {
+  if (result.response.status === 401 || profileResult.response.status === 401) {
     redirect(signInHref);
   }
   if (result.response.status === 404 || result.response.status === 403) {
     notFound();
   }
+  if (profileResult.response.status !== 200 && profileResult.response.status !== 404) {
+    throw new Error(
+      `Failed to load the photographer profile: HTTP ${String(profileResult.response.status)}`,
+    );
+  }
   if (!result.data) {
     throw new Error(`Failed to load booking "${id}": HTTP ${String(result.response.status)}`);
   }
   const booking = result.data;
-  if (booking.photographerId !== user.id) {
+  if (booking.photographerId !== profileResult.data?.id) {
     notFound();
   }
 

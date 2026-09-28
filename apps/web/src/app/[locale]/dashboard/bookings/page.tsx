@@ -45,25 +45,34 @@ export default async function DashboardBookingsPage({
   }
   const api = await serverApi();
 
-  const [t, result] = await Promise.all([
+  const [t, profileResult, result] = await Promise.all([
     getTranslations({ locale, namespace: 'web.dashboard.bookings' }),
+    api.GET('/v1/me/photographer-profile', { cache: 'no-store' }),
     api.GET('/v1/bookings', {
       params: { query: { limit: DASHBOARD_BOOKINGS_LIMIT, ...(cursor ? { cursor } : {}) } },
       cache: 'no-store',
     }),
   ]);
 
-  if (result.response.status === 401) {
+  if (result.response.status === 401 || profileResult.response.status === 401) {
     redirect(signInHref);
+  }
+  if (profileResult.response.status !== 200 && profileResult.response.status !== 404) {
+    throw new Error(
+      `Failed to load the photographer profile: HTTP ${String(profileResult.response.status)}`,
+    );
   }
   if (!result.data) {
     throw new Error(`Failed to load your bookings: HTTP ${String(result.response.status)}`);
   }
 
   // `GET /bookings` has no client/photographer filter, so this page - the
-  // photographer-facing one - only shows bookings where the signed-in user
-  // is the photographer; /bookings shows the client side of the same list.
-  const items = result.data.items.filter((booking) => booking.photographerId === user.id);
+  // photographer-facing one - only shows bookings where the signed-in user's
+  // own photographer profile is the one being booked; /bookings shows the
+  // client side of the same list. Without a profile, none of the bookings
+  // can be this photographer's, so the list is simply empty.
+  const profileId = profileResult.data?.id;
+  const items = result.data.items.filter((booking) => booking.photographerId === profileId);
 
   return (
     <div className="flex flex-col gap-8">

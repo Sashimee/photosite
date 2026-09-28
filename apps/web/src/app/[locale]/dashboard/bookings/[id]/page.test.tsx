@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { translate } from '@/testing/mock-translations';
 
 const BOOKING_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
-const PHOTOGRAPHER_ID = '3fa85f64-5717-4562-b3fc-2c963f66eeee';
+const USER_ID = '3fa85f64-5717-4562-b3fc-2c963f66d001';
+const PROFILE_ID = '3fa85f64-5717-4562-b3fc-2c963f66eeee';
+const OTHER_PROFILE_ID = '3fa85f64-5717-4562-b3fc-2c963f66ffff';
 
 const getSessionMock = vi.fn();
 const apiGetMock = vi.fn();
@@ -34,7 +36,7 @@ const BOOKING = {
   id: BOOKING_ID,
   quoteId: '3fa85f64-5717-4562-b3fc-2c963f66aaaa',
   clientId: '3fa85f64-5717-4562-b3fc-2c963f66cccc',
-  photographerId: PHOTOGRAPHER_ID,
+  photographerId: PROFILE_ID,
   total: { amountCents: 157500, currency: 'EUR' },
   scheduledAt: '2026-12-01T10:00:00.000Z',
   location: { lat: 49.6116, lng: 6.1319 },
@@ -46,10 +48,25 @@ const BOOKING = {
   cancellationReason: null,
 };
 
-function mockApi({ data, status = 200 }: { data?: unknown; status?: number }) {
+function mockApi({
+  data,
+  status = 200,
+  profileId = PROFILE_ID,
+  profileStatus = 200,
+}: {
+  data?: unknown;
+  status?: number;
+  profileId?: string | null;
+  profileStatus?: number;
+}) {
   apiGetMock.mockImplementation((url: string) => {
     if (url === '/v1/bookings/{id}') {
       return Promise.resolve({ data, response: { status } });
+    }
+    if (url === '/v1/me/photographer-profile') {
+      return profileStatus === 200
+        ? Promise.resolve({ data: { id: profileId }, response: { status: profileStatus } })
+        : Promise.resolve({ data: undefined, response: { status: profileStatus } });
     }
     throw new Error(`unexpected GET ${url}`);
   });
@@ -79,7 +96,7 @@ describe('DashboardBookingDetailPage', () => {
   });
 
   it('renders notFound when the id is not a valid identifier', async () => {
-    getSessionMock.mockResolvedValue({ id: PHOTOGRAPHER_ID });
+    getSessionMock.mockResolvedValue({ id: USER_ID });
     const Page = await loadPage();
 
     const digest = await redirectDigest(
@@ -102,7 +119,7 @@ describe('DashboardBookingDetailPage', () => {
   });
 
   it('redirects to sign-in when the session expires between the check and the fetch', async () => {
-    getSessionMock.mockResolvedValue({ id: PHOTOGRAPHER_ID });
+    getSessionMock.mockResolvedValue({ id: USER_ID });
     mockApi({ status: 401 });
     const Page = await loadPage();
 
@@ -114,7 +131,7 @@ describe('DashboardBookingDetailPage', () => {
   });
 
   it('renders notFound when the booking does not exist', async () => {
-    getSessionMock.mockResolvedValue({ id: PHOTOGRAPHER_ID });
+    getSessionMock.mockResolvedValue({ id: USER_ID });
     mockApi({ status: 404 });
     const Page = await loadPage();
 
@@ -126,7 +143,7 @@ describe('DashboardBookingDetailPage', () => {
   });
 
   it('renders notFound on a 403, the same as a 404', async () => {
-    getSessionMock.mockResolvedValue({ id: PHOTOGRAPHER_ID });
+    getSessionMock.mockResolvedValue({ id: USER_ID });
     mockApi({ status: 403 });
     const Page = await loadPage();
 
@@ -137,9 +154,32 @@ describe('DashboardBookingDetailPage', () => {
     expect(digest).toMatch(/;404$/);
   });
 
-  it('renders notFound when the booking belongs to a different photographer', async () => {
-    getSessionMock.mockResolvedValue({ id: 'someone-else' });
+  it('renders notFound when the booking belongs to a different photographer profile', async () => {
+    getSessionMock.mockResolvedValue({ id: USER_ID });
+    mockApi({ data: BOOKING, profileId: OTHER_PROFILE_ID });
+    const Page = await loadPage();
+
+    const digest = await redirectDigest(
+      Page({ params: Promise.resolve({ locale: 'en', id: BOOKING_ID }) }),
+    );
+
+    expect(digest).toMatch(/;404$/);
+  });
+
+  it('renders the booking when photographerId matches the profile id even though it differs from the session user id', async () => {
+    getSessionMock.mockResolvedValue({ id: USER_ID });
     mockApi({ data: BOOKING });
+    const Page = await loadPage();
+
+    const element = await Page({ params: Promise.resolve({ locale: 'en', id: BOOKING_ID }) });
+    await renderResolved(element);
+
+    expect(screen.getByRole('heading', { level: 1, name: '€1,575.00' })).toBeInTheDocument();
+  });
+
+  it('renders notFound when the booking’s photographerId matches the session user id but not the profile id', async () => {
+    getSessionMock.mockResolvedValue({ id: USER_ID });
+    mockApi({ data: { ...BOOKING, photographerId: USER_ID }, profileId: PROFILE_ID });
     const Page = await loadPage();
 
     const digest = await redirectDigest(
@@ -150,7 +190,7 @@ describe('DashboardBookingDetailPage', () => {
   });
 
   it('throws loudly when the API call fails unexpectedly', async () => {
-    getSessionMock.mockResolvedValue({ id: PHOTOGRAPHER_ID });
+    getSessionMock.mockResolvedValue({ id: USER_ID });
     mockApi({ status: 500 });
     const Page = await loadPage();
 
@@ -160,7 +200,7 @@ describe('DashboardBookingDetailPage', () => {
   });
 
   it('does not render any checkout UI for the photographer', async () => {
-    getSessionMock.mockResolvedValue({ id: PHOTOGRAPHER_ID });
+    getSessionMock.mockResolvedValue({ id: USER_ID });
     mockApi({ data: BOOKING });
     const Page = await loadPage();
 
@@ -171,7 +211,7 @@ describe('DashboardBookingDetailPage', () => {
   });
 
   it('does not show a payout figure for the photographer', async () => {
-    getSessionMock.mockResolvedValue({ id: PHOTOGRAPHER_ID });
+    getSessionMock.mockResolvedValue({ id: USER_ID });
     mockApi({ data: BOOKING });
     const Page = await loadPage();
 
@@ -182,7 +222,7 @@ describe('DashboardBookingDetailPage', () => {
   });
 
   it('links back to the dashboard bookings list and shows the total', async () => {
-    getSessionMock.mockResolvedValue({ id: PHOTOGRAPHER_ID });
+    getSessionMock.mockResolvedValue({ id: USER_ID });
     mockApi({ data: BOOKING });
     const Page = await loadPage();
 
