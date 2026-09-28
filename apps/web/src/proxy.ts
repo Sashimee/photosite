@@ -23,11 +23,13 @@ const imgOrigins = [
 const REVISION_HEADER = 'x-photoo-revision';
 const revision = process.env.PHOTOO_REVISION ?? 'unknown';
 
+const stripeEnabled = Boolean(env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+
 export function proxy(request: NextRequest): NextResponse {
   const { pathname, search } = request.nextUrl;
   const isDev = process.env.NODE_ENV === 'development';
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
-  const cspHeader = buildCspHeader(nonce, isDev, connectOrigins, imgOrigins);
+  const cspHeader = buildCspHeader(nonce, isDev, connectOrigins, imgOrigins, stripeEnabled);
 
   const redirectPath = buildLocaleRedirectPath(
     pathname,

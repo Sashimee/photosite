@@ -62,6 +62,22 @@ describe('env', () => {
       loadEnv({ NODE_ENV: 'production', SENTRY_REQUIRED: 'true', NEXT_PUBLIC_SENTRY_DSN: '' }),
     ).rejects.toThrow(/NEXT_PUBLIC_SENTRY_DSN is required/);
   });
+
+  it('treats an empty Stripe publishable key as unset', async () => {
+    const env = await loadEnv({ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: '' });
+    expect(env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY).toBeUndefined();
+  });
+
+  it('accepts a test-mode Stripe publishable key', async () => {
+    const env = await loadEnv({ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_abc123' });
+    expect(env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY).toBe('pk_test_abc123');
+  });
+
+  it('rejects a malformed Stripe publishable key', async () => {
+    await expect(loadEnv({ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'sk_live_abc123' })).rejects.toThrow(
+      /NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY/,
+    );
+  });
 });
 
 // Guards the bug that took every data-driven page down on the preview: Next
