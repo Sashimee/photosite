@@ -228,4 +228,23 @@ describe('BookingDetail', () => {
     expect(screen.queryByTestId('booking-refund-dialog')).not.toBeInTheDocument();
     expect(screen.queryByTestId('booking-document-button-receipt')).not.toBeInTheDocument();
   });
+
+  it('shows the booking total only, with no separate payout or platform fee figure, for either role', async () => {
+    const { BookingDetail } = await import('./booking-detail');
+
+    for (const viewerRole of ['client', 'photographer'] as const) {
+      const element = await BookingDetail({
+        booking: baseBooking,
+        locale: 'en',
+        backHref: '/en/bookings',
+        backLabel: 'Back to bookings',
+        viewerRole,
+      });
+      const { unmount } = render(element);
+
+      expect(screen.getAllByText('€1,575.00')).toHaveLength(2);
+
+      unmount();
+    }
+  });
 });

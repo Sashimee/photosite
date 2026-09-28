@@ -144,4 +144,31 @@ describe('BookingDeliveryForm', () => {
     ).toBeInTheDocument();
     expect(routerRefreshMock).not.toHaveBeenCalled();
   });
+
+  it('shows a mapped error when the request is rejected as unprocessable', async () => {
+    apiPostMock.mockResolvedValue({ data: undefined, error: { code: 'UNPROCESSABLE_ENTITY' } });
+    const BookingDeliveryForm = await loadBookingDeliveryForm();
+    const user = userEvent.setup();
+
+    render(<BookingDeliveryForm booking={baseBooking} />);
+
+    await user.type(
+      screen.getByLabelText(translate('web.bookings.detail.delivery', 'messageLabel')),
+      'Here are the final photos.',
+    );
+    await user.type(
+      screen.getByLabelText(translate('web.bookings.detail.delivery', 'externalLinkLabel')),
+      'https://example.com/gallery',
+    );
+    await user.click(
+      screen.getByRole('button', {
+        name: translate('web.bookings.detail.delivery', 'submitCta'),
+      }),
+    );
+
+    expect(
+      await screen.findByText(translate('web.bookings', 'errors.invalid')),
+    ).toBeInTheDocument();
+    expect(routerRefreshMock).not.toHaveBeenCalled();
+  });
 });

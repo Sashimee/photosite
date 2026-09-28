@@ -134,4 +134,24 @@ describe('BookingCancelDialog', () => {
     ).toBeInTheDocument();
     expect(routerRefreshMock).not.toHaveBeenCalled();
   });
+
+  it('shows a mapped error and does not refresh when the request is rejected as unprocessable', async () => {
+    apiPostMock.mockResolvedValue({ data: undefined, error: { code: 'UNPROCESSABLE_ENTITY' } });
+    const BookingCancelDialog = await loadBookingCancelDialog();
+    const user = userEvent.setup();
+
+    render(<BookingCancelDialog booking={baseBooking} />);
+
+    await user.click(
+      screen.getByRole('button', { name: translate('web.bookings.detail.cancel', 'cta') }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: translate('web.bookings.detail.cancel', 'confirmCta') }),
+    );
+
+    expect(
+      await screen.findByText(translate('web.bookings', 'errors.invalid')),
+    ).toBeInTheDocument();
+    expect(routerRefreshMock).not.toHaveBeenCalled();
+  });
 });

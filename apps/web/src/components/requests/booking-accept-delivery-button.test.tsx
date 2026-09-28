@@ -123,4 +123,28 @@ describe('BookingAcceptDeliveryButton', () => {
       }),
     ).toBeInTheDocument();
   });
+
+  it('shows a mapped error when the request is rejected as a conflict', async () => {
+    apiPostMock.mockResolvedValue({ data: undefined, error: { code: 'CONFLICT' } });
+    const BookingAcceptDeliveryButton = await loadBookingAcceptDeliveryButton();
+    const user = userEvent.setup();
+
+    render(<BookingAcceptDeliveryButton booking={baseBooking} />);
+
+    await user.click(
+      screen.getByRole('button', {
+        name: translate('web.bookings.detail.acceptDelivery', 'cta'),
+      }),
+    );
+    await user.click(
+      screen.getByRole('button', {
+        name: translate('web.bookings.detail.acceptDelivery', 'confirmCta'),
+      }),
+    );
+
+    expect(
+      await screen.findByText(translate('web.bookings', 'errors.conflict')),
+    ).toBeInTheDocument();
+    expect(routerRefreshMock).not.toHaveBeenCalled();
+  });
 });
