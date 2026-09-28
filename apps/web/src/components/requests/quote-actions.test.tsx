@@ -105,7 +105,7 @@ describe('QuoteActions', () => {
     ).toBeEnabled();
   });
 
-  it('accepts a sent quote, refreshes and links to the new booking', async () => {
+  it('accepts a sent quote and navigates to the new booking', async () => {
     const bookingId = '3fa85f64-5717-4562-b3fc-2c963f66dddd';
     const fetchMock = vi
       .fn()
@@ -129,15 +129,13 @@ describe('QuoteActions', () => {
 
     const [request] = fetchMock.mock.calls[0] as [Request];
     expect(request.url).toContain(`/v1/quotes/${baseQuote.id}/accept`);
-    expect(refreshMock).toHaveBeenCalled();
-    expect(
-      await screen.findByRole('link', {
-        name: translate('web.quotes.detail', 'acceptedBookingCta'),
-      }),
-    ).toHaveAttribute('href', `/en/bookings/${bookingId}`);
+    await vi.waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith(`/en/bookings/${bookingId}`);
+    });
+    expect(refreshMock).not.toHaveBeenCalled();
   });
 
-  it('does not show a booking link once the accept response has no bookingId', async () => {
+  it('falls back to refreshing when the accept response has no bookingId', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(
@@ -158,10 +156,10 @@ describe('QuoteActions', () => {
       }),
     );
 
-    expect(refreshMock).toHaveBeenCalled();
-    expect(
-      screen.queryByRole('link', { name: translate('web.quotes.detail', 'acceptedBookingCta') }),
-    ).not.toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(refreshMock).toHaveBeenCalled();
+    });
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it('shows a mapped error and keeps the dialog open when accept is rejected', async () => {
@@ -185,6 +183,7 @@ describe('QuoteActions', () => {
 
     expect(await screen.findByText(translate('web.quotes', 'errors.conflict'))).toBeInTheDocument();
     expect(refreshMock).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it('resets pending and shows a generic error when accept fails on the network', async () => {
@@ -205,6 +204,7 @@ describe('QuoteActions', () => {
 
     expect(await screen.findByText(translate('web.quotes', 'errors.generic'))).toBeInTheDocument();
     expect(refreshMock).not.toHaveBeenCalled();
+    expect(pushMock).not.toHaveBeenCalled();
     expect(
       screen.getByRole('button', { name: translate('web.quotes.detail', 'acceptConfirmCta') }),
     ).toBeEnabled();

@@ -186,6 +186,10 @@ describe('QuoteDetailPage', () => {
     render(element);
 
     expect(screen.getByText('Quote accepted.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View your bookings' })).toHaveAttribute(
+      'href',
+      '/en/bookings',
+    );
   });
 
   it('only shows quote actions to the quote’s own client', async () => {

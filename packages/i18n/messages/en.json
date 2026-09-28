@@ -1637,7 +1637,7 @@
         "withdrawPending": "Withdrawing…",
         "withdrawDismissCta": "Keep quote",
         "acceptedNotice": "Quote accepted.",
-        "acceptedBookingCta": "Go to booking and pay",
+        "viewBookingsCta": "View your bookings",
         "declinedNotice": "Quote declined.",
         "withdrawnNotice": "This quote was withdrawn by the photographer.",
         "notFound": {

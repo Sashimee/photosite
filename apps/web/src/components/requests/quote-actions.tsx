@@ -1,7 +1,6 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -32,9 +31,6 @@ export function QuoteActions({
 
   const [acceptPending, setAcceptPending] = useState(false);
   const [acceptError, setAcceptError] = useState<string | null>(null);
-  // Only ever set from the accept response itself: `GET /quotes/{id}` never
-  // returns a bookingId, so this doesn't survive a hard reload once accepted.
-  const [acceptedBookingId, setAcceptedBookingId] = useState<string | null>(null);
   const [declinePending, setDeclinePending] = useState(false);
   const [declineError, setDeclineError] = useState<string | null>(null);
 
@@ -53,8 +49,11 @@ export function QuoteActions({
         setAcceptError(requestErrorMessage(tErrors, error));
         return false;
       }
-      setAcceptedBookingId(data.bookingId);
-      router.refresh();
+      if (data.bookingId) {
+        router.push(`/${locale}/bookings/${data.bookingId}`);
+      } else {
+        router.refresh();
+      }
       return true;
     } catch {
       setAcceptError(requestErrorMessage(tErrors, undefined));
@@ -121,14 +120,6 @@ export function QuoteActions({
           onConfirm={decline}
         />
       </div>
-      {acceptedBookingId ? (
-        <Link
-          href={`/${locale}/bookings/${acceptedBookingId}`}
-          className="self-start text-sm font-medium text-primary underline-offset-4 hover:underline"
-        >
-          {t('acceptedBookingCta')}
-        </Link>
-      ) : null}
     </div>
   );
 }

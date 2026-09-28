@@ -118,7 +118,15 @@ export default async function QuoteDetailPage({
       </div>
 
       {quote.status === 'accepted' ? (
-        <FormNotice tone="success">{t('acceptedNotice')}</FormNotice>
+        <FormNotice tone="success">
+          {t('acceptedNotice')}{' '}
+          <Link
+            href={`/${locale}/bookings`}
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            {t('viewBookingsCta')}
+          </Link>
+        </FormNotice>
       ) : null}
       {quote.status === 'declined' ? (
         <FormNotice tone="info">{t('declinedNotice')}</FormNotice>
