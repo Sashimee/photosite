@@ -1621,7 +1621,7 @@
         "acceptCta": "Accept quote",
         "declineCta": "Decline quote",
         "acceptConfirmTitle": "Accept this quote?",
-        "acceptConfirmDescription": "Booking and payment are coming soon; accepting reserves this quote and we'll follow up with next steps.",
+        "acceptConfirmDescription": "Accepting reserves this quote and creates a booking you'll pay for next.",
         "acceptConfirmCta": "Yes, accept quote",
         "acceptPending": "Accepting…",
         "acceptDismissCta": "Not yet",
@@ -1636,7 +1636,8 @@
         "withdrawConfirmCta": "Yes, withdraw quote",
         "withdrawPending": "Withdrawing…",
         "withdrawDismissCta": "Keep quote",
-        "acceptedNotice": "Quote accepted. Booking and payment are coming soon — we'll be in touch with next steps.",
+        "acceptedNotice": "Quote accepted.",
+        "acceptedBookingCta": "Go to booking and pay",
         "declinedNotice": "Quote declined.",
         "withdrawnNotice": "This quote was withdrawn by the photographer.",
         "notFound": {

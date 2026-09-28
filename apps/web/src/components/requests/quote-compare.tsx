@@ -77,7 +77,7 @@ export async function QuoteCompare({
               >
                 {tQuote('viewCta')}
               </Link>
-              <QuoteActions quote={quote} currentUserId={currentUserId} />
+              <QuoteActions quote={quote} currentUserId={currentUserId} locale={locale} />
             </li>
           );
         })}

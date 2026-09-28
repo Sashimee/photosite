@@ -185,11 +185,7 @@ describe('QuoteDetailPage', () => {
     });
     render(element);
 
-    expect(
-      screen.getByText(
-        "Quote accepted. Booking and payment are coming soon — we'll be in touch with next steps.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Quote accepted.')).toBeInTheDocument();
   });
 
   it('only shows quote actions to the quote’s own client', async () => {

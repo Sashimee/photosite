@@ -58,7 +58,9 @@ describe('QuoteActions', () => {
     vi.stubGlobal('fetch', vi.fn());
     const QuoteActions = await loadQuoteActions();
 
-    const { container } = render(<QuoteActions quote={baseQuote} currentUserId="someone-else" />);
+    const { container } = render(
+      <QuoteActions quote={baseQuote} currentUserId="someone-else" locale="en" />,
+    );
 
     expect(container).toBeEmptyDOMElement();
   });
@@ -71,6 +73,7 @@ describe('QuoteActions', () => {
       <QuoteActions
         quote={{ ...baseQuote, status: 'accepted' }}
         currentUserId={baseQuote.clientId}
+        locale="en"
       />,
     );
 
@@ -90,6 +93,7 @@ describe('QuoteActions', () => {
       <QuoteActions
         quote={{ ...baseQuote, validUntil: '2020-01-01T00:00:00.000Z' }}
         currentUserId={baseQuote.clientId}
+        locale="en"
       />,
     );
 
@@ -101,15 +105,18 @@ describe('QuoteActions', () => {
     ).toBeEnabled();
   });
 
-  it('accepts a sent quote and refreshes', async () => {
+  it('accepts a sent quote, refreshes and links to the new booking', async () => {
+    const bookingId = '3fa85f64-5717-4562-b3fc-2c963f66dddd';
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(new Response(JSON.stringify(baseQuote), { status: 200 }));
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ...baseQuote, bookingId }), { status: 200 }),
+      );
     vi.stubGlobal('fetch', fetchMock);
     const QuoteActions = await loadQuoteActions();
     const user = userEvent.setup();
 
-    render(<QuoteActions quote={baseQuote} currentUserId={baseQuote.clientId} />);
+    render(<QuoteActions quote={baseQuote} currentUserId={baseQuote.clientId} locale="en" />);
 
     await user.click(
       screen.getByRole('button', { name: translate('web.quotes.detail', 'acceptCta') }),
@@ -123,6 +130,38 @@ describe('QuoteActions', () => {
     const [request] = fetchMock.mock.calls[0] as [Request];
     expect(request.url).toContain(`/v1/quotes/${baseQuote.id}/accept`);
     expect(refreshMock).toHaveBeenCalled();
+    expect(
+      await screen.findByRole('link', {
+        name: translate('web.quotes.detail', 'acceptedBookingCta'),
+      }),
+    ).toHaveAttribute('href', `/en/bookings/${bookingId}`);
+  });
+
+  it('does not show a booking link once the accept response has no bookingId', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ...baseQuote, bookingId: null }), { status: 200 }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const QuoteActions = await loadQuoteActions();
+    const user = userEvent.setup();
+
+    render(<QuoteActions quote={baseQuote} currentUserId={baseQuote.clientId} locale="en" />);
+
+    await user.click(
+      screen.getByRole('button', { name: translate('web.quotes.detail', 'acceptCta') }),
+    );
+    await user.click(
+      await screen.findByRole('button', {
+        name: translate('web.quotes.detail', 'acceptConfirmCta'),
+      }),
+    );
+
+    expect(refreshMock).toHaveBeenCalled();
+    expect(
+      screen.queryByRole('link', { name: translate('web.quotes.detail', 'acceptedBookingCta') }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows a mapped error and keeps the dialog open when accept is rejected', async () => {
@@ -133,7 +172,7 @@ describe('QuoteActions', () => {
     const QuoteActions = await loadQuoteActions();
     const user = userEvent.setup();
 
-    render(<QuoteActions quote={baseQuote} currentUserId={baseQuote.clientId} />);
+    render(<QuoteActions quote={baseQuote} currentUserId={baseQuote.clientId} locale="en" />);
 
     await user.click(
       screen.getByRole('button', { name: translate('web.quotes.detail', 'acceptCta') }),
@@ -154,7 +193,7 @@ describe('QuoteActions', () => {
     const QuoteActions = await loadQuoteActions();
     const user = userEvent.setup();
 
-    render(<QuoteActions quote={baseQuote} currentUserId={baseQuote.clientId} />);
+    render(<QuoteActions quote={baseQuote} currentUserId={baseQuote.clientId} locale="en" />);
 
     await user.click(
       screen.getByRole('button', { name: translate('web.quotes.detail', 'acceptCta') }),
@@ -179,7 +218,7 @@ describe('QuoteActions', () => {
     const QuoteActions = await loadQuoteActions();
     const user = userEvent.setup();
 
-    render(<QuoteActions quote={baseQuote} currentUserId={baseQuote.clientId} />);
+    render(<QuoteActions quote={baseQuote} currentUserId={baseQuote.clientId} locale="en" />);
     await user.click(
       screen.getByRole('button', { name: translate('web.quotes.detail', 'acceptCta') }),
     );

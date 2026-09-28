@@ -157,7 +157,7 @@ export default async function QuoteDetailPage({
         </div>
       ) : null}
 
-      <QuoteActions quote={quote} currentUserId={user.id} />
+      <QuoteActions quote={quote} currentUserId={user.id} locale={locale} />
       {isOwnPhotographerQuote ? <WithdrawQuoteAction quote={quote} /> : null}
     </section>
   );
