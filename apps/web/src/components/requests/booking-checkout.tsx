@@ -76,7 +76,7 @@ export function BookingCheckout({
   const [state, setState] = useState<CheckoutState>({ status: 'loading' });
   const [returnError, setReturnError] = useState<string | null>(null);
 
-  const returnClientSecret = searchParams.get('payment_intent_client_secret');
+  const [returnClientSecret] = useState(() => searchParams.get('payment_intent_client_secret'));
 
   useEffect(() => {
     if (!returnClientSecret) {
@@ -88,7 +88,7 @@ export function BookingCheckout({
     params.delete('redirect_status');
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [returnClientSecret, pathname, router, searchParams]);
+  }, [returnClientSecret]);
 
   useEffect(() => {
     let cancelled = false;

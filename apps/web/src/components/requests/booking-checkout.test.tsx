@@ -242,6 +242,33 @@ describe('BookingCheckout', () => {
     expect(routerRefreshMock).toHaveBeenCalledTimes(5);
   });
 
+  it('keeps the processing notice and does not request a new payment intent after the return params are stripped from the URL', async () => {
+    searchParamsMock = new URLSearchParams(
+      'payment_intent_client_secret=pi_123_secret_abc&payment_intent=pi_123&redirect_status=succeeded',
+    );
+    getStripeMock.mockResolvedValue(stripeClientMock);
+    retrievePaymentIntentMock.mockResolvedValue({ paymentIntent: { status: 'processing' } });
+    routerReplaceMock.mockImplementation(() => {
+      searchParamsMock = new URLSearchParams();
+    });
+    const BookingCheckout = await loadBookingCheckout();
+
+    const { rerender } = render(<BookingCheckout bookingId={BOOKING_ID} returnUrl={RETURN_URL} />);
+
+    expect(
+      await screen.findByText(translate('web.bookings.detail', 'checkout.processingReturn')),
+    ).toBeInTheDocument();
+    expect(retrievePaymentIntentMock).toHaveBeenCalledTimes(1);
+
+    rerender(<BookingCheckout bookingId={BOOKING_ID} returnUrl={RETURN_URL} />);
+
+    expect(
+      screen.getByText(translate('web.bookings.detail', 'checkout.processingReturn')),
+    ).toBeInTheDocument();
+    expect(retrievePaymentIntentMock).toHaveBeenCalledTimes(1);
+    expect(apiPostMock).not.toHaveBeenCalled();
+  });
+
   it('shows an error and still loads a fresh payment intent when the return status is requires_payment_method', async () => {
     searchParamsMock = new URLSearchParams(
       'payment_intent_client_secret=pi_123_secret_abc&payment_intent=pi_123&redirect_status=failed',
