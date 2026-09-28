@@ -62,5 +62,38 @@
         "body": "Ein Kunde hat eine Buchungszahlung von {total} bei seiner Bank angefochten. Die Buchung ist eingefroren und wird erst freigegeben, nachdem ein Finanz-Admin sie im Admin-Backend geprüft hat. Details: {url}"
       }
     }
+  },
+  "documents": {
+    "common": {
+      "reference": "Buchungsreferenz: {reference}",
+      "issuedOn": "Datum: {date}",
+      "contact": "photoo.lu · hello@photoo.lu",
+      "page": "Seite {page} von {pages}"
+    },
+    "receipt": {
+      "title": "Buchungsbeleg",
+      "sellerHeading": "Fotograf (Verkäufer)",
+      "buyerHeading": "Kunde",
+      "itemsHeading": "Leistungen",
+      "lineItem": "{qty} × {label}",
+      "totalPaid": "Gesamt bezahlt",
+      "refunded": "Erstattet",
+      "netPaid": "Netto bezahlter Betrag",
+      "sellerNotice": "Dieser Beleg bestätigt eine über {appName} geleistete Zahlung. {appName} ist nicht der Verkäufer dieser Leistungen: Das ist der Fotograf, der für jede gesetzlich vorgeschriebene Rechnung verantwortlich bleibt."
+    },
+    "feeInvoice": {
+      "title": "Rechnung über die Plattformgebühr",
+      "issuerHeading": "Ausgestellt von",
+      "recipientHeading": "Ausgestellt an",
+      "bookingAmount": "Vom Kunden bezahlter Buchungsbetrag",
+      "refundedToClient": "An den Kunden erstattet",
+      "platformFee": "Plattformgebühr ({percent})",
+      "vatOnFee": "MwSt. auf die Plattformgebühr ({rate})",
+      "totalFee": "Plattformgebühr gesamt",
+      "transferred": "An Sie überwiesen",
+      "reversed": "Von Ihrer Überweisung zurückgebucht",
+      "payout": "Ihre Auszahlung",
+      "payoutNotice": "Ihre Auszahlung wird auf Ihr verbundenes Stripe-Konto überwiesen. Sie bleiben dafür verantwortlich, Ihrem Kunden eine Rechnung zu stellen und dieses Einkommen zu versteuern."
+    }
   }
 }

@@ -770,6 +770,39 @@
       "extended": "Extended use"
     }
   },
+  "documents": {
+    "common": {
+      "reference": "Booking reference: {reference}",
+      "issuedOn": "Date: {date}",
+      "contact": "photoo.lu · hello@photoo.lu",
+      "page": "Page {page} of {pages}"
+    },
+    "receipt": {
+      "title": "Booking receipt",
+      "sellerHeading": "Photographer (seller)",
+      "buyerHeading": "Client",
+      "itemsHeading": "Services",
+      "lineItem": "{qty} × {label}",
+      "totalPaid": "Total paid",
+      "refunded": "Refunded to you",
+      "netPaid": "Net amount paid",
+      "sellerNotice": "This receipt confirms a payment made through {appName}. {appName} is not the seller of these services: the photographer is, and remains responsible for issuing any invoice the law requires."
+    },
+    "feeInvoice": {
+      "title": "Platform fee invoice",
+      "issuerHeading": "Issued by",
+      "recipientHeading": "Issued to",
+      "bookingAmount": "Booking amount paid by the client",
+      "refundedToClient": "Refunded to the client",
+      "platformFee": "Platform fee ({percent})",
+      "vatOnFee": "VAT on the platform fee ({rate})",
+      "totalFee": "Total platform fee",
+      "transferred": "Transferred to you",
+      "reversed": "Reversed from your transfer",
+      "payout": "Your payout",
+      "payoutNotice": "Your payout is transferred to your connected Stripe account. You remain responsible for invoicing your client and for declaring this income."
+    }
+  },
   "email": {
     "verifyEmail": {
       "subject": "Verify your {appName} email",

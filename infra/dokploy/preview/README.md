@@ -291,8 +291,8 @@ each app actually calls (`apps/api/src/storage/storage.service.ts`,
 
 | User | Bucket | Actions |
 |------|--------|---------|
-| `MINIO_API_ACCESS_KEY` (`api`) | `photoo-private` | Get, Put, Delete (covers presigned PUT/GET, HEAD, and same-bucket Copy) |
-| `MINIO_WORKER_ACCESS_KEY` (`worker`, and `seed` which only calls the same public-write path) | `photoo-private`: Get, Delete; `photoo-public`: Put | |
+| `MINIO_API_ACCESS_KEY` (`api`) | `photoo-private` | Get, Put, Delete (covers presigned PUT/GET, HEAD, and same-bucket Copy); plus ListBucket on the bucket itself, scoped by an `s3:prefix` condition to `bookings/*`, so `HeadObject` on a missing booking document 404s instead of 403 (`apps/api/src/modules/payments/booking-documents.service.ts`) |
+| `MINIO_WORKER_ACCESS_KEY` (`worker`, and `seed` which only calls the same public-write path) | `photoo-private`: Get, Delete everywhere, Put scoped to `bookings/*` and `gdpr-exports/*` (booking receipt/invoice PDFs and GDPR export archives); plus ListBucket on the bucket itself, scoped by an `s3:prefix` condition to those same two prefixes, so `HeadObject` on a missing key 404s instead of 403 (`apps/worker/src/storage/storage.service.ts`); `photoo-public`: Put | |
 | `MINIO_BACKUP_ACCESS_KEY` (`backup`'s `backup.sh`) | `photoo-backups` | List, Put - no Get, no Delete |
 | `MINIO_PRUNE_ACCESS_KEY` (`backup`'s `prune.sh`) | `photoo-backups` (`photoo/*` only) | List (whole bucket), Get, Delete (`photoo/*` only) |
 

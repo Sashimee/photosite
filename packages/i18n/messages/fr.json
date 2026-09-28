@@ -62,5 +62,38 @@
         "body": "Un client a contesté auprès de sa banque un paiement de réservation de {total}. La réservation est gelée et ne sera pas libérée avant l'examen d'un administrateur finance dans le back-office. Détails : {url}"
       }
     }
+  },
+  "documents": {
+    "common": {
+      "reference": "Référence de la réservation : {reference}",
+      "issuedOn": "Date : {date}",
+      "contact": "photoo.lu · hello@photoo.lu",
+      "page": "Page {page} sur {pages}"
+    },
+    "receipt": {
+      "title": "Reçu de réservation",
+      "sellerHeading": "Photographe (vendeur)",
+      "buyerHeading": "Client",
+      "itemsHeading": "Prestations",
+      "lineItem": "{qty} × {label}",
+      "totalPaid": "Total payé",
+      "refunded": "Remboursé",
+      "netPaid": "Montant net payé",
+      "sellerNotice": "Ce reçu confirme un paiement effectué via {appName}. {appName} n'est pas le vendeur de ces prestations : c'est le photographe, qui reste responsable d'émettre toute facture exigée par la loi."
+    },
+    "feeInvoice": {
+      "title": "Facture des frais de plateforme",
+      "issuerHeading": "Émise par",
+      "recipientHeading": "Émise à",
+      "bookingAmount": "Montant de la réservation payé par le client",
+      "refundedToClient": "Remboursé au client",
+      "platformFee": "Frais de plateforme ({percent})",
+      "vatOnFee": "TVA sur les frais de plateforme ({rate})",
+      "totalFee": "Total des frais de plateforme",
+      "transferred": "Viré sur votre compte",
+      "reversed": "Repris sur votre virement",
+      "payout": "Votre versement",
+      "payoutNotice": "Votre versement est viré sur votre compte Stripe connecté. Vous restez responsable de la facturation de votre client et de la déclaration de ce revenu."
+    }
   }
 }

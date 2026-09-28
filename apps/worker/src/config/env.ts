@@ -126,6 +126,7 @@ const BaseEnvSchema = z.object({
 
   WORKER_CONCURRENCY_GDPR_EXPORT: z.coerce.number().int().positive().default(1),
   WORKER_CONCURRENCY_GDPR_SWEEP: z.coerce.number().int().positive().default(1),
+  WORKER_CONCURRENCY_RECEIPT_PDF: z.coerce.number().int().positive().default(1),
   GDPR_SWEEP_INTERVAL_MS: z.coerce
     .number()
     .int()

@@ -15,6 +15,7 @@ export {
   LICENCE_USAGES,
   REQUEST_STATUSES,
   QUOTE_STATUSES,
+  BOOKING_DOCUMENTS,
   BOOKING_STATUSES,
   CONVERSATION_TYPES,
   ATTACHMENT_KINDS,
@@ -48,6 +49,7 @@ export {
   type LicenceUsage,
   type RequestStatus,
   type QuoteStatus,
+  type BookingDocument,
   type BookingStatus,
   type ConversationType,
   type AttachmentKind,
@@ -131,6 +133,7 @@ export { HealthResponseSchema, ReadyResponseSchema } from './contract/health.js'
 
 export {
   BOOKING_RELEASE_QUEUE_NAME,
+  bookingDocumentKey,
   BookingReleaseJobSchema,
   EMAIL_QUEUE_NAME,
   EmailJobSchema,
@@ -164,6 +167,9 @@ export {
   QUEUE_NAMES,
   QUOTE_EXPIRY_QUEUE_NAME,
   QuoteExpiryJobSchema,
+  RECEIPT_PDF_QUEUE_NAME,
+  receiptPdfJobId,
+  ReceiptPdfJobSchema,
   UPLOADS_CLEANUP_QUEUE_NAME,
   UploadsCleanupJobSchema,
   type BookingReleaseJob,
@@ -183,6 +189,7 @@ export {
   type QueueJobPayload,
   type QueueName,
   type QuoteExpiryJob,
+  type ReceiptPdfJob,
   type UploadsCleanupJob,
 } from './queues.js';
 
@@ -295,6 +302,8 @@ export {
 
 export {
   BookingBaseSchema,
+  BookingDocumentDownloadResponseSchema,
+  BookingDocumentSchema,
   BookingSchema,
   CancelBookingRequestSchema,
   CreateDeliveryRequestSchema,

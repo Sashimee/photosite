@@ -1,4 +1,4 @@
-import { BOOKING_STATUSES } from '../enums.js';
+import { BOOKING_DOCUMENTS, BOOKING_STATUSES } from '../enums.js';
 import {
   CursorPaginationQuerySchema,
   HttpUrlSchema,
@@ -83,6 +83,18 @@ export const PaymentIntentResponseSchema = z
   })
   .strict()
   .openapi('BookingPaymentIntent');
+
+export const BookingDocumentSchema = z.enum(BOOKING_DOCUMENTS).openapi({ example: 'receipt' });
+
+export const BookingDocumentDownloadResponseSchema = z
+  .object({
+    url: z.url().openapi({
+      example: 'https://storage.photoo.lu/bookings/abc123/receipt.pdf?signature=xyz',
+    }),
+    expiresAt: IsoDateTimeSchema,
+  })
+  .strict()
+  .openapi('BookingDocumentDownload');
 
 registry.registerPath({
   method: 'get',
@@ -191,5 +203,26 @@ registry.registerPath({
       content: { 'application/json': { schema: PaymentIntentResponseSchema } },
     },
     ...errorResponses([401, 403, 404, 409, 422]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/bookings/{id}/documents/{document}'),
+  summary:
+    'Get a 10-minute presigned download URL for a released booking document. The client gets ' +
+    'the receipt, the photographer the platform-fee invoice; 403 for the other party, 404 for ' +
+    'anyone else, 409 while the booking is not released or the PDF is not generated yet.',
+  tags: ['bookings'],
+  security: AUTH_SECURITY,
+  request: {
+    params: z.object({ id: IdSchema, document: BookingDocumentSchema }).strict(),
+  },
+  responses: {
+    '200': {
+      description: 'Presigned download URL issued',
+      content: { 'application/json': { schema: BookingDocumentDownloadResponseSchema } },
+    },
+    ...errorResponses([401, 403, 404, 409]),
   },
 });

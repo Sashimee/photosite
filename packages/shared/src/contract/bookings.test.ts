@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BookingDocumentDownloadResponseSchema,
+  BookingDocumentSchema,
   BookingSchema,
   CancelBookingRequestSchema,
   CreateDeliveryRequestSchema,
@@ -162,6 +164,46 @@ describe('PaymentIntentResponseSchema', () => {
   it('rejects a response without the amount', () => {
     expect(
       PaymentIntentResponseSchema.safeParse({ clientSecret: 'pi_123_secret_abc' }).success,
+    ).toBe(false);
+  });
+});
+
+describe('BookingDocumentSchema', () => {
+  it.each(['receipt', 'fee-invoice'])('accepts %s', (document) => {
+    expect(BookingDocumentSchema.safeParse(document).success).toBe(true);
+  });
+
+  it('rejects an unknown document', () => {
+    expect(BookingDocumentSchema.safeParse('credit-note').success).toBe(false);
+  });
+});
+
+describe('BookingDocumentDownloadResponseSchema', () => {
+  it('accepts a url with its expiry', () => {
+    expect(
+      BookingDocumentDownloadResponseSchema.safeParse({
+        url: 'https://storage.photoo.lu/bookings/abc/receipt.pdf?signature=xyz',
+        expiresAt: '2026-09-28T10:10:00.000Z',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a non-url', () => {
+    expect(
+      BookingDocumentDownloadResponseSchema.safeParse({
+        url: 'not a url',
+        expiresAt: '2026-09-28T10:10:00.000Z',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects unknown extra keys', () => {
+    expect(
+      BookingDocumentDownloadResponseSchema.safeParse({
+        url: 'https://storage.photoo.lu/bookings/abc/receipt.pdf',
+        expiresAt: '2026-09-28T10:10:00.000Z',
+        key: 'bookings/abc/receipt.pdf',
+      }).success,
     ).toBe(false);
   });
 });

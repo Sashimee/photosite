@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOOKING_RELEASE_QUEUE_NAME,
+  bookingDocumentKey,
   BookingReleaseJobSchema,
   EMAIL_QUEUE_NAME,
   EmailJobSchema,
@@ -35,6 +36,7 @@ import {
   QUOTE_EXPIRY_QUEUE_NAME,
   QuoteExpiryJobSchema,
   RECEIPT_PDF_QUEUE_NAME,
+  receiptPdfJobId,
   ReceiptPdfJobSchema,
   UPLOADS_CLEANUP_QUEUE_NAME,
   UploadsCleanupJobSchema,
@@ -377,22 +379,56 @@ describe.each([
 });
 
 describe('ReceiptPdfJobSchema', () => {
-  it('accepts a valid bookingId', () => {
-    expect(ReceiptPdfJobSchema.safeParse({ bookingId: VALID_UPLOAD_ID }).success).toBe(true);
+  it.each(['receipt', 'fee-invoice'])('accepts a valid bookingId with document %s', (document) => {
+    expect(ReceiptPdfJobSchema.safeParse({ bookingId: VALID_UPLOAD_ID, document }).success).toBe(
+      true,
+    );
   });
 
   it('rejects a missing bookingId', () => {
-    expect(ReceiptPdfJobSchema.safeParse({}).success).toBe(false);
+    expect(ReceiptPdfJobSchema.safeParse({ document: 'receipt' }).success).toBe(false);
+  });
+
+  it('rejects a missing document', () => {
+    expect(ReceiptPdfJobSchema.safeParse({ bookingId: VALID_UPLOAD_ID }).success).toBe(false);
+  });
+
+  it('rejects an unknown document', () => {
+    expect(
+      ReceiptPdfJobSchema.safeParse({ bookingId: VALID_UPLOAD_ID, document: 'invoice' }).success,
+    ).toBe(false);
   });
 
   it('rejects a non-uuid bookingId', () => {
-    expect(ReceiptPdfJobSchema.safeParse({ bookingId: 'not-a-uuid' }).success).toBe(false);
+    expect(
+      ReceiptPdfJobSchema.safeParse({ bookingId: 'not-a-uuid', document: 'receipt' }).success,
+    ).toBe(false);
   });
 
   it('rejects unknown extra keys', () => {
     expect(
-      ReceiptPdfJobSchema.safeParse({ bookingId: VALID_UPLOAD_ID, extra: 'nope' }).success,
+      ReceiptPdfJobSchema.safeParse({
+        bookingId: VALID_UPLOAD_ID,
+        document: 'receipt',
+        extra: 'nope',
+      }).success,
     ).toBe(false);
+  });
+});
+
+describe('booking document helpers', () => {
+  it('builds one job id per booking and document', () => {
+    expect(receiptPdfJobId(VALID_UPLOAD_ID, 'receipt')).toBe(`receipt-${VALID_UPLOAD_ID}`);
+    expect(receiptPdfJobId(VALID_UPLOAD_ID, 'fee-invoice')).toBe(`fee-invoice-${VALID_UPLOAD_ID}`);
+  });
+
+  it('builds the private bucket key of each document', () => {
+    expect(bookingDocumentKey(VALID_UPLOAD_ID, 'receipt')).toBe(
+      `bookings/${VALID_UPLOAD_ID}/receipt.pdf`,
+    );
+    expect(bookingDocumentKey(VALID_UPLOAD_ID, 'fee-invoice')).toBe(
+      `bookings/${VALID_UPLOAD_ID}/fee-invoice.pdf`,
+    );
   });
 });
 

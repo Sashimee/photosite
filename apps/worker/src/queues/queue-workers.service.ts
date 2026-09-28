@@ -13,6 +13,7 @@ import {
   PROVENANCE_CHECK_QUEUE_NAME,
   PUSH_RECEIPTS_QUEUE_NAME,
   QUOTE_EXPIRY_QUEUE_NAME,
+  RECEIPT_PDF_QUEUE_NAME,
   UPLOADS_CLEANUP_QUEUE_NAME,
 } from '@photoo/shared';
 import { Queue, Worker } from 'bullmq';
@@ -21,6 +22,7 @@ import { Logger } from 'nestjs-pino';
 import { AuditLogService } from '../common/audit-log.service.js';
 import { reportJobFailure } from '../common/monitoring/report-job-failure.js';
 import { APP_CONFIG, type Env } from '../config/env.js';
+import { createReceiptPdfProcessor } from '../documents/receipt-pdf.processor.js';
 import { createMailTransport } from '../email/mail-transport.js';
 import { createGdprExportProcessor } from '../gdpr/gdpr-export.processor.js';
 import { createGdprSweepProcessor } from '../gdpr/gdpr-sweep.processor.js';
@@ -407,6 +409,20 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       },
     );
 
+    const receiptPdfWorker = new Worker(
+      RECEIPT_PDF_QUEUE_NAME,
+      createReceiptPdfProcessor({
+        prisma: this.prisma,
+        storage: this.storage,
+        auditLog: this.auditLog,
+        logger: this.logger,
+      }),
+      {
+        connection: this.newConnection(),
+        concurrency: this.config.WORKER_CONCURRENCY_RECEIPT_PDF,
+      },
+    );
+
     for (const [name, worker] of [
       [FILE_SCAN_QUEUE_NAME, fileScanWorker],
       [IMAGE_PROCESS_QUEUE_NAME, imageProcessWorker],
@@ -421,6 +437,7 @@ export class QueueWorkersService implements OnApplicationBootstrap, OnApplicatio
       [NOTIFICATIONS_CLEANUP_QUEUE_NAME, notificationsCleanupWorker],
       [GDPR_EXPORT_QUEUE_NAME, gdprExportWorker],
       [GDPR_SWEEP_QUEUE_NAME, gdprSweepWorker],
+      [RECEIPT_PDF_QUEUE_NAME, receiptPdfWorker],
     ] as const) {
       worker.on('failed', (job, err) => {
         this.logger.error({ err, jobId: job?.id, queue: name }, 'worker: job failed');
