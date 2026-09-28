@@ -12,7 +12,7 @@
     },
     "@photoo/web#build": {
       "dependsOn": ["^build"],
-      "env": ["ALLOW_LOCAL_IMAGE_HOSTS"],
+      "env": ["ALLOW_LOCAL_IMAGE_HOSTS", "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "@photoo/admin#build": {
