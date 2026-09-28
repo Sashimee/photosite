@@ -24,6 +24,36 @@ vi.mock('./booking-status-timeline', () => ({
   ),
 }));
 
+vi.mock('./booking-delivery-form', () => ({
+  BookingDeliveryForm: ({ booking }: { booking: Booking }) => (
+    <div data-testid="booking-delivery-form" data-booking-id={booking.id} />
+  ),
+}));
+
+vi.mock('./booking-accept-delivery-button', () => ({
+  BookingAcceptDeliveryButton: ({ booking }: { booking: Booking }) => (
+    <div data-testid="booking-accept-delivery-button" data-booking-id={booking.id} />
+  ),
+}));
+
+vi.mock('./booking-refund-dialog', () => ({
+  BookingRefundDialog: ({ booking }: { booking: Booking }) => (
+    <div data-testid="booking-refund-dialog" data-booking-id={booking.id} />
+  ),
+}));
+
+vi.mock('./booking-cancel-dialog', () => ({
+  BookingCancelDialog: ({ booking }: { booking: Booking }) => (
+    <div data-testid="booking-cancel-dialog" data-booking-id={booking.id} />
+  ),
+}));
+
+vi.mock('./booking-document-button', () => ({
+  BookingDocumentButton: ({ booking, document }: { booking: Booking; document: string }) => (
+    <div data-testid={`booking-document-button-${document}`} data-booking-id={booking.id} />
+  ),
+}));
+
 const baseBooking: Booking = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   quoteId: '3fa85f64-5717-4562-b3fc-2c963f66aaaa',
@@ -48,6 +78,7 @@ describe('BookingDetail', () => {
       locale: 'en',
       backHref: '/en/bookings',
       backLabel: 'Back to bookings',
+      viewerRole: 'client',
       checkoutReturnUrl: 'https://photoo.lu/en/bookings/return',
     });
     render(element);
@@ -64,6 +95,7 @@ describe('BookingDetail', () => {
       locale: 'en',
       backHref: '/en/bookings',
       backLabel: 'Back to bookings',
+      viewerRole: 'client',
     });
     render(element);
 
@@ -77,6 +109,7 @@ describe('BookingDetail', () => {
       locale: 'en',
       backHref: '/en/bookings',
       backLabel: 'Back to bookings',
+      viewerRole: 'client',
       checkoutReturnUrl: 'https://photoo.lu/en/bookings/return',
     });
     render(element);
@@ -93,6 +126,7 @@ describe('BookingDetail', () => {
         locale: 'en',
         backHref: '/en/bookings',
         backLabel: 'Back to bookings',
+        viewerRole: 'client',
         checkoutReturnUrl: 'https://photoo.lu/en/bookings/return',
       });
       render(element);
@@ -108,6 +142,7 @@ describe('BookingDetail', () => {
       locale: 'en',
       backHref: '/en/bookings',
       backLabel: 'Back to bookings',
+      viewerRole: 'client',
     });
     render(element);
 
@@ -121,6 +156,7 @@ describe('BookingDetail', () => {
       locale: 'en',
       backHref: '/en/bookings',
       backLabel: 'Back to bookings',
+      viewerRole: 'client',
     });
     render(element);
 
@@ -145,6 +181,7 @@ describe('BookingDetail', () => {
       locale: 'en',
       backHref: '/en/bookings',
       backLabel: 'Back to bookings',
+      viewerRole: 'client',
     });
     render(element);
 
@@ -152,5 +189,62 @@ describe('BookingDetail', () => {
     expect(
       screen.getByText(translate('web.bookings.detail', 'noLocation'), { exact: false }),
     ).toBeInTheDocument();
+  });
+
+  it('renders the client actions and not the photographer actions for viewerRole "client"', async () => {
+    const { BookingDetail } = await import('./booking-detail');
+    const element = await BookingDetail({
+      booking: baseBooking,
+      locale: 'en',
+      backHref: '/en/bookings',
+      backLabel: 'Back to bookings',
+      viewerRole: 'client',
+    });
+    render(element);
+
+    expect(screen.getByTestId('booking-accept-delivery-button')).toBeInTheDocument();
+    expect(screen.getByTestId('booking-refund-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('booking-cancel-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('booking-document-button-receipt')).toBeInTheDocument();
+    expect(screen.queryByTestId('booking-delivery-form')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('booking-document-button-fee-invoice')).not.toBeInTheDocument();
+  });
+
+  it('renders the photographer actions and not the client actions for viewerRole "photographer"', async () => {
+    const { BookingDetail } = await import('./booking-detail');
+    const element = await BookingDetail({
+      booking: baseBooking,
+      locale: 'en',
+      backHref: '/en/dashboard/bookings',
+      backLabel: 'Back to bookings',
+      viewerRole: 'photographer',
+    });
+    render(element);
+
+    expect(screen.getByTestId('booking-delivery-form')).toBeInTheDocument();
+    expect(screen.getByTestId('booking-cancel-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('booking-document-button-fee-invoice')).toBeInTheDocument();
+    expect(screen.queryByTestId('booking-accept-delivery-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('booking-refund-dialog')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('booking-document-button-receipt')).not.toBeInTheDocument();
+  });
+
+  it('shows the booking total only, with no separate payout or platform fee figure, for either role', async () => {
+    const { BookingDetail } = await import('./booking-detail');
+
+    for (const viewerRole of ['client', 'photographer'] as const) {
+      const element = await BookingDetail({
+        booking: baseBooking,
+        locale: 'en',
+        backHref: '/en/bookings',
+        backLabel: 'Back to bookings',
+        viewerRole,
+      });
+      const { unmount } = render(element);
+
+      expect(screen.getAllByText('€1,575.00')).toHaveLength(2);
+
+      unmount();
+    }
   });
 });

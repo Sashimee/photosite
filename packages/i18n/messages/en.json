@@ -1698,6 +1698,50 @@
           "title": "Booking not found",
           "description": "This booking doesn't exist, or it isn't yours.",
           "backCta": "Back to bookings"
+        },
+        "delivery": {
+          "title": "Deliver this booking",
+          "description": "Share a message and a link to the final files.",
+          "messageLabel": "Message",
+          "externalLinkLabel": "Link to the files",
+          "submitCta": "Send delivery",
+          "pending": "Sending…",
+          "success": "Delivery sent."
+        },
+        "acceptDelivery": {
+          "cta": "Accept delivery",
+          "confirmTitle": "Accept this delivery?",
+          "confirmDescription": "Accepting releases the payment to the photographer. This can't be undone.",
+          "confirmCta": "Accept and release payment",
+          "pending": "Accepting…",
+          "dismissCta": "Cancel"
+        },
+        "refund": {
+          "cta": "Request a refund",
+          "title": "Request a refund",
+          "description": "Leave the amount empty to refund the full remaining total.",
+          "amountLabel": "Amount",
+          "amountPlaceholder": "Full amount",
+          "reasonLabel": "Reason",
+          "submitCta": "Request refund",
+          "pending": "Requesting…",
+          "cancelCta": "Cancel",
+          "invalidAmount": "Enter a valid amount with at most 2 decimal places."
+        },
+        "cancel": {
+          "cta": "Cancel booking",
+          "confirmTitle": "Cancel this booking?",
+          "confirmDescription": "This can't be undone.",
+          "reasonLabel": "Reason (optional)",
+          "confirmCta": "Cancel booking",
+          "pending": "Cancelling…",
+          "dismissCta": "Keep booking"
+        },
+        "documents": {
+          "receiptCta": "Download receipt",
+          "feeInvoiceCta": "Download fee invoice",
+          "pending": "Preparing…",
+          "preparing": "This document is being prepared. Try again shortly."
         }
       },
       "status": {

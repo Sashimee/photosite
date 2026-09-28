@@ -73,6 +73,7 @@ export default async function DashboardBookingDetailPage({
       locale={locale}
       backHref={`/${locale}/dashboard/bookings`}
       backLabel={t('backToList')}
+      viewerRole="photographer"
     />
   );
 }

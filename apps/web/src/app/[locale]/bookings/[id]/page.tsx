@@ -69,6 +69,7 @@ export default async function BookingDetailPage({
       backHref={`/${locale}/bookings`}
       backLabel={t('backToList')}
       checkoutReturnUrl={absoluteUrl(locale, `/bookings/${booking.id}`)}
+      viewerRole="client"
     />
   );
 }

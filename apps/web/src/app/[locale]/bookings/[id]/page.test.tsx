@@ -14,6 +14,10 @@ vi.mock('@/lib/session', () => ({
   getSession: getSessionMock,
   serverApi: vi.fn().mockResolvedValue({ GET: apiGetMock }),
 }));
+vi.mock('next/navigation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/navigation')>();
+  return { ...actual, useRouter: () => ({ refresh: vi.fn() }) };
+});
 vi.mock('next-intl/server', () => ({
   getTranslations:
     ({ namespace }: { namespace: string }) =>
