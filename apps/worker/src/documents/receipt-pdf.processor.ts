@@ -60,7 +60,9 @@ export function createReceiptPdfProcessor(deps: ReceiptPdfDeps): Processor<Recei
             currency: true,
           },
         },
-        ledgerEntries: { select: { type: true, amountCents: true, currency: true } },
+        ledgerEntries: {
+          select: { type: true, amountCents: true, currency: true, occurredAt: true },
+        },
         client: { select: { name: true, email: true, locale: true } },
         photographer: {
           select: {

@@ -4,6 +4,7 @@ export interface LedgerRow {
   type: LedgerEntryType;
   amountCents: number;
   currency: string;
+  occurredAt: Date;
 }
 
 export interface QuoteSnapshot {
@@ -35,9 +36,11 @@ function sumOf(rows: readonly LedgerRow[], type: LedgerEntryType, sign: 1 | -1 =
 
 // Every figure on the receipt and the fee invoice comes from the ledger, the
 // record of what Stripe actually moved, never from payoutAmount(quote): a
-// refund before release shrinks the transfer, and a post-release refund
-// reverses part of it. The quote only splits the ledger's fee into the base
-// fee and VAT on the fee, through the same helper that priced it.
+// refund before release shrinks the transfer. The documents describe the
+// booking as released, so only rows up to the release transfer count; later
+// reversals, refunds and disputes belong to credit notes, not to these
+// documents. The quote only splits the ledger's fee into the base fee and VAT
+// on the fee, through the same helper that priced it.
 export function deriveBookingAmounts(
   bookingId: string,
   quote: QuoteSnapshot,
@@ -45,40 +48,52 @@ export function deriveBookingAmounts(
   countryVatRatePercent: number,
 ): BookingAmounts {
   const currency = quote.currency.toUpperCase();
-  const foreign = ledger.find((row) => row.currency.toUpperCase() !== currency);
+  const releaseTransfer = ledger
+    .filter((row) => row.type === 'transfer')
+    .reduce<LedgerRow | null>(
+      (earliest, row) =>
+        earliest === null || row.occurredAt.getTime() < earliest.occurredAt.getTime()
+          ? row
+          : earliest,
+      null,
+    );
+  if (!releaseTransfer) {
+    throw new Error(
+      `booking documents: booking ${bookingId} has no transfer in the ledger; documents are only generated after release`,
+    );
+  }
+  const releasedAtMs = releaseTransfer.occurredAt.getTime();
+  const snapshot = ledger.filter((row) => row.occurredAt.getTime() <= releasedAtMs);
+
+  const foreign = snapshot.find((row) => row.currency.toUpperCase() !== currency);
   if (foreign) {
     throw new Error(
       `booking documents: booking ${bookingId} has a ${foreign.type} ledger row in ${foreign.currency} but the quote is in ${quote.currency}; reconcile the ledger before generating documents`,
     );
   }
 
-  const chargedCents = sumOf(ledger, 'charge');
-  const refundedCents = sumOf(ledger, 'refund', -1);
-  const feeCents = sumOf(ledger, 'platform_fee', -1);
-  const transferredCents = sumOf(ledger, 'transfer', -1);
-  const reversedCents = sumOf(ledger, 'reversal');
+  const chargedCents = sumOf(snapshot, 'charge');
+  const refundedCents = sumOf(snapshot, 'refund', -1);
+  const feeCents = sumOf(snapshot, 'platform_fee', -1);
+  const transferredCents = sumOf(snapshot, 'transfer', -1);
+  const reversedCents = sumOf(snapshot, 'reversal');
   const payoutCents = transferredCents - reversedCents;
   const netPaidCents = chargedCents - refundedCents;
 
   if (chargedCents !== quote.totalCents) {
     throw new Error(
-      `booking documents: booking ${bookingId} has ${String(chargedCents)} charged in the ledger but the quote total is ${String(quote.totalCents)}; reconcile the charge before generating documents`,
-    );
-  }
-  if (transferredCents <= 0) {
-    throw new Error(
-      `booking documents: booking ${bookingId} has no transfer in the ledger; documents are only generated after release`,
+      `booking documents: booking ${bookingId} has ${String(chargedCents)} charged in the ledger up to release but the quote total is ${String(quote.totalCents)}; reconcile the charge before generating documents`,
     );
   }
   if (
+    transferredCents <= 0 ||
     refundedCents < 0 ||
     feeCents < 0 ||
-    reversedCents < 0 ||
-    payoutCents < 0 ||
-    netPaidCents - feeCents !== payoutCents
+    reversedCents !== 0 ||
+    netPaidCents - feeCents !== transferredCents
   ) {
     throw new Error(
-      `booking documents: ledger of booking ${bookingId} does not balance (charged ${String(chargedCents)}, refunded ${String(refundedCents)}, fee ${String(feeCents)}, transferred ${String(transferredCents)}, reversed ${String(reversedCents)}); reconcile it before generating documents`,
+      `booking documents: ledger of booking ${bookingId} does not balance at release (charged ${String(chargedCents)}, refunded ${String(refundedCents)}, fee ${String(feeCents)}, transferred ${String(transferredCents)}, reversed ${String(reversedCents)}); reconcile it before generating documents`,
     );
   }
 

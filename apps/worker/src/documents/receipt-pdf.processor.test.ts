@@ -13,13 +13,27 @@ interface FakeLedgerRow {
   type: string;
   amountCents: number;
   currency: string;
+  occurredAt: Date;
 }
+
+const RELEASED_AT = new Date('2026-09-20T10:00:00Z');
+const AFTER_RELEASE = new Date('2026-09-25T10:00:00Z');
 
 function releasedLedger(): FakeLedgerRow[] {
   return [
-    { type: 'charge', amountCents: 12_345, currency: 'eur' },
-    { type: 'transfer', amountCents: -(12_345 - FEE), currency: 'eur' },
-    { type: 'platform_fee', amountCents: -FEE, currency: 'eur' },
+    {
+      type: 'charge',
+      amountCents: 12_345,
+      currency: 'eur',
+      occurredAt: new Date('2026-09-01T10:00:00Z'),
+    },
+    {
+      type: 'transfer',
+      amountCents: -(12_345 - FEE),
+      currency: 'eur',
+      occurredAt: RELEASED_AT,
+    },
+    { type: 'platform_fee', amountCents: -FEE, currency: 'eur', occurredAt: RELEASED_AT },
   ];
 }
 
@@ -28,7 +42,7 @@ function fakeBooking(
 ) {
   return {
     id: BOOKING_ID,
-    releasedAt: new Date('2026-09-20T10:00:00Z'),
+    releasedAt: RELEASED_AT,
     quote: {
       lineItems: [{ label: 'Portrait session', qty: 1, unitCents: 12_345 }],
       subtotalCents: 12_345,
@@ -141,17 +155,54 @@ describe('receipt-pdf processor', () => {
     expect(puts).toHaveLength(0);
   });
 
-  it('throws, so BullMQ retries, while a post-release refund is half written', async () => {
+  it('renders the release-time amounts while a post-release refund is half written', async () => {
     const { deps, puts, record } = setup({
       booking: fakeBooking({
         ledgerEntries: [
           ...releasedLedger(),
-          { type: 'reversal', amountCents: 1_000, currency: 'eur' },
+          {
+            type: 'reversal',
+            amountCents: 12_345 - FEE,
+            currency: 'eur',
+            occurredAt: AFTER_RELEASE,
+          },
         ],
       }),
     });
 
-    await expect(createReceiptPdfProcessor(deps)(fakeJob('fee-invoice'))).rejects.toThrow();
+    await createReceiptPdfProcessor(deps)(fakeJob('fee-invoice'));
+
+    expect(puts).toHaveLength(1);
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        after: expect.objectContaining({
+          refundedCents: 0,
+          reversedCents: 0,
+          feeCents: FEE,
+          payoutCents: 12_345 - FEE,
+        }) as unknown,
+      }),
+    );
+  });
+
+  it('throws, so BullMQ retries, when the ledger does not balance at release', async () => {
+    const { deps, puts, record } = setup({
+      booking: fakeBooking({
+        ledgerEntries: [
+          ...releasedLedger(),
+          {
+            type: 'refund',
+            amountCents: -1_000,
+            currency: 'eur',
+            occurredAt: new Date('2026-09-10T10:00:00Z'),
+          },
+        ],
+      }),
+    });
+
+    await expect(createReceiptPdfProcessor(deps)(fakeJob('fee-invoice'))).rejects.toThrow(
+      /does not balance/,
+    );
     expect(puts).toHaveLength(0);
     expect(record).not.toHaveBeenCalled();
   });
