@@ -36,6 +36,56 @@
             "tooManyRequestsWithRetry": "Está enviando presupuestos demasiado rápido. Intente de nuevo en {seconds, plural, one {# segundo} other {# segundos}}."
           }
         }
+      },
+      "nav": {
+        "payouts": "Cobros"
+      },
+      "overview": {
+        "checklist": {
+          "payouts": {
+            "title": "Cobros",
+            "todoDescription": "Conecta una cuenta bancaria con Stripe para recibir tus pagos.",
+            "incompleteStatus": "En revisión",
+            "incompleteDescription": "Stripe está revisando tus datos. Continúa la configuración si te pide más información.",
+            "doneDescription": "Los cobros están activados. Tus ingresos van a tu cuenta bancaria.",
+            "startCta": "Configurar cobros",
+            "continueCta": "Continuar configuración",
+            "cta": "Ver cobros",
+            "needsProfile": "Crea primero tu perfil."
+          }
+        }
+      },
+      "payouts": {
+        "metaTitle": "Cobros",
+        "title": "Cobros",
+        "backToOverview": "Volver al resumen",
+        "intro": "Los cobros pasan por Stripe. Photoo nunca ve tus datos bancarios.",
+        "needsProfileTitle": "Crea primero tu perfil",
+        "needsProfileDescription": "Los cobros están vinculados a tu perfil de fotógrafo, así que empieza por crearlo.",
+        "needsProfileCta": "Crear tu perfil",
+        "status": {
+          "notStarted": "Sin empezar",
+          "incomplete": "En revisión",
+          "enabled": "Cobros activados"
+        },
+        "description": {
+          "notStarted": "Conecta una cuenta bancaria con Stripe para cobrar tus reservas.",
+          "incomplete": "Stripe está revisando tus datos, lo que puede tardar un poco. Si Stripe pide más información, continúa la configuración.",
+          "enabled": "Los cobros están activados. Tus ingresos van a tu cuenta bancaria."
+        },
+        "setupCta": "Configurar cobros",
+        "continueCta": "Continuar configuración",
+        "pending": "Abriendo Stripe…",
+        "errors": {
+          "generic": "Algo salió mal. Inténtalo de nuevo.",
+          "conflict": "La configuración de cobros no está disponible ahora. Inténtalo más tarde.",
+          "invalid": "Revisa tus datos e inténtalo de nuevo.",
+          "forbidden": "No tienes acceso a los cobros.",
+          "notFound": "No se encontró tu perfil de fotógrafo.",
+          "emailNotVerified": "Verifica tu correo electrónico antes de configurar los cobros.",
+          "tooManyRequests": "Vas demasiado rápido. Espera un poco e inténtalo de nuevo.",
+          "tooManyRequestsWithRetry": "Vas demasiado rápido. Inténtalo de nuevo en {seconds, plural, one {# segundo} other {# segundos}}."
+        }
       }
     }
   },

@@ -1833,7 +1833,8 @@
         "verification": "Verification",
         "requests": "Requests",
         "quotes": "Quotes",
-        "bookings": "Bookings"
+        "bookings": "Bookings",
+        "payouts": "Payouts"
       },
       "needsRole": {
         "title": "Photographer dashboard",
@@ -1854,8 +1855,7 @@
         "checklist": {
           "status": {
             "done": "Done",
-            "todo": "Not started",
-            "comingSoon": "Coming soon"
+            "todo": "Not started"
           },
           "profile": {
             "title": "Profile details",
@@ -1885,8 +1885,14 @@
           },
           "payouts": {
             "title": "Payouts",
-            "description": "Connect a bank account with Stripe so you can get paid.",
-            "comingSoon": "Not available yet."
+            "todoDescription": "Connect a bank account with Stripe so you can get paid.",
+            "incompleteStatus": "In review",
+            "incompleteDescription": "Stripe is reviewing your details. Continue setup if it asks for more.",
+            "doneDescription": "Payouts are enabled. Your earnings go to your bank account.",
+            "startCta": "Set up payouts",
+            "continueCta": "Continue setup",
+            "cta": "View payouts",
+            "needsProfile": "Create your profile first."
           }
         }
       },
@@ -2209,6 +2215,38 @@
         "intro": "Bookings from quotes clients have accepted.",
         "empty": "You don't have any bookings yet.",
         "loadMore": "Next page"
+      },
+      "payouts": {
+        "metaTitle": "Payouts",
+        "title": "Payouts",
+        "backToOverview": "Back to overview",
+        "intro": "Payouts go through Stripe. Photoo never sees your bank details.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Payouts are connected to your photographer profile, so set that up first.",
+        "needsProfileCta": "Create your profile",
+        "status": {
+          "notStarted": "Not started",
+          "incomplete": "In review",
+          "enabled": "Payouts enabled"
+        },
+        "description": {
+          "notStarted": "Connect a bank account with Stripe so you can get paid for bookings.",
+          "incomplete": "Stripe is reviewing your details. This can take a little while. If Stripe asks for more information, continue setup.",
+          "enabled": "Payouts are enabled. Your earnings go to your bank account."
+        },
+        "setupCta": "Set up payouts",
+        "continueCta": "Continue setup",
+        "pending": "Opening Stripe…",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "Payouts setup is not available right now. Try again later.",
+          "invalid": "Check your details and try again.",
+          "forbidden": "You don't have access to payouts.",
+          "notFound": "Your photographer profile could not be found.",
+          "emailNotVerified": "Verify your email address before setting up payouts.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
       }
     },
     "emailVerification": {
