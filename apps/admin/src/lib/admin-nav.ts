@@ -30,12 +30,7 @@ const ADMIN_NAV_SECTIONS: readonly AdminNavSection[] = [
   { id: 'health', href: '/health', labelKey: 'health' },
   { id: 'users', href: '/users', labelKey: 'users' },
   { id: 'verification', href: '/verification', labelKey: 'verification' },
-  {
-    id: 'provenance',
-    href: '/provenance',
-    labelKey: 'provenance',
-    blockedBy: { kind: 'api', step: '1A.10' },
-  },
+  { id: 'provenance', href: '/provenance', labelKey: 'provenance' },
   {
     id: 'finance',
     href: '/finance',

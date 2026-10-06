@@ -9,13 +9,14 @@ function fakeT() {
 }
 
 describe('resolveNavSections', () => {
-  it('marks the dashboard, health, users and verification sections as available with no note', () => {
+  it('marks the dashboard, health, users, verification and provenance sections as available with no note', () => {
     const sections = resolveNavSections(fakeT());
 
     const dashboard = sections.find((section) => section.id === 'dashboard');
     const health = sections.find((section) => section.id === 'health');
     const users = sections.find((section) => section.id === 'users');
     const verification = sections.find((section) => section.id === 'verification');
+    const provenance = sections.find((section) => section.id === 'provenance');
     const moderation = sections.find((section) => section.id === 'moderation');
     const dataRequests = sections.find((section) => section.id === 'data-requests');
     const settings = sections.find((section) => section.id === 'settings');
@@ -32,6 +33,12 @@ describe('resolveNavSections', () => {
       available: true,
     });
     expect(verification?.note).toBeUndefined();
+    expect(provenance).toMatchObject({
+      href: '/provenance',
+      label: 'nav.provenance',
+      available: true,
+    });
+    expect(provenance?.note).toBeUndefined();
     expect(moderation).toMatchObject({
       href: '/moderation',
       label: 'nav.moderation',
@@ -55,10 +62,10 @@ describe('resolveNavSections', () => {
   it('labels a section blocked on a missing endpoint as available after that step', () => {
     const sections = resolveNavSections(fakeT());
 
-    const provenance = sections.find((section) => section.id === 'provenance');
+    const finance = sections.find((section) => section.id === 'finance');
 
-    expect(provenance?.available).toBe(false);
-    expect(provenance?.note).toBe('nav.availableAfter:{"step":"1A.10"}');
+    expect(finance?.available).toBe(false);
+    expect(finance?.note).toBe('nav.availableAfter:{"step":"1A.8"}');
   });
 
   it('resolves every section exactly once, in a stable order', () => {
