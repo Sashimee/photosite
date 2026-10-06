@@ -18,6 +18,14 @@ overrides:
   # GHSA-vcvr-r3jv-pc5j: apps/api never imports next, but better-auth's optional
   # next peer was resolved to 16.3.5 independently of the web/admin pins.
   'next@<16.3.6': 16.3.6
+  # GHSA-pqg4-j6r4-53mv (shell-quote command injection, critical)
+  'shell-quote@<1.11.0': ^1.11.0
+  # GHSA-c475-qrg2-pj4r (basic-ftp quadratic-time DoS, high)
+  'basic-ftp@<6.2.1': ^6.2.1
+  # GHSA-68fv-2mgg-jv7q (source-map-js event-loop DoS, high)
+  'source-map-js@<1.2.2': ^1.2.2
+  # GHSA-wq5f-xc86-pv6w (sharp librsvg CVE, high); pinned to match apps/worker
+  sharp: 0.35.5
   # GHSA-ph9p-34f9-6g65 (tmp path traversal, high) and GHSA-7c78-jf6q-g5cm
   # (tmp type-confusion path traversal, high, fixed one release later):
   # @lhci/cli depends on tmp@^0.1.0 directly and pulls a second copy via
@@ -36,3 +44,12 @@ overrides:
   # and 3.x - verified by re-running the Lighthouse job's consent-granted
   # puppeteerScript end-to-end after this override, not assumed.
   '@puppeteer/browsers': 3.0.2
+# GHSA-86w9-cpqp-85rv (node-forge) and GHSA-vfj7-8cjw-p6xm (braces) have no
+# released patch. node-forge is only reachable through expo > @expo/cli code
+# signing and braces through eslint-plugin-next, tailwindcss and metro; all
+# run on developer or EAS build machines and never ship in api, worker or the
+# web/admin runtime. Remove once patched releases exist, see #538.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-86w9-cpqp-85rv
+    - GHSA-vfj7-8cjw-p6xm
