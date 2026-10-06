@@ -9,7 +9,7 @@ function fakeT() {
 }
 
 describe('resolveNavSections', () => {
-  it('marks the dashboard, health, users, verification and provenance sections as available with no note', () => {
+  it('marks the dashboard, health, users, verification, provenance and finance sections as available with no note', () => {
     const sections = resolveNavSections(fakeT());
 
     const dashboard = sections.find((section) => section.id === 'dashboard');
@@ -17,6 +17,7 @@ describe('resolveNavSections', () => {
     const users = sections.find((section) => section.id === 'users');
     const verification = sections.find((section) => section.id === 'verification');
     const provenance = sections.find((section) => section.id === 'provenance');
+    const finance = sections.find((section) => section.id === 'finance');
     const moderation = sections.find((section) => section.id === 'moderation');
     const dataRequests = sections.find((section) => section.id === 'data-requests');
     const settings = sections.find((section) => section.id === 'settings');
@@ -39,6 +40,8 @@ describe('resolveNavSections', () => {
       available: true,
     });
     expect(provenance?.note).toBeUndefined();
+    expect(finance).toMatchObject({ href: '/finance', label: 'nav.finance', available: true });
+    expect(finance?.note).toBeUndefined();
     expect(moderation).toMatchObject({
       href: '/moderation',
       label: 'nav.moderation',
@@ -57,15 +60,6 @@ describe('resolveNavSections', () => {
       available: true,
     });
     expect(settings?.note).toBeUndefined();
-  });
-
-  it('labels a section blocked on a missing endpoint as available after that step', () => {
-    const sections = resolveNavSections(fakeT());
-
-    const finance = sections.find((section) => section.id === 'finance');
-
-    expect(finance?.available).toBe(false);
-    expect(finance?.note).toBe('nav.availableAfter:{"step":"1A.8"}');
   });
 
   it('resolves every section exactly once, in a stable order', () => {
