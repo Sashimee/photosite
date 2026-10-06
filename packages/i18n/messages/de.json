@@ -38,7 +38,8 @@
         }
       },
       "nav": {
-        "payouts": "Auszahlungen"
+        "payouts": "Auszahlungen",
+        "earnings": "Einnahmen"
       },
       "overview": {
         "checklist": {
@@ -85,6 +86,27 @@
           "emailNotVerified": "Bestätige deine E-Mail-Adresse, bevor du Auszahlungen einrichtest.",
           "tooManyRequests": "Du gehst zu schnell vor. Warte kurz und versuche es erneut.",
           "tooManyRequestsWithRetry": "Du gehst zu schnell vor. Versuche es in {seconds, plural, one {# Sekunde} other {# Sekunden}} erneut."
+        }
+      },
+      "earnings": {
+        "metaTitle": "Einnahmen",
+        "title": "Einnahmen",
+        "backToOverview": "Zurück zur Übersicht",
+        "intro": "Was Sie mit Buchungen verdient haben, pro Währung.",
+        "releasedLabel": "Auf Ihr Stripe-Konto freigegeben",
+        "heldLabel": "Zurückgehalten, bis die Lieferung akzeptiert ist",
+        "recentHeading": "Letzte Aktivität",
+        "recentDate": "Datum",
+        "recentAmount": "Betrag",
+        "recentLink": "Buchung ansehen",
+        "payoutSchedule": "Freigegebenes Geld geht auf Ihr Stripe-Guthaben. Stripe überweist es dann nach Ihrem Auszahlungsplan auf Ihr Bankkonto, in der Regel innerhalb weniger Tage, sofern Auszahlungen in Ihrem Stripe-Konto aktiviert sind.",
+        "emptyTitle": "Noch keine Einnahmen",
+        "emptyDescription": "Einnahmen erscheinen hier, sobald ein Kunde bucht und bezahlt.",
+        "errors": {
+          "generic": "Beim Laden Ihrer Einnahmen ist etwas schiefgelaufen. Laden Sie die Seite neu und versuchen Sie es erneut.",
+          "forbidden": "Nur Fotografen können Einnahmen sehen.",
+          "tooManyRequests": "Sie sind zu schnell. Bitte langsamer und erneut versuchen.",
+          "tooManyRequestsWithRetry": "Sie sind zu schnell. Versuchen Sie es in {seconds, plural, one {# Sekunde} other {# Sekunden}} erneut."
         }
       }
     }

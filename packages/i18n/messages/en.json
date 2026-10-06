@@ -1834,7 +1834,8 @@
         "requests": "Requests",
         "quotes": "Quotes",
         "bookings": "Bookings",
-        "payouts": "Payouts"
+        "payouts": "Payouts",
+        "earnings": "Earnings"
       },
       "needsRole": {
         "title": "Photographer dashboard",
@@ -2244,6 +2245,27 @@
           "forbidden": "You don't have access to payouts.",
           "notFound": "Your photographer profile could not be found.",
           "emailNotVerified": "Verify your email address before setting up payouts.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "earnings": {
+        "metaTitle": "Earnings",
+        "title": "Earnings",
+        "backToOverview": "Back to overview",
+        "intro": "What you have earned from bookings, per currency.",
+        "releasedLabel": "Released to your Stripe account",
+        "heldLabel": "Held until delivery is accepted",
+        "recentHeading": "Recent activity",
+        "recentDate": "Date",
+        "recentAmount": "Amount",
+        "recentLink": "View booking",
+        "payoutSchedule": "Released money goes to your Stripe balance. Stripe then pays it to your bank on your payout schedule, usually within a few days, as long as payouts are enabled on your Stripe account.",
+        "emptyTitle": "No earnings yet",
+        "emptyDescription": "Earnings appear here once a client books and pays.",
+        "errors": {
+          "generic": "Something went wrong loading your earnings. Reload the page to try again.",
+          "forbidden": "Only photographers can see earnings.",
           "tooManyRequests": "You're doing that too fast. Slow down and try again.",
           "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
         }

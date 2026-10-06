@@ -15,6 +15,8 @@ import { BookingPaymentsService } from './booking-payments.service.js';
 import { BookingRefundService } from './booking-refund.service.js';
 import { BookingReleaseQueueService } from './booking-release-queue.service.js';
 import { BookingReleaseService } from './booking-release.service.js';
+import { EarningsService } from './earnings.service.js';
+import { MyEarningsController } from './my-earnings.controller.js';
 import { MyStripeController } from './my-stripe.controller.js';
 import { PaymentsRateLimitService } from './payments-rate-limit.service.js';
 import { StripeConnectService } from './stripe-connect.service.js';
@@ -27,6 +29,7 @@ import { stripeGatewayProvider } from './stripe/stripe-gateway.provider.js';
   imports: [AuthModule, AdminModule, NotificationsModule],
   controllers: [
     MyStripeController,
+    MyEarningsController,
     BookingPaymentsController,
     BookingDocumentsController,
     AdminBookingsController,
@@ -43,6 +46,7 @@ import { stripeGatewayProvider } from './stripe/stripe-gateway.provider.js';
     BookingMoneyEventsService,
     BookingMoneyLockService,
     AdminBookingsService,
+    EarningsService,
     StripeWebhookService,
     StripeEventSweepService,
     PaymentsRateLimitService,

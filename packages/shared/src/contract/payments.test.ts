@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   CreateRefundRequestSchema,
   CreateRefundResponseSchema,
+  EARNINGS_RECENT_LIMIT,
+  EarningsResponseSchema,
   StripeAccountLinkResponseSchema,
   StripeAccountResponseSchema,
   StripeWebhookEventSchema,
@@ -154,6 +156,86 @@ describe('CreateRefundResponseSchema', () => {
     );
     expect(CreateRefundResponseSchema.safeParse({ ...partial, refundId: 're_123' }).success).toBe(
       false,
+    );
+  });
+});
+
+describe('EarningsResponseSchema', () => {
+  const entry = {
+    bookingId: '0190a0b2-0000-7000-8000-000000000001',
+    amountCents: 23797,
+    currency: 'EUR',
+    occurredAt: '2026-10-01T10:00:00.000Z',
+  };
+
+  it('accepts empty arrays for a photographer with no bookings', () => {
+    expect(EarningsResponseSchema.safeParse({ totals: [], recent: [] }).success).toBe(true);
+  });
+
+  it('accepts one totals row per currency', () => {
+    expect(
+      EarningsResponseSchema.safeParse({
+        totals: [
+          { currency: 'EUR', releasedCents: 23797, heldCents: 0 },
+          { currency: 'USD', releasedCents: 0, heldCents: 9500 },
+        ],
+        recent: [entry],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects negative or fractional amounts', () => {
+    expect(
+      EarningsResponseSchema.safeParse({
+        totals: [{ currency: 'EUR', releasedCents: -1, heldCents: 0 }],
+        recent: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      EarningsResponseSchema.safeParse({
+        totals: [],
+        recent: [{ ...entry, amountCents: 10.5 }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a negative recent amount and a malformed booking id', () => {
+    expect(
+      EarningsResponseSchema.safeParse({ totals: [], recent: [{ ...entry, amountCents: -1 }] })
+        .success,
+    ).toBe(false);
+    expect(
+      EarningsResponseSchema.safeParse({ totals: [], recent: [{ ...entry, bookingId: 'nope' }] })
+        .success,
+    ).toBe(false);
+    expect(
+      EarningsResponseSchema.safeParse({
+        totals: [{ currency: 'EUR', releasedCents: 0, heldCents: -1 }],
+        recent: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a lowercase currency and unknown keys', () => {
+    expect(
+      EarningsResponseSchema.safeParse({
+        totals: [{ currency: 'eur', releasedCents: 0, heldCents: 0 }],
+        recent: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      EarningsResponseSchema.safeParse({
+        totals: [{ currency: 'EUR', releasedCents: 0, heldCents: 0, feePercent: 5 }],
+        recent: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('caps recent at the documented limit', () => {
+    const recent = Array.from({ length: EARNINGS_RECENT_LIMIT + 1 }, () => entry);
+    expect(EarningsResponseSchema.safeParse({ totals: [], recent }).success).toBe(false);
+    expect(EarningsResponseSchema.safeParse({ totals: [], recent: recent.slice(1) }).success).toBe(
+      true,
     );
   });
 });

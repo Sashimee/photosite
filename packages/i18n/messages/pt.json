@@ -38,7 +38,8 @@
         }
       },
       "nav": {
-        "payouts": "Pagamentos"
+        "payouts": "Pagamentos",
+        "earnings": "Ganhos"
       },
       "overview": {
         "checklist": {
@@ -85,6 +86,27 @@
           "emailNotVerified": "Confirme o seu e-mail antes de configurar os pagamentos.",
           "tooManyRequests": "Está a fazer isso demasiado depressa. Abrande e tente novamente.",
           "tooManyRequestsWithRetry": "Está a fazer isso demasiado depressa. Tente novamente dentro de {seconds, plural, one {# segundo} other {# segundos}}."
+        }
+      },
+      "earnings": {
+        "metaTitle": "Ganhos",
+        "title": "Ganhos",
+        "backToOverview": "Voltar à visão geral",
+        "intro": "O que ganhou com as reservas, por moeda.",
+        "releasedLabel": "Libertado para a sua conta Stripe",
+        "heldLabel": "Retido até a entrega ser aceite",
+        "recentHeading": "Atividade recente",
+        "recentDate": "Data",
+        "recentAmount": "Montante",
+        "recentLink": "Ver reserva",
+        "payoutSchedule": "O dinheiro libertado vai para o seu saldo Stripe. A Stripe transfere-o depois para a sua conta bancária de acordo com o seu calendário de pagamentos, normalmente em poucos dias, desde que os pagamentos estejam ativados na sua conta Stripe.",
+        "emptyTitle": "Ainda sem ganhos",
+        "emptyDescription": "Os ganhos aparecem aqui assim que um cliente reservar e pagar.",
+        "errors": {
+          "generic": "Ocorreu um erro ao carregar os seus ganhos. Recarregue a página para tentar novamente.",
+          "forbidden": "Só os fotógrafos podem ver os ganhos.",
+          "tooManyRequests": "Está a ir depressa demais. Abrande e tente novamente.",
+          "tooManyRequestsWithRetry": "Está a ir depressa demais. Tente novamente dentro de {seconds, plural, one {# segundo} other {# segundos}}."
         }
       }
     }

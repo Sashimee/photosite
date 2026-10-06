@@ -1,5 +1,12 @@
 import { BookingSchema } from './bookings.js';
-import { IdSchema, MoneySchema, errorResponses, requiresVerifiedEmail } from './common.js';
+import {
+  CurrencyCodeSchema,
+  IdSchema,
+  IsoDateTimeSchema,
+  MoneySchema,
+  errorResponses,
+  requiresVerifiedEmail,
+} from './common.js';
 import { AUTH_SECURITY, apiPath, registry } from './registry.js';
 import { z } from './zod.js';
 
@@ -33,6 +40,42 @@ export const StripeAccountLinkResponseSchema = z
   })
   .strict()
   .openapi('StripeAccountLinkResponse');
+
+// One row per currency the photographer has money in; amounts are never
+// converted or summed across currencies. `releasedCents` is the ledger's
+// transfers minus reversals; `heldCents` is the quote snapshot's
+// `subtotalCents - platformFeeCents` (minus any refund before release) on
+// bookings not yet transferred, never recomputed from a fee percent.
+export const EarningsTotalSchema = z
+  .object({
+    currency: CurrencyCodeSchema,
+    releasedCents: z.int().nonnegative().openapi({ example: 23797 }),
+    heldCents: z.int().nonnegative().openapi({ example: 9500 }),
+  })
+  .strict()
+  .openapi('EarningsTotal');
+
+// `amountCents` is the booking's net from the ledger (transfers minus
+// reversals); `occurredAt` is its latest transfer or reversal entry.
+export const EarningsRecentEntrySchema = z
+  .object({
+    bookingId: IdSchema,
+    amountCents: z.int().nonnegative().openapi({ example: 23797 }),
+    currency: CurrencyCodeSchema,
+    occurredAt: IsoDateTimeSchema,
+  })
+  .strict()
+  .openapi('EarningsRecentEntry');
+
+export const EARNINGS_RECENT_LIMIT = 20;
+
+export const EarningsResponseSchema = z
+  .object({
+    totals: z.array(EarningsTotalSchema),
+    recent: z.array(EarningsRecentEntrySchema).max(EARNINGS_RECENT_LIMIT),
+  })
+  .strict()
+  .openapi('EarningsResponse');
 
 // The shape the API's webhook endpoint (`POST /v1/stripe/webhook`,
 // docs/PAYMENTS.md) receives after Fastify's route-scoped raw-body capture
@@ -129,6 +172,23 @@ registry.registerPath({
       content: { 'application/json': { schema: StripeAccountLinkResponseSchema } },
     },
     ...errorResponses([401, 403, 404, 409, 429]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/me/earnings'),
+  summary: "The caller's released and held earnings per currency",
+  description:
+    'Photographer only. `totals` has one row per currency, never converted. `recent` lists at most 20 bookings with a transfer or reversal, newest first. A photographer with no bookings gets empty arrays.',
+  tags: ['payments'],
+  security: AUTH_SECURITY,
+  responses: {
+    '200': {
+      description: 'Earnings summary',
+      content: { 'application/json': { schema: EarningsResponseSchema } },
+    },
+    ...errorResponses([401, 403, 429]),
   },
 });
 
