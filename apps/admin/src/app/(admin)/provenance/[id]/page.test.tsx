@@ -19,11 +19,11 @@ vi.mock('next-intl/server', async () => {
 });
 
 const checkActionsMock = vi.fn(({ checkId }: { checkId: string }) => (
-  <div data-testid="check-actions">{checkId}</div>
+  <div data-testid="check-actions" data-check-id={checkId} />
 ));
 const checkSignalsMock = vi.fn(() => <div data-testid="check-signals" />);
 const decisionHistoryMock = vi.fn(({ targetId }: { targetId: string }) => (
-  <div data-testid="decision-history">{targetId}</div>
+  <div data-testid="decision-history" data-target-id={targetId} />
 ));
 vi.mock('./check-actions', () => ({ CheckActions: checkActionsMock }));
 vi.mock('./check-signals', () => ({ CheckSignals: checkSignalsMock }));
