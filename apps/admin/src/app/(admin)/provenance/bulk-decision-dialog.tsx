@@ -15,6 +15,7 @@ import {
 import { FormNotice } from '@/components/ui/form-message';
 import { api } from '@/lib/api';
 import { apiErrorMessage } from '@/lib/api-errors';
+import { retryAfterSeconds } from '@/lib/auth-errors';
 
 import {
   DecisionFields,
@@ -30,7 +31,12 @@ export interface BulkTarget {
   label: string;
 }
 
-type RowResult = { ok: true } | { ok: false; message: string };
+type RowResult = { ok: true } | { ok: false; message: string } | { ok: false; notAttempted: true };
+
+type RowOutcome =
+  | { kind: 'row'; result: RowResult }
+  | { kind: 'rateLimited'; retryAfterSeconds: number | undefined }
+  | { kind: 'authRedirect' };
 
 export function BulkDecisionDialog({
   status,
@@ -51,6 +57,7 @@ export function BulkDecisionDialog({
   const [running, setRunning] = useState(false);
   const [snapshot, setSnapshot] = useState<BulkTarget[]>([]);
   const [results, setResults] = useState<Record<string, RowResult>>({});
+  const [rateLimit, setRateLimit] = useState<{ seconds: number | undefined } | null>(null);
 
   function handleOpenChange(next: boolean) {
     if (running) {
@@ -62,21 +69,31 @@ export function BulkDecisionDialog({
       setErrors({});
       setSnapshot([]);
       setResults({});
+      setRateLimit(null);
     }
   }
 
-  async function decideOne(id: string, request: DecisionRequest): Promise<RowResult> {
+  async function decideOne(id: string, request: DecisionRequest): Promise<RowOutcome> {
     try {
       const { error } = await api.POST('/v1/admin/provenance/{id}/decision', {
         params: { path: { id } },
         body: request,
       });
-      if (error) {
-        return { ok: false, message: apiErrorMessage(tErrors, tErrors('errors.generic'), error) };
+      if (!error) {
+        return { kind: 'row', result: { ok: true } };
       }
-      return { ok: true };
+      if (error.code === 'UNAUTHORIZED' || error.code === 'TWO_FACTOR_REQUIRED') {
+        return { kind: 'authRedirect' };
+      }
+      if (error.code === 'TOO_MANY_REQUESTS') {
+        return { kind: 'rateLimited', retryAfterSeconds: retryAfterSeconds(error.details) };
+      }
+      return {
+        kind: 'row',
+        result: { ok: false, message: apiErrorMessage(tErrors, tErrors('errors.generic'), error) },
+      };
     } catch {
-      return { ok: false, message: tErrors('errors.generic') };
+      return { kind: 'row', result: { ok: false, message: tErrors('errors.generic') } };
     }
   }
 
@@ -90,9 +107,22 @@ export function BulkDecisionDialog({
     setRunning(true);
     setSnapshot(targets);
     setResults({});
+    setRateLimit(null);
     const outcome: Record<string, RowResult> = {};
-    for (const target of targets) {
-      outcome[target.id] = await decideOne(target.id, validated.request);
+    for (const [index, target] of targets.entries()) {
+      const decided = await decideOne(target.id, validated.request);
+      if (decided.kind === 'authRedirect') {
+        break;
+      }
+      if (decided.kind === 'rateLimited') {
+        for (const remaining of targets.slice(index)) {
+          outcome[remaining.id] = { ok: false, notAttempted: true };
+        }
+        setResults({ ...outcome });
+        setRateLimit({ seconds: decided.retryAfterSeconds });
+        break;
+      }
+      outcome[target.id] = decided.result;
       setResults({ ...outcome });
     }
     setRunning(false);
@@ -156,14 +186,31 @@ export function BulkDecisionDialog({
                   <li key={target.id} className="flex flex-wrap gap-2">
                     <span className="text-foreground">{target.label}</span>
                     {result ? (
-                      <span className={result.ok ? 'text-muted-foreground' : 'text-destructive'}>
-                        {result.ok ? t('success') : t('failure', { message: result.message })}
+                      <span
+                        className={
+                          result.ok || 'notAttempted' in result
+                            ? 'text-muted-foreground'
+                            : 'text-destructive'
+                        }
+                      >
+                        {result.ok
+                          ? t('success')
+                          : 'notAttempted' in result
+                            ? t('notAttempted')
+                            : t('failure', { message: result.message })}
                       </span>
                     ) : null}
                   </li>
                 );
               })}
             </ul>
+            {finished && rateLimit ? (
+              <FormNotice tone="error">
+                {rateLimit.seconds === undefined
+                  ? t('rateLimited')
+                  : t('rateLimitedWithRetry', { seconds: rateLimit.seconds })}
+              </FormNotice>
+            ) : null}
             {finished && anyFailed ? <FormNotice tone="error">{t('failedHint')}</FormNotice> : null}
             <div className="flex justify-end">
               <DialogClose asChild>

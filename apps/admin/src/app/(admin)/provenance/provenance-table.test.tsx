@@ -297,4 +297,78 @@ describe('ProvenanceTable edge cases', () => {
     expect(await within(dialog).findByText('This value is too short.')).toBeInTheDocument();
     expect(postMock).not.toHaveBeenCalled();
   });
+
+  async function runBulkApprove(names: string[]) {
+    getMock.mockResolvedValue({
+      data: {
+        items: names.map((name, index) => summary(`c${String(index + 1)}`, name)),
+        nextCursor: null,
+      },
+    });
+    const ProvenanceTable = await loadProvenanceTable();
+    const events = userEvent.setup();
+
+    render(<ProvenanceTable status="pending_review" />);
+    for (const name of names) {
+      await events.click(await screen.findByRole('checkbox', { name: `Select image by ${name}` }));
+    }
+    await events.click(screen.getByRole('button', { name: 'Approve selected' }));
+    const dialog = await screen.findByRole('dialog');
+    await events.type(within(dialog).getByLabelText(/Internal note/), 'Verified');
+    await events.click(within(dialog).getByRole('button', { name: 'Apply to selected' }));
+    return { dialog, events };
+  }
+
+  const names = ['Jane', 'John', 'Joan', 'Jade'];
+
+  it('stops on a rate limit, leaves the remaining rows unattempted and selected, and shows the retry time', async () => {
+    postMock.mockResolvedValueOnce({ data: {} }).mockResolvedValueOnce({
+      error: { code: 'TOO_MANY_REQUESTS', details: { retryAfterSeconds: 42 } },
+    });
+    const { dialog, events } = await runBulkApprove(names);
+
+    expect(await within(dialog).findByText(/Try again in 42 seconds/)).toBeInTheDocument();
+    expect(postMock).toHaveBeenCalledTimes(2);
+    expect(within(dialog).getAllByText('Not attempted')).toHaveLength(3);
+    expect(within(dialog).queryByText(/Failed:/)).not.toBeInTheDocument();
+
+    await events.click(within(dialog).getByRole('button', { name: 'Close' }));
+    expect(screen.getByRole('checkbox', { name: 'Select image by Jane' })).not.toBeChecked();
+    for (const name of names.slice(1)) {
+      expect(screen.getByRole('checkbox', { name: `Select image by ${name}` })).toBeChecked();
+    }
+  });
+
+  it('shows a generic rate-limit message without a retry time', async () => {
+    postMock.mockResolvedValueOnce({ error: { code: 'TOO_MANY_REQUESTS' } });
+    const { dialog } = await runBulkApprove(names);
+
+    expect(await within(dialog).findByText(/Try again later\./)).toBeInTheDocument();
+    expect(postMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops without a row message when the API asks for two-factor re-verification', async () => {
+    postMock
+      .mockResolvedValueOnce({ data: {} })
+      .mockResolvedValueOnce({ error: { code: 'TWO_FACTOR_REQUIRED' } });
+    const { dialog } = await runBulkApprove(names);
+
+    await waitFor(() => {
+      expect(within(dialog).getByRole('button', { name: 'Close' })).toBeEnabled();
+    });
+    expect(postMock).toHaveBeenCalledTimes(2);
+    expect(within(dialog).queryByText(/Failed:/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Not attempted/)).not.toBeInTheDocument();
+  });
+
+  it('stops without a row message on a 401', async () => {
+    postMock.mockResolvedValueOnce({ error: { code: 'UNAUTHORIZED' } });
+    const { dialog } = await runBulkApprove(names);
+
+    await waitFor(() => {
+      expect(within(dialog).getByRole('button', { name: 'Close' })).toBeEnabled();
+    });
+    expect(postMock).toHaveBeenCalledTimes(1);
+    expect(within(dialog).queryByText(/Failed:/)).not.toBeInTheDocument();
+  });
 });

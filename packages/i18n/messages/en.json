@@ -879,7 +879,10 @@
         "results": "Results",
         "success": "Done",
         "failure": "Failed: {message}",
-        "failedHint": "Failed images stay selected so you can retry."
+        "failedHint": "Failed images stay selected so you can retry.",
+        "notAttempted": "Not attempted",
+        "rateLimited": "Too many decisions in a short time. The remaining images were not attempted and stay selected. Try again later.",
+        "rateLimitedWithRetry": "Too many decisions in a short time. The remaining images were not attempted and stay selected. Try again in {seconds, plural, one {# second} other {# seconds}}."
       }
     }
   },
