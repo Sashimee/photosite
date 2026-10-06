@@ -1,3 +1,5 @@
+import type { useFormatter } from 'next-intl';
+
 export type AmountParseResult =
   | { ok: true; amountCents: number }
   | { ok: false; reason: 'invalid' | 'notPositive' | 'tooManyDecimals' | 'tooLarge' };
@@ -5,8 +7,26 @@ export type AmountParseResult =
 const AMOUNT_PATTERN = /^(-)?(\d+)(?:[.,](\d*))?$/;
 
 export function minorUnitDigits(currency: string): number {
-  return new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions()
-    .maximumFractionDigits;
+  const { maximumFractionDigits } = new Intl.NumberFormat('en', {
+    style: 'currency',
+    currency,
+  }).resolvedOptions();
+  if (maximumFractionDigits === undefined) {
+    throw new Error(`No minor-unit digits known for currency ${currency}`);
+  }
+  return maximumFractionDigits;
+}
+
+// The generated Money type is nullable because its OpenAPI component is shared
+// with fields that really can be null; a booking total never is.
+export function requireMoney<T extends { amountCents: number; currency: string }>(
+  money: T | null | undefined,
+  context: string,
+): T {
+  if (!money) {
+    throw new Error(`Expected ${context} to be present`);
+  }
+  return money;
 }
 
 export function parseAmountToCents(input: string, currency: string): AmountParseResult {
@@ -35,7 +55,7 @@ export function centsToMajorUnits(amountCents: number, currency: string): number
 }
 
 export function formatCents(
-  format: { number: (value: number, options: Intl.NumberFormatOptions) => string },
+  format: Pick<ReturnType<typeof useFormatter>, 'number'>,
   amountCents: number,
   currency: string,
 ): string {

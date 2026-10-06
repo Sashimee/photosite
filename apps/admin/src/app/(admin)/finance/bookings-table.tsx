@@ -3,17 +3,19 @@
 import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
 
-import type { components } from '@photoo/api-client';
-
 import {
   DataTable,
   type DataTableColumn,
   type DataTableFetchResult,
 } from '@/components/data-table';
 import { api } from '@/lib/api';
-import { formatCents } from '@/lib/money';
+import { formatCents, requireMoney } from '@/lib/money';
 
-type AdminBooking = components['schemas']['AdminBooking'];
+function listBookings(cursor: string | undefined) {
+  return api.GET('/v1/admin/bookings', { params: { query: cursor ? { cursor } : {} } });
+}
+
+type AdminBooking = NonNullable<Awaited<ReturnType<typeof listBookings>>['data']>['items'][number];
 
 export function BookingsTable() {
   const t = useTranslations('admin.finance');
@@ -36,17 +38,30 @@ export function BookingsTable() {
     {
       id: 'total',
       header: t('columns.total'),
-      cell: (row) => formatCents(format, row.total.amountCents, row.total.currency),
+      cell: (row) => {
+        const total = requireMoney(row.total, `total of booking ${row.id}`);
+        return formatCents(format, total.amountCents, total.currency);
+      },
     },
     {
       id: 'refunded',
       header: t('columns.refunded'),
-      cell: (row) => formatCents(format, row.refundedCents, row.total.currency),
+      cell: (row) =>
+        formatCents(
+          format,
+          row.refundedCents,
+          requireMoney(row.total, `total of booking ${row.id}`).currency,
+        ),
     },
     {
       id: 'reversed',
       header: t('columns.reversed'),
-      cell: (row) => formatCents(format, row.reversedCents, row.total.currency),
+      cell: (row) =>
+        formatCents(
+          format,
+          row.reversedCents,
+          requireMoney(row.total, `total of booking ${row.id}`).currency,
+        ),
     },
     {
       id: 'dispute',
@@ -60,12 +75,8 @@ export function BookingsTable() {
     },
   ];
 
-  async function fetchPage(
-    cursor: string | undefined,
-  ): Promise<DataTableFetchResult<AdminBooking>> {
-    return api.GET('/v1/admin/bookings', {
-      params: { query: cursor ? { cursor } : {} },
-    });
+  function fetchPage(cursor: string | undefined): Promise<DataTableFetchResult<AdminBooking>> {
+    return listBookings(cursor);
   }
 
   return (
