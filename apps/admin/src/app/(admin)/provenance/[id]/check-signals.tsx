@@ -2,7 +2,7 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 
 import type { components } from '@photoo/api-client';
 
-import { CopyText } from './copy-text';
+import { CopyText } from '@/components/copy-text';
 
 type AdminProvenanceCheck = components['schemas']['AdminProvenanceCheck'];
 
