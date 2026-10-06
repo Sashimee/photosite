@@ -135,6 +135,23 @@ describe('DashboardEarningsPage', () => {
     expect(screen.getAllByRole('link', { name: 'View booking' })).toHaveLength(2);
   });
 
+  it('shows a held-only currency with zero released and no recent section', async () => {
+    getSessionMock.mockResolvedValue({ id: 'user-1' });
+    mockEarnings(200, {
+      totals: [{ currency: 'EUR', releasedCents: 0, heldCents: 9500 }],
+      recent: [],
+    });
+
+    await renderPage();
+
+    const row = within(screen.getByText('Paid out to you').closest('li') as HTMLElement);
+    expect(row.getByText('€0.00')).toBeInTheDocument();
+    expect(row.getByText('€95.00')).toBeInTheDocument();
+    expect(screen.queryByText('No earnings yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('Recent activity')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'View booking' })).not.toBeInTheDocument();
+  });
+
   it('shows a rate-limit message with the retry delay on 429', async () => {
     getSessionMock.mockResolvedValue({ id: 'user-1' });
     mockEarnings(429, undefined, {

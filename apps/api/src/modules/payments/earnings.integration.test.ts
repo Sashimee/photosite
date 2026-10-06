@@ -424,4 +424,38 @@ describe('GET /v1/me/earnings integration', () => {
     const times = earnings.recent.map((entry) => Date.parse(entry.occurredAt));
     expect(times).toEqual([...times].sort((a, b) => b - a));
   });
+
+  it('breaks ties on identical entry time by booking id descending, at the cap too', async () => {
+    const tied = await createPhotographer('tied');
+    const sameInstant = at(50);
+    const bookingIds: string[] = [];
+    for (let index = 0; index < 21; index += 1) {
+      bookingIds.push(
+        await seedBooking(tied, client.id, {
+          status: 'released',
+          subtotalCents: 1000,
+          platformFeeCents: 50,
+          ledger: [{ type: 'transfer', amountCents: -950, occurredAt: sameInstant }],
+        }),
+      );
+    }
+    const response = await getEarnings(tied.token);
+    expect(response.statusCode).toBe(200);
+    const earnings = EarningsResponseSchema.parse(response.json());
+    const expected = [...bookingIds].sort().reverse().slice(0, 20);
+    expect(earnings.recent.map((entry) => entry.bookingId)).toEqual(expected);
+    expect(earnings.totals).toEqual([{ currency: 'EUR', releasedCents: 21 * 950, heldCents: 0 }]);
+  });
+
+  it('fails loudly rather than reporting a reversal that has no transfer', async () => {
+    const broken = await createPhotographer('reversal-only');
+    await seedBooking(broken, client.id, {
+      status: 'released',
+      subtotalCents: 1000,
+      platformFeeCents: 50,
+      ledger: [{ type: 'reversal', amountCents: 500, occurredAt: at(20) }],
+    });
+    const response = await getEarnings(broken.token);
+    expect(response.statusCode).toBe(500);
+  });
 });

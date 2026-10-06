@@ -199,6 +199,23 @@ describe('EarningsResponseSchema', () => {
     ).toBe(false);
   });
 
+  it('rejects a negative recent amount and a malformed booking id', () => {
+    expect(
+      EarningsResponseSchema.safeParse({ totals: [], recent: [{ ...entry, amountCents: -1 }] })
+        .success,
+    ).toBe(false);
+    expect(
+      EarningsResponseSchema.safeParse({ totals: [], recent: [{ ...entry, bookingId: 'nope' }] })
+        .success,
+    ).toBe(false);
+    expect(
+      EarningsResponseSchema.safeParse({
+        totals: [{ currency: 'EUR', releasedCents: 0, heldCents: -1 }],
+        recent: [],
+      }).success,
+    ).toBe(false);
+  });
+
   it('rejects a lowercase currency and unknown keys', () => {
     expect(
       EarningsResponseSchema.safeParse({
