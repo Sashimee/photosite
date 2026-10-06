@@ -64,7 +64,7 @@ describe('DashboardEarningsPage', () => {
     await renderPage();
 
     expect(screen.getByText('No earnings yet')).toBeInTheDocument();
-    expect(screen.queryByText('Paid out to you')).not.toBeInTheDocument();
+    expect(screen.queryByText('Released to your Stripe account')).not.toBeInTheDocument();
     expect(screen.queryByText('Recent activity')).not.toBeInTheDocument();
   });
 
@@ -84,13 +84,13 @@ describe('DashboardEarningsPage', () => {
 
     await renderPage();
 
-    expect(screen.getByText('Paid out to you')).toBeInTheDocument();
+    expect(screen.getByText('Released to your Stripe account')).toBeInTheDocument();
     expect(screen.getByText('Held until delivery is accepted')).toBeInTheDocument();
     expect(screen.getByText('€1,234.56')).toBeInTheDocument();
     expect(screen.getByText('€78.00')).toBeInTheDocument();
     expect(screen.getByText('€95.00')).toBeInTheDocument();
     expect(
-      screen.getByText(/Stripe pays out to your bank account on its own schedule/),
+      screen.getByText(/Stripe then pays it to your bank on your payout schedule/),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View booking' })).toHaveAttribute(
       'href',
@@ -125,7 +125,7 @@ describe('DashboardEarningsPage', () => {
     await renderPage();
 
     const rows = screen
-      .getAllByText('Paid out to you')
+      .getAllByText('Released to your Stripe account')
       .map((label) => within(label.closest('li') as HTMLElement));
     expect(rows).toHaveLength(2);
     expect(rows[0]?.getByText('€100.00')).toBeInTheDocument();
@@ -144,7 +144,9 @@ describe('DashboardEarningsPage', () => {
 
     await renderPage();
 
-    const row = within(screen.getByText('Paid out to you').closest('li') as HTMLElement);
+    const row = within(
+      screen.getByText('Released to your Stripe account').closest('li') as HTMLElement,
+    );
     expect(row.getByText('€0.00')).toBeInTheDocument();
     expect(row.getByText('€95.00')).toBeInTheDocument();
     expect(screen.queryByText('No earnings yet')).not.toBeInTheDocument();
@@ -162,7 +164,7 @@ describe('DashboardEarningsPage', () => {
     await renderPage();
 
     expect(screen.getByText(/Try again in 30 seconds/)).toBeInTheDocument();
-    expect(screen.queryByText('Paid out to you')).not.toBeInTheDocument();
+    expect(screen.queryByText('Released to your Stripe account')).not.toBeInTheDocument();
   });
 
   it('shows the forbidden message on 403', async () => {
