@@ -145,5 +145,6 @@ export function mapOwnProfile(
     isPublished: profile.isPublished,
     stripeOnboardingComplete: profile.stripeOnboardingComplete,
     stripePayoutsEnabled: profile.stripePayoutsEnabled,
+    stripeAccountConnected: profile.stripeAccountId !== null,
   });
 }

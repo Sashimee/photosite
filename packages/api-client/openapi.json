@@ -780,6 +780,9 @@
           },
           "stripePayoutsEnabled": {
             "type": "boolean"
+          },
+          "stripeAccountConnected": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -802,7 +805,8 @@
           "verificationStatus",
           "isPublished",
           "stripeOnboardingComplete",
-          "stripePayoutsEnabled"
+          "stripePayoutsEnabled",
+          "stripeAccountConnected"
         ],
         "additionalProperties": false
       },

@@ -38,6 +38,7 @@ const PROFILE = {
   isPublished: false,
   stripeOnboardingComplete: false,
   stripePayoutsEnabled: false,
+  stripeAccountConnected: false,
 };
 
 function mockProfile(
@@ -227,7 +228,12 @@ describe('DashboardOverviewPage', () => {
 
   it('shows the payouts row as done once payouts are enabled', async () => {
     getSessionMock.mockResolvedValue({ id: 'user-1' });
-    mockProfile(200, { ...PROFILE, stripeOnboardingComplete: true, stripePayoutsEnabled: true });
+    mockProfile(200, {
+      ...PROFILE,
+      stripeOnboardingComplete: true,
+      stripePayoutsEnabled: true,
+      stripeAccountConnected: true,
+    });
     const Page = await loadPage();
 
     render(await Page({ params: Promise.resolve({ locale: 'en' }) }));

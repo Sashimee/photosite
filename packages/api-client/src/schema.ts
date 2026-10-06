@@ -11640,6 +11640,7 @@ export interface components {
             isPublished: boolean;
             stripeOnboardingComplete: boolean;
             stripePayoutsEnabled: boolean;
+            stripeAccountConnected: boolean;
         };
         LatLng: {
             /** @example 49.6116 */
