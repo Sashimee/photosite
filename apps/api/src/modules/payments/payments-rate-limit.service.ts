@@ -4,11 +4,13 @@ import {
   type RateLimitRule,
 } from '../../common/rate-limit/redis-rate-limiter.js';
 
+const ONE_MINUTE = 60;
 const ONE_HOUR = 60 * 60;
 
 const CREATE_ACCOUNT_RULE: RateLimitRule = { windowSeconds: ONE_HOUR, max: 10 };
 const CREATE_ACCOUNT_LINK_RULE: RateLimitRule = { windowSeconds: ONE_HOUR, max: 30 };
 const REFUND_RULE: RateLimitRule = { windowSeconds: ONE_HOUR, max: 10 };
+const EARNINGS_READ_RULE: RateLimitRule = { windowSeconds: ONE_MINUTE, max: 60 };
 
 @Injectable()
 export class PaymentsRateLimitService {
@@ -38,6 +40,15 @@ export class PaymentsRateLimitService {
       userId,
       REFUND_RULE,
       'Too many refund requests. Try again later.',
+    );
+  }
+
+  async enforceEarningsRead(userId: string): Promise<void> {
+    await this.enforce(
+      'payments:earnings-read:account',
+      userId,
+      EARNINGS_READ_RULE,
+      'Too many earnings requests. Try again later.',
     );
   }
 
