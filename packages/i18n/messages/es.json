@@ -38,7 +38,8 @@
         }
       },
       "nav": {
-        "payouts": "Cobros"
+        "payouts": "Cobros",
+        "earnings": "Ingresos"
       },
       "overview": {
         "checklist": {
@@ -84,6 +85,27 @@
           "notFound": "No se encontró tu perfil de fotógrafo.",
           "emailNotVerified": "Verifica tu correo electrónico antes de configurar los cobros.",
           "tooManyRequests": "Vas demasiado rápido. Espera un poco e inténtalo de nuevo.",
+          "tooManyRequestsWithRetry": "Vas demasiado rápido. Inténtalo de nuevo en {seconds, plural, one {# segundo} other {# segundos}}."
+        }
+      },
+      "earnings": {
+        "metaTitle": "Ingresos",
+        "title": "Ingresos",
+        "backToOverview": "Volver al resumen",
+        "intro": "Lo que has ganado con las reservas, por moneda.",
+        "releasedLabel": "Pagado a ti",
+        "heldLabel": "Retenido hasta que se acepte la entrega",
+        "recentHeading": "Actividad reciente",
+        "recentDate": "Fecha",
+        "recentAmount": "Importe",
+        "recentLink": "Ver reserva",
+        "payoutSchedule": "Stripe transfiere a tu cuenta bancaria según su propio calendario, por lo que puede tardar unos días desde que aparece un pago aquí.",
+        "emptyTitle": "Aún no hay ingresos",
+        "emptyDescription": "Los ingresos aparecen aquí cuando un cliente reserva y paga.",
+        "errors": {
+          "generic": "Algo salió mal al cargar tus ingresos. Recarga la página para intentarlo de nuevo.",
+          "forbidden": "Solo los fotógrafos pueden ver los ingresos.",
+          "tooManyRequests": "Vas demasiado rápido. Más despacio e inténtalo de nuevo.",
           "tooManyRequestsWithRetry": "Vas demasiado rápido. Inténtalo de nuevo en {seconds, plural, one {# segundo} other {# segundos}}."
         }
       }

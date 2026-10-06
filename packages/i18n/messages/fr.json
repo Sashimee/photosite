@@ -38,7 +38,8 @@
         }
       },
       "nav": {
-        "payouts": "Paiements"
+        "payouts": "Paiements",
+        "earnings": "Revenus"
       },
       "overview": {
         "checklist": {
@@ -83,6 +84,27 @@
           "forbidden": "Vous n'avez pas accès aux paiements.",
           "notFound": "Votre profil de photographe est introuvable.",
           "emailNotVerified": "Vérifiez votre adresse e-mail avant de configurer les paiements.",
+          "tooManyRequests": "Vous allez trop vite. Ralentissez et réessayez.",
+          "tooManyRequestsWithRetry": "Vous allez trop vite. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}."
+        }
+      },
+      "earnings": {
+        "metaTitle": "Revenus",
+        "title": "Revenus",
+        "backToOverview": "Retour à l'aperçu",
+        "intro": "Ce que vous avez gagné grâce aux réservations, par devise.",
+        "releasedLabel": "Versé sur votre compte",
+        "heldLabel": "Retenu jusqu'à l'acceptation de la livraison",
+        "recentHeading": "Activité récente",
+        "recentDate": "Date",
+        "recentAmount": "Montant",
+        "recentLink": "Voir la réservation",
+        "payoutSchedule": "Stripe verse l'argent sur votre compte bancaire selon son propre calendrier ; cela peut prendre quelques jours après l'apparition d'un versement ici.",
+        "emptyTitle": "Aucun revenu pour l'instant",
+        "emptyDescription": "Vos revenus apparaissent ici dès qu'un client réserve et paie.",
+        "errors": {
+          "generic": "Une erreur est survenue lors du chargement de vos revenus. Rechargez la page pour réessayer.",
+          "forbidden": "Seuls les photographes peuvent voir les revenus.",
           "tooManyRequests": "Vous allez trop vite. Ralentissez et réessayez.",
           "tooManyRequestsWithRetry": "Vous allez trop vite. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}."
         }
