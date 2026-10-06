@@ -5798,6 +5798,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/earnings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's released and held earnings per currency
+         * @description Photographer only. `totals` has one row per currency, never converted. `recent` lists at most 20 bookings with a transfer or reversal, newest first. A photographer with no bookings gets empty arrays.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Earnings summary */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EarningsResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/stripe/webhook": {
         parameters: {
             query?: never;
@@ -12506,6 +12572,42 @@ export interface components {
              * @example https://connect.stripe.com/setup/e/acct_1P/abc123
              */
             url: string;
+        };
+        EarningsResponse: {
+            totals: components["schemas"]["EarningsTotal"][];
+            recent: components["schemas"]["EarningsRecentEntry"][];
+        };
+        EarningsTotal: {
+            /**
+             * @description ISO 4217 currency code
+             * @example EUR
+             */
+            currency: string;
+            /** @example 23797 */
+            releasedCents: number;
+            /** @example 9500 */
+            heldCents: number;
+        };
+        EarningsRecentEntry: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            bookingId: string;
+            /** @example 23797 */
+            amountCents: number;
+            /**
+             * @description ISO 4217 currency code
+             * @example EUR
+             */
+            currency: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            occurredAt: string;
         };
         StripeWebhookAckResponse: {
             /** @enum {boolean} */
