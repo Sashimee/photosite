@@ -94,4 +94,82 @@ describe('DecisionDialog', () => {
 
     expect(await screen.findByText("This check couldn't be found.")).toBeInTheDocument();
   });
+
+  it('requires a reason to flag', async () => {
+    const events = await openDialog();
+
+    await events.selectOptions(screen.getByLabelText('Decision'), 'flagged');
+    await events.type(screen.getByLabelText(/Internal note/), 'Unsure');
+    await events.click(screen.getByRole('button', { name: 'Confirm decision' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Choose a reason/);
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks a whitespace-only note', async () => {
+    const events = await openDialog();
+
+    await events.type(screen.getByLabelText(/Internal note/), '    ');
+    await events.click(screen.getByRole('button', { name: 'Confirm decision' }));
+
+    expect(await screen.findByText('This value is too short.')).toBeInTheDocument();
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it('submits a flag with trimmed note, reason and reason text', async () => {
+    postMock.mockResolvedValueOnce({ data: { id: 'check-1' } });
+    const events = await openDialog();
+
+    await events.selectOptions(screen.getByLabelText('Decision'), 'flagged');
+    await events.type(screen.getByLabelText(/Internal note/), '  Suspicious  ');
+    await events.selectOptions(screen.getByLabelText(/^Reason \(/), 'other');
+    await events.type(screen.getByLabelText(/Reason details/), ' Needs context ');
+    await events.click(screen.getByRole('button', { name: 'Confirm decision' }));
+
+    await waitFor(() => {
+      expect(postMock).toHaveBeenCalledWith('/v1/admin/provenance/{id}/decision', {
+        params: { path: { id: 'check-1' } },
+        body: {
+          status: 'flagged',
+          note: 'Suspicious',
+          decisionReason: 'other',
+          decisionReasonText: 'Needs context',
+        },
+      });
+    });
+  });
+
+  it.each([
+    ['UNPROCESSABLE_ENTITY', "That request wasn't valid."],
+    ['VALIDATION_ERROR', "That request wasn't valid."],
+    ['CONFLICT', /something changed/],
+    ['FORBIDDEN', "You don't have permission to do this."],
+    ['SOMETHING_ELSE', "That couldn't be completed. Please retry."],
+  ])('shows the mapped message for a %s response and keeps the dialog open', async (code, text) => {
+    postMock.mockResolvedValueOnce({ error: { code } });
+    const onDecided = vi.fn();
+    const events = await openDialog(onDecided);
+
+    await events.type(screen.getByLabelText(/Internal note/), 'ok');
+    await events.click(screen.getByRole('button', { name: 'Confirm decision' }));
+
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(onDecided).not.toHaveBeenCalled();
+  });
+
+  it('shows no message when the API asks for two-factor re-verification', async () => {
+    postMock.mockResolvedValueOnce({ error: { code: 'TWO_FACTOR_REQUIRED' } });
+    const onDecided = vi.fn();
+    const events = await openDialog(onDecided);
+
+    await events.type(screen.getByLabelText(/Internal note/), 'ok');
+    await events.click(screen.getByRole('button', { name: 'Confirm decision' }));
+
+    await waitFor(() => {
+      expect(postMock).toHaveBeenCalled();
+    });
+    expect(screen.queryByText("That couldn't be completed. Please retry.")).not.toBeInTheDocument();
+    expect(onDecided).not.toHaveBeenCalled();
+  });
 });
