@@ -3981,6 +3981,310 @@
         ],
         "additionalProperties": false
       },
+      "AdminDashboard": {
+        "type": "object",
+        "properties": {
+          "window": {
+            "type": "string",
+            "enum": [
+              "7d",
+              "30d",
+              "90d"
+            ]
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "signups": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              },
+              "client": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              },
+              "photographer": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              },
+              "professional": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "total",
+              "client",
+              "photographer",
+              "professional"
+            ],
+            "additionalProperties": false
+          },
+          "activity": {
+            "type": "object",
+            "properties": {
+              "requests": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              },
+              "quotes": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              },
+              "bookings": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "requests",
+              "quotes",
+              "bookings"
+            ],
+            "additionalProperties": false
+          },
+          "money": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "gmv": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "currency": {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$",
+                      "description": "ISO 4217 currency code",
+                      "example": "EUR"
+                    },
+                    "current": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "previous": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "currency",
+                    "current",
+                    "previous"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "refunds": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "currency": {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$",
+                      "description": "ISO 4217 currency code",
+                      "example": "EUR"
+                    },
+                    "current": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "previous": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "currency",
+                    "current",
+                    "previous"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "feeRevenue": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "currency": {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$",
+                      "description": "ISO 4217 currency code",
+                      "example": "EUR"
+                    },
+                    "current": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "previous": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "currency",
+                    "current",
+                    "previous"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "gmv",
+              "refunds",
+              "feeRevenue"
+            ],
+            "additionalProperties": false,
+            "description": "Per-currency integer cents, as positive magnitudes. Null unless the caller holds finance or superadmin."
+          },
+          "backlogs": {
+            "type": "object",
+            "properties": {
+              "verification": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "provenance": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reports": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "dataRequests": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "verification",
+              "provenance",
+              "reports",
+              "dataRequests"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "window",
+          "generatedAt",
+          "signups",
+          "activity",
+          "money",
+          "backlogs"
+        ],
+        "additionalProperties": false
+      },
       "AdminUser": {
         "type": "object",
         "properties": {
@@ -15959,6 +16263,77 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AdminMe"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/dashboard": {
+      "get": {
+        "summary": "Platform KPIs for a trailing window, with the previous window for comparison",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "30d",
+                "90d"
+              ],
+              "default": "30d"
+            },
+            "required": false,
+            "name": "window",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregate counts and backlogs; money is null without finance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDashboard"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
