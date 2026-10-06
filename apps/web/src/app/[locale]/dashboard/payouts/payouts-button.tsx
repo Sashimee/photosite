@@ -8,6 +8,17 @@ import { FormNotice } from '@/components/ui/form-message';
 import { api } from '@/lib/api';
 import { requestErrorMessage } from '@/lib/request-errors';
 
+function isHttpsUrl(value: unknown): value is string {
+  if (typeof value !== 'string') {
+    return false;
+  }
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function PayoutsButton({ resume }: { resume: boolean }) {
   const t = useTranslations('web.dashboard.payouts');
   const [pending, setPending] = useState(false);
@@ -26,17 +37,24 @@ export function PayoutsButton({ resume }: { resume: boolean }) {
       const account = await api.POST('/v1/me/stripe/account');
       if (account.error) {
         setError(errorMessage(account.error));
+        setPending(false);
         return;
       }
       const link = await api.POST('/v1/me/stripe/account-link');
       if (link.error) {
         setError(errorMessage(link.error));
+        setPending(false);
         return;
       }
-      window.location.assign(link.data.url);
+      const url: unknown = link.data.url;
+      if (!isHttpsUrl(url)) {
+        setError(t('errors.generic'));
+        setPending(false);
+        return;
+      }
+      window.location.assign(url);
     } catch {
       setError(requestErrorMessage(t, undefined));
-    } finally {
       setPending(false);
     }
   }
