@@ -736,6 +736,151 @@
         "htmlLabel": "HTML",
         "textLabel": "Text"
       }
+    },
+    "provenance": {
+      "verdicts": {
+        "pass": "Pass",
+        "review": "Needs review",
+        "fail": "Fail"
+      },
+      "statuses": {
+        "processing": "Processing",
+        "pending_review": "Pending review",
+        "approved": "Approved",
+        "flagged": "Flagged",
+        "rejected": "Rejected"
+      },
+      "decisionStatuses": {
+        "approved": "Approve",
+        "flagged": "Flag",
+        "rejected": "Reject"
+      },
+      "reasons": {
+        "ai_generated": "AI-generated image",
+        "not_own_work": "Not the photographer's own work",
+        "manipulated_metadata": "Manipulated metadata",
+        "other": "Other"
+      },
+      "scoreValue": "{score, number, percent}",
+      "notChecked": "Not checked (no vendor configured)",
+      "errors": {
+        "generic": "That couldn't be completed. Please retry.",
+        "forbidden": "You don't have permission to do this.",
+        "notFound": "This check couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "conflict": "That couldn't be completed because something changed. Reload and retry.",
+        "alreadyRunning": "A recheck is already running for this image."
+      },
+      "list": {
+        "title": "Provenance queue",
+        "caption": "Provenance checks awaiting review, oldest first",
+        "columns": {
+          "select": "Select",
+          "thumbnail": "Image",
+          "photographer": "Photographer",
+          "verdict": "Verdict",
+          "score": "Score",
+          "checkedAt": "Checked",
+          "status": "Status"
+        },
+        "selectRow": "Select image by {photographer}",
+        "thumbnailAlt": "Portfolio image by {photographer}",
+        "notChecked": "Not checked",
+        "empty": {
+          "title": "No provenance checks match this filter.",
+          "hint": "The queue defaults to images pending review, oldest first."
+        },
+        "filters": {
+          "formLabel": "Provenance filters",
+          "statusLabel": "Image status",
+          "verdictLabel": "Verdict",
+          "allVerdicts": "All verdicts",
+          "submit": "Filter"
+        },
+        "bulk": {
+          "selected": "{count, plural, one {# image selected} other {# images selected}}",
+          "approve": "Approve selected",
+          "reject": "Reject selected",
+          "clear": "Clear selection"
+        }
+      },
+      "decision": {
+        "noteLabel": "Internal note (only admins see this)",
+        "noteHint": "Evidence, links and reasoning for other reviewers. Never shown to the photographer.",
+        "reasonLabel": "Reason (shown to the photographer)",
+        "reasonPlaceholder": "Choose a reason",
+        "reasonTextLabel": "Reason details (shown to the photographer)",
+        "reasonTextHint": "Required for \"Other\". Part of the statement of reasons the photographer receives. Do not put evidence links or detection details here.",
+        "statusLabel": "Decision",
+        "errors": {
+          "reasonRequired": "Choose a reason; the photographer is told why.",
+          "reasonTextRequired": "Describe the reason; it is required for \"Other\"."
+        }
+      },
+      "detail": {
+        "title": "Provenance check",
+        "photographer": "Photographer",
+        "thumbnailAlt": "Portfolio image by {photographer}",
+        "fields": {
+          "status": "Image status",
+          "verdict": "Verdict",
+          "score": "Score",
+          "checkedAt": "Checked",
+          "reviewedAt": "Reviewed",
+          "reviewer": "Reviewed by"
+        },
+        "signals": {
+          "title": "Signals",
+          "aiScore": "AI score",
+          "aiVendor": "AI vendor",
+          "reverseMatches": "Reverse image matches",
+          "reverseMatchesNone": "No matches found.",
+          "reverseMatchesHint": "Shown as text on purpose. Do not open unknown URLs from this session.",
+          "c2paValid": "C2PA signature",
+          "c2paValidYes": "Valid",
+          "c2paValidNo": "Invalid",
+          "exifCamera": "Camera (EXIF)",
+          "exifCapturedAt": "Captured (EXIF)",
+          "exifMissing": "Not present"
+        },
+        "decisionRecord": {
+          "title": "Decision on record",
+          "note": "Internal note",
+          "reason": "Reason sent to the photographer",
+          "reasonText": "Reason details sent to the photographer"
+        },
+        "actions": {
+          "title": "Actions",
+          "recheck": "Recheck",
+          "rechecking": "Rechecking...",
+          "rechecked": "Recheck started. Reload in a moment to see the new result.",
+          "decide": "Record decision",
+          "dialogTitle": "Record a decision",
+          "consequences": "This updates the image status immediately and is written to the audit log. Flag and reject notify the photographer with the reason you choose.",
+          "confirm": "Confirm decision"
+        },
+        "history": {
+          "title": "Decision history",
+          "caption": "Audit log entries for this check",
+          "empty": "No decisions recorded yet.",
+          "systemActor": "System",
+
+          "columns": {
+            "occurredAt": "When",
+            "action": "Action",
+            "actor": "Actor"
+          }
+        }
+      },
+      "bulk": {
+        "title": "{count, plural, one {Decide # image} other {Decide # images}}",
+        "consequences": "The same note and reason are applied to every selected image. Each decision is recorded separately in the audit log. Flagging is not available in bulk.",
+        "confirm": "Apply to selected",
+        "results": "Results",
+        "success": "Done",
+        "failure": "Failed: {message}",
+        "failedHint": "Failed images stay selected so you can retry."
+      }
     }
   },
   "common": {
@@ -743,6 +888,7 @@
     "cancel": "Cancel",
     "close": "Close",
     "copy": "Copy",
+
     "copied": "Copied",
     "error": "An error occurred",
     "loading": "Loading...",
