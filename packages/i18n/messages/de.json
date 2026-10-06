@@ -36,6 +36,56 @@
             "tooManyRequestsWithRetry": "Sie senden Angebote zu schnell. Versuchen Sie es in {seconds, plural, one {# Sekunde} other {# Sekunden}} erneut."
           }
         }
+      },
+      "nav": {
+        "payouts": "Auszahlungen"
+      },
+      "overview": {
+        "checklist": {
+          "payouts": {
+            "title": "Auszahlungen",
+            "todoDescription": "Verbinde über Stripe ein Bankkonto, um bezahlt zu werden.",
+            "incompleteStatus": "In Prüfung",
+            "incompleteDescription": "Stripe prüft deine Angaben. Setze die Einrichtung fort, falls Stripe weitere Angaben verlangt.",
+            "doneDescription": "Auszahlungen sind aktiviert. Dein Verdienst geht auf dein Bankkonto.",
+            "startCta": "Auszahlungen einrichten",
+            "continueCta": "Einrichtung fortsetzen",
+            "cta": "Auszahlungen ansehen",
+            "needsProfile": "Lege zuerst dein Profil an."
+          }
+        }
+      },
+      "payouts": {
+        "metaTitle": "Auszahlungen",
+        "title": "Auszahlungen",
+        "backToOverview": "Zurück zur Übersicht",
+        "intro": "Auszahlungen laufen über Stripe. Photoo sieht deine Bankdaten nie.",
+        "needsProfileTitle": "Lege zuerst dein Profil an",
+        "needsProfileDescription": "Auszahlungen gehören zu deinem Fotografenprofil. Richte es also zuerst ein.",
+        "needsProfileCta": "Profil anlegen",
+        "status": {
+          "notStarted": "Nicht begonnen",
+          "incomplete": "In Prüfung",
+          "enabled": "Auszahlungen aktiviert"
+        },
+        "description": {
+          "notStarted": "Verbinde über Stripe ein Bankkonto, um für Buchungen bezahlt zu werden.",
+          "incomplete": "Stripe prüft deine Angaben. Das kann etwas dauern. Falls Stripe weitere Angaben verlangt, setze die Einrichtung fort.",
+          "enabled": "Auszahlungen sind aktiviert. Dein Verdienst geht auf dein Bankkonto."
+        },
+        "setupCta": "Auszahlungen einrichten",
+        "continueCta": "Einrichtung fortsetzen",
+        "pending": "Stripe wird geöffnet…",
+        "errors": {
+          "generic": "Etwas ist schiefgelaufen. Versuche es erneut.",
+          "conflict": "Die Einrichtung der Auszahlungen ist derzeit nicht verfügbar. Versuche es später erneut.",
+          "invalid": "Prüfe deine Angaben und versuche es erneut.",
+          "forbidden": "Du hast keinen Zugriff auf Auszahlungen.",
+          "notFound": "Dein Fotografenprofil wurde nicht gefunden.",
+          "emailNotVerified": "Bestätige deine E-Mail-Adresse, bevor du Auszahlungen einrichtest.",
+          "tooManyRequests": "Du gehst zu schnell vor. Warte kurz und versuche es erneut.",
+          "tooManyRequestsWithRetry": "Du gehst zu schnell vor. Versuche es in {seconds, plural, one {# Sekunde} other {# Sekunden}} erneut."
+        }
       }
     }
   },

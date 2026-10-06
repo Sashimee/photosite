@@ -202,6 +202,7 @@ describe('OwnPhotographerProfileSchema', () => {
       isPublished: true,
       stripeOnboardingComplete: true,
       stripePayoutsEnabled: true,
+      stripeAccountConnected: true,
     };
     expect(OwnPhotographerProfileSchema.safeParse(valid).success).toBe(true);
     expect(

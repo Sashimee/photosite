@@ -91,6 +91,10 @@ describe('DashboardLayout', () => {
       'href',
       '/en/dashboard/quotes',
     );
+    expect(screen.getByRole('link', { name: 'Payouts' })).toHaveAttribute(
+      'href',
+      '/en/dashboard/payouts',
+    );
     expect(screen.getByText('checklist content')).toBeInTheDocument();
   });
 });

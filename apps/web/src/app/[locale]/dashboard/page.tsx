@@ -11,6 +11,8 @@ import { FormNotice } from '@/components/ui/form-message';
 import { buildRobotsMetadata } from '@/lib/robots';
 import { getSession, serverApi } from '@/lib/session';
 
+import { payoutsState } from './payouts/payouts-state';
+
 export async function generateMetadata({
   params,
 }: {
@@ -32,7 +34,7 @@ function ChecklistRow({
   action,
 }: {
   title: string;
-  status: 'done' | 'todo' | 'comingSoon';
+  status: 'done' | 'todo';
   statusLabel: string;
   description: string;
   action: ReactNode;
@@ -107,6 +109,8 @@ export default async function DashboardOverviewPage({
   const profileHref = `/${locale}/dashboard/profile`;
   const portfolioHref = `/${locale}/dashboard/portfolio`;
   const verificationHref = `/${locale}/dashboard/verification`;
+  const payoutsHref = `/${locale}/dashboard/payouts`;
+  const payouts = profile ? payoutsState(profile) : null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -214,13 +218,40 @@ export default async function DashboardOverviewPage({
 
         <ChecklistRow
           title={overview('checklist.payouts.title')}
-          status="comingSoon"
-          statusLabel={overview('checklist.status.comingSoon')}
-          description={overview('checklist.payouts.description')}
+          status={payouts === 'enabled' ? 'done' : 'todo'}
+          statusLabel={overview(
+            payouts === 'enabled'
+              ? 'checklist.status.done'
+              : payouts === 'incomplete'
+                ? 'checklist.payouts.incompleteStatus'
+                : 'checklist.status.todo',
+          )}
+          description={overview(
+            payouts === 'enabled'
+              ? 'checklist.payouts.doneDescription'
+              : payouts === 'incomplete'
+                ? 'checklist.payouts.incompleteDescription'
+                : 'checklist.payouts.todoDescription',
+          )}
           action={
-            <span className="text-sm text-muted-foreground">
-              {overview('checklist.payouts.comingSoon')}
-            </span>
+            payouts ? (
+              <Link
+                href={payoutsHref}
+                className="self-start text-sm font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {overview(
+                  payouts === 'enabled'
+                    ? 'checklist.payouts.cta'
+                    : payouts === 'incomplete'
+                      ? 'checklist.payouts.continueCta'
+                      : 'checklist.payouts.startCta',
+                )}
+              </Link>
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                {overview('checklist.payouts.needsProfile')}
+              </span>
+            )
           }
         />
       </ul>

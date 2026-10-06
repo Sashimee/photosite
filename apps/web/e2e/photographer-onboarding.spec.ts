@@ -172,7 +172,7 @@ test.describe('photographer onboarding', () => {
     await context.close();
   });
 
-  test('a fresh photographer sees the checklist with nothing done, and the Stripe row rendered as unavailable rather than omitted', async () => {
+  test('a fresh photographer sees the checklist with nothing done, and the payouts row present in its not-started state rather than omitted', async () => {
     await page.goto(`/${LOCALE}/dashboard`);
 
     await expect(page.getByText('Create your profile below to get started.')).toBeVisible();
@@ -181,11 +181,14 @@ test.describe('photographer onboarding', () => {
       `/${LOCALE}/dashboard/profile`,
     );
 
-    // 1B.8's own regression to guard against: the payouts/Stripe row must
-    // still render, just as "not available yet" - never disappear because
-    // 1A.8/Stripe onboarding hasn't shipped.
-    await expect(page.getByText('Payouts')).toBeVisible();
-    await expect(page.getByText('Not available yet.')).toBeVisible();
+    // 1B.8's own regression to guard against: the payouts row must always
+    // render in the checklist. With no profile yet it is not started and asks
+    // for the profile first, offering no payouts link until one exists.
+    const payoutsRow = page.getByRole('list').getByRole('listitem').filter({ hasText: 'Payouts' });
+    await expect(payoutsRow).toHaveCount(1);
+    await expect(payoutsRow.getByText('Not started')).toBeVisible();
+    await expect(payoutsRow.getByText('Create your profile first.')).toBeVisible();
+    await expect(payoutsRow.getByRole('link')).toHaveCount(0);
 
     // Without a profile, portfolio/verification offer no link to manage
     // them yet - a further, cheap proof that "nothing is done".

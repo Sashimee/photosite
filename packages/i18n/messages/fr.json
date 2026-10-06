@@ -36,6 +36,56 @@
             "tooManyRequestsWithRetry": "Vous envoyez des devis trop rapidement. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}."
           }
         }
+      },
+      "nav": {
+        "payouts": "Paiements"
+      },
+      "overview": {
+        "checklist": {
+          "payouts": {
+            "title": "Paiements",
+            "todoDescription": "Reliez un compte bancaire via Stripe pour être payé.",
+            "incompleteStatus": "En cours de vérification",
+            "incompleteDescription": "Stripe vérifie vos informations. Poursuivez la configuration s'il en demande davantage.",
+            "doneDescription": "Les paiements sont activés. Vos revenus sont versés sur votre compte bancaire.",
+            "startCta": "Configurer les paiements",
+            "continueCta": "Poursuivre la configuration",
+            "cta": "Voir les paiements",
+            "needsProfile": "Créez d'abord votre profil."
+          }
+        }
+      },
+      "payouts": {
+        "metaTitle": "Paiements",
+        "title": "Paiements",
+        "backToOverview": "Retour à l'aperçu",
+        "intro": "Les paiements passent par Stripe. Photoo ne voit jamais vos coordonnées bancaires.",
+        "needsProfileTitle": "Créez d'abord votre profil",
+        "needsProfileDescription": "Les paiements sont rattachés à votre profil de photographe : commencez par le créer.",
+        "needsProfileCta": "Créer votre profil",
+        "status": {
+          "notStarted": "Non commencé",
+          "incomplete": "En cours de vérification",
+          "enabled": "Paiements activés"
+        },
+        "description": {
+          "notStarted": "Reliez un compte bancaire via Stripe pour être payé pour vos réservations.",
+          "incomplete": "Stripe vérifie vos informations, ce qui peut prendre un peu de temps. Si Stripe demande plus d'informations, poursuivez la configuration.",
+          "enabled": "Les paiements sont activés. Vos revenus sont versés sur votre compte bancaire."
+        },
+        "setupCta": "Configurer les paiements",
+        "continueCta": "Poursuivre la configuration",
+        "pending": "Ouverture de Stripe…",
+        "errors": {
+          "generic": "Une erreur est survenue. Réessayez.",
+          "conflict": "La configuration des paiements n'est pas disponible pour le moment. Réessayez plus tard.",
+          "invalid": "Vérifiez vos informations et réessayez.",
+          "forbidden": "Vous n'avez pas accès aux paiements.",
+          "notFound": "Votre profil de photographe est introuvable.",
+          "emailNotVerified": "Vérifiez votre adresse e-mail avant de configurer les paiements.",
+          "tooManyRequests": "Vous allez trop vite. Ralentissez et réessayez.",
+          "tooManyRequestsWithRetry": "Vous allez trop vite. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}."
+        }
       }
     }
   },
