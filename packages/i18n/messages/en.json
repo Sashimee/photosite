@@ -885,6 +885,53 @@
         "rateLimitedWithRetry": "Too many decisions in a short time. The remaining images were not attempted and stay selected. Try again in {seconds, plural, one {# second} other {# seconds}}."
       }
     },
+    "dashboard": {
+      "title": "Dashboard",
+      "windowLabel": "Time window",
+      "windows": {
+        "7d": "Last 7 days",
+        "30d": "Last 30 days",
+        "90d": "Last 90 days"
+      },
+      "comparison": "Compared with the previous {days, plural, one {# day} other {# days}}",
+      "generatedAt": "Generated {at}",
+      "signups": {
+        "title": "Sign-ups",
+        "total": "All new accounts",
+        "client": "Clients",
+        "photographer": "Photographers",
+        "professional": "Professionals"
+      },
+      "activity": {
+        "title": "Activity",
+        "requests": "Requests created",
+        "quotes": "Quotes sent",
+        "bookings": "Bookings paid"
+      },
+      "delta": {
+        "new": "New",
+        "unchanged": "No change",
+        "previous": "Previous: {value}",
+        "increase": "Up {value}",
+        "decrease": "Down {value}"
+      },
+      "money": {
+        "title": "Money",
+        "gmv": "GMV",
+        "refunds": "Refunds",
+        "feeRevenue": "Fee revenue (realised at release)",
+        "noData": "No money movement recorded",
+        "requiresFinance": "Money figures require the finance permission."
+      },
+      "backlogs": {
+        "title": "Backlogs",
+        "verification": "Verification cases awaiting review",
+        "provenance": "Provenance checks awaiting review",
+        "reports": "Open reports",
+        "dataRequests": "Open data requests",
+        "open": "Open queue"
+      }
+    },
     "finance": {
       "title": "Bookings",
       "caption": "Bookings with refunded and reversed totals",
