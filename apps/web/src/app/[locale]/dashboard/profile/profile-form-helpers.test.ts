@@ -61,6 +61,7 @@ describe('defaultValuesFromProfile', () => {
       isPublished: false,
       stripeOnboardingComplete: false,
       stripePayoutsEnabled: false,
+      stripeAccountConnected: false,
     });
 
     expect(defaults.bio).toEqual({ en: 'Hello', fr: 'Bonjour', de: '', pt: '', es: '' });

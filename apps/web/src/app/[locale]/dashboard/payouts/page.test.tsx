@@ -26,6 +26,7 @@ const PROFILE = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
   stripeOnboardingComplete: false,
   stripePayoutsEnabled: false,
+  stripeAccountConnected: false,
 };
 
 function mockProfile(status: number, data?: unknown) {
@@ -118,6 +119,18 @@ describe('DashboardPayoutsPage', () => {
 
     expect(screen.getByText('In review')).toBeInTheDocument();
     expect(screen.getByText(/Stripe is reviewing your details/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'resume' })).toBeInTheDocument();
+  });
+
+  it('shows the in-review state and the continue button when only the Stripe account exists', async () => {
+    getSessionMock.mockResolvedValue({ id: 'user-1' });
+    mockProfile(200, { ...PROFILE, stripeAccountConnected: true });
+    const Page = await loadPage();
+
+    render(await Page({ params: Promise.resolve({ locale: 'en' }) }));
+
+    expect(screen.getByText('In review')).toBeInTheDocument();
+    expect(screen.queryByText('Not started')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'resume' })).toBeInTheDocument();
   });
 

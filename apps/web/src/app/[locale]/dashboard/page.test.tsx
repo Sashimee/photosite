@@ -226,6 +226,21 @@ describe('DashboardOverviewPage', () => {
     );
   });
 
+  it('shows the payouts row as in review when only the Stripe account exists', async () => {
+    getSessionMock.mockResolvedValue({ id: 'user-1' });
+    mockProfile(200, { ...PROFILE, stripeAccountConnected: true });
+    const Page = await loadPage();
+
+    render(await Page({ params: Promise.resolve({ locale: 'en' }) }));
+
+    expect(screen.getByText('In review')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Set up payouts' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Continue setup' })).toHaveAttribute(
+      'href',
+      '/en/dashboard/payouts',
+    );
+  });
+
   it('shows the payouts row as done once payouts are enabled', async () => {
     getSessionMock.mockResolvedValue({ id: 'user-1' });
     mockProfile(200, {
