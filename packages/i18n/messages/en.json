@@ -887,7 +887,7 @@
     },
     "finance": {
       "title": "Bookings",
-      "caption": "Bookings, newest first",
+      "caption": "Bookings with refunded and reversed totals",
       "columns": {
         "id": "Booking",
         "status": "Status",

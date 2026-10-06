@@ -33,3 +33,11 @@ export function parseAmountToCents(input: string, currency: string): AmountParse
 export function centsToMajorUnits(amountCents: number, currency: string): number {
   return amountCents / 10 ** minorUnitDigits(currency);
 }
+
+export function formatCents(
+  format: { number: (value: number, options: Intl.NumberFormatOptions) => string },
+  amountCents: number,
+  currency: string,
+): string {
+  return format.number(centsToMajorUnits(amountCents, currency), { style: 'currency', currency });
+}
