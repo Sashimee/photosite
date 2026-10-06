@@ -11,8 +11,15 @@ export function financeErrorMessage(
   if (error?.code === 'TOO_MANY_REQUESTS') {
     return tFinance('errors.tooManyRequests');
   }
+  if (error?.code === 'CONFLICT') {
+    return tAction('errors.conflict', { detail: error.message ?? '' });
+  }
   if (error?.code === 'UNPROCESSABLE_ENTITY') {
     return tAction('errors.unprocessable');
   }
   return apiErrorMessage(tFinance, tFinance('errors.generic'), error);
+}
+
+export function isUnknownOutcome(response: { status: number }): boolean {
+  return response.status >= 500;
 }

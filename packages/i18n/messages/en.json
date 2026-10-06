@@ -924,8 +924,7 @@
           "total": "Total",
           "refunded": "Refunded so far",
           "reversed": "Reversed from the transfer so far",
-          "refundable": "Still refundable (hint)",
-          "refundableHint": "Total minus refunded. Only a hint: the API checks the real limit when you submit."
+          "limitHint": "The API checks the maximum refund when you submit. After release, a refund cannot exceed what is left on the photographer's transfer; the platform fee is not refunded."
         },
         "fields": {
           "status": "Status",
@@ -948,7 +947,7 @@
         },
         "actions": {
           "title": "Actions",
-          "none": "Refunds and transfer reversals are only available for released bookings."
+          "none": "Refunds are only available for released bookings, and transfer reversals for released bookings or disputed bookings that already have a transfer."
         }
       },
       "refund": {
@@ -958,7 +957,7 @@
         "summary": "You are about to refund {amount} ({currency}) on booking {id}.",
         "twoFactorNotice": "Submitting asks for your second factor again. Anything typed here is cleared when you come back.",
         "amountLabel": "Amount ({currency})",
-        "amountHint": "Up to {refundable} looks refundable. The API decides the real limit.",
+        "amountHint": "The API checks the maximum. After release, a refund cannot exceed what is left on the photographer's transfer; the platform fee is not refunded.",
         "reasonLabel": "Internal reason (audit log only, not shown to the client or photographer)",
         "submit": "Refund",
         "submitting": "Refunding...",
@@ -969,13 +968,14 @@
           "amountTooLarge": "That amount is too large.",
           "reasonRequired": "Give a reason for the audit log.",
           "reasonTooLong": "The reason is too long (2000 characters at most).",
+          "conflict": "The refund was not made because of a conflict. Server message: {detail}",
           "unprocessable": "That amount is more than can still be refunded, or more than is left on the photographer's transfer. Nothing was refunded."
         }
       },
       "reverse": {
         "open": "Reverse transfer",
         "title": "Reverse payout transfer",
-        "description": "Takes back whatever is left on the photographer's transfer to the platform balance. The client is not refunded and the booking keeps its status. This moves real money and is written to the audit log.",
+        "description": "Use this to recover a lost chargeback from the photographer: it takes back whatever is left on their transfer to the platform balance. To refund the client, use Refund instead, which already reverses and refunds in one step. After a reversal, this booking can no longer be refunded to the client from here. This moves real money and is written to the audit log.",
         "summary": "You are about to reverse the remaining transfer ({currency}) on booking {id}.",
         "twoFactorNotice": "Submitting asks for your second factor again. Anything typed here is cleared when you come back.",
         "reasonLabel": "Internal reason (audit log only, not shown to the client or photographer)",
@@ -984,6 +984,7 @@
         "errors": {
           "reasonRequired": "Give a reason for the audit log.",
           "reasonTooLong": "The reason is too long (2000 characters at most).",
+          "conflict": "The reversal was not made because of a conflict. Server message: {detail}",
           "unprocessable": "Nothing is left on the transfer to reverse. Nothing was changed."
         }
       },
@@ -996,6 +997,7 @@
         "forbidden": "You don't have permission to do this.",
         "notFound": "This booking couldn't be found.",
         "invalid": "That request wasn't valid.",
+        "unknownOutcome": "The outcome is unknown: the request may or may not have gone through. Reload the page and check the refunded and reversed figures before trying again. Refund and reverse stay disabled until you reload.",
         "conflict": "This booking is no longer in a state that allows that. Reload and check.",
         "tooManyRequests": "Too many admin changes in a short time. Wait a moment, then reload to check the ledger before retrying."
       }

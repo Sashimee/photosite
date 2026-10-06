@@ -26,7 +26,6 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const format = await getFormatter();
   const total = requireMoney(booking.total, `total of booking ${id}`);
   const { currency } = total;
-  const refundableCents = Math.max(0, total.amountCents - booking.refundedCents);
 
   const timestamps = [
     ['scheduledAt', booking.scheduledAt],
@@ -88,10 +87,8 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           <dd className="text-foreground">
             {formatCents(format, booking.reversedCents, currency)}
           </dd>
-          <dt className="text-muted-foreground">{t('detail.money.refundable')}</dt>
-          <dd className="text-foreground">{formatCents(format, refundableCents, currency)}</dd>
         </dl>
-        <p className="text-xs text-muted-foreground">{t('detail.money.refundableHint')}</p>
+        <p className="text-xs text-muted-foreground">{t('detail.money.limitHint')}</p>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -114,7 +111,6 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           status={booking.status}
           transferId={booking.transferId}
           currency={currency}
-          refundableCents={refundableCents}
         />
       </div>
     </section>

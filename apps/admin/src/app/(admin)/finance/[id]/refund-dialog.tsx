@@ -20,7 +20,7 @@ import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import { formatCents, minorUnitDigits, parseAmountToCents } from '@/lib/money';
 
-import { financeErrorMessage } from '../finance-errors';
+import { financeErrorMessage, isUnknownOutcome } from '../finance-errors';
 import { ReasonField } from '../reason-field';
 
 interface Errors {
@@ -31,13 +31,15 @@ interface Errors {
 export function RefundDialog({
   bookingId,
   currency,
-  refundableCents,
+  disabled,
   onDone,
+  onUnknownOutcome,
 }: {
   bookingId: string;
   currency: string;
-  refundableCents: number;
+  disabled: boolean;
   onDone: () => void;
+  onUnknownOutcome: () => void;
 }) {
   const t = useTranslations('admin.finance.refund');
   const tFinance = useTranslations('admin.finance');
@@ -54,13 +56,19 @@ export function RefundDialog({
   const parsed = parseAmountToCents(amount, currency);
 
   function handleOpenChange(next: boolean) {
-    setOpen(next);
-    if (!next) {
-      setAmount('');
-      setReason('');
-      setErrors({});
-      setSubmitError(null);
+    if (next) {
+      setOpen(true);
+    } else if (!inFlight.current) {
+      close();
     }
+  }
+
+  function close() {
+    setOpen(false);
+    setAmount('');
+    setReason('');
+    setErrors({});
+    setSubmitError(null);
   }
 
   function amountError(): string | undefined {
@@ -113,22 +121,28 @@ export function RefundDialog({
     inFlight.current = true;
     setSubmitting(true);
     try {
-      const { error } = await api.POST('/v1/admin/bookings/{id}/refund', {
+      const { error, response } = await api.POST('/v1/admin/bookings/{id}/refund', {
         params: { path: { id: bookingId } },
         body: result.data,
       });
-      if (error) {
-        // src/lib/api.ts already redirects to re-verification for this code.
-        if (error.code === 'TWO_FACTOR_REQUIRED') {
-          return;
-        }
+      // src/lib/api.ts already redirects to re-verification for this code.
+      if (error?.code === 'TWO_FACTOR_REQUIRED' || response.status === 401) {
+        return;
+      }
+      if (isUnknownOutcome(response)) {
+        close();
+        onUnknownOutcome();
+        return;
+      }
+      if (error || !response.ok) {
         setSubmitError(financeErrorMessage(tFinance, t, error));
         return;
       }
-      handleOpenChange(false);
+      close();
       onDone();
     } catch {
-      setSubmitError(tFinance('errors.generic'));
+      close();
+      onUnknownOutcome();
     } finally {
       inFlight.current = false;
       setSubmitting(false);
@@ -138,7 +152,9 @@ export function RefundDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button type="button">{t('open')}</Button>
+        <Button type="button" disabled={disabled}>
+          {t('open')}
+        </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogTitle>{t('title')}</DialogTitle>
@@ -177,7 +193,7 @@ export function RefundDialog({
               aria-describedby="refund-amount-hint refund-amount-error"
             />
             <p id="refund-amount-hint" className="text-xs text-muted-foreground">
-              {t('amountHint', { refundable: formatCents(format, refundableCents, currency) })}
+              {t('amountHint')}
             </p>
             <FieldError id="refund-amount-error" message={errors.amount} />
           </div>
@@ -190,7 +206,7 @@ export function RefundDialog({
           />
           <div className="flex justify-end gap-2">
             <DialogClose asChild>
-              <Button type="button" variant="ghost">
+              <Button type="button" variant="ghost" disabled={submitting}>
                 {tCommon('cancel')}
               </Button>
             </DialogClose>

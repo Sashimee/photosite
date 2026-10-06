@@ -16,13 +16,7 @@ vi.mock('@/lib/api', () => ({ api: { POST: postMock } }));
 async function renderActions(status: string, transferId: string | null = 'tr_1') {
   const { BookingActions } = await import('./booking-actions');
   render(
-    <BookingActions
-      bookingId="booking-1"
-      status={status}
-      transferId={transferId}
-      currency="EUR"
-      refundableCents={12000}
-    />,
+    <BookingActions bookingId="booking-1" status={status} transferId={transferId} currency="EUR" />,
   );
 }
 
@@ -70,7 +64,10 @@ describe('BookingActions', () => {
   });
 
   it('refreshes the page and confirms after a successful refund', async () => {
-    postMock.mockResolvedValueOnce({ data: { id: 'booking-1' } });
+    postMock.mockResolvedValueOnce({
+      data: { id: 'booking-1' },
+      response: { ok: true, status: 200 },
+    });
     await renderActions('released');
     const events = userEvent.setup();
 
@@ -83,5 +80,29 @@ describe('BookingActions', () => {
     await waitFor(() => {
       expect(refreshMock).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('says reversal is available for disputed bookings that have a transfer when nothing is offered', async () => {
+    await renderActions('pending_payment', null);
+
+    expect(screen.getByText(/disputed bookings that already have a transfer/)).toBeInTheDocument();
+  });
+
+  it('locks both actions and warns after an unknown outcome until the page is reloaded', async () => {
+    postMock.mockRejectedValueOnce(new TypeError('network'));
+    await renderActions('released');
+    const events = userEvent.setup();
+
+    await events.click(screen.getByRole('button', { name: 'Refund after release' }));
+    await events.type(screen.getByLabelText(/^Amount/), '10');
+    await events.type(screen.getByLabelText(/^Internal reason/), 'x');
+    await events.click(screen.getByRole('button', { name: 'Refund' }));
+
+    expect(await screen.findByText(/The outcome is unknown/)).toBeInTheDocument();
+    expect(refreshMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Refund after release' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reverse transfer' })).toBeDisabled();
+    expect(screen.queryByText(/Refund submitted/)).not.toBeInTheDocument();
+    expect(postMock).toHaveBeenCalledTimes(1);
   });
 });

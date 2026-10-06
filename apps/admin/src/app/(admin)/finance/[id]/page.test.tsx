@@ -65,7 +65,7 @@ beforeEach(() => {
 });
 
 describe('BookingPage', () => {
-  it('shows the money summary with the refundable hint, stripe ids as text and the actions', async () => {
+  it('shows the money summary with the limit explanation and no computed refundable figure, stripe ids as text and the actions', async () => {
     serverApiMock.mockResolvedValue({
       GET: vi.fn().mockResolvedValue({ data: booking(), response: { status: 200 } }),
     });
@@ -77,7 +77,8 @@ describe('BookingPage', () => {
     expect(screen.getByText('€120.00')).toBeInTheDocument();
     expect(screen.getByText('€25.00')).toBeInTheDocument();
     expect(screen.getByText('€10.00')).toBeInTheDocument();
-    expect(screen.getByText('€95.00')).toBeInTheDocument();
+    expect(screen.queryByText('€95.00')).not.toBeInTheDocument();
+    expect(screen.getByText(/platform fee is not refunded/)).toBeInTheDocument();
     expect(screen.getByText('pi_123')).toBeInTheDocument();
     expect(screen.getByText('ch_123')).toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
@@ -87,7 +88,6 @@ describe('BookingPage', () => {
       status: 'released',
       transferId: null,
       currency: 'EUR',
-      refundableCents: 9500,
     });
   });
 
@@ -108,18 +108,6 @@ describe('BookingPage', () => {
 
     expect(screen.getByText('Lost')).toBeInTheDocument();
     expect(screen.getByText('Client changed plans')).toBeInTheDocument();
-  });
-
-  it('never reports a negative refundable amount', async () => {
-    serverApiMock.mockResolvedValue({
-      GET: vi
-        .fn()
-        .mockResolvedValue({ data: booking({ refundedCents: 13000 }), response: { status: 200 } }),
-    });
-
-    await renderPage();
-
-    expect(bookingActionsMock.mock.calls[0]?.[0]).toMatchObject({ refundableCents: 0 });
   });
 
   it('renders not found on 404', async () => {
@@ -174,7 +162,6 @@ describe('BookingPage', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(bookingActionsMock.mock.calls[0]?.[0]).toMatchObject({
       transferId: null,
-      refundableCents: 12000,
     });
   });
 
@@ -224,10 +211,9 @@ describe('BookingPage', () => {
     await renderPage();
 
     expect(screen.getByText('¥5,000')).toBeInTheDocument();
-    expect(screen.getByText('¥4,000')).toBeInTheDocument();
+    expect(screen.getByText('¥1,000')).toBeInTheDocument();
     expect(bookingActionsMock.mock.calls[0]?.[0]).toMatchObject({
       currency: 'JPY',
-      refundableCents: 4000,
     });
   });
 });
