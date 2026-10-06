@@ -197,7 +197,7 @@ describe('DashboardOverviewPage', () => {
     expect(screen.getByText('Verified.')).toBeInTheDocument();
   });
 
-  it('shows the Stripe payouts row as not available yet rather than omitting it', async () => {
+  it('links the payouts row to set up payouts when onboarding has not started', async () => {
     getSessionMock.mockResolvedValue({ id: 'user-1' });
     mockProfile(200, PROFILE);
     const Page = await loadPage();
@@ -205,6 +205,50 @@ describe('DashboardOverviewPage', () => {
     render(await Page({ params: Promise.resolve({ locale: 'en' }) }));
 
     expect(screen.getByText('Payouts')).toBeInTheDocument();
-    expect(screen.getByText('Not available yet.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Set up payouts' })).toHaveAttribute(
+      'href',
+      '/en/dashboard/payouts',
+    );
+  });
+
+  it('shows the payouts row as in review while Stripe has not enabled payouts', async () => {
+    getSessionMock.mockResolvedValue({ id: 'user-1' });
+    mockProfile(200, { ...PROFILE, stripeOnboardingComplete: true });
+    const Page = await loadPage();
+
+    render(await Page({ params: Promise.resolve({ locale: 'en' }) }));
+
+    expect(screen.getByText('In review')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Continue setup' })).toHaveAttribute(
+      'href',
+      '/en/dashboard/payouts',
+    );
+  });
+
+  it('shows the payouts row as done once payouts are enabled', async () => {
+    getSessionMock.mockResolvedValue({ id: 'user-1' });
+    mockProfile(200, { ...PROFILE, stripeOnboardingComplete: true, stripePayoutsEnabled: true });
+    const Page = await loadPage();
+
+    render(await Page({ params: Promise.resolve({ locale: 'en' }) }));
+
+    expect(
+      screen.getByText('Payouts are enabled. Your earnings go to your bank account.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View payouts' })).toHaveAttribute(
+      'href',
+      '/en/dashboard/payouts',
+    );
+  });
+
+  it('asks for a profile before payouts when there is none', async () => {
+    getSessionMock.mockResolvedValue({ id: 'user-1' });
+    mockProfile(404);
+    const Page = await loadPage();
+
+    render(await Page({ params: Promise.resolve({ locale: 'en' }) }));
+
+    expect(screen.queryByRole('link', { name: 'Set up payouts' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Create your profile first.').length).toBeGreaterThan(0);
   });
 });
