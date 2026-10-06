@@ -43,6 +43,7 @@ interface BookingSeed {
   platformFeeCents: number;
   currency?: string;
   ledger?: LedgerSeed[];
+  lostDisputeCents?: number;
 }
 
 function at(minutesAgo: number): Date {
@@ -177,6 +178,18 @@ describe('GET /v1/me/earnings integration', () => {
         })),
       });
     }
+    if (seed.lostDisputeCents !== undefined) {
+      await prisma.dispute.create({
+        data: {
+          bookingId: booking.id,
+          openedById: clientId,
+          reason: 'fixture',
+          status: 'lost',
+          resolution: 'stripe:lost',
+          amountRefundedCents: seed.lostDisputeCents,
+        },
+      });
+    }
     return booking.id;
   }
 
@@ -263,6 +276,13 @@ describe('GET /v1/me/earnings integration', () => {
         ],
       },
       disputedBeforeRelease: { status: 'disputed', subtotalCents: 4000, platformFeeCents: 200 },
+      lostDisputeBeforeRelease: {
+        status: 'disputed',
+        subtotalCents: 6000,
+        platformFeeCents: 300,
+        ledger: [{ type: 'charge', amountCents: 6000, occurredAt: at(400) }],
+        lostDisputeCents: 6000,
+      },
       refunded: {
         status: 'refunded',
         subtotalCents: 7000,
@@ -312,6 +332,7 @@ describe('GET /v1/me/earnings integration', () => {
       });
       const bookingIds = bookings.map((booking) => booking.id);
       await prisma.ledgerEntry.deleteMany({ where: { bookingId: { in: bookingIds } } });
+      await prisma.dispute.deleteMany({ where: { bookingId: { in: bookingIds } } });
       await prisma.booking.deleteMany({ where: { id: { in: bookingIds } } });
       await prisma.quote.deleteMany({ where: { photographerId: { in: createdProfileIds } } });
       await prisma.auditLog.deleteMany({ where: { targetId: { in: createdProfileIds } } });
@@ -357,8 +378,9 @@ describe('GET /v1/me/earnings integration', () => {
         // 23797 - 2000 reversed, 9500, and 4750 transferred before the dispute.
         releasedCents: 21797 + 9500 + 4750,
         // paid_held 9500, in_progress 19000, delivered 28500 - 3000 refunded,
-        // disputed before release 3800. Refunded, cancelled and
-        // pending_payment are excluded; the post-release dispute is released.
+        // disputed before release 3800. Refunded, cancelled,
+        // pending_payment and the dispute lost before release are excluded;
+        // the post-release dispute is released.
         heldCents: 9500 + 19000 + 25500 + 3800,
       },
       { currency: 'USD', releasedCents: 1900, heldCents: 7600 },
@@ -445,6 +467,32 @@ describe('GET /v1/me/earnings integration', () => {
     const expected = [...bookingIds].sort().reverse().slice(0, 20);
     expect(earnings.recent.map((entry) => entry.bookingId)).toEqual(expected);
     expect(earnings.totals).toEqual([{ currency: 'EUR', releasedCents: 21 * 950, heldCents: 0 }]);
+  });
+
+  it('clamps a booking refunded past its payout to 0 held, leaving other held bookings intact', async () => {
+    const clamped = await createPhotographer('clamped');
+    // A dashboard refund of 9600 on a 10000 booking with a 500 fee would
+    // otherwise leave -100 held and eat into the other booking.
+    await seedBooking(clamped, client.id, {
+      status: 'delivered',
+      subtotalCents: 10000,
+      platformFeeCents: 500,
+      ledger: [
+        { type: 'charge', amountCents: 10000, occurredAt: at(40) },
+        { type: 'refund', amountCents: -9600, occurredAt: at(30) },
+      ],
+    });
+    await seedBooking(clamped, client.id, {
+      status: 'paid_held',
+      subtotalCents: 4000,
+      platformFeeCents: 200,
+    });
+    const response = await getEarnings(clamped.token);
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      totals: [{ currency: 'EUR', releasedCents: 0, heldCents: 3800 }],
+      recent: [],
+    });
   });
 
   it('fails loudly rather than reporting a reversal that has no transfer', async () => {
