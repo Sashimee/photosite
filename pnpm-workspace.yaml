@@ -15,6 +15,9 @@ overrides:
   deepmerge-ts: 8.0.2
   fastify: 5.12.5
   mysql2: 3.24.4
+  # GHSA-vcvr-r3jv-pc5j: apps/api never imports next, but better-auth's optional
+  # next peer was resolved to 16.3.5 independently of the web/admin pins.
+  'next@<16.3.6': 16.3.6
   # GHSA-ph9p-34f9-6g65 (tmp path traversal, high) and GHSA-7c78-jf6q-g5cm
   # (tmp type-confusion path traversal, high, fixed one release later):
   # @lhci/cli depends on tmp@^0.1.0 directly and pulls a second copy via
