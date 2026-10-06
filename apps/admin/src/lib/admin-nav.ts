@@ -31,12 +31,7 @@ const ADMIN_NAV_SECTIONS: readonly AdminNavSection[] = [
   { id: 'users', href: '/users', labelKey: 'users' },
   { id: 'verification', href: '/verification', labelKey: 'verification' },
   { id: 'provenance', href: '/provenance', labelKey: 'provenance' },
-  {
-    id: 'finance',
-    href: '/finance',
-    labelKey: 'finance',
-    blockedBy: { kind: 'api', step: '1A.8' },
-  },
+  { id: 'finance', href: '/finance', labelKey: 'finance' },
   { id: 'moderation', href: '/moderation', labelKey: 'moderation' },
   { id: 'data-requests', href: '/data-requests', labelKey: 'dataRequests' },
   { id: 'settings', href: '/settings', labelKey: 'settings' },
