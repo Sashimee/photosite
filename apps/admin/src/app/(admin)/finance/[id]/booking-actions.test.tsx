@@ -46,6 +46,14 @@ describe('BookingActions', () => {
     expect(screen.getByRole('button', { name: 'Reverse transfer' })).toBeInTheDocument();
   });
 
+  it('shows a disputed booking that was already released as reverse-only, never refund', async () => {
+    await renderActions('disputed', 'tr_released');
+
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Reverse transfer' })).toBeInTheDocument();
+    expect(screen.queryByText(/only available for released bookings/)).not.toBeInTheDocument();
+  });
+
   it.each([
     ['disputed', null],
     ['pending_payment', null],

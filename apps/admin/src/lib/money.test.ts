@@ -47,6 +47,50 @@ describe('parseAmountToCents', () => {
   });
 });
 
+describe('parseAmountToCents separators and extremes', () => {
+  it.each([
+    ['\t12.34\n', 'EUR', 1234],
+    ['5.', 'EUR', 500],
+    ['007.5', 'EUR', 750],
+    ['0,5', 'EUR', 50],
+    ['1,234', 'KWD', 1234],
+    ['9007199254740991', 'JPY', 9007199254740991],
+  ])('accepts %j %s as %i', (input, currency, expected) => {
+    expect(parseAmountToCents(input, currency)).toEqual({ ok: true, amountCents: expected });
+  });
+
+  it.each([
+    ['1,234', 'EUR'],
+    ['1.234', 'EUR'],
+    ['1,234', 'JPY'],
+    ['12,345', 'EUR'],
+  ])('never reads the thousands separator in %s %s as a decimal point', (input, currency) => {
+    expect(parseAmountToCents(input, currency)).toEqual({ ok: false, reason: 'tooManyDecimals' });
+  });
+
+  it.each(['1,234.56', '1.234,56', '1,234,567', '1 234.56', "1'234.56", '+5', '+5.00', '.5', ',5'])(
+    'rejects the mixed or prefixed format %j as invalid',
+    (input) => {
+      expect(parseAmountToCents(input, 'EUR')).toEqual({ ok: false, reason: 'invalid' });
+    },
+  );
+
+  it.each([
+    ['90071992547409.92', 'EUR'],
+    ['9007199254740992', 'JPY'],
+    ['1' + '0'.repeat(30), 'EUR'],
+  ])('flags %s %s as too large', (input, currency) => {
+    expect(parseAmountToCents(input, currency)).toEqual({ ok: false, reason: 'tooLarge' });
+  });
+
+  it('accepts the largest safe amount for EUR', () => {
+    expect(parseAmountToCents('90071992547409.91', 'EUR')).toEqual({
+      ok: true,
+      amountCents: Number.MAX_SAFE_INTEGER,
+    });
+  });
+});
+
 describe('minorUnitDigits', () => {
   it('follows the currency', () => {
     expect(minorUnitDigits('EUR')).toBe(2);

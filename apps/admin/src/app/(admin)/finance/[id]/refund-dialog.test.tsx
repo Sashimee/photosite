@@ -221,4 +221,93 @@ describe('RefundDialog', () => {
 
     expect(screen.getByLabelText(/^Amount/)).toHaveValue('');
   });
+
+  it('still sends an amount above the refundable hint because the API is authoritative', async () => {
+    postMock.mockResolvedValueOnce({ data: { id: 'booking-1' } });
+    const events = await openDialog();
+
+    await fill(events, '90.01', 'over the hint');
+    await events.click(screen.getByRole('button', { name: 'Refund' }));
+
+    await waitFor(() => {
+      expect(postMock).toHaveBeenCalledWith(
+        '/v1/admin/bookings/{id}/refund',
+        expect.objectContaining({ body: { amountCents: 9001, reason: 'over the hint' } }),
+      );
+    });
+  });
+
+  it('accepts a comma decimal separator', async () => {
+    postMock.mockResolvedValueOnce({ data: { id: 'booking-1' } });
+    const events = await openDialog();
+
+    await fill(events, '12,34', 'x');
+    await events.click(screen.getByRole('button', { name: 'Refund' }));
+
+    await waitFor(() => {
+      expect(postMock).toHaveBeenCalledWith(
+        '/v1/admin/bookings/{id}/refund',
+        expect.objectContaining({ body: { amountCents: 1234, reason: 'x' } }),
+      );
+    });
+  });
+
+  it('does not send a whitespace-only reason even with a valid amount', async () => {
+    const events = await openDialog();
+
+    await fill(events, '5', ' \t ');
+    await events.click(screen.getByRole('button', { name: 'Refund' }));
+
+    expect(await screen.findByText('Give a reason for the audit log.')).toBeInTheDocument();
+    expect(postMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('closes the dialog and reports done exactly once on success', async () => {
+    postMock.mockResolvedValueOnce({ data: { id: 'booking-1' } });
+    const onDone = vi.fn();
+    const events = await openDialog(onDone);
+
+    await fill(events, '5', 'reason');
+    await events.click(screen.getByRole('button', { name: 'Refund' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends one request when the submit button is double clicked', async () => {
+    let resolve: (value: unknown) => void = () => undefined;
+    postMock.mockReturnValueOnce(
+      new Promise((r) => {
+        resolve = r;
+      }),
+    );
+    const events = await openDialog();
+
+    await fill(events, '5', 'reason');
+    await events.dblClick(screen.getByRole('button', { name: 'Refund' }));
+
+    expect(postMock).toHaveBeenCalledTimes(1);
+    resolve({ data: { id: 'booking-1' } });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('allows a retry after a failed request', async () => {
+    postMock.mockResolvedValueOnce({ error: { code: 'CONFLICT' } });
+    postMock.mockResolvedValueOnce({ data: { id: 'booking-1' } });
+    const events = await openDialog();
+
+    await fill(events, '5', 'reason');
+    await events.click(screen.getByRole('button', { name: 'Refund' }));
+    await screen.findByText(/no longer in a state that allows that/);
+    await events.click(screen.getByRole('button', { name: 'Refund' }));
+
+    await waitFor(() => {
+      expect(postMock).toHaveBeenCalledTimes(2);
+    });
+  });
 });

@@ -139,4 +139,95 @@ describe('BookingPage', () => {
 
     await expect(Page({ params: Promise.resolve({ id: 'x' }) })).rejects.toThrow(/HTTP 500/);
   });
+
+  it('throws on 403 instead of rendering not found', async () => {
+    serverApiMock.mockResolvedValue({
+      GET: vi.fn().mockResolvedValue({ data: undefined, response: { status: 403 } }),
+    });
+    const Page = (await import('./page')).default;
+
+    await expect(Page({ params: Promise.resolve({ id: 'x' }) })).rejects.toThrow(/HTTP 403/);
+    expect(notFoundMock).not.toHaveBeenCalled();
+  });
+
+  it('shows "None" for a missing dispute and every missing stripe id, and omits empty timestamps', async () => {
+    serverApiMock.mockResolvedValue({
+      GET: vi.fn().mockResolvedValue({
+        data: booking({
+          status: 'pending_payment',
+          paymentIntentId: null,
+          chargeId: null,
+          transferId: null,
+          deliveredAt: null,
+          releasedAt: null,
+          refundedCents: 0,
+          reversedCents: 0,
+        }),
+        response: { status: 200 },
+      }),
+    });
+
+    await renderPage();
+
+    expect(screen.getAllByText('None')).toHaveLength(4);
+    expect(screen.queryByText('Delivered')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(bookingActionsMock.mock.calls[0]?.[0]).toMatchObject({
+      transferId: null,
+      refundableCents: 12000,
+    });
+  });
+
+  it('renders the transfer id as plain text and passes it to the actions', async () => {
+    serverApiMock.mockResolvedValue({
+      GET: vi.fn().mockResolvedValue({
+        data: booking({ transferId: 'tr_123' }),
+        response: { status: 200 },
+      }),
+    });
+
+    await renderPage();
+
+    expect(screen.getByText('tr_123')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(bookingActionsMock.mock.calls[0]?.[0]).toMatchObject({ transferId: 'tr_123' });
+  });
+
+  it('passes a disputed booking through with its transfer so only reverse is offered', async () => {
+    serverApiMock.mockResolvedValue({
+      GET: vi.fn().mockResolvedValue({
+        data: booking({ status: 'disputed', disputeStatus: 'needs_response', transferId: 'tr_9' }),
+        response: { status: 200 },
+      }),
+    });
+
+    await renderPage();
+
+    expect(bookingActionsMock.mock.calls[0]?.[0]).toMatchObject({
+      status: 'disputed',
+      transferId: 'tr_9',
+    });
+  });
+
+  it('formats cents with the booking currency minor unit', async () => {
+    serverApiMock.mockResolvedValue({
+      GET: vi.fn().mockResolvedValue({
+        data: booking({
+          total: { amountCents: 5000, currency: 'JPY' },
+          refundedCents: 1000,
+          reversedCents: 0,
+        }),
+        response: { status: 200 },
+      }),
+    });
+
+    await renderPage();
+
+    expect(screen.getByText('¥5,000')).toBeInTheDocument();
+    expect(screen.getByText('¥4,000')).toBeInTheDocument();
+    expect(bookingActionsMock.mock.calls[0]?.[0]).toMatchObject({
+      currency: 'JPY',
+      refundableCents: 4000,
+    });
+  });
 });
