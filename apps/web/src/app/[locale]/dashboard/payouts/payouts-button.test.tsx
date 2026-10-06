@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -153,6 +153,95 @@ describe('PayoutsButton', () => {
 
   it('shows the generic error when the request throws', async () => {
     apiPostMock.mockRejectedValue(new Error('network'));
+    const assign = stubLocationAssign();
+    const PayoutsButton = await loadButton();
+    const user = userEvent.setup();
+
+    render(<PayoutsButton resume={false} />);
+    await user.click(screen.getByRole('button', { name: translate(NAMESPACE, 'setupCta') }));
+
+    expect(await screen.findByText(translate(NAMESPACE, 'errors.generic'))).toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
+  });
+  it('disables the button and ignores a second click while the requests are pending', async () => {
+    let resolveAccount: (value: unknown) => void = () => undefined;
+    apiPostMock.mockImplementation((url: string) =>
+      url === '/v1/me/stripe/account'
+        ? new Promise((resolve) => {
+            resolveAccount = resolve;
+          })
+        : Promise.resolve({ data: { url: LINK_URL }, error: undefined }),
+    );
+    const assign = stubLocationAssign();
+    const PayoutsButton = await loadButton();
+    const user = userEvent.setup();
+
+    render(<PayoutsButton resume={false} />);
+    await user.click(screen.getByRole('button', { name: translate(NAMESPACE, 'setupCta') }));
+    const button = screen.getByRole('button', { name: translate(NAMESPACE, 'pending') });
+    await user.click(button);
+
+    expect(button).toBeDisabled();
+    expect(apiPostMock).toHaveBeenCalledTimes(1);
+
+    resolveAccount({ data: { stripeAccountId: 'acct_1' }, error: undefined });
+    await waitFor(() => {
+      expect(assign).toHaveBeenCalledExactlyOnceWith(LINK_URL);
+    });
+    expect(apiPostMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-enables the button after an error so the user can retry', async () => {
+    apiPostMock.mockResolvedValue({ data: undefined, error: { code: 'CONFLICT' } });
+    stubLocationAssign();
+    const PayoutsButton = await loadButton();
+    const user = userEvent.setup();
+
+    render(<PayoutsButton resume={false} />);
+    await user.click(screen.getByRole('button', { name: translate(NAMESPACE, 'setupCta') }));
+
+    await screen.findByText(translate(NAMESPACE, 'errors.conflict'));
+    expect(screen.getByRole('button', { name: translate(NAMESPACE, 'setupCta') })).toBeEnabled();
+  });
+
+  it('clears the previous error when retrying', async () => {
+    apiPostMock.mockResolvedValueOnce({ data: undefined, error: { code: 'CONFLICT' } });
+    apiPostMock.mockImplementation((url: string) =>
+      Promise.resolve(
+        url === '/v1/me/stripe/account'
+          ? { data: { stripeAccountId: 'acct_1' }, error: undefined }
+          : { data: { url: LINK_URL }, error: undefined },
+      ),
+    );
+    const assign = stubLocationAssign();
+    const PayoutsButton = await loadButton();
+    const user = userEvent.setup();
+
+    render(<PayoutsButton resume={false} />);
+    await user.click(screen.getByRole('button', { name: translate(NAMESPACE, 'setupCta') }));
+    await screen.findByText(translate(NAMESPACE, 'errors.conflict'));
+    await user.click(screen.getByRole('button', { name: translate(NAMESPACE, 'setupCta') }));
+
+    await waitFor(() => {
+      expect(assign).toHaveBeenCalledExactlyOnceWith(LINK_URL);
+    });
+    expect(screen.queryByText(translate(NAMESPACE, 'errors.conflict'))).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['a missing url', {}],
+    ['an empty url', { url: '' }],
+    ['a non-string url', { url: 42 }],
+    ['a javascript: url', { url: 'javascript:alert(1)' }],
+    ['a relative url', { url: '/dashboard' }],
+  ])('does not navigate and shows an error for %s', async (_label, data) => {
+    apiPostMock.mockImplementation((url: string) =>
+      Promise.resolve(
+        url === '/v1/me/stripe/account'
+          ? { data: { stripeAccountId: 'acct_1' }, error: undefined }
+          : { data, error: undefined },
+      ),
+    );
     const assign = stubLocationAssign();
     const PayoutsButton = await loadButton();
     const user = userEvent.setup();

@@ -37,6 +37,11 @@ function mockProfile(status: number, data?: unknown) {
   });
 }
 
+async function loadMetadata() {
+  const mod = await import('./page');
+  return mod.generateMetadata;
+}
+
 async function loadPage() {
   const mod = await import('./page');
   return mod.default;
@@ -125,5 +130,41 @@ describe('DashboardPayoutsPage', () => {
 
     expect(screen.getByText('Payouts enabled')).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+  it('marks the page noindex with a translated title', async () => {
+    const generateMetadata = await loadMetadata();
+
+    const metadata = await generateMetadata({ params: Promise.resolve({ locale: 'en' }) });
+
+    expect(metadata.robots).toEqual({ index: false, follow: false });
+    expect(metadata.title).toBe(translate('web.dashboard.payouts', 'metaTitle'));
+  });
+
+  it('returns empty metadata for an unknown locale', async () => {
+    const generateMetadata = await loadMetadata();
+
+    expect(await generateMetadata({ params: Promise.resolve({ locale: 'xx' }) })).toEqual({});
+  });
+
+  it('renders not found for an unknown locale without calling the api', async () => {
+    const Page = await loadPage();
+
+    const digest = await redirectDigest(Page({ params: Promise.resolve({ locale: 'xx' }) }));
+
+    expect(digest).toContain('NEXT_HTTP_ERROR_FALLBACK;404');
+    expect(getSessionMock).not.toHaveBeenCalled();
+    expect(apiGetMock).not.toHaveBeenCalled();
+  });
+
+  it('links the 404 state to the profile page', async () => {
+    getSessionMock.mockResolvedValue({ id: 'user-1' });
+    mockProfile(404);
+    const Page = await loadPage();
+
+    render(await Page({ params: Promise.resolve({ locale: 'en' }) }));
+
+    expect(
+      screen.getByRole('link', { name: translate('web.dashboard.payouts', 'needsProfileCta') }),
+    ).toHaveAttribute('href', '/en/dashboard/profile');
   });
 });
