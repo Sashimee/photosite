@@ -46,7 +46,7 @@ describe('BookingAcceptDelivery', () => {
     fireEvent.press(screen.getByTestId('booking-accept-delivery'));
     expect(mockedPost).not.toHaveBeenCalled();
     expect(screen.getByText(/releases the payment to the photographer/)).toBeTruthy();
-    expect(screen.getByText(/link the photographer sent you in chat/)).toBeTruthy();
+    expect(screen.queryByText(/in chat/)).toBeNull();
 
     fireEvent.press(screen.getByTestId('booking-accept-delivery-confirm'));
 

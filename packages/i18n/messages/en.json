@@ -2037,7 +2037,7 @@
       "acceptDelivery": {
         "cta": "Accept delivery",
         "confirmTitle": "Accept this delivery?",
-        "confirmDescription": "Accepting releases the payment to the photographer. This can't be undone. Check the link the photographer sent you in chat before you accept.",
+        "confirmDescription": "Accepting releases the payment to the photographer. This can't be undone.",
         "confirmCta": "Accept and release payment",
         "pending": "Accepting…",
         "dismissCta": "Cancel",
