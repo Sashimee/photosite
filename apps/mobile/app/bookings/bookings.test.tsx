@@ -221,6 +221,50 @@ describe('client booking detail', () => {
     expect(screen.queryByTestId('booking-accept-delivery')).toBeNull();
   });
 
+  it('refunds a paid booking in full and re-renders from the returned booking', async () => {
+    mockedGet.mockReturnValue(ok(makeBooking('b1', { status: 'paid_held' })));
+    mockedPost.mockReturnValue(
+      ok({
+        status: 'refunded',
+        amount: { amountCents: 157777, currency: 'EUR' },
+        refundedTotal: { amountCents: 157777, currency: 'EUR' },
+        booking: makeBooking('b1', { status: 'refunded' }),
+      }),
+    );
+    open('/bookings/b1');
+
+    fireEvent.press(await screen.findByTestId('booking-refund'));
+    fireEvent.changeText(screen.getByTestId('booking-refund-reason'), 'Changed my mind');
+    fireEvent.press(screen.getByTestId('booking-refund-submit'));
+
+    await screen.findByTestId('booking-timeline-exit');
+    expect(screen.getByTestId('booking-refund-done')).toBeTruthy();
+    expect(screen.queryByTestId('booking-refund')).toBeNull();
+  });
+
+  it('cancels a booking awaiting payment and re-renders from the returned booking', async () => {
+    mockedGet.mockReturnValue(ok(makeBooking('b1', { status: 'pending_payment' })));
+    mockedPost.mockReturnValue(ok(makeBooking('b1', { status: 'cancelled' })));
+    open('/bookings/b1');
+
+    fireEvent.press(await screen.findByTestId('booking-cancel'));
+    fireEvent.press(screen.getByTestId('booking-cancel-confirm'));
+
+    await screen.findByTestId('booking-timeline-exit');
+    expect(screen.queryByTestId('booking-cancel')).toBeNull();
+    expect(screen.queryByTestId('booking-pay-panel')).toBeNull();
+  });
+
+  it('offers the receipt, and not the fee invoice, on a released booking', async () => {
+    mockedGet.mockReturnValue(ok(makeBooking('b1', { status: 'released' })));
+    open('/bookings/b1');
+
+    await screen.findByTestId('booking-document-receipt');
+    expect(screen.queryByTestId('booking-document-fee-invoice')).toBeNull();
+    expect(screen.queryByTestId('booking-refund')).toBeNull();
+    expect(screen.queryByTestId('booking-cancel')).toBeNull();
+  });
+
   it('offers no delivery actions to the client before delivery', async () => {
     mockedGet.mockReturnValue(ok(makeBooking('b1', { status: 'paid_held' })));
     open('/bookings/b1');

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { PrimaryButton } from '../form/primary-button';
@@ -15,6 +15,7 @@ export function ConfirmAction({
   outline,
   onConfirm,
   testID,
+  children,
 }: {
   triggerLabel: string;
   title: string;
@@ -27,6 +28,7 @@ export function ConfirmAction({
   outline?: boolean;
   onConfirm: () => Promise<void>;
   testID: string;
+  children?: ReactNode;
 }) {
   const [confirming, setConfirming] = useState(false);
 
@@ -65,6 +67,7 @@ export function ConfirmAction({
     <View className="gap-3 rounded-md border border-border bg-muted p-4" testID={`${testID}-panel`}>
       <Text className="text-base font-semibold text-foreground">{title}</Text>
       <Text className="text-sm text-muted-foreground">{description}</Text>
+      {children}
       <PrimaryButton
         testID={`${testID}-confirm`}
         label={pending ? pendingLabel : confirmLabel}
