@@ -2017,9 +2017,30 @@
         "loadFailed": "We couldn't load this booking.",
         "retry": "Try again",
         "sessionExpired": "Your session has expired. Sign in again to see this booking.",
-        "payPending": "Awaiting payment. You can pay on photoo.lu for now; if you have already paid, it can take a moment to show here.",
         "releaseDue": "Payment releases to the photographer automatically on {date} unless you accept the delivery before then.",
         "disputed": "This payment has been disputed with your bank. Photoo is handling the dispute, and there's nothing you need to do in the app."
+      },
+      "pay": {
+        "title": "Pay for this booking",
+        "description": "Pay by card, Apple Pay or Google Pay. The payment is held until the photographer delivers.",
+        "unavailable": "Payment is not available in this environment",
+        "loading": "Preparing payment…",
+        "payCta": "Pay {amount}",
+        "processing": "Payment submitted. We're waiting for confirmation, which can take a moment.",
+        "processingTimeout": "Still processing. If you completed the payment, it can take a few minutes to show here. Refresh to check again.",
+        "refresh": "Refresh",
+        "failed": "The payment didn't go through. Try again or use another payment method.",
+        "loadFailed": "We couldn't prepare the payment. Check your connection and try again.",
+        "retry": "Try again"
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "conflict": "This booking is no longer awaiting payment.",
+        "invalid": "This booking can't be paid right now.",
+        "forbidden": "You don't have access to this booking.",
+        "notFound": "This booking could not be found.",
+        "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
       },
       "status": {
         "pending_payment": "Awaiting payment",

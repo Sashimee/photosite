@@ -8,14 +8,17 @@ import { formatDateTime } from '../../lib/date-format';
 import { formatMoney, requireMoney } from '../../lib/money';
 import type { BookingViewer } from '../../lib/use-bookings-list';
 import { FormNotice } from '../form/form-notice';
+import { BookingPayPanel } from './booking-pay-panel';
 import { BookingStatusTimeline } from './booking-status-timeline';
 
 export function BookingDetailView({
   booking,
   viewer,
+  onBookingChanged,
 }: {
   booking: Booking;
   viewer: BookingViewer;
+  onBookingChanged?: (booking: Booking) => void;
 }) {
   const { t, i18n } = useTranslation();
   const locale = resolveLocale(i18n.language);
@@ -53,10 +56,8 @@ export function BookingDetailView({
         </Text>
       </View>
 
-      {booking.status === 'pending_payment' && viewer === 'client' ? (
-        <FormNotice tone="info" testID="booking-pay-pending">
-          {t('mobile.bookings.detail.payPending')}
-        </FormNotice>
+      {booking.status === 'pending_payment' && viewer === 'client' && onBookingChanged ? (
+        <BookingPayPanel bookingId={booking.id} onBookingChanged={onBookingChanged} />
       ) : null}
       {booking.status === 'delivered' && booking.releaseDueAt ? (
         <FormNotice tone="info" testID="booking-release-due">

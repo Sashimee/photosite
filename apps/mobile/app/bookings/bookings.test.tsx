@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
+import { fireEvent, renderRouter, screen, waitFor, within } from 'expo-router/testing-library';
 import type { ReactNode } from 'react';
 
 jest.mock('../../src/lib/use-unread-count', () => ({ useUnreadCount: () => 0 }));
@@ -172,12 +172,14 @@ describe('client booking detail', () => {
     expect(screen.getByTestId('booking-location')).toHaveTextContent('Location No location set');
   });
 
-  it('shows a non-payment state on pending_payment and never says paid', async () => {
+  it('shows the payment-unavailable state on pending_payment without a Stripe key and never says paid', async () => {
     mockedGet.mockReturnValue(ok(makeBooking('b1')));
     open('/bookings/b1');
 
-    await screen.findByTestId('booking-pay-pending');
-    expect(screen.getByText(/Awaiting payment\. You can pay on photoo\.lu/)).toBeTruthy();
+    await screen.findByTestId('booking-pay-unavailable');
+    expect(screen.getByText('Payment is not available in this environment')).toBeTruthy();
+    expect(within(screen.getByTestId('booking-pay-panel')).queryByText(/\bpaid\b/i)).toBeNull();
+    expect(api.POST).not.toHaveBeenCalled();
     expect(screen.getByTestId('booking-timeline-step-pending_payment').props).toMatchObject({
       accessibilityState: { selected: true },
     });
@@ -199,7 +201,7 @@ describe('client booking detail', () => {
     expect(screen.getByTestId('booking-release-due')).toHaveTextContent(
       /releases to the photographer automatically on .*2027/,
     );
-    expect(screen.queryByTestId('booking-pay-pending')).toBeNull();
+    expect(screen.queryByTestId('booking-pay-panel')).toBeNull();
   });
 
   it.each(['cancelled', 'refunded', 'disputed'])(
@@ -220,7 +222,7 @@ describe('client booking detail', () => {
     open('/bookings/b1');
 
     await screen.findByTestId('booking-disputed');
-    expect(screen.queryByTestId('booking-pay-pending')).toBeNull();
+    expect(screen.queryByTestId('booking-pay-panel')).toBeNull();
   });
 
   it('renders a booking where the user is the photographer as not found', async () => {

@@ -1,6 +1,7 @@
 import type { ExpoConfig } from 'expo/config';
 
 const easProjectId = process.env.EAS_PROJECT_ID;
+const stripeMerchantIdentifier = process.env.EXPO_PUBLIC_STRIPE_MERCHANT_IDENTIFIER;
 
 const config: ExpoConfig = {
   name: 'Photoo',
@@ -73,6 +74,13 @@ const config: ExpoConfig = {
     ],
     'expo-document-picker',
     'expo-notifications',
+    [
+      '@stripe/stripe-react-native',
+      {
+        ...(stripeMerchantIdentifier ? { merchantIdentifier: stripeMerchantIdentifier } : {}),
+        enableGooglePay: true,
+      },
+    ],
     '@sentry/react-native',
   ],
   experiments: {
