@@ -1794,7 +1794,58 @@
       "account": "Account"
     },
     "account": {
-      "signedOutIntro": "Sign in to manage your bookings and profile."
+      "signedOutIntro": "Sign in to manage your bookings and profile.",
+      "deletion": {
+        "cta": "Delete account",
+        "confirmTitle": "Delete your account?",
+        "confirmDescription": "Your account is deactivated immediately and you are signed out on every device. After a 30-day grace period, your personal data is deleted or anonymised, except records we must keep by law or to handle disputes (e.g. invoices, identity verification and booking records). Your chat messages are deleted 90 days after your request. We'll email you a link to cancel the deletion at any time before the grace period ends. Deletion can't start while a verification is in review or a recently accepted quote is still inside the withdrawal period.",
+        "confirmCta": "Yes, delete my account",
+        "pending": "Deleting…",
+        "dismissCta": "Cancel",
+        "errors": {
+          "generic": "Something went wrong. Please try again.",
+          "conflict": "Your account can't be deleted right now.",
+          "verificationInReview": "Your account can't be deleted while an identity verification is in review. Wait for the decision or withdraw it, then try again.",
+          "acceptedQuoteWithdrawalWindow": "Your account can't be deleted while an accepted quote is still inside the withdrawal period. Try again once it has ended.",
+          "invalid": "We couldn't process this request. Please try again.",
+          "unauthorized": "Your session has ended. Please sign in again.",
+          "forbidden": "You don't have access to this request.",
+          "notFound": "This request could not be found.",
+          "gone": "This request is no longer available.",
+          "tooManyRequests": "Too many attempts. Please try again later.",
+          "tooManyRequestsWithRetry": "Too many attempts. Please try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "export": {
+        "title": "Download my data",
+        "description": "Get a copy of your personal data as a zip file. We prepare it in the background and the download link stays valid for a limited time. You can request one export per 24 hours.",
+        "requestCta": "Request my data",
+        "requesting": "Requesting…",
+        "downloadCta": "Download my data",
+        "opening": "Opening…",
+        "refreshCta": "Refresh status",
+        "status": {
+          "none": "No export requested yet.",
+          "pending": "Your export is queued.",
+          "processing": "Your export is being prepared.",
+          "ready": "Your export is ready to download.",
+          "failed": "Your last export failed. You can request a new one.",
+          "expired": "Your last export has expired. You can request a new one."
+        },
+        "errors": {
+          "generic": "Something went wrong. Please try again.",
+          "conflict": "This export isn't ready yet. Try again shortly.",
+          "verificationInReview": "This request can't be processed right now.",
+          "acceptedQuoteWithdrawalWindow": "This request can't be processed right now.",
+          "invalid": "We couldn't process this request. Please try again.",
+          "unauthorized": "Your session has ended. Please sign in again.",
+          "forbidden": "You don't have access to this export.",
+          "notFound": "This export could not be found.",
+          "gone": "This download has expired. Request a new export.",
+          "tooManyRequests": "You can request one export per 24 hours. Please try again later.",
+          "tooManyRequestsWithRetry": "You can request one export per 24 hours. Please try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      }
     },
     "notFound": {
       "title": "Page not found",
