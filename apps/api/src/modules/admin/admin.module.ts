@@ -11,6 +11,9 @@ import { AdminAuditLogController } from './admin-audit-log.controller.js';
 import { AdminAuditLogRepository } from './admin-audit-log.repository.js';
 import { AdminAuditLogService } from './admin-audit-log.service.js';
 import { AdminAuditService } from './admin-audit.service.js';
+import { AdminDashboardController } from './admin-dashboard.controller.js';
+import { AdminDashboardRepository } from './admin-dashboard.repository.js';
+import { AdminDashboardService } from './admin-dashboard.service.js';
 import { AdminDataRequestsController } from './admin-data-requests.controller.js';
 import { AdminDataRequestsRepository } from './admin-data-requests.repository.js';
 import { AdminDataRequestsService } from './admin-data-requests.service.js';
@@ -45,6 +48,7 @@ import { ProvenanceCheckQueueModule } from '../profiles/provenance-check-queue.m
   ],
   controllers: [
     AdminMeController,
+    AdminDashboardController,
     AdminUsersController,
     AdminSettingsController,
     AdminAuditLogController,
@@ -59,6 +63,8 @@ import { ProvenanceCheckQueueModule } from '../profiles/provenance-check-queue.m
     AdminPermissionsService,
     AdminMutationRateLimitService,
     AdminMeService,
+    AdminDashboardService,
+    AdminDashboardRepository,
     AdminUsersService,
     AdminUsersRepository,
     AdminSettingsService,

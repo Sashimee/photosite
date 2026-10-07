@@ -89,6 +89,69 @@ export const AdminMeSchema = z
   .strict()
   .openapi('AdminMe');
 
+export const ADMIN_DASHBOARD_WINDOWS = ['7d', '30d', '90d'] as const;
+
+export const AdminDashboardQuerySchema = z
+  .object({ window: z.enum(ADMIN_DASHBOARD_WINDOWS).default('30d') })
+  .strict();
+
+const DashboardCountSchema = z.number().int().nonnegative();
+
+const DashboardWindowedCountSchema = z
+  .object({ current: DashboardCountSchema, previous: DashboardCountSchema })
+  .strict();
+
+const DashboardWindowedMoneySchema = z
+  .object({
+    currency: CurrencyCodeSchema,
+    current: DashboardCountSchema,
+    previous: DashboardCountSchema,
+  })
+  .strict();
+
+export const AdminDashboardSchema = z
+  .object({
+    window: z.enum(ADMIN_DASHBOARD_WINDOWS),
+    generatedAt: IsoDateTimeSchema,
+    signups: z
+      .object({
+        total: DashboardWindowedCountSchema,
+        client: DashboardWindowedCountSchema,
+        photographer: DashboardWindowedCountSchema,
+        professional: DashboardWindowedCountSchema,
+      })
+      .strict(),
+    activity: z
+      .object({
+        requests: DashboardWindowedCountSchema,
+        quotes: DashboardWindowedCountSchema,
+        bookings: DashboardWindowedCountSchema,
+      })
+      .strict(),
+    money: z
+      .object({
+        gmv: z.array(DashboardWindowedMoneySchema),
+        refunds: z.array(DashboardWindowedMoneySchema),
+        feeRevenue: z.array(DashboardWindowedMoneySchema),
+      })
+      .strict()
+      .nullable()
+      .openapi({
+        description:
+          'Per-currency integer cents, as positive magnitudes. Null unless the caller holds finance or superadmin.',
+      }),
+    backlogs: z
+      .object({
+        verification: DashboardCountSchema,
+        provenance: DashboardCountSchema,
+        reports: DashboardCountSchema,
+        dataRequests: DashboardCountSchema,
+      })
+      .strict(),
+  })
+  .strict()
+  .openapi('AdminDashboard');
+
 export const AdminUserSearchQuerySchema = z
   .object({
     q: z.string().min(1).max(200).optional(),
@@ -433,6 +496,23 @@ registry.registerPath({
       content: { 'application/json': { schema: AdminMeSchema } },
     },
     ...errorResponses([401, 403]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/dashboard'),
+  summary: 'Platform KPIs for a trailing window, with the previous window for comparison',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation(),
+  request: { query: AdminDashboardQuerySchema },
+  responses: {
+    '200': {
+      description: 'Aggregate counts and backlogs; money is null without finance',
+      content: { 'application/json': { schema: AdminDashboardSchema } },
+    },
+    ...errorResponses([400, 401, 403]),
   },
 });
 

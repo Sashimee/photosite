@@ -8012,6 +8012,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Platform KPIs for a trailing window, with the previous window for comparison */
+        get: {
+            parameters: {
+                query?: {
+                    window?: "7d" | "30d" | "90d";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Aggregate counts and backlogs; money is null without finance */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminDashboard"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/users": {
         parameters: {
             query?: never;
@@ -13007,6 +13072,84 @@ export interface components {
              * @example 2026-09-16T12:00:00.000Z
              */
             twoFactorFreshUntil: string | null;
+        };
+        AdminDashboard: {
+            /** @enum {string} */
+            window: "7d" | "30d" | "90d";
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            generatedAt: string;
+            signups: {
+                total: {
+                    current: number;
+                    previous: number;
+                };
+                client: {
+                    current: number;
+                    previous: number;
+                };
+                photographer: {
+                    current: number;
+                    previous: number;
+                };
+                professional: {
+                    current: number;
+                    previous: number;
+                };
+            };
+            activity: {
+                requests: {
+                    current: number;
+                    previous: number;
+                };
+                quotes: {
+                    current: number;
+                    previous: number;
+                };
+                bookings: {
+                    current: number;
+                    previous: number;
+                };
+            };
+            /** @description Per-currency integer cents, as positive magnitudes. Null unless the caller holds finance or superadmin. */
+            money: {
+                gmv: {
+                    /**
+                     * @description ISO 4217 currency code
+                     * @example EUR
+                     */
+                    currency: string;
+                    current: number;
+                    previous: number;
+                }[];
+                refunds: {
+                    /**
+                     * @description ISO 4217 currency code
+                     * @example EUR
+                     */
+                    currency: string;
+                    current: number;
+                    previous: number;
+                }[];
+                feeRevenue: {
+                    /**
+                     * @description ISO 4217 currency code
+                     * @example EUR
+                     */
+                    currency: string;
+                    current: number;
+                    previous: number;
+                }[];
+            } | null;
+            backlogs: {
+                verification: number;
+                provenance: number;
+                reports: number;
+                dataRequests: number;
+            };
         };
         AdminUser: {
             /**

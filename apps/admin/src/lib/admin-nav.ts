@@ -1,3 +1,5 @@
+import type { AdminPermission } from '@photoo/shared';
+
 import type { TranslateFn } from './auth-errors';
 
 interface NavBlock {
@@ -9,6 +11,7 @@ interface AdminNavSection {
   id: string;
   href: string;
   labelKey: string;
+  permission?: AdminPermission;
   blockedBy?: NavBlock;
 }
 
@@ -29,11 +32,16 @@ const ADMIN_NAV_SECTIONS: readonly AdminNavSection[] = [
   { id: 'dashboard', href: '/', labelKey: 'dashboard' },
   { id: 'health', href: '/health', labelKey: 'health' },
   { id: 'users', href: '/users', labelKey: 'users' },
-  { id: 'verification', href: '/verification', labelKey: 'verification' },
-  { id: 'provenance', href: '/provenance', labelKey: 'provenance' },
-  { id: 'finance', href: '/finance', labelKey: 'finance' },
-  { id: 'moderation', href: '/moderation', labelKey: 'moderation' },
-  { id: 'data-requests', href: '/data-requests', labelKey: 'dataRequests' },
+  {
+    id: 'verification',
+    href: '/verification',
+    labelKey: 'verification',
+    permission: 'verification',
+  },
+  { id: 'provenance', href: '/provenance', labelKey: 'provenance', permission: 'moderation' },
+  { id: 'finance', href: '/finance', labelKey: 'finance', permission: 'finance' },
+  { id: 'moderation', href: '/moderation', labelKey: 'moderation', permission: 'moderation' },
+  { id: 'data-requests', href: '/data-requests', labelKey: 'dataRequests', permission: 'support' },
   { id: 'settings', href: '/settings', labelKey: 'settings' },
 ];
 
@@ -49,4 +57,12 @@ export function resolveNavSections(t: TranslateFn): ResolvedNavSection[] {
         : t('nav.comingSoon', { step: section.blockedBy.step });
     return { id: section.id, href: section.href, label, available: false, note };
   });
+}
+
+export function canOpenSection(id: string, permissions: readonly AdminPermission[]): boolean {
+  const section = ADMIN_NAV_SECTIONS.find((candidate) => candidate.id === id);
+  if (!section) {
+    throw new Error(`Unknown admin nav section: ${id}`);
+  }
+  return !section.permission || permissions.includes(section.permission);
 }
