@@ -22,6 +22,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe.js';
 import { AdminAccessService } from '../admin/admin-access.service.js';
 import { AdminMutationRateLimitService } from '../admin/admin-mutation-rate-limit.service.js';
+import { FetchOnlyGuard } from '../auth/fetch-only-guard.js';
 import { OriginGuard } from '../auth/origin-guard.js';
 import { AdminBookingsService } from './admin-bookings.service.js';
 import { BookingRefundService } from './booking-refund.service.js';
@@ -50,6 +51,7 @@ export class AdminBookingsController {
   }
 
   @Get('export.csv')
+  @UseGuards(FetchOnlyGuard)
   async export(
     @Query(new ZodValidationPipe(AdminBookingsExportQuerySchema))
     query: ReturnType<(typeof AdminBookingsExportQuerySchema)['parse']>,
@@ -57,7 +59,7 @@ export class AdminBookingsController {
     @Res({ passthrough: false }) reply: FastifyReply,
   ): Promise<void> {
     const { user } = await this.adminAccess.requirePermission(request, 'finance', REQUIRES_2FA);
-    await this.rateLimit.enforceMoney(user.id);
+    await this.rateLimit.enforceExport(user.id);
     const { filename, body } = await this.adminBookings.exportCsv(user, query, request.ip);
     reply
       .header('Content-Type', 'text/csv; charset=utf-8')

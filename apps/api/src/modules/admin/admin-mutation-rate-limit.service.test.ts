@@ -17,14 +17,16 @@ describe('AdminMutationRateLimitService', () => {
     await rateLimit.enforce('admin-1');
     await rateLimit.enforceDelete('admin-1');
     await rateLimit.enforceMoney('admin-1');
+    await rateLimit.enforceExport('admin-1');
     expect(consume.mock.calls).toEqual([
       ['admin:mutation:admin', 'admin-1', { windowSeconds: 60, max: 30 }],
       ['admin:mutation:delete', 'admin-1', { windowSeconds: 60, max: 5 }],
       ['admin:mutation:money', 'admin-1', { windowSeconds: 600, max: 5 }],
+      ['admin:export', 'admin-1', { windowSeconds: 600, max: 5 }],
     ]);
   });
 
-  it.each(['enforce', 'enforceDelete', 'enforceMoney'] as const)(
+  it.each(['enforce', 'enforceDelete', 'enforceMoney', 'enforceExport'] as const)(
     '%s throws 429 with retryAfterSeconds when the limit is hit',
     async (method) => {
       const { rateLimit } = service(false);

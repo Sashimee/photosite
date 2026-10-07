@@ -1925,50 +1925,103 @@ describe('stripe webhook integration', () => {
       ).toBe(0);
     });
 
-    it('spends one budget across export, refund and reverse-transfer, each answering 429 afterwards', async () => {
-      const admin = await adminWithTwoFactor('budget-all', true);
-      const held = await paidBooking('budget-all');
+    it('keeps the export budget separate from refunds and reversals', async () => {
+      const exporter = await adminWithTwoFactor('budget-export', true);
+      const exportHeld = await paidBooking('budget-export');
+      await clearRateLimitKeys();
+      const refunder = await adminWithTwoFactor('budget-refund', true);
+      const refundHeld = await paidBooking('budget-refund');
+      await clearRateLimitKeys();
 
-      expect((await exportCsv(admin, 'dispute=open')).statusCode).toBe(200);
-      expect(
-        (await adminPost(admin, held.bookingId, 'refund', { amountCents: 100 })).statusCode,
-      ).toBe(409);
-      expect((await adminPost(admin, held.bookingId, 'reverse-transfer', {})).statusCode).toBe(409);
-      expect((await exportCsv(admin, 'dispute=open')).statusCode).toBe(200);
-      expect((await adminPost(admin, held.bookingId, 'reverse-transfer', {})).statusCode).toBe(409);
-
-      const limited = [
-        await exportCsv(admin, 'dispute=open'),
-        await adminPost(admin, held.bookingId, 'refund', { amountCents: 100 }),
-        await adminPost(admin, held.bookingId, 'reverse-transfer', {}),
-      ];
-      for (const response of limited) {
-        expect(response.statusCode).toBe(429);
-        expect(response.json<{ code: string }>().code).toBe('TOO_MANY_REQUESTS');
+      for (let n = 0; n < 5; n += 1) {
+        expect((await exportCsv(exporter, 'dispute=open')).statusCode).toBe(200);
       }
+      const exportLimited = await exportCsv(exporter, 'dispute=open');
+      expect(exportLimited.statusCode).toBe(429);
+      expect(exportLimited.json<{ code: string }>().code).toBe('TOO_MANY_REQUESTS');
+      expect(
+        (await adminPost(exporter, exportHeld.bookingId, 'refund', { amountCents: 100 }))
+          .statusCode,
+      ).toBe(409);
+      expect(
+        (await adminPost(exporter, exportHeld.bookingId, 'reverse-transfer', {})).statusCode,
+      ).toBe(409);
+      expect(
+        await prisma.auditLog.count({
+          where: { actorId: exporter.id, action: 'admin.bookings_exported' },
+        }),
+      ).toBe(5);
+
+      for (let n = 0; n < 5; n += 1) {
+        const action = n % 2 === 0 ? 'refund' : 'reverse-transfer';
+        const payload = action === 'refund' ? { amountCents: 100 } : {};
+        expect((await adminPost(refunder, refundHeld.bookingId, action, payload)).statusCode).toBe(
+          409,
+        );
+      }
+      expect(
+        (await adminPost(refunder, refundHeld.bookingId, 'refund', { amountCents: 100 }))
+          .statusCode,
+      ).toBe(429);
+      expect((await exportCsv(refunder, 'dispute=open')).statusCode).toBe(200);
     });
 
-    it('counts exports against the money budget shared with refunds', async () => {
-      const admin = await adminWithTwoFactor('export-limit', true);
-      const held = await paidBooking('export-limit');
-
-      for (let n = 0; n < 4; n += 1) {
-        expect((await exportCsv(admin, 'dispute=open')).statusCode).toBe(200);
+    it('refuses navigations and cross-site requests before auditing or counting them', async () => {
+      const admin = await adminWithTwoFactor('export-navigate', true);
+      const refused = [
+        {
+          'sec-fetch-mode': 'navigate',
+          'sec-fetch-site': 'cross-site',
+          'sec-fetch-dest': 'document',
+        },
+        {
+          'sec-fetch-mode': 'navigate',
+          'sec-fetch-site': 'same-site',
+          'sec-fetch-dest': 'document',
+        },
+        { 'sec-fetch-mode': 'navigate', 'sec-fetch-site': 'none', 'sec-fetch-dest': 'document' },
+        { 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'cross-site', 'sec-fetch-dest': 'empty' },
+        { 'sec-fetch-mode': 'no-cors', 'sec-fetch-site': 'cross-site', 'sec-fetch-dest': 'image' },
+      ];
+      for (const fetchHeaders of refused) {
+        for (let n = 0; n < 2; n += 1) {
+          const response = await fastify().inject({
+            method: 'GET',
+            url: '/v1/admin/bookings/export.csv?dispute=open',
+            remoteAddress: FAKE_IP,
+            headers: { ...admin.headers, ...fetchHeaders },
+          });
+          expect(response.statusCode, JSON.stringify(fetchHeaders)).toBe(403);
+          expect(response.json(), JSON.stringify(fetchHeaders)).toMatchObject({
+            code: 'FORBIDDEN',
+          });
+        }
       }
-      expect(
-        (await adminPost(admin, held.bookingId, 'refund', { amountCents: 100 })).statusCode,
-      ).toBe(409);
-      const limited = await exportCsv(admin, 'dispute=open');
-      expect(limited.statusCode).toBe(429);
-      expect(limited.json<{ code: string }>().code).toBe('TOO_MANY_REQUESTS');
-      expect(
-        (await adminPost(admin, held.bookingId, 'refund', { amountCents: 100 })).statusCode,
-      ).toBe(429);
       expect(
         await prisma.auditLog.count({
           where: { actorId: admin.id, action: 'admin.bookings_exported' },
         }),
-      ).toBe(4);
+      ).toBe(0);
+
+      for (const site of ['same-site', 'same-origin', 'same-site', 'same-origin', 'same-site']) {
+        const allowed = await fastify().inject({
+          method: 'GET',
+          url: '/v1/admin/bookings/export.csv?dispute=open',
+          remoteAddress: FAKE_IP,
+          headers: {
+            ...admin.headers,
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': site,
+            'sec-fetch-dest': 'empty',
+          },
+        });
+        expect(allowed.statusCode, site).toBe(200);
+      }
+      expect(
+        await prisma.auditLog.count({
+          where: { actorId: admin.id, action: 'admin.bookings_exported' },
+        }),
+      ).toBe(5);
     });
   });
 });

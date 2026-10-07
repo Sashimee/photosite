@@ -1197,7 +1197,7 @@ registry.registerPath({
     String(ADMIN_BOOKINGS_EXPORT_ROW_CAP) +
     ' rows; a capped export ends with a final `' +
     ADMIN_BOOKINGS_EXPORT_TRUNCATED_LINE +
-    '` line. Needs a fresh second factor (403 `TWO_FACTOR_REQUIRED`), is audit-logged as `admin.bookings_exported`, and counts against the admin money rate limit shared with refund and reverse-transfer (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).',
+    '` line. Call it with `fetch` from the admin origin: a browser navigation (`Sec-Fetch-Mode: navigate`) or a request whose `Sec-Fetch-Site` is present and not `same-origin`/`same-site` is refused with 403 `FORBIDDEN` before anything is audited or counted; requests without Sec-Fetch headers still need the permission and second factor. Needs a fresh second factor (403 `TWO_FACTOR_REQUIRED`), is audit-logged as `admin.bookings_exported`, and has its own per-admin export rate limit, separate from the refund and reverse-transfer money limit (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).',
   ...adminOperation('finance', { requires2fa: true }),
   request: {
     query: AdminBookingsExportQuerySchema,
@@ -1242,7 +1242,7 @@ registry.registerPath({
   path: apiPath('/admin/bookings/{id}/refund'),
   summary: 'Refund a booking after release',
   description:
-    'Released bookings only, otherwise 409 `BOOKING_STATE` with `details.status`. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. When `expectedRefundedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. 409 `PENDING_REVERSAL_MISMATCH` when an earlier attempt reversed the transfer and failed to refund: `details.pendingCents` is the amount to retry with. Subject to the admin mutation rate limit and the admin money rate limit shared with reverse-transfer and export (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).',
+    'Released bookings only, otherwise 409 `BOOKING_STATE` with `details.status`. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. When `expectedRefundedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. 409 `PENDING_REVERSAL_MISMATCH` when an earlier attempt reversed the transfer and failed to refund: `details.pendingCents` is the amount to retry with. Subject to the admin mutation rate limit and the admin money rate limit shared with reverse-transfer (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('finance', { requires2fa: true }),
@@ -1268,7 +1268,7 @@ registry.registerPath({
   path: apiPath('/admin/bookings/{id}/reverse-transfer'),
   summary: 'Reverse the payout transfer for a booking',
   description:
-    'After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409 `BOOKING_STATE` with `details.status`. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. When `expectedReversedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. The booking keeps its status. Subject to the admin mutation rate limit and the admin money rate limit shared with refund and export (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).',
+    'After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409 `BOOKING_STATE` with `details.status`. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. When `expectedReversedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. The booking keeps its status. Subject to the admin mutation rate limit and the admin money rate limit shared with refund (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('finance', { requires2fa: true }),
