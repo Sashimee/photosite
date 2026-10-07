@@ -23,40 +23,28 @@ function nonEmpty(value: string | string[] | undefined): string | string[] | und
   return value === '' ? undefined : value;
 }
 
-function toFilters(data: ReturnType<typeof AdminBookingsQuerySchema.parse>): FinanceFilters {
-  return {
-    ...(data.status ? { status: data.status } : {}),
-    ...(data.createdFrom && data.createdTo
-      ? { createdFrom: data.createdFrom, createdTo: data.createdTo }
-      : {}),
-    ...(data.dispute ? { dispute: data.dispute } : {}),
-  };
-}
+type ParsedQuery = ReturnType<typeof AdminBookingsQuerySchema.parse>;
 
-export function parseFinanceSearchParams(raw: RawFinanceSearchParams): FinanceFilters {
+function parseSubset(raw: RawFinanceSearchParams, fields: readonly string[]): Partial<ParsedQuery> {
   const candidate = Object.fromEntries(
-    (['status', 'createdFrom', 'createdTo', 'dispute'] as const)
+    fields
       .map((field) => [field, nonEmpty(raw[field])] as const)
       .filter(([, value]) => value !== undefined),
   );
+  const result = AdminBookingsQuerySchema.safeParse(candidate);
+  return result.success ? result.data : {};
+}
 
-  const first = AdminBookingsQuerySchema.safeParse(candidate);
-  if (first.success) {
-    return toFilters(first.data);
-  }
+export function parseFinanceSearchParams(raw: RawFinanceSearchParams): FinanceFilters {
+  const { status } = parseSubset(raw, ['status']);
+  const { dispute } = parseSubset(raw, ['dispute']);
+  const { createdFrom, createdTo } = parseSubset(raw, DATE_FIELDS);
 
-  const invalid = new Set(first.error.issues.map((issue) => String(issue.path[0])));
-  const dropDates = DATE_FIELDS.some((field) => invalid.has(field));
-  const remaining = Object.fromEntries(
-    Object.entries(candidate).filter(
-      ([field]) => !invalid.has(field) && !(dropDates && DATE_FIELDS.includes(field)),
-    ),
-  );
-  const second = AdminBookingsQuerySchema.safeParse(remaining);
-  if (!second.success) {
-    throw new Error('Finance filters still invalid after dropping the failing fields');
-  }
-  return toFilters(second.data);
+  return {
+    ...(status ? { status } : {}),
+    ...(createdFrom && createdTo ? { createdFrom, createdTo } : {}),
+    ...(dispute ? { dispute } : {}),
+  };
 }
 
 export function financeFiltersKey(filters: FinanceFilters): string {
