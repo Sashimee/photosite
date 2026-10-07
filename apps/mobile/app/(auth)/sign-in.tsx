@@ -1,5 +1,5 @@
 import { SignInRequestSchema } from '@photoo/shared';
-import { Link, useRouter } from 'expo-router';
+import { Link, useGlobalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text } from 'react-native';
@@ -12,11 +12,13 @@ import { api } from '../../src/lib/api';
 import { authErrorMessage, scopedAuthTranslate } from '../../src/lib/auth-errors';
 import { useAuth } from '../../src/lib/auth-context';
 import { fieldErrorMessages } from '../../src/lib/form-errors';
+import { sanitizeReturnPath } from '../../src/lib/return-path';
 
 export default function SignInScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { signIn } = useAuth();
+  const { next } = useGlobalSearchParams<{ next?: string }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -42,7 +44,10 @@ export default function SignInScreen() {
     }
 
     if ('twoFactorRequired' in data) {
-      router.push('/two-factor');
+      const returnPath = sanitizeReturnPath(next);
+      router.push(
+        returnPath ? { pathname: '/two-factor', params: { next: returnPath } } : '/two-factor',
+      );
       return;
     }
 
