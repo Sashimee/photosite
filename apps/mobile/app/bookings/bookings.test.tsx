@@ -199,7 +199,7 @@ describe('client booking detail', () => {
 
     await screen.findByTestId('booking-release-due');
     expect(screen.getByTestId('booking-release-due')).toHaveTextContent(
-      /releases to the photographer automatically on .*2027/,
+      /payment is released to the photographer automatically on .*2027/,
     );
     expect(screen.queryByTestId('booking-pay-panel')).toBeNull();
   });
