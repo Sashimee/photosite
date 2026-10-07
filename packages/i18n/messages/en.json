@@ -1627,6 +1627,7 @@
     },
     "profile": {
       "title": "Photographer",
+      "back": "Back",
       "avatarAlt": "{displayName}",
       "languages": "Speaks: {languages}",
       "rating": "{ratingAvg, number, ::.0} ({ratingCount, plural, one {# review} other {# reviews}})",
