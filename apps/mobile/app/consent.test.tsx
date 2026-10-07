@@ -18,7 +18,9 @@ jest.mock('expo-secure-store', () => ({
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: 5,
 }));
 
-const mockAuth = { current: { status: 'signed-in', user: { id: 'u1', roles: ['client'] } } };
+const mockAuth: { current: { status: string; user: { id: string; roles: string[] } | null } } = {
+  current: { status: 'signed-in', user: { id: 'u1', roles: ['client'] } },
+};
 jest.mock('../src/lib/auth-context', () => ({
   AuthProvider: ({ children }: { children: ReactNode }) => children,
   useAuth: () => mockAuth.current,
