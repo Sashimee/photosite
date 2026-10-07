@@ -1,6 +1,7 @@
 import { createConfig } from '@photoo/config/eslint';
 
 export default [
+  { ignores: ['e2e/scripts/**'] },
   ...createConfig(import.meta.dirname),
   {
     languageOptions: {

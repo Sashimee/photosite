@@ -4,3 +4,6 @@ executionOrder:
   continueOnFailure: false
   flowsOrder:
     - Launch and answer the consent prompt
+    - Sign up and verify the email with the emailed token
+    - Sign in with a verified account
+    - Refuse sign-in for an unverified account
