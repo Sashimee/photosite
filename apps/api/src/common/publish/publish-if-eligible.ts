@@ -45,7 +45,11 @@ export async function publishIfEligible(
       deletedAt: null,
       verificationStatus: 'verified',
       stripePayoutsEnabled: true,
-      user: { status: 'active', roles: { has: 'photographer' } },
+      user: {
+        status: 'active',
+        roles: { has: 'photographer' },
+        dataRequests: { none: { type: 'delete', status: 'pending' } },
+      },
     },
     data: { isPublished: true },
   });

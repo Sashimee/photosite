@@ -62,6 +62,24 @@ describe('publishIfEligible', () => {
     );
   });
 
+  it('repeats every user guard of the read in the guarded write', async () => {
+    const { tx, run } = setup(eligibleRow());
+
+    await run();
+
+    expect(tx.photographerProfile.updateMany.mock.lastCall?.[0]).toMatchObject({
+      where: {
+        verificationStatus: 'verified',
+        stripePayoutsEnabled: true,
+        user: {
+          status: 'active',
+          roles: { has: 'photographer' },
+          dataRequests: { none: { type: 'delete', status: 'pending' } },
+        },
+      },
+    });
+  });
+
   it('is idempotent: the second call does nothing', async () => {
     const { tx, run } = setup(eligibleRow());
 
