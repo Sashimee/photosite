@@ -28,6 +28,10 @@ export function createFakeSocket() {
       listeners.get(event)?.delete(handler);
       return socket;
     }),
+    removeAllListeners: jest.fn(() => {
+      listeners.clear();
+      return socket;
+    }),
     connect: jest.fn(() => {
       socket.connected = true;
       dispatch('connect');
@@ -74,6 +78,7 @@ export function createFakeSocket() {
       socket.connected = false;
       socket.on.mockClear();
       socket.off.mockClear();
+      socket.removeAllListeners.mockClear();
       socket.connect.mockClear();
       socket.disconnect.mockClear();
       socket.emit.mockClear();

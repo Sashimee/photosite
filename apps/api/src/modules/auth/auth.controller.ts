@@ -285,6 +285,7 @@ export class AuthController {
     const { user, headers } = await requireSession(this.auth, request);
     try {
       const response = await this.auth.api.revokeSessions({ headers, asResponse: true });
+      await this.prisma.client.device.deleteMany({ where: { userId: user.id } });
       await applyFetchResponse(response, reply);
       this.chatSocketBridge.disconnectUser(user.id);
       reply.status(204);
@@ -517,6 +518,7 @@ export class AuthController {
         await this.prisma.client.session.deleteMany({
           where: { userId: user.id, id: { not: session.id } },
         });
+        await this.prisma.client.device.deleteMany({ where: { userId: user.id } });
       }
       const response = await this.auth.api.verifyTOTP({
         body: { code: input.code },

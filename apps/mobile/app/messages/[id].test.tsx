@@ -13,6 +13,17 @@ jest.mock('../../src/lib/api', () => ({
   setUnauthorizedListener: jest.fn(),
 }));
 
+const mockPermission = jest.fn<() => Promise<string>>();
+const mockRequestPermission = jest.fn<() => Promise<boolean>>();
+const mockRegister = jest.fn<() => Promise<string>>();
+jest.mock('../../src/lib/push', () => ({
+  getPushPermission: () => mockPermission(),
+  requestPushPermission: () => mockRequestPermission(),
+  registerPushDevice: () => mockRegister(),
+  isPromptDismissed: () => Promise.resolve(false),
+  dismissPrompt: () => Promise.resolve(),
+}));
+
 jest.mock('../../src/lib/use-unread-count', () => ({ useUnreadCount: () => 0 }));
 
 const mockRequestCamera = jest.fn<() => Promise<{ granted: boolean; canAskAgain: boolean }>>();
@@ -174,6 +185,49 @@ beforeEach(() => {
   olderMessages = [];
   nextCursor = null;
   installApi();
+  mockPermission.mockResolvedValue('denied');
+  mockRequestPermission.mockResolvedValue(true);
+  mockRegister.mockResolvedValue('registered');
+});
+
+describe('notification prompt', () => {
+  it('stays hidden and leaves chat usable when notifications are denied', async () => {
+    await openThread();
+
+    expect(screen.queryByTestId('notification-prompt')).toBeNull();
+    expect(screen.getByPlaceholderText('Write a message…')).toBeTruthy();
+    expect(mockRequestPermission).not.toHaveBeenCalled();
+  });
+
+  it('asks once permission is undetermined and registers after the user agrees', async () => {
+    mockPermission.mockResolvedValue('undetermined');
+    await openThread();
+
+    await waitFor(() => screen.getByTestId('notification-prompt'));
+    expect(screen.getByText('Turn on notifications')).toBeTruthy();
+    expect(mockRequestPermission).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('notification-prompt-enable'));
+
+    await waitFor(() => {
+      expect(mockRegister).toHaveBeenCalledTimes(1);
+    });
+    expect(mockRequestPermission).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('notification-prompt')).toBeNull();
+  });
+
+  it('hides the prompt without asking the OS when dismissed', async () => {
+    mockPermission.mockResolvedValue('undetermined');
+    await openThread();
+    await waitFor(() => screen.getByTestId('notification-prompt'));
+
+    fireEvent.press(screen.getByTestId('notification-prompt-dismiss'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('notification-prompt')).toBeNull();
+    });
+    expect(mockRequestPermission).not.toHaveBeenCalled();
+  });
 });
 
 describe('message thread', () => {

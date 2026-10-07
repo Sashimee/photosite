@@ -10,21 +10,34 @@ jest.mock('expo-secure-store', () => ({
 }));
 
 jest.mock('./api', () => ({
-  api: { GET: jest.fn() },
+  api: { GET: jest.fn(), DELETE: jest.fn() },
   setUnauthorizedListener: jest.fn(),
 }));
 
+jest.mock('@sentry/react-native', () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+  addBreadcrumb: jest.fn(),
+}));
+
+jest.mock('./chat-socket', () => ({ resetChatSocket: jest.fn() }));
+
 import * as SecureStore from 'expo-secure-store';
 
+import * as Sentry from '@sentry/react-native';
+
 import { api, setUnauthorizedListener } from './api';
+import { resetChatSocket } from './chat-socket';
 import { AuthProvider, useAuth } from './auth-context';
 
 const mockedSecureStore = jest.mocked(SecureStore);
 const mockedGet = jest.mocked(api.GET);
+const mockedDelete = jest.mocked(api.DELETE);
 const mockedSetUnauthorizedListener = jest.mocked(setUnauthorizedListener);
 
 const TOKEN_KEY = 'photoo.session.token';
 const EXPIRES_AT_KEY = 'photoo.session.expiresAt';
+const DEVICE_ID_KEY = 'photoo.push.deviceId';
 
 const user = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
@@ -212,5 +225,128 @@ describe('AuthProvider', () => {
       expect.anything(),
     );
     await waitFor(() => screen.getByText('status:signed-in'));
+  });
+  describe('push device unregistration', () => {
+    let signOut: () => Promise<void>;
+
+    function Capture() {
+      signOut = useAuth().signOut;
+      return null;
+    }
+
+    function storeSignedInSession() {
+      mockedSecureStore.getItemAsync.mockImplementation((key: string) => {
+        if (key === TOKEN_KEY) return Promise.resolve('token-abc');
+        if (key === EXPIRES_AT_KEY)
+          return Promise.resolve(new Date(Date.now() + 60_000).toISOString());
+        if (key === DEVICE_ID_KEY) return Promise.resolve('device-1');
+        return Promise.resolve(null);
+      });
+      mockedGet.mockResolvedValue({
+        data: { user },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      });
+      mockedSecureStore.deleteItemAsync.mockResolvedValue();
+    }
+
+    function renderCapture() {
+      return render(
+        <AuthProvider>
+          <Probe />
+          <Capture />
+        </AuthProvider>,
+      );
+    }
+
+    it('deletes the device before clearing the session, and resets the chat socket', async () => {
+      storeSignedInSession();
+      mockedDelete.mockResolvedValue({ response: new Response(null, { status: 204 }) });
+      renderCapture();
+      await waitFor(() => screen.getByText('status:signed-in'));
+
+      await act(async () => {
+        await signOut();
+      });
+
+      expect(mockedDelete).toHaveBeenCalledWith('/v1/me/devices/{id}', {
+        params: { path: { id: 'device-1' } },
+        signal: expect.anything(),
+      });
+      const deleteOrder = mockedDelete.mock.invocationCallOrder[0] ?? 0;
+      const clearOrder =
+        mockedSecureStore.deleteItemAsync.mock.invocationCallOrder[
+          mockedSecureStore.deleteItemAsync.mock.calls.findIndex(([key]) => key === TOKEN_KEY)
+        ] ?? 0;
+      expect(deleteOrder).toBeLessThan(clearOrder);
+      expect(resetChatSocket).toHaveBeenCalledTimes(1);
+      screen.getByText('status:signed-out');
+    });
+
+    it('still clears the session and reports the failure when the DELETE rejects', async () => {
+      storeSignedInSession();
+      mockedDelete.mockRejectedValue(new Error('network down'));
+      renderCapture();
+      await waitFor(() => screen.getByText('status:signed-in'));
+
+      await act(async () => {
+        await signOut();
+      });
+
+      expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith(TOKEN_KEY, expect.anything());
+      expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+      screen.getByText('status:signed-out');
+    });
+
+    it('reports a non-2xx DELETE and still signs out', async () => {
+      storeSignedInSession();
+      mockedDelete.mockResolvedValue({ response: new Response(null, { status: 500 }) });
+      renderCapture();
+      await waitFor(() => screen.getByText('status:signed-in'));
+
+      await act(async () => {
+        await signOut();
+      });
+
+      expect(Sentry.captureMessage).toHaveBeenCalledWith(expect.stringContaining('500'), 'warning');
+      screen.getByText('status:signed-out');
+    });
+
+    it('unregisters on the remote-revocation path too, once', async () => {
+      storeSignedInSession();
+      mockedDelete.mockResolvedValue({ response: new Response(null, { status: 401 }) });
+      renderCapture();
+      await waitFor(() => screen.getByText('status:signed-in'));
+
+      act(() => {
+        currentUnauthorizedListener()();
+        currentUnauthorizedListener()();
+      });
+
+      await waitFor(() => screen.getByText('status:signed-out'));
+      expect(mockedDelete).toHaveBeenCalledTimes(1);
+      expect(resetChatSocket).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not call the API when no device was registered', async () => {
+      storeSignedInSession();
+      mockedSecureStore.getItemAsync.mockImplementation((key: string) =>
+        Promise.resolve(
+          key === TOKEN_KEY
+            ? 'token-abc'
+            : key === EXPIRES_AT_KEY
+              ? new Date(Date.now() + 60_000).toISOString()
+              : null,
+        ),
+      );
+      renderCapture();
+      await waitFor(() => screen.getByText('status:signed-in'));
+
+      await act(async () => {
+        await signOut();
+      });
+
+      expect(mockedDelete).not.toHaveBeenCalled();
+    });
   });
 });

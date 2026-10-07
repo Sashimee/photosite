@@ -6,6 +6,7 @@ import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native
 import { resolveLocale } from '@photoo/shared';
 
 import { MessageBubble } from '../../src/components/chat/message-bubble';
+import { NotificationPrompt } from '../../src/components/chat/notification-prompt';
 import { MessageComposer } from '../../src/components/chat/message-composer';
 import { FormNotice } from '../../src/components/form/form-notice';
 import { RequireSession } from '../../src/components/require-session';
@@ -16,6 +17,7 @@ import { formatDay } from '../../src/lib/date-format';
 import { groupMessages } from '../../src/lib/message-grouping';
 import { requestErrorMessage } from '../../src/lib/request-errors';
 import { useConversation, type PendingMessage } from '../../src/lib/use-conversation';
+import { useNotificationPrompt } from '../../src/lib/use-notification-prompt';
 import { useScreenVisible } from '../../src/lib/use-screen-visible';
 import type { components } from '@photoo/api-client';
 
@@ -47,6 +49,9 @@ function Thread({ id }: { id: string }) {
   const locale = resolveLocale(i18n.language);
   const visible = useScreenVisible();
   const chat = useConversation(id, visible);
+  const notificationPrompt = useNotificationPrompt(
+    chat.messages.length > 0 || chat.pending.length > 0,
+  );
   const currentUserId = user?.id ?? '';
   const clientLabel = t('mobile.chat.participant.clientLabel');
 
@@ -133,6 +138,12 @@ function Thread({ id }: { id: string }) {
             {t('mobile.chat.thread.reconnecting')}
           </FormNotice>
         </View>
+      ) : null}
+      {notificationPrompt.visible ? (
+        <NotificationPrompt
+          onEnable={() => void notificationPrompt.enable()}
+          onDismiss={() => void notificationPrompt.dismiss()}
+        />
       ) : null}
       <FlatList
         testID="thread-list"

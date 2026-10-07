@@ -168,9 +168,9 @@ export function buildAuth({
       revokeSessionsOnPasswordReset: true,
       // Runs after Better Auth has already resolved the reset token to a
       // user (issue #101); no need to verify the token ourselves.
-      onPasswordReset: ({ user }) => {
+      onPasswordReset: async ({ user }) => {
+        await prisma.device.deleteMany({ where: { userId: user.id } });
         chatSocketBridge.disconnectUser(user.id);
-        return Promise.resolve();
       },
       onExistingUserSignUp: async ({ user }) => {
         await emailQueue.enqueue({ type: 'account-exists', to: user.email });

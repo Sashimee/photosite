@@ -95,6 +95,12 @@ export function useChatSocket(enabled = true): UseChatSocketResult {
   return { socket, connected };
 }
 
+export function resetChatSocket(): void {
+  sharedSocket?.disconnect();
+  sharedSocket?.removeAllListeners();
+  sharedSocket = null;
+}
+
 export function resetChatSocketForTesting(): void {
   sharedSocket?.disconnect();
   sharedSocket = null;

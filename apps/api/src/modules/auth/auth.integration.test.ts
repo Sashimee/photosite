@@ -318,10 +318,37 @@ describe('auth integration', () => {
     }, 20_000);
   });
 
+  async function seedDevices(email: string): Promise<{ userId: string; bystanderId: string }> {
+    const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+    const bystanderEmail = uniqueEmail('device-bystander');
+    await signUp(bystanderEmail);
+    const bystander = await prisma.user.findUniqueOrThrow({ where: { email: bystanderEmail } });
+    for (const userId of [user.id, bystander.id]) {
+      await prisma.device.create({
+        data: {
+          userId,
+          expoPushToken: `ExponentPushToken[${randomUUID()}]`,
+          platform: 'ios',
+          lastSeenAt: new Date(),
+        },
+      });
+    }
+    return { userId: user.id, bystanderId: bystander.id };
+  }
+
+  async function expectOnlyBystanderDevices(ids: {
+    userId: string;
+    bystanderId: string;
+  }): Promise<void> {
+    expect(await prisma.device.findMany({ where: { userId: ids.userId } })).toHaveLength(0);
+    expect(await prisma.device.findMany({ where: { userId: ids.bystanderId } })).toHaveLength(1);
+  }
+
   it('resets a forgotten password end to end', async () => {
     const email = uniqueEmail('reset');
     await signUp(email);
     await verifyByEmail(email);
+    const deviceOwners = await seedDevices(email);
 
     const signInBeforeReset = await fastify().inject({
       method: 'POST',
@@ -350,6 +377,7 @@ describe('auth integration', () => {
       payload: { token, password: newPassword },
     });
     expect(confirmResponse.statusCode).toBe(200);
+    await expectOnlyBystanderDevices(deviceOwners);
 
     const sessionAfterReset = await fastify().inject({
       method: 'GET',
@@ -414,6 +442,7 @@ describe('auth integration', () => {
     const email = uniqueEmail('totp');
     await signUp(email);
     await verifyByEmail(email);
+    const deviceOwners = await seedDevices(email);
     const signInResponse = await fastify().inject({
       method: 'POST',
       url: '/v1/auth/sign-in',
@@ -448,6 +477,7 @@ describe('auth integration', () => {
       payload: { code: generateTotpCode(secret) },
     });
     expect(verifyTotpResponse.statusCode).toBe(200);
+    await expectOnlyBystanderDevices(deviceOwners);
     expect(
       verifyTotpResponse.json<{ user: { twoFactorEnabled: boolean } }>().user.twoFactorEnabled,
     ).toBe(true);
@@ -817,6 +847,7 @@ describe('auth integration', () => {
       }>();
       expect(completionBody.user.email).toBe(email);
 
+      const deviceOwners = await seedDevices(email);
       const revokeCookie = completion.cookies.find((c) => c.name === 'photoo_session');
       const revokeCookieHeader = revokeCookie
         ? `${revokeCookie.name}=${revokeCookie.value}`
@@ -828,6 +859,12 @@ describe('auth integration', () => {
         headers: { cookie: revokeCookieHeader, origin: 'http://localhost:3000' },
       });
       expect(revokeResponse.statusCode).toBe(204);
+      expect(await prisma.device.findMany({ where: { userId: deviceOwners.userId } })).toHaveLength(
+        0,
+      );
+      expect(
+        await prisma.device.findMany({ where: { userId: deviceOwners.bystanderId } }),
+      ).toHaveLength(1);
 
       const afterRevoke = await fastify().inject({
         method: 'GET',

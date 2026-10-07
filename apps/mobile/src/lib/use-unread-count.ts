@@ -1,3 +1,4 @@
+import * as Notifications from 'expo-notifications';
 import { usePathname } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -50,6 +51,10 @@ export function useUnreadCount(): number {
       socket.off(SERVER_SOCKET_EVENTS.CONVERSATION_UPDATED, handleUpdated);
     };
   }, [signedIn, refresh]);
+
+  useEffect(() => {
+    void Notifications.setBadgeCountAsync(signedIn ? count : 0).catch(() => undefined);
+  }, [signedIn, count]);
 
   return count;
 }

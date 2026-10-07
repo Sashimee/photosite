@@ -89,6 +89,7 @@ export class AdminUsersService {
       // same class of bug as #101/#127: kill every session, then drop
       // sockets outside the transaction once the change has committed.
       await tx.session.deleteMany({ where: { userId: id } });
+      await tx.device.deleteMany({ where: { userId: id } });
 
       await this.auditService.record(tx, {
         actorId: admin.id,

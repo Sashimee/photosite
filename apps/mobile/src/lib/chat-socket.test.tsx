@@ -13,7 +13,7 @@ jest.mock('./session', () => ({
   getSessionToken: () => mockGetSessionToken(),
 }));
 
-import { resetChatSocketForTesting, useChatSocket } from './chat-socket';
+import { resetChatSocket, resetChatSocketForTesting, useChatSocket } from './chat-socket';
 
 type AuthCallback = (callback: (data: Record<string, unknown>) => void) => void;
 
@@ -102,5 +102,18 @@ describe('chat socket', () => {
     renderHook(() => useChatSocket(false));
 
     expect(mockFake.socket.connect).not.toHaveBeenCalled();
+  });
+
+  it('drops the connection and every listener on reset, then builds a fresh socket', () => {
+    installAppState();
+    renderHook(() => useChatSocket());
+    expect(io).toHaveBeenCalledTimes(1);
+
+    resetChatSocket();
+
+    expect(mockFake.socket.disconnect).toHaveBeenCalled();
+    expect(mockFake.socket.removeAllListeners).toHaveBeenCalledTimes(1);
+    renderHook(() => useChatSocket());
+    expect(io).toHaveBeenCalledTimes(2);
   });
 });

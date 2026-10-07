@@ -1732,6 +1732,13 @@
         "tooManyRequests": "You're sending messages too fast. Slow down and try again.",
         "tooManyRequestsWithRetry": "You're sending messages too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
       }
+    },
+    "notifications": {
+      "prompt": {
+        "explanation": "Get notified when someone replies, even when the app is closed. Notifications show the sender's name, never the message.",
+        "enableCta": "Turn on notifications",
+        "dismissCta": "Not now"
+      }
     }
   },
   "push": {

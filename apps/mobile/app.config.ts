@@ -71,6 +71,7 @@ const config: ExpoConfig = {
       },
     ],
     'expo-document-picker',
+    'expo-notifications',
     '@sentry/react-native',
   ],
   experiments: {
