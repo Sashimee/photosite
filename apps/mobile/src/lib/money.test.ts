@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { formatMoney, wholeUnitsToCents } from './money';
+import { formatMoney, requireMoney, wholeUnitsToCents } from './money';
 
 describe('formatMoney', () => {
   it('formats integer cents as currency in the given locale', () => {
@@ -29,5 +29,15 @@ describe('wholeUnitsToCents', () => {
 
   it.each(['', '  ', '1.5', '1,5', '-3', 'abc', '1e3'])('rejects %j as NaN', (text) => {
     expect(wholeUnitsToCents(text)).toBeNaN();
+  });
+});
+
+describe('requireMoney', () => {
+  it('returns a present amount and throws loudly on a missing one', () => {
+    const money = { amountCents: 100, currency: 'EUR' };
+    expect(requireMoney(money, 'x')).toBe(money);
+    expect(() => requireMoney(null, 'product "p1"')).toThrow(
+      'Expected product "p1" to have a price',
+    );
   });
 });
