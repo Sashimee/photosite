@@ -9450,12 +9450,19 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List bookings */
+        /**
+         * List bookings
+         * @description Newest first. `status` repeats to match any of several statuses; `createdFrom`/`createdTo` are UTC dates, half-open `[from, to)`, given together, at most 366 days apart; `dispute` is `any` (ever disputed), `open` (an open dispute) or `none`. A cursor only continues the filter set it was issued for; reusing it with other filters is a 400.
+         */
         get: {
             parameters: {
                 query?: {
                     cursor?: string;
                     limit?: number;
+                    status?: ("pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled") | ("pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled")[];
+                    createdFrom?: string;
+                    createdTo?: string;
+                    dispute?: "any" | "open" | "none";
                 };
                 header?: never;
                 path?: never;
@@ -9473,6 +9480,15 @@ export interface paths {
                             items: components["schemas"]["AdminBooking"][];
                             nextCursor: string | null;
                         };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
                     };
                 };
                 /** @description Unauthorized */
@@ -9529,7 +9545,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["AdminBooking"];
+                        "application/json": components["schemas"]["AdminBookingDetail"];
                     };
                 };
                 /** @description Unauthorized */
@@ -9580,7 +9596,7 @@ export interface paths {
         put?: never;
         /**
          * Refund a booking after release
-         * @description Released bookings only, otherwise 409. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. Subject to the admin mutation rate limit (429).
+         * @description Released bookings only, otherwise 409. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. When `expectedRefundedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. Subject to the admin mutation rate limit (429).
          */
         post: {
             parameters: {
@@ -9597,6 +9613,7 @@ export interface paths {
                     "application/json": {
                         amountCents: number;
                         reason: string;
+                        expectedRefundedCents?: number;
                     };
                 };
             };
@@ -9607,7 +9624,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["AdminBooking"];
+                        "application/json": components["schemas"]["AdminBookingDetail"];
                     };
                 };
                 /** @description Bad request */
@@ -9692,7 +9709,7 @@ export interface paths {
         put?: never;
         /**
          * Reverse the payout transfer for a booking
-         * @description After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. The booking keeps its status. Subject to the admin mutation rate limit (429).
+         * @description After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. When `expectedReversedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. The booking keeps its status. Subject to the admin mutation rate limit (429).
          */
         post: {
             parameters: {
@@ -9708,6 +9725,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         reason: string;
+                        expectedReversedCents?: number;
                     };
                 };
             };
@@ -9718,7 +9736,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["AdminBooking"];
+                        "application/json": components["schemas"]["AdminBookingDetail"];
                     };
                 };
                 /** @description Bad request */
@@ -13578,9 +13596,151 @@ export interface components {
             transferId: string | null;
             refundedCents: number;
             reversedCents: number;
+            refundableCents: number;
+            reversibleCents: number;
             /** @enum {string|null} */
             disputeStatus: "open" | "won" | "lost" | null;
         };
+        AdminBookingDetail: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            quoteId: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            clientId: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            photographerId: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            scheduledAt: string | null;
+            location: components["schemas"]["LatLng"] & (Record<string, never> | null);
+            total: components["schemas"]["Money"];
+            /** @enum {string} */
+            status: "pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled";
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            releaseDueAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            deliveredAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            releasedAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            cancelledAt: string | null;
+            cancellationReason: string | null;
+            paymentIntentId: string | null;
+            chargeId: string | null;
+            transferId: string | null;
+            refundedCents: number;
+            reversedCents: number;
+            refundableCents: number;
+            reversibleCents: number;
+            /** @enum {string|null} */
+            disputeStatus: "open" | "won" | "lost" | null;
+            ledger: components["schemas"]["AdminLedgerEntry"][];
+            ledgerTruncated: boolean;
+            disputes: components["schemas"]["AdminDispute"][];
+            payout: components["schemas"]["AdminBookingPayout"];
+        };
+        AdminLedgerEntry: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /** @enum {string} */
+            type: "charge" | "platform_fee" | "transfer" | "refund" | "reversal" | "payout";
+            amountCents: number;
+            /**
+             * @description ISO 4217 currency code
+             * @example EUR
+             */
+            currency: string;
+            stripeObjectId: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            occurredAt: string;
+        };
+        AdminDispute: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /** @enum {string} */
+            status: "open" | "won" | "lost";
+            reason: string;
+            resolution: string | null;
+            amountRefundedCents: number | null;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            openedById: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            adminId: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            openedAt: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            updatedAt: string;
+        };
+        AdminBookingPayout: {
+            stripeAccountId: string;
+            onboardingComplete: boolean;
+            payoutsEnabled: boolean;
+            entries: components["schemas"]["AdminLedgerEntry"][];
+        } | null;
         AdminReport: {
             /**
              * Format: uuid

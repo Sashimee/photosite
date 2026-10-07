@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AdminBookingDetailSchema,
   AdminBookingSchema,
+  AdminBookingsQuerySchema,
   AdminCountryLegalTextsResponseSchema,
   AdminCountrySchema,
   AdminDataRequestSchema,
@@ -19,6 +21,7 @@ import {
   RefundBookingRequestSchema,
   RejectVerificationCaseRequestSchema,
   ResolveReportRequestSchema,
+  ReverseBookingTransferRequestSchema,
   RestoreReportRequestSchema,
   SetUserRolesRequestSchema,
   SuspendUserRequestSchema,
@@ -263,6 +266,8 @@ describe('AdminBookingSchema', () => {
     transferId: null,
     refundedCents: 0,
     reversedCents: 0,
+    refundableCents: 0,
+    reversibleCents: 0,
     disputeStatus: null,
   };
 
@@ -292,6 +297,15 @@ describe('AdminBookingSchema', () => {
     expect(
       AdminBookingSchema.safeParse({ ...validBooking, disputeStatus: 'pending' }).success,
     ).toBe(false);
+    expect(AdminBookingSchema.safeParse({ ...validBooking, refundableCents: -1 }).success).toBe(
+      false,
+    );
+  });
+
+  it('requires the server-computed money hints', () => {
+    const withoutHint: Partial<typeof validBooking> = { ...validBooking };
+    delete withoutHint.refundableCents;
+    expect(AdminBookingSchema.safeParse(withoutHint).success).toBe(false);
   });
 
   it('rejects unknown keys', () => {
@@ -310,6 +324,179 @@ describe('RefundBookingRequestSchema', () => {
       RefundBookingRequestSchema.safeParse({ amountCents: 5000, reason: 'Client cancelled' })
         .success,
     ).toBe(true);
+  });
+
+  it('accepts a non-negative integer expectedRefundedCents only', () => {
+    const base = { amountCents: 5000, reason: 'Client cancelled' };
+    expect(
+      RefundBookingRequestSchema.safeParse({ ...base, expectedRefundedCents: 0 }).success,
+    ).toBe(true);
+    expect(
+      RefundBookingRequestSchema.safeParse({ ...base, expectedRefundedCents: -1 }).success,
+    ).toBe(false);
+    expect(
+      RefundBookingRequestSchema.safeParse({ ...base, expectedRefundedCents: 1.5 }).success,
+    ).toBe(false);
+  });
+});
+
+describe('ReverseBookingTransferRequestSchema', () => {
+  it('accepts a non-negative integer expectedReversedCents only', () => {
+    expect(
+      ReverseBookingTransferRequestSchema.safeParse({ reason: 'Chargeback lost' }).success,
+    ).toBe(true);
+    expect(
+      ReverseBookingTransferRequestSchema.safeParse({
+        reason: 'Chargeback lost',
+        expectedReversedCents: 4750,
+      }).success,
+    ).toBe(true);
+    expect(
+      ReverseBookingTransferRequestSchema.safeParse({
+        reason: 'Chargeback lost',
+        expectedReversedCents: -5,
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('AdminBookingsQuerySchema', () => {
+  it('normalises one or several statuses to a sorted, de-duplicated array', () => {
+    expect(AdminBookingsQuerySchema.parse({ status: 'released' }).status).toEqual(['released']);
+    expect(
+      AdminBookingsQuerySchema.parse({ status: ['released', 'disputed', 'released'] }).status,
+    ).toEqual(['disputed', 'released']);
+    expect(AdminBookingsQuerySchema.parse({}).status).toBeUndefined();
+  });
+
+  it('rejects an unknown status, dispute filter or key', () => {
+    expect(AdminBookingsQuerySchema.safeParse({ status: 'paid' }).success).toBe(false);
+    expect(AdminBookingsQuerySchema.safeParse({ status: ['released', 'paid'] }).success).toBe(
+      false,
+    );
+    expect(AdminBookingsQuerySchema.safeParse({ status: [] }).success).toBe(false);
+    expect(AdminBookingsQuerySchema.safeParse({ dispute: 'closed' }).success).toBe(false);
+    expect(AdminBookingsQuerySchema.safeParse({ clientId: id }).success).toBe(false);
+  });
+
+  it('accepts each dispute filter', () => {
+    for (const dispute of ['any', 'open', 'none']) {
+      expect(AdminBookingsQuerySchema.safeParse({ dispute }).success).toBe(true);
+    }
+  });
+
+  it('accepts a half-open date range up to 366 days', () => {
+    expect(
+      AdminBookingsQuerySchema.safeParse({ createdFrom: '2026-10-01', createdTo: '2026-10-02' })
+        .success,
+    ).toBe(true);
+    expect(
+      AdminBookingsQuerySchema.safeParse({ createdFrom: '2026-01-01', createdTo: '2027-01-02' })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects an empty, inverted, too long, half-given or non-date range', () => {
+    const invalid = [
+      { createdFrom: '2026-10-01', createdTo: '2026-10-01' },
+      { createdFrom: '2026-10-02', createdTo: '2026-10-01' },
+      { createdFrom: '2026-01-01', createdTo: '2027-01-03' },
+      { createdFrom: '2026-10-01' },
+      { createdTo: '2026-10-01' },
+      { createdFrom: '2026-10-01T00:00:00Z', createdTo: '2026-10-02T00:00:00Z' },
+      { createdFrom: '2026-02-30', createdTo: '2026-03-02' },
+    ];
+    for (const query of invalid) {
+      expect(AdminBookingsQuerySchema.safeParse(query).success).toBe(false);
+    }
+  });
+});
+
+describe('AdminBookingDetailSchema', () => {
+  const booking = {
+    id,
+    quoteId: id,
+    clientId: id,
+    photographerId: id,
+    scheduledAt: null,
+    location: null,
+    total: { amountCents: 25050, currency: 'EUR' },
+    status: 'released',
+    releaseDueAt: null,
+    deliveredAt: null,
+    releasedAt: '2026-10-08T10:00:00.000Z',
+    cancelledAt: null,
+    cancellationReason: null,
+    paymentIntentId: 'pi_1',
+    chargeId: 'ch_1',
+    transferId: 'tr_1',
+    refundedCents: 0,
+    reversedCents: 0,
+    refundableCents: 23797,
+    reversibleCents: 23797,
+    disputeStatus: 'won',
+  };
+  const entry = {
+    id,
+    type: 'transfer',
+    amountCents: -23797,
+    currency: 'EUR',
+    stripeObjectId: 'tr_1',
+    occurredAt: '2026-10-08T10:00:00.000Z',
+  };
+  const dispute = {
+    id,
+    status: 'won',
+    reason: 'fraudulent',
+    resolution: null,
+    amountRefundedCents: null,
+    openedById: id,
+    adminId: null,
+    openedAt: '2026-10-09T10:00:00.000Z',
+    updatedAt: '2026-10-10T10:00:00.000Z',
+  };
+  const detail = {
+    ...booking,
+    ledger: [entry],
+    ledgerTruncated: false,
+    disputes: [dispute],
+    payout: {
+      stripeAccountId: 'acct_1',
+      onboardingComplete: true,
+      payoutsEnabled: true,
+      entries: [],
+    },
+  };
+
+  it('accepts signed ledger rows, disputes and a payout block', () => {
+    expect(AdminBookingDetailSchema.safeParse(detail).success).toBe(true);
+    expect(AdminBookingDetailSchema.safeParse({ ...detail, payout: null }).success).toBe(true);
+  });
+
+  it('rejects a ledger longer than the cap', () => {
+    expect(
+      AdminBookingDetailSchema.safeParse({
+        ...detail,
+        ledger: Array.from({ length: 201 }, () => entry),
+        ledgerTruncated: true,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects names or emails on a dispute', () => {
+    expect(
+      AdminBookingDetailSchema.safeParse({
+        ...detail,
+        disputes: [{ ...dispute, openedByEmail: 'client@example.com' }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an unknown ledger type', () => {
+    expect(
+      AdminBookingDetailSchema.safeParse({ ...detail, ledger: [{ ...entry, type: 'fee' }] })
+        .success,
+    ).toBe(false);
   });
 });
 
