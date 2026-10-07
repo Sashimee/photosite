@@ -1389,6 +1389,58 @@
         "rating": "{ratingAvg, number, ::.0} ({ratingCount, plural, one {# review} other {# reviews}})"
       }
     },
+    "requests": {
+      "list": {
+        "newRequest": "New request"
+      },
+      "new": {
+        "title": "Tell photographers what you need",
+        "intro": "Describe your shoot and matching photographers can send you a quote.",
+        "photographerIntro": "This request goes out to every matching photographer nearby, not just the one you were viewing.",
+        "cancel": "Cancel",
+        "countriesError": "We couldn't load the list of countries.",
+        "countriesRetry": "Try again"
+      },
+      "form": {
+        "titleLabel": "Title",
+        "categoryLabel": "Category",
+        "descriptionLabel": "Description",
+        "eventDateLabel": "Event date and time",
+        "eventDatePlaceholder": "Choose a date and time",
+        "eventDateInPast": "Choose a date and time in the future.",
+        "dateFlexibleLabel": "My date is flexible",
+        "locationHeading": "Location",
+        "locationExplanation": "Pick your city or share your location so photographers know where you need them.",
+        "cityLabel": "City",
+        "locationSet": "Location set.",
+        "locationRequired": "Choose a city or use your location before sending the request.",
+        "addressHeading": "Address",
+        "addressHint": "Only shared with a photographer once you accept their quote.",
+        "addressLine1Label": "Address line 1",
+        "addressLine2Label": "Address line 2 (optional)",
+        "addressCityLabel": "City",
+        "addressPostalCodeLabel": "Postal code",
+        "addressCountryLabel": "Country",
+        "budgetHeading": "Budget",
+        "budgetMinLabel": "Minimum (whole amounts)",
+        "budgetMaxLabel": "Maximum (whole amounts)",
+        "budgetCurrencyHint": "Choose a country to set your currency.",
+        "budgetMinGreaterThanMax": "Minimum must not be greater than maximum.",
+        "usageLabel": "How will you use the photos?",
+        "submit": "Send request",
+        "submitting": "Sending…",
+        "submitFailed": "Your request was not sent. Nothing was lost, so check your connection and try again."
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "conflict": "This request can't be changed right now.",
+        "invalid": "Check the highlighted fields and try again.",
+        "forbidden": "You don't have access to this request.",
+        "notFound": "This request could not be found.",
+        "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      }
+    },
     "auth": {
       "roles": {
         "client": "Client looking to book a photographer",
