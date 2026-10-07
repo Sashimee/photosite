@@ -1925,6 +1925,29 @@ describe('stripe webhook integration', () => {
       ).toBe(0);
     });
 
+    it('spends one budget across export, refund and reverse-transfer, each answering 429 afterwards', async () => {
+      const admin = await adminWithTwoFactor('budget-all', true);
+      const held = await paidBooking('budget-all');
+
+      expect((await exportCsv(admin, 'dispute=open')).statusCode).toBe(200);
+      expect(
+        (await adminPost(admin, held.bookingId, 'refund', { amountCents: 100 })).statusCode,
+      ).toBe(409);
+      expect((await adminPost(admin, held.bookingId, 'reverse-transfer', {})).statusCode).toBe(409);
+      expect((await exportCsv(admin, 'dispute=open')).statusCode).toBe(200);
+      expect((await adminPost(admin, held.bookingId, 'reverse-transfer', {})).statusCode).toBe(409);
+
+      const limited = [
+        await exportCsv(admin, 'dispute=open'),
+        await adminPost(admin, held.bookingId, 'refund', { amountCents: 100 }),
+        await adminPost(admin, held.bookingId, 'reverse-transfer', {}),
+      ];
+      for (const response of limited) {
+        expect(response.statusCode).toBe(429);
+        expect(response.json<{ code: string }>().code).toBe('TOO_MANY_REQUESTS');
+      }
+    });
+
     it('counts exports against the money budget shared with refunds', async () => {
       const admin = await adminWithTwoFactor('export-limit', true);
       const held = await paidBooking('export-limit');

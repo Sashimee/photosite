@@ -504,6 +504,38 @@ describe('AdminBookingsService.exportCsv', () => {
     expect(text).not.toContain(`,"=cmd`);
   });
 
+  it.each([
+    ['JPY', 25050, '25050', 4000, '4000'],
+    ['KWD', 25050, '25.050', 4005, '4.005'],
+  ])(
+    'writes %s money in its own minor units',
+    async (currency, totalCents, total, movedCents, moved) => {
+      const { service } = setup({
+        rows: [bookingRow({ quote: { totalCents, currency } })],
+        ledger: [
+          { ...ledgerRow('reversal', movedCents, 1), currency },
+          { ...ledgerRow('refund', -movedCents, 2), currency },
+        ],
+      });
+
+      const text = await readAll((await service.exportCsv(admin, exportQuery(), null)).body);
+
+      const cells = (text.split('\r\n')[1] ?? '').slice(1, -1).split('","');
+      expect(cells.slice(2, 6)).toEqual([currency, total, moved, moved]);
+    },
+  );
+
+  it('writes zero refunded and reversed as a zero amount in the booking currency', async () => {
+    const { service } = setup({
+      rows: [bookingRow({ quote: { totalCents: 100, currency: 'JPY' } })],
+    });
+
+    const text = await readAll((await service.exportCsv(admin, exportQuery(), null)).body);
+
+    const cells = (text.split('\r\n')[1] ?? '').slice(1, -1).split('","');
+    expect(cells.slice(2, 6)).toEqual(['JPY', '100', '0', '0']);
+  });
+
   it('writes only the header row when nothing matches', async () => {
     const { service } = setup({ rows: [] });
     const text = await readAll((await service.exportCsv(admin, exportQuery(), null)).body);
