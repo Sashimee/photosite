@@ -1,4 +1,12 @@
 export {
+  CATEGORY_PURPOSES,
+  CONSENT_CATEGORIES,
+  isPolicyVersionNewer,
+  type ConsentCategory,
+  type ConsentCategoryGrants,
+} from './consent-categories.js';
+
+export {
   DEFAULT_LOCALE,
   SUPPORTED_LOCALES,
   isLocale,
