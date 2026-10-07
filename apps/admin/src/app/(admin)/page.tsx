@@ -1,4 +1,6 @@
+import { headers } from 'next/headers';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
 
 import { ADMIN_DASHBOARD_WINDOWS } from '@photoo/shared';
@@ -6,6 +8,7 @@ import { ADMIN_DASHBOARD_WINDOWS } from '@photoo/shared';
 import { canOpenSection } from '@/lib/admin-nav';
 import { formatCents } from '@/lib/money';
 import { getSession, serverApi } from '@/lib/server-api';
+import { buildSignInRedirect } from '@/lib/sign-in-path';
 
 import { KpiCard } from './kpi-card';
 
@@ -40,12 +43,39 @@ export default async function AdminHomePage({
     );
   }
 
-  const window = parseWindow((await searchParams).window);
+  const selectedWindow = parseWindow((await searchParams).window);
   const api = await serverApi();
   const [me, dashboard] = await Promise.all([
     api.GET('/v1/admin/me', { cache: 'no-store' }),
-    api.GET('/v1/admin/dashboard', { params: { query: { window } }, cache: 'no-store' }),
+    api.GET('/v1/admin/dashboard', {
+      params: { query: { window: selectedWindow } },
+      cache: 'no-store',
+    }),
   ]);
+  const pathname = (await headers()).get('x-pathname');
+  for (const result of [me, dashboard]) {
+    if (result.response.status === 401) {
+      redirect(buildSignInRedirect(pathname));
+    }
+    if (result.response.status === 403 && result.error?.code === 'TWO_FACTOR_REQUIRED') {
+      redirect(buildSignInRedirect(pathname, 'reverify'));
+    }
+  }
+  if (dashboard.response.status === 403 && dashboard.error?.code === 'FORBIDDEN') {
+    return (
+      <section className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-12">
+        <header className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold text-foreground">{t('title')}</h1>
+          <p className="text-sm text-muted-foreground">
+            {shell('signedInAs', { email: user.email })}
+          </p>
+        </header>
+        <p role="status" className="text-sm text-muted-foreground">
+          {t('noPermissions')}
+        </p>
+      </section>
+    );
+  }
   if (!me.data) {
     throw new Error(
       `Admin permissions lookup failed with HTTP ${String(me.response.status)}; check the API at NEXT_PUBLIC_API_URL`,
@@ -58,7 +88,7 @@ export default async function AdminHomePage({
   }
   const { permissions } = me.data;
   const { signups, activity, money, backlogs, generatedAt } = dashboard.data;
-  const days = Number.parseInt(window, 10);
+  const days = Number.parseInt(selectedWindow, 10);
   const count = (value: number) => format.number(value);
 
   const countCard = (label: string, metric: { current: number; previous: number }) => (
@@ -85,7 +115,7 @@ export default async function AdminHomePage({
             <Link
               key={option}
               href={`/?window=${option}`}
-              aria-current={option === window ? 'true' : undefined}
+              aria-current={option === selectedWindow ? 'true' : undefined}
               className="rounded-md border border-border px-3 py-1 text-sm text-foreground hover:bg-accent aria-[current=true]:bg-primary aria-[current=true]:text-primary-foreground"
             >
               {t(`windows.${option}`)}

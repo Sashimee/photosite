@@ -887,6 +887,7 @@
     },
     "dashboard": {
       "title": "Dashboard",
+      "noPermissions": "You have no admin permissions yet; ask a superadmin to grant one.",
       "windowLabel": "Time window",
       "windows": {
         "7d": "Last 7 days",

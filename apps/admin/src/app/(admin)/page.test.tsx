@@ -1,5 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getSessionMock = vi.fn();
 const getMock = vi.fn();
@@ -8,6 +8,12 @@ vi.mock('@/lib/server-api', () => ({
   getSession: getSessionMock,
   serverApi: () => Promise.resolve({ GET: getMock }),
 }));
+const headersMock = vi.fn();
+const redirectMock = vi.fn((url: string) => {
+  throw new Error(`NEXT_REDIRECT:${url}`);
+});
+vi.mock('next/headers', () => ({ headers: headersMock }));
+vi.mock('next/navigation', () => ({ redirect: redirectMock }));
 vi.mock('next-intl/server', async () => {
   const { mockUseFormatter, translate } = await import('@/testing/mock-translations');
   return {
@@ -82,6 +88,12 @@ describe('AdminHomePage', () => {
     vi.resetModules();
     getSessionMock.mockReset();
     getMock.mockReset();
+    headersMock.mockReset();
+    redirectMock.mockClear();
+  });
+
+  beforeEach(() => {
+    headersMock.mockResolvedValue({ get: (name: string) => (name === 'x-pathname' ? '/' : null) });
   });
 
   it('shows who is signed in', async () => {
@@ -405,19 +417,54 @@ describe('AdminHomePage', () => {
     });
   });
 
-  it('throws loudly when the dashboard request fails', async () => {
-    getSessionMock.mockResolvedValue({ email: 'admin@example.com' });
-    getMock.mockImplementation((path: string) =>
-      Promise.resolve(
-        path === '/v1/admin/me'
-          ? { data: { permissions: [] }, response: { status: 200 } }
-          : { data: undefined, response: { status: 403 } },
-      ),
-    );
-    const AdminHomePage = await loadPage();
+  describe('dashboard failures', () => {
+    function mockDashboardFailure(status: number, code?: string) {
+      getSessionMock.mockResolvedValue({ email: 'admin@example.com' });
+      getMock.mockImplementation((path: string) =>
+        Promise.resolve(
+          path === '/v1/admin/me'
+            ? { data: { permissions: [] }, response: { status: 200 } }
+            : { data: undefined, error: code ? { code } : undefined, response: { status } },
+        ),
+      );
+    }
 
-    await expect(AdminHomePage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
-      /Dashboard lookup failed with HTTP 403/,
-    );
+    it('shows the header and a no-permissions notice, with no cards, on 403 FORBIDDEN', async () => {
+      mockDashboardFailure(403, 'FORBIDDEN');
+
+      await renderPage();
+
+      expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+      expect(screen.getByText('Signed in as admin@example.com')).toBeInTheDocument();
+      expect(
+        screen.getByText('You have no admin permissions yet; ask a superadmin to grant one.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('navigation', { name: 'Time window' })).not.toBeInTheDocument();
+      expect(screen.queryByText('All new accounts')).not.toBeInTheDocument();
+    });
+
+    it('redirects to a reverify sign-in on 403 TWO_FACTOR_REQUIRED', async () => {
+      mockDashboardFailure(403, 'TWO_FACTOR_REQUIRED');
+
+      await expect(renderPage()).rejects.toThrow('NEXT_REDIRECT:/sign-in?next=%2F&reverify=1');
+    });
+
+    it('redirects to sign-in on 401', async () => {
+      mockDashboardFailure(401);
+
+      await expect(renderPage()).rejects.toThrow('NEXT_REDIRECT:/sign-in?next=%2F');
+    });
+
+    it('throws loudly on any other failure, including a 403 with another code', async () => {
+      mockDashboardFailure(403, 'SOMETHING_ELSE');
+
+      await expect(renderPage()).rejects.toThrow(/Dashboard lookup failed with HTTP 403/);
+    });
+
+    it('throws loudly on a server error', async () => {
+      mockDashboardFailure(500);
+
+      await expect(renderPage()).rejects.toThrow(/Dashboard lookup failed with HTTP 500/);
+    });
   });
 });
