@@ -2307,6 +2307,30 @@
         "enableCta": "Turn on notifications",
         "dismissCta": "Not now"
       }
+    },
+    "consent": {
+      "title": "Your privacy choices",
+      "intro": "Choose what we may do beyond running the app. You can change this at any time in Account.",
+      "necessary": {
+        "title": "Necessary",
+        "description": "Keeps you signed in, secures your account and makes bookings and chat work."
+      },
+      "analytics": {
+        "title": "Analytics",
+        "description": "Lets us measure which screens are used and where the app crashes or is confusing, so we can fix and improve it."
+      },
+      "adsMarketing": {
+        "title": "Ads and marketing",
+        "description": "Lets us measure our own advertising and send you offers and news about photoo.lu."
+      },
+      "alwaysOn": "Always on",
+      "acceptAll": "Accept all",
+      "declineAll": "Decline all",
+      "save": "Save my choices",
+      "saved": "Your choices are saved.",
+      "loading": "Loading your choices",
+      "settingsEntry": "Privacy choices",
+      "settingsEntryHint": "Review or change what you allow."
     }
   },
   "push": {

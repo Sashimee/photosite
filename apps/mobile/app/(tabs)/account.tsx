@@ -33,6 +33,21 @@ function AccountContent() {
           </Text>
         </Pressable>
       ) : null}
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => {
+          router.push('/consent');
+        }}
+        testID="account-consent-entry"
+        className="mt-3 min-h-11 gap-1 rounded-md border border-border bg-card p-4"
+      >
+        <Text className="text-base font-semibold text-foreground">
+          {t('mobile.consent.settingsEntry')}
+        </Text>
+        <Text className="text-sm text-muted-foreground">
+          {t('mobile.consent.settingsEntryHint')}
+        </Text>
+      </Pressable>
     </View>
   );
 }
