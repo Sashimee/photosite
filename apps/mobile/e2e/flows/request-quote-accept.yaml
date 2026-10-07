@@ -116,7 +116,7 @@ name: Request a photographer, receive a quote and accept it
 - scrollUntilVisible:
     element:
       id: request-submit
-    visibilityPercentage: 100
+- scroll
 - tapOn:
     id: request-submit
 - extendedWaitUntil:
@@ -145,7 +145,7 @@ name: Request a photographer, receive a quote and accept it
 - scrollUntilVisible:
     element:
       id: quote-accept
-    visibilityPercentage: 100
+- scroll
 - tapOn:
     id: quote-accept
 - extendedWaitUntil:
