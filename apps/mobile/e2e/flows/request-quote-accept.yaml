@@ -39,8 +39,14 @@ name: Request a photographer, receive a quote and accept it
 - tapOn:
     id: request-title
 - inputText: E2E wedding coverage
+- scrollUntilVisible:
+    element:
+      id: request-category-wedding
 - tapOn:
     id: request-category-wedding
+- scrollUntilVisible:
+    element:
+      id: request-description
 - tapOn:
     id: request-description
 - inputText: Full day wedding coverage requested by the Maestro e2e flow.
