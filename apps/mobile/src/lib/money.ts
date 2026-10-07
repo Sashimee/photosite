@@ -16,6 +16,16 @@ export function formatMoney(money: Money | null | undefined, locale: Locale): st
   );
 }
 
+export function lowestPrice(prices: readonly (Money | null)[]): Money | null {
+  let lowest: Money | null = null;
+  for (const price of prices) {
+    if (price && (!lowest || price.amountCents < lowest.amountCents)) {
+      lowest = price;
+    }
+  }
+  return lowest;
+}
+
 const WHOLE_UNITS = /^\d+$/;
 
 // Anything but a plain non-negative whole number becomes NaN so the shared

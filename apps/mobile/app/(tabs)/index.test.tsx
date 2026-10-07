@@ -87,4 +87,44 @@ describe('Discover screen', () => {
     await waitFor(() => screen.getByTestId('discover-empty'));
     expect(mockedGet).toHaveBeenCalledTimes(2);
   });
+
+  it('opens the photographer profile when a result row is pressed', async () => {
+    mockedGet.mockImplementation(((path: string) =>
+      Promise.resolve(
+        path === '/v1/photographers'
+          ? {
+              data: {
+                items: [
+                  {
+                    id: 'p1',
+                    slug: 'jane-doe',
+                    displayName: 'Jane Doe Photography',
+                    headline: null,
+                    avatarUrl: null,
+                    categories: [],
+                    languages: [],
+                    city: 'Luxembourg',
+                    countryCode: 'LU',
+                    ratingAvg: 0,
+                    ratingCount: 0,
+                    startingPrice: null,
+                  },
+                ],
+                nextCursor: null,
+              },
+              error: undefined,
+              response: new Response(null, { status: 200 }),
+            }
+          : { data: undefined, error: {}, response: new Response(null, { status: 500 }) },
+      )) as never);
+
+    renderRouter('./app', { initialUrl: '/' });
+
+    fireEvent.press(await screen.findByTestId('photographer-row-p1'));
+
+    await screen.findByTestId('profile-error');
+    expect(mockedGet).toHaveBeenCalledWith('/v1/photographers/{slug}', {
+      params: { path: { slug: 'jane-doe' } },
+    });
+  });
 });

@@ -108,7 +108,17 @@ export default function DiscoverScreen() {
         testID="discover-results"
         data={items}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <PhotographerCard photographer={item} />}
+        renderItem={({ item }) => (
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => {
+              router.push({ pathname: '/photographers/[slug]', params: { slug: item.slug } });
+            }}
+            testID={`photographer-row-${item.id}`}
+          >
+            <PhotographerCard photographer={item} />
+          </Pressable>
+        )}
         onEndReachedThreshold={0.5}
         onEndReached={() => {
           loadMore();
