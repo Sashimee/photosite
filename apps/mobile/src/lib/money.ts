@@ -1,4 +1,4 @@
-import type { Locale } from '@photoo/shared';
+import { payoutAmount as sharedPayoutAmount, type Locale } from '@photoo/shared';
 
 export interface Money {
   amountCents: number;
@@ -55,11 +55,11 @@ export function payoutAmount(subtotal: Money, platformFee: Money): Money {
       `payoutAmount: currency mismatch (${subtotal.currency} vs ${platformFee.currency})`,
     );
   }
-  const amountCents = subtotal.amountCents - platformFee.amountCents;
-  if (amountCents < 0) {
-    throw new Error(
-      `payoutAmount: fee ${String(platformFee.amountCents)} exceeds subtotal ${String(subtotal.amountCents)}`,
-    );
-  }
-  return { amountCents, currency: subtotal.currency };
+  return {
+    amountCents: sharedPayoutAmount({
+      subtotalCents: subtotal.amountCents,
+      platformFeeCents: platformFee.amountCents,
+    }),
+    currency: subtotal.currency,
+  };
 }

@@ -58,6 +58,6 @@ describe('payoutAmount', () => {
   it('throws when the fee exceeds the subtotal', () => {
     expect(() =>
       payoutAmount({ amountCents: 100, currency: 'EUR' }, { amountCents: 500, currency: 'EUR' }),
-    ).toThrow('exceeds subtotal');
+    ).toThrow('platformFeeCents must be between');
   });
 });
