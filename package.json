@@ -41,14 +41,14 @@
     "@photoo/config": "workspace:*",
     "@photoo/shared": "workspace:*",
     "@playwright/test": "1.63.0",
-    "@types/node": "26.6.2",
+    "@types/node": "26.6.4",
     "eslint": "9.39.5",
     "husky": "9.1.7",
-    "lint-staged": "17.5.1",
-    "prettier": "3.9.8",
+    "lint-staged": "17.6.0",
+    "prettier": "3.9.9",
     "puppeteer-core": "24.43.1",
-    "turbo": "2.11.2",
+    "turbo": "2.11.7",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.70.0"
+    "typescript-eslint": "8.71.0"
   }
 }
