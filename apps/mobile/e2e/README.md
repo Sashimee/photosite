@@ -35,4 +35,4 @@ Every auth flow starts from `subflows/fresh-start.yaml` (clear state, decline co
 
 Email verification: the link in the email points at the web app (`WEB_APP_URL/verify-email#token=...`), which an emulator-only run has no site to open. The sign-up flow therefore reads the token from the same email and types it into the app's own "verification code" field (`verify-email-token`), which posts it to the API. This exercises the app's verification screen rather than a server-side shortcut.
 
-Not covered yet: sign-out. The account screen has no sign-out control until 1C.2b lands, so there is nothing to tap.
+Not covered yet: sign out everywhere, role addition and locale switching on the account tab (jest covers them).

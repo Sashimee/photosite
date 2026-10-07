@@ -1795,6 +1795,38 @@
     },
     "account": {
       "signedOutIntro": "Sign in to manage your bookings and profile.",
+      "profile": {
+        "title": "Your account",
+        "signedInAs": "Signed in as {email}",
+        "rolesLabel": "Roles",
+        "roles": {
+          "client": "Client",
+          "photographer": "Photographer",
+          "professional": "Professional",
+          "admin": "Admin"
+        },
+        "becomePhotographer": "Become a photographer",
+        "becomingPhotographer": "Adding the role…",
+        "errors": {
+          "generic": "Something went wrong. Please try again.",
+          "roleAlreadyAssigned": "You already have this role.",
+          "unauthorized": "Your session has ended. Please sign in again.",
+          "tooManyRequests": "Too many attempts. Please try again later."
+        }
+      },
+      "session": {
+        "signOut": "Sign out",
+        "signingOut": "Signing out…",
+        "signOutEverywhere": "Sign out everywhere",
+        "signOutEverywhereTitle": "Sign out everywhere?",
+        "signOutEverywhereDescription": "This ends your session on every device, including this one. You will need to sign in again.",
+        "signOutEverywhereConfirm": "Yes, sign out everywhere",
+        "signOutEverywherePending": "Signing out…",
+        "dismiss": "Cancel",
+        "errors": {
+          "generic": "We couldn't end your other sessions. Check your connection and try again."
+        }
+      },
       "deletion": {
         "cta": "Delete account",
         "confirmTitle": "Delete your account?",

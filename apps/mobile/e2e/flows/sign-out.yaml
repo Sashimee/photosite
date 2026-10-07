@@ -1,5 +1,5 @@
 appId: lu.photoo.app
-name: Sign in with a verified account
+name: Sign out from the account tab
 ---
 - runScript:
     file: ../scripts/create-user.js
@@ -23,5 +23,16 @@ name: Sign in with a verified account
     visible:
       id: account-email
     timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: account-sign-out
+- tapOn:
+    id: account-sign-out
+- extendedWaitUntil:
+    visible:
+      id: account-sign-in
+    timeout: 20000
 - assertNotVisible:
-    id: account-sign-in
+    id: account-sign-out
+- assertNotVisible:
+    id: account-deletion
