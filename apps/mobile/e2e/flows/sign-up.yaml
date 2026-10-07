@@ -6,9 +6,11 @@ name: Sign up and verify the email with the emailed token
     env:
       REGISTER: 'false'
 - runFlow: ../subflows/fresh-start.yaml
-- runFlow: ../subflows/open-sign-in.yaml
-- tapOn:
-    id: sign-in-sign-up-link
+- openLink: photoo:///sign-up
+- extendedWaitUntil:
+    visible:
+      id: sign-up-submit
+    timeout: 10000
 - tapOn:
     id: sign-up-email
 - inputText: ${output.email}
