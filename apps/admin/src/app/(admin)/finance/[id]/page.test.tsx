@@ -10,8 +10,8 @@ const notFoundMock = vi.fn(() => {
 vi.mock('next/navigation', () => ({ notFound: notFoundMock }));
 
 vi.mock('next-intl', async () => {
-  const { mockUseTranslations } = await import('@/testing/mock-translations');
-  return { useTranslations: mockUseTranslations };
+  const { mockUseFormatter, mockUseTranslations } = await import('@/testing/mock-translations');
+  return { useTranslations: mockUseTranslations, useFormatter: mockUseFormatter };
 });
 
 vi.mock('next-intl/server', async () => {
@@ -48,7 +48,13 @@ function booking(overrides: Record<string, unknown> = {}) {
     transferId: null,
     refundedCents: 2500,
     reversedCents: 1000,
+    refundableCents: 1500,
+    reversibleCents: 800,
     disputeStatus: null,
+    ledger: [],
+    ledgerTruncated: false,
+    disputes: [],
+    payout: null,
     ...overrides,
   };
 }
@@ -65,7 +71,7 @@ beforeEach(() => {
 });
 
 describe('BookingPage', () => {
-  it('shows the money summary with the limit explanation and no computed refundable figure, stripe ids as text and the actions', async () => {
+  it('shows the money summary with the API refundable and reversible figures, the limit explanation, stripe ids as text and the actions', async () => {
     serverApiMock.mockResolvedValue({
       GET: vi.fn().mockResolvedValue({ data: booking(), response: { status: 200 } }),
     });
@@ -77,7 +83,8 @@ describe('BookingPage', () => {
     expect(screen.getByText('€120.00')).toBeInTheDocument();
     expect(screen.getByText('€25.00')).toBeInTheDocument();
     expect(screen.getByText('€10.00')).toBeInTheDocument();
-    expect(screen.queryByText('€95.00')).not.toBeInTheDocument();
+    expect(screen.getByText('€15.00')).toBeInTheDocument();
+    expect(screen.getByText('€8.00')).toBeInTheDocument();
     expect(screen.getByText(/platform fee is not refunded/)).toBeInTheDocument();
     expect(screen.getByText('pi_123')).toBeInTheDocument();
     expect(screen.getByText('ch_123')).toBeInTheDocument();
@@ -88,6 +95,9 @@ describe('BookingPage', () => {
       status: 'released',
       transferId: null,
       currency: 'EUR',
+      refundedCents: 2500,
+      refundableCents: 1500,
+      reversedCents: 1000,
     });
   });
 
@@ -215,5 +225,104 @@ describe('BookingPage', () => {
     expect(bookingActionsMock.mock.calls[0]?.[0]).toMatchObject({
       currency: 'JPY',
     });
+  });
+
+  it('renders ledger rows with signed amounts, type labels and copyable stripe ids', async () => {
+    serverApiMock.mockResolvedValue({
+      GET: vi.fn().mockResolvedValue({
+        data: booking({
+          ledger: [
+            {
+              id: 'l1',
+              type: 'charge',
+              amountCents: 12000,
+              currency: 'EUR',
+              stripeObjectId: 'ch_123',
+              occurredAt: '2026-09-18T10:00:00.000Z',
+            },
+            {
+              id: 'l2',
+              type: 'platform_fee',
+              amountCents: -600,
+              currency: 'EUR',
+              stripeObjectId: 'fee_1',
+              occurredAt: '2026-09-18T10:00:01.000Z',
+            },
+          ],
+        }),
+        response: { status: 200 },
+      }),
+    });
+
+    await renderPage();
+
+    expect(screen.getByText('Platform fee')).toBeInTheDocument();
+    expect(screen.getByText('-€6.00')).toBeInTheDocument();
+    expect(screen.getByText('fee_1')).toBeInTheDocument();
+    expect(screen.queryByText(/More exist/)).not.toBeInTheDocument();
+  });
+
+  it('says so when the ledger is truncated', async () => {
+    serverApiMock.mockResolvedValue({
+      GET: vi.fn().mockResolvedValue({
+        data: booking({ ledgerTruncated: true }),
+        response: { status: 200 },
+      }),
+    });
+
+    await renderPage();
+
+    expect(screen.getByText(/More exist/)).toBeInTheDocument();
+  });
+
+  it('shows the empty states for ledger and disputes and no Connect account', async () => {
+    serverApiMock.mockResolvedValue({
+      GET: vi.fn().mockResolvedValue({ data: booking(), response: { status: 200 } }),
+    });
+
+    await renderPage();
+
+    expect(screen.getByText('No ledger entries yet.')).toBeInTheDocument();
+    expect(screen.getByText('No disputes on this booking.')).toBeInTheDocument();
+    expect(screen.getByText(/no Connect account on record/)).toBeInTheDocument();
+  });
+
+  it('renders disputes with ids only and the payout block with its empty entries state', async () => {
+    serverApiMock.mockResolvedValue({
+      GET: vi.fn().mockResolvedValue({
+        data: booking({
+          disputes: [
+            {
+              id: 'd1',
+              status: 'open',
+              reason: 'fraudulent',
+              resolution: null,
+              amountRefundedCents: null,
+              openedById: 'user-9',
+              adminId: null,
+              openedAt: '2026-09-22T10:00:00.000Z',
+              updatedAt: '2026-09-22T10:00:00.000Z',
+            },
+          ],
+          payout: {
+            stripeAccountId: 'acct_1',
+            onboardingComplete: true,
+            payoutsEnabled: false,
+            entries: [],
+          },
+        }),
+        response: { status: 200 },
+      }),
+    });
+
+    await renderPage();
+
+    expect(screen.getByText('d1')).toBeInTheDocument();
+    expect(screen.getByText('user-9')).toBeInTheDocument();
+    expect(screen.getByText('fraudulent')).toBeInTheDocument();
+    expect(screen.getByText('acct_1')).toBeInTheDocument();
+    expect(screen.getByText('Yes')).toBeInTheDocument();
+    expect(screen.getByText('No')).toBeInTheDocument();
+    expect(screen.getByText(/No payout entries recorded/)).toBeInTheDocument();
   });
 });

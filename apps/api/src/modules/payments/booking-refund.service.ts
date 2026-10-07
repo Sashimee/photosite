@@ -8,7 +8,7 @@ import { AdminAuditService } from '../admin/admin-audit.service.js';
 import { BOOKING_INCLUDE, toBookingDtos } from '../bookings/booking-dto.js';
 import { transitionBooking } from '../bookings/booking-state.js';
 import { assertSupportedCurrency } from '../bookings/create-booking.js';
-import { AdminBookingsService, type AdminBookingDto } from './admin-bookings.service.js';
+import { AdminBookingsService, type AdminBookingDetailDto } from './admin-bookings.service.js';
 import { ledgerTotals, reversibleCents } from './booking-ledger.js';
 import { BookingMoneyLockService } from './booking-money-lock.service.js';
 import {
@@ -35,6 +35,17 @@ interface Actor {
 interface RefundInput {
   amountCents?: number | undefined;
   reason: string;
+}
+
+interface AdminRefundInput {
+  amountCents: number;
+  reason: string;
+  expectedRefundedCents?: number | undefined;
+}
+
+interface AdminReversalInput {
+  reason: string;
+  expectedReversedCents?: number | undefined;
 }
 
 interface ClientRefundPlan {
@@ -89,6 +100,22 @@ function unprocessable(message: string): HttpException {
   return new HttpException({ code: 'UNPROCESSABLE_ENTITY', message }, 422);
 }
 
+function assertLedgerUnchanged(
+  label: 'refunded' | 'reversed',
+  expectedCents: number | undefined,
+  actualCents: number,
+): void {
+  if (expectedCents !== undefined && expectedCents !== actualCents) {
+    throw new HttpException(
+      {
+        code: 'LEDGER_CHANGED',
+        message: `The booking has ${String(actualCents)} ${label}, not the ${String(expectedCents)} you saw; reload it before trying again`,
+      },
+      409,
+    );
+  }
+}
+
 async function lockBooking(tx: Prisma.TransactionClient, bookingId: string): Promise<void> {
   const [locked] = await tx.$queryRaw<{ id: string }[]>`
     SELECT id FROM "Booking" WHERE id = ${bookingId} FOR UPDATE`;
@@ -133,18 +160,18 @@ export class BookingRefundService {
   refundAsAdmin(
     admin: Actor,
     bookingId: string,
-    input: { amountCents: number; reason: string },
+    input: AdminRefundInput,
     ip: string | null,
-  ): Promise<AdminBookingDto> {
+  ): Promise<AdminBookingDetailDto> {
     return this.underMoneyLock(bookingId, () => this.adminRefund(admin, bookingId, input, ip));
   }
 
   reverseTransferAsAdmin(
     admin: Actor,
     bookingId: string,
-    input: { reason: string },
+    input: AdminReversalInput,
     ip: string | null,
-  ): Promise<AdminBookingDto> {
+  ): Promise<AdminBookingDetailDto> {
     return this.underMoneyLock(bookingId, () =>
       this.adminTransferReversal(admin, bookingId, input, ip),
     );
@@ -310,10 +337,10 @@ export class BookingRefundService {
   private async adminRefund(
     admin: Actor,
     bookingId: string,
-    input: { amountCents: number; reason: string },
+    input: AdminRefundInput,
     ip: string | null,
-  ): Promise<AdminBookingDto> {
-    const plan = await this.planAdminRefund(bookingId, input.amountCents);
+  ): Promise<AdminBookingDetailDto> {
+    const plan = await this.planAdminRefund(bookingId, input);
     if (!plan.reversalPending) {
       const reversal = await this.gateway.reverseTransfer({
         transferId: plan.transferId,
@@ -335,6 +362,7 @@ export class BookingRefundService {
               refundKey: plan.refundKey,
               reversalId: reversal.id,
               amountCents: reversal.amountCents,
+              reason: input.reason,
             },
             ip,
           });
@@ -401,7 +429,8 @@ export class BookingRefundService {
   // A reversal recorded under the next refund key means an earlier attempt
   // reversed the transfer and then failed to refund; the retry resumes with
   // the refund instead of reversing a second time.
-  private planAdminRefund(bookingId: string, amountCents: number): Promise<AdminRefundPlan> {
+  private planAdminRefund(bookingId: string, input: AdminRefundInput): Promise<AdminRefundPlan> {
+    const { amountCents } = input;
     return this.prisma.client.$transaction(
       async (tx) => {
         await lockBooking(tx, bookingId);
@@ -426,6 +455,7 @@ export class BookingRefundService {
         const { quote } = booking;
         assertSupportedCurrency(quote.currency);
         const totals = await ledgerTotals(tx, bookingId);
+        assertLedgerUnchanged('refunded', input.expectedRefundedCents, totals.refundedCents);
         const refundKey = refundIdempotencyKey(bookingId, totals.refundCount);
         const reversals = await tx.auditLog.findMany({
           where: { action: 'booking.refund_reversal', targetType: 'Booking', targetId: bookingId },
@@ -472,10 +502,10 @@ export class BookingRefundService {
   private async adminTransferReversal(
     admin: Actor,
     bookingId: string,
-    input: { reason: string },
+    input: AdminReversalInput,
     ip: string | null,
-  ): Promise<AdminBookingDto> {
-    const plan = await this.planReversal(bookingId);
+  ): Promise<AdminBookingDetailDto> {
+    const plan = await this.planReversal(bookingId, input.expectedReversedCents);
     const reversal = await this.gateway.reverseTransfer({
       transferId: plan.transferId,
       amountCents: plan.amountCents,
@@ -515,7 +545,10 @@ export class BookingRefundService {
     return this.adminBookings.get(bookingId);
   }
 
-  private planReversal(bookingId: string): Promise<ReversalPlan> {
+  private planReversal(
+    bookingId: string,
+    expectedReversedCents: number | undefined,
+  ): Promise<ReversalPlan> {
     return this.prisma.client.$transaction(
       async (tx) => {
         await lockBooking(tx, bookingId);
@@ -532,6 +565,7 @@ export class BookingRefundService {
           );
         }
         const totals = await ledgerTotals(tx, bookingId);
+        assertLedgerUnchanged('reversed', expectedReversedCents, totals.reversedCents);
         const reversible = reversibleCents(totals);
         if (reversible <= 0) {
           throw unprocessable('Nothing is left on the photographer transfer to reverse');

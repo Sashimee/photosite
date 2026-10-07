@@ -481,6 +481,64 @@ describe('BookingRefundService.refundAsAdmin', () => {
     ).rejects.toThrow(/exceeds the unrefunded amount/);
   });
 
+  it('records the admin reason on the reversal audit row', async () => {
+    const { service, audits, release } = await setup();
+    await release();
+
+    await service.refundAsAdmin(
+      admin,
+      'booking-1',
+      { amountCents: 1000, reason: 'Photographer no-show' },
+      null,
+    );
+
+    expect(audits.find((audit) => audit.action === 'booking.refund_reversal')?.after).toMatchObject(
+      { reason: 'Photographer no-show', amountCents: 1000 },
+    );
+  });
+
+  it('answers 409 LEDGER_CHANGED without calling Stripe when the refunded sum moved', async () => {
+    const { service, ledger, audits, createRefund, reverseTransfer, release } = await setup();
+    await release();
+    await service.refundAsAdmin(admin, 'booking-1', { amountCents: 1000, reason: 'r' }, null);
+    createRefund.mockClear();
+    reverseTransfer.mockClear();
+    const ledgerBefore = ledger.length;
+    const auditsBefore = audits.length;
+
+    const error = await service
+      .refundAsAdmin(
+        admin,
+        'booking-1',
+        { amountCents: 500, reason: 'r', expectedRefundedCents: 0 },
+        null,
+      )
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(HttpException);
+    expect((error as HttpException).getStatus()).toBe(409);
+    expect((error as HttpException).getResponse()).toMatchObject({ code: 'LEDGER_CHANGED' });
+    expect(createRefund).not.toHaveBeenCalled();
+    expect(reverseTransfer).not.toHaveBeenCalled();
+    expect(ledger).toHaveLength(ledgerBefore);
+    expect(audits).toHaveLength(auditsBefore);
+  });
+
+  it('refunds when the expected refunded sum still matches the ledger', async () => {
+    const { service, ledger, release } = await setup();
+    await release();
+    await service.refundAsAdmin(admin, 'booking-1', { amountCents: 1000, reason: 'r' }, null);
+
+    await service.refundAsAdmin(
+      admin,
+      'booking-1',
+      { amountCents: 500, reason: 'r', expectedRefundedCents: 1000 },
+      null,
+    );
+
+    expect(ledger.at(-1)).toMatchObject({ type: 'refund', amountCents: -500 });
+  });
+
   it('returns 409 before release', async () => {
     const { service, reverseTransfer } = await setup();
     await expect(
@@ -552,6 +610,34 @@ describe('BookingRefundService.reverseTransferAsAdmin', () => {
     await expect(
       httpStatus(service.reverseTransferAsAdmin(admin, 'booking-1', { reason: 'again' }, null)),
     ).resolves.toBe(422);
+  });
+
+  it('answers 409 LEDGER_CHANGED without calling Stripe when the reversed sum moved', async () => {
+    const { service, ledger, audits, reverseTransfer, release } = await setup();
+    await release();
+    await service.refundAsAdmin(admin, 'booking-1', { amountCents: 1000, reason: 'r' }, null);
+    reverseTransfer.mockClear();
+    const ledgerBefore = ledger.length;
+    const auditsBefore = audits.length;
+
+    const error = await service
+      .reverseTransferAsAdmin(admin, 'booking-1', { reason: 'r', expectedReversedCents: 0 }, null)
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(HttpException);
+    expect((error as HttpException).getStatus()).toBe(409);
+    expect((error as HttpException).getResponse()).toMatchObject({ code: 'LEDGER_CHANGED' });
+    expect(reverseTransfer).not.toHaveBeenCalled();
+    expect(ledger).toHaveLength(ledgerBefore);
+    expect(audits).toHaveLength(auditsBefore);
+
+    await service.reverseTransferAsAdmin(
+      admin,
+      'booking-1',
+      { reason: 'r', expectedReversedCents: 1000 },
+      null,
+    );
+    expect(ledger.at(-1)).toMatchObject({ type: 'reversal', amountCents: PAYOUT - 1000 });
   });
 
   it('allows a disputed booking that was released and refuses one that was not', async () => {

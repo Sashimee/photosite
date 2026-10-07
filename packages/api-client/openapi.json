@@ -5298,6 +5298,14 @@
             "type": "integer",
             "minimum": 0
           },
+          "refundableCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reversibleCents": {
+            "type": "integer",
+            "minimum": 0
+          },
           "disputeStatus": {
             "type": [
               "string",
@@ -5330,7 +5338,367 @@
           "transferId",
           "refundedCents",
           "reversedCents",
+          "refundableCents",
+          "reversibleCents",
           "disputeStatus"
+        ],
+        "additionalProperties": false
+      },
+      "AdminBookingDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "quoteId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "clientId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "photographerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "scheduledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "location": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LatLng"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_payment",
+              "paid_held",
+              "in_progress",
+              "delivered",
+              "released",
+              "refunded",
+              "disputed",
+              "cancelled"
+            ]
+          },
+          "releaseDueAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "deliveredAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "releasedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "cancelledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "cancellationReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "paymentIntentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "chargeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "transferId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "refundedCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reversedCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "refundableCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reversibleCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "disputeStatus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "open",
+              "won",
+              "lost",
+              null
+            ]
+          },
+          "ledger": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminLedgerEntry"
+            },
+            "maxItems": 200
+          },
+          "ledgerTruncated": {
+            "type": "boolean"
+          },
+          "disputes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminDispute"
+            }
+          },
+          "payout": {
+            "$ref": "#/components/schemas/AdminBookingPayout"
+          }
+        },
+        "required": [
+          "id",
+          "quoteId",
+          "clientId",
+          "photographerId",
+          "scheduledAt",
+          "location",
+          "total",
+          "status",
+          "releaseDueAt",
+          "deliveredAt",
+          "releasedAt",
+          "cancelledAt",
+          "cancellationReason",
+          "paymentIntentId",
+          "chargeId",
+          "transferId",
+          "refundedCents",
+          "reversedCents",
+          "refundableCents",
+          "reversibleCents",
+          "disputeStatus",
+          "ledger",
+          "ledgerTruncated",
+          "disputes",
+          "payout"
+        ],
+        "additionalProperties": false
+      },
+      "AdminLedgerEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "charge",
+              "platform_fee",
+              "transfer",
+              "refund",
+              "reversal",
+              "payout"
+            ]
+          },
+          "amountCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "ISO 4217 currency code",
+            "example": "EUR"
+          },
+          "stripeObjectId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "amountCents",
+          "currency",
+          "stripeObjectId",
+          "occurredAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminDispute": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "won",
+              "lost"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "resolution": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "amountRefundedCents": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "openedById": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "adminId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "reason",
+          "resolution",
+          "amountRefundedCents",
+          "openedById",
+          "adminId",
+          "openedAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminBookingPayout": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "stripeAccountId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "onboardingComplete": {
+            "type": "boolean"
+          },
+          "payoutsEnabled": {
+            "type": "boolean"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminLedgerEntry"
+            }
+          }
+        },
+        "required": [
+          "stripeAccountId",
+          "onboardingComplete",
+          "payoutsEnabled",
+          "entries"
         ],
         "additionalProperties": false
       },
@@ -18142,6 +18510,7 @@
             "cookieAuth": []
           }
         ],
+        "description": "Newest first. `status` repeats to match any of several statuses; `createdFrom`/`createdTo` are UTC dates, half-open `[from, to)`, given together, at most 366 days apart; `dispute` is `any` (ever disputed), `open` (an open dispute) or `none`. A cursor only continues the filter set it was issued for; reusing it with other filters is a 400.",
         "x-required-permission": "finance",
         "parameters": [
           {
@@ -18162,6 +18531,77 @@
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "pending_payment",
+                    "paid_held",
+                    "in_progress",
+                    "delivered",
+                    "released",
+                    "refunded",
+                    "disputed",
+                    "cancelled"
+                  ]
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "pending_payment",
+                      "paid_held",
+                      "in_progress",
+                      "delivered",
+                      "released",
+                      "refunded",
+                      "disputed",
+                      "cancelled"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8
+                }
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "createdFrom",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "createdTo",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "open",
+                "none"
+              ]
+            },
+            "required": false,
+            "name": "dispute",
             "in": "query"
           }
         ],
@@ -18192,6 +18632,16 @@
                     "nextCursor"
                   ],
                   "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
@@ -18251,7 +18701,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminBooking"
+                  "$ref": "#/components/schemas/AdminBookingDetail"
                 }
               }
             }
@@ -18292,7 +18742,7 @@
     "/v1/admin/bookings/{id}/refund": {
       "post": {
         "summary": "Refund a booking after release",
-        "description": "Released bookings only, otherwise 409. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. Subject to the admin mutation rate limit (429).",
+        "description": "Released bookings only, otherwise 409. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. When `expectedRefundedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. Subject to the admin mutation rate limit (429).",
         "tags": [
           "admin"
         ],
@@ -18331,6 +18781,10 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 2000
+                  },
+                  "expectedRefundedCents": {
+                    "type": "integer",
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -18348,7 +18802,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminBooking"
+                  "$ref": "#/components/schemas/AdminBookingDetail"
                 }
               }
             }
@@ -18429,7 +18883,7 @@
     "/v1/admin/bookings/{id}/reverse-transfer": {
       "post": {
         "summary": "Reverse the payout transfer for a booking",
-        "description": "After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. The booking keeps its status. Subject to the admin mutation rate limit (429).",
+        "description": "After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. When `expectedReversedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. The booking keeps its status. Subject to the admin mutation rate limit (429).",
         "tags": [
           "admin"
         ],
@@ -18464,6 +18918,10 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 2000
+                  },
+                  "expectedReversedCents": {
+                    "type": "integer",
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -18480,7 +18938,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminBooking"
+                  "$ref": "#/components/schemas/AdminBookingDetail"
                 }
               }
             }

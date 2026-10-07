@@ -10,7 +10,7 @@ export interface BookingLedgerTotals {
   reversalCount: number;
 }
 
-const EMPTY_TOTALS: BookingLedgerTotals = {
+export const EMPTY_LEDGER_TOTALS: Readonly<BookingLedgerTotals> = {
   refundedCents: 0,
   refundCount: 0,
   transferredCents: 0,
@@ -35,7 +35,7 @@ export async function ledgerTotalsByBooking(
     _count: { _all: true },
   });
   for (const group of groups) {
-    const current = totals.get(group.bookingId) ?? { ...EMPTY_TOTALS };
+    const current = totals.get(group.bookingId) ?? { ...EMPTY_LEDGER_TOTALS };
     const sum = group._sum.amountCents ?? 0;
     if (group.type === 'refund') {
       current.refundedCents = -sum;
@@ -56,7 +56,7 @@ export async function ledgerTotals(
   bookingId: string,
 ): Promise<BookingLedgerTotals> {
   const totals = await ledgerTotalsByBooking(db, [bookingId]);
-  return totals.get(bookingId) ?? { ...EMPTY_TOTALS };
+  return totals.get(bookingId) ?? { ...EMPTY_LEDGER_TOTALS };
 }
 
 export function reversibleCents(totals: BookingLedgerTotals): number {

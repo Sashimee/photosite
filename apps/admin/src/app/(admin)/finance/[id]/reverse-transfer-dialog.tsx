@@ -23,12 +23,14 @@ import { ReasonField } from '../reason-field';
 export function ReverseTransferDialog({
   bookingId,
   currency,
+  reversedCents,
   disabled,
   onDone,
   onUnknownOutcome,
 }: {
   bookingId: string;
   currency: string;
+  reversedCents: number;
   disabled: boolean;
   onDone: () => void;
   onUnknownOutcome: () => void;
@@ -62,7 +64,10 @@ export function ReverseTransferDialog({
     if (inFlight.current) {
       return;
     }
-    const result = ReverseBookingTransferRequestSchema.safeParse({ reason: reason.trim() });
+    const result = ReverseBookingTransferRequestSchema.safeParse({
+      reason: reason.trim(),
+      expectedReversedCents: reversedCents,
+    });
     if (!result.success) {
       const issue = result.error.issues[0];
       setReasonError(
@@ -77,7 +82,7 @@ export function ReverseTransferDialog({
     try {
       const { error, response } = await api.POST('/v1/admin/bookings/{id}/reverse-transfer', {
         params: { path: { id: bookingId } },
-        body: result.data,
+        body: { ...result.data, expectedReversedCents: reversedCents },
       });
       // src/lib/api.ts already redirects to re-verification for this code.
       if (error?.code === 'TWO_FACTOR_REQUIRED' || response.status === 401) {

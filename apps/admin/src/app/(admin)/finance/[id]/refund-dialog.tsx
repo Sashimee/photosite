@@ -31,12 +31,16 @@ interface Errors {
 export function RefundDialog({
   bookingId,
   currency,
+  refundedCents,
+  refundableCents,
   disabled,
   onDone,
   onUnknownOutcome,
 }: {
   bookingId: string;
   currency: string;
+  refundedCents: number;
+  refundableCents: number;
   disabled: boolean;
   onDone: () => void;
   onUnknownOutcome: () => void;
@@ -102,6 +106,7 @@ export function RefundDialog({
     const request = {
       amountCents: parsed.ok ? parsed.amountCents : 0,
       reason: reason.trim(),
+      expectedRefundedCents: refundedCents,
     };
     const result = RefundBookingRequestSchema.safeParse(request);
     if (!result.success) {
@@ -123,7 +128,7 @@ export function RefundDialog({
     try {
       const { error, response } = await api.POST('/v1/admin/bookings/{id}/refund', {
         params: { path: { id: bookingId } },
-        body: result.data,
+        body: { ...result.data, expectedRefundedCents: refundedCents },
       });
       // src/lib/api.ts already redirects to re-verification for this code.
       if (error?.code === 'TWO_FACTOR_REQUIRED' || response.status === 401) {
@@ -190,10 +195,13 @@ export function RefundDialog({
                 setAmount(event.target.value);
               }}
               aria-invalid={Boolean(errors.amount)}
-              aria-describedby="refund-amount-hint refund-amount-error"
+              aria-describedby="refund-amount-hint refund-amount-max refund-amount-error"
             />
             <p id="refund-amount-hint" className="text-xs text-muted-foreground">
               {t('amountHint')}
+            </p>
+            <p id="refund-amount-max" className="text-xs text-muted-foreground">
+              {t('amountMax', { amount: formatCents(format, refundableCents, currency) })}
             </p>
             <FieldError id="refund-amount-error" message={errors.amount} />
           </div>
