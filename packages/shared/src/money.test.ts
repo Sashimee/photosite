@@ -44,4 +44,27 @@ describe('formatMinorUnits', () => {
     expect(() => formatMinorUnits(Number.MAX_SAFE_INTEGER + 1, 'EUR')).toThrow(RangeError);
     expect(() => formatMinorUnits(Number.NaN, 'EUR')).toThrow(RangeError);
   });
+
+  it('writes a three-decimal currency with three places', () => {
+    expect(formatMinorUnits(1, 'KWD')).toBe('0.001');
+    expect(formatMinorUnits(12345, 'KWD')).toBe('12.345');
+    expect(formatMinorUnits(-1, 'KWD')).toBe('-0.001');
+  });
+
+  it('writes a zero-decimal currency of zero and a negative without a point', () => {
+    expect(formatMinorUnits(0, 'JPY')).toBe('0');
+    expect(formatMinorUnits(-500, 'JPY')).toBe('-500');
+  });
+
+  it('writes negative zero as plain zero', () => {
+    expect(formatMinorUnits(-0, 'EUR')).toBe('0.00');
+  });
+
+  it('accepts a lowercase currency code', () => {
+    expect(formatMinorUnits(1234, 'eur')).toBe('12.34');
+  });
+
+  it('rejects infinity', () => {
+    expect(() => formatMinorUnits(Number.POSITIVE_INFINITY, 'EUR')).toThrow(RangeError);
+  });
 });
