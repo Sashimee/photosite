@@ -122,4 +122,36 @@ describe('centsToAmountInput', () => {
       amountCents: 2500,
     });
   });
+
+  it.each([
+    [0, 'EUR', '0.00'],
+    [1, 'EUR', '0.01'],
+    [10, 'EUR', '0.10'],
+    [99, 'EUR', '0.99'],
+    [100, 'EUR', '1.00'],
+    [101, 'EUR', '1.01'],
+    [Number.MAX_SAFE_INTEGER, 'EUR', '90071992547409.91'],
+    [0, 'JPY', '0'],
+    [1, 'JPY', '1'],
+    [100, 'JPY', '100'],
+    [0, 'KWD', '0.000'],
+    [1, 'KWD', '0.001'],
+    [1000, 'KWD', '1.000'],
+  ])('writes %i minor units of %s as %s', (cents, currency, expected) => {
+    expect(centsToAmountInput(cents, currency)).toBe(expected);
+  });
+
+  it.each([
+    [0, 'EUR'],
+    [1, 'EUR'],
+    [100, 'EUR'],
+    [999_999_999, 'EUR'],
+    [1, 'KWD'],
+    [12345, 'JPY'],
+  ])('round-trips %i of %s through the amount parser', (cents, currency) => {
+    const result = parseAmountToCents(centsToAmountInput(cents, currency), currency);
+    expect(result).toEqual(
+      cents === 0 ? { ok: false, reason: 'notPositive' } : { ok: true, amountCents: cents },
+    );
+  });
 });

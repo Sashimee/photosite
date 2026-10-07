@@ -117,20 +117,27 @@ describe('ExportButton', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it.each([null, 'attachment', 'attachment; filename="../../etc/passwd"'])(
-    'falls back to photoo-bookings.csv for the header %s',
-    async (disposition) => {
-      getMock.mockResolvedValueOnce(csvResponse('id\n', disposition));
-      const events = await renderButton();
+  it.each([
+    null,
+    'attachment',
+    '',
+    'attachment; filename="../../etc/passwd"',
+    'attachment; filename=photoo-bookings.csv',
+    'attachment; filename=""',
+    'attachment; filename="a b.csv"',
+    "attachment; filename*=UTF-8''x.csv",
+    'attachment; filename="x.csv',
+  ])('falls back to photoo-bookings.csv for the header %s', async (disposition) => {
+    getMock.mockResolvedValueOnce(csvResponse('id\n', disposition));
+    const events = await renderButton();
 
-      await events.click(exportButton());
+    await events.click(exportButton());
 
-      await waitFor(() => {
-        expect(clickSpy).toHaveBeenCalledTimes(1);
-      });
-      expect((clickSpy.mock.contexts[0] as HTMLAnchorElement).download).toBe('photoo-bookings.csv');
-    },
-  );
+    await waitFor(() => {
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
+    expect((clickSpy.mock.contexts[0] as HTMLAnchorElement).download).toBe('photoo-bookings.csv');
+  });
 
   it('saves the file and shows the cap notice when it ends with #truncated', async () => {
     getMock.mockResolvedValueOnce(csvResponse('"id"\n"b1"\n#truncated\n', null));
@@ -229,5 +236,53 @@ describe('ExportButton', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/export failed/);
     expect(clickSpy).not.toHaveBeenCalled();
+  });
+
+  it('saves nothing and shows an error when the body is not a file', async () => {
+    getMock.mockResolvedValueOnce({
+      data: undefined,
+      response: { ok: true, status: 200, headers: new Headers() },
+    });
+    const events = await renderButton();
+
+    await events.click(exportButton());
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/export failed/);
+    expect(clickSpy).not.toHaveBeenCalled();
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it('saves nothing when the downloaded blob cannot be read', async () => {
+    const broken = new Blob(['x'], { type: 'text/csv' });
+    vi.spyOn(broken, 'slice').mockImplementation(() => {
+      throw new Error('stream aborted');
+    });
+    getMock.mockResolvedValueOnce({
+      data: broken,
+      response: { ok: true, status: 200, headers: new Headers() },
+    });
+    const events = await renderButton();
+
+    await events.click(exportButton());
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/export failed/);
+    expect(clickSpy).not.toHaveBeenCalled();
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(exportButton()).toBeEnabled();
+  });
+
+  it('allows a second export after a failed one and clears the earlier error', async () => {
+    getMock.mockRejectedValueOnce(new TypeError('network error'));
+    getMock.mockResolvedValueOnce(csvResponse('id\n', null));
+    const events = await renderButton();
+
+    await events.click(exportButton());
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    await events.click(exportButton());
+
+    await waitFor(() => {
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
