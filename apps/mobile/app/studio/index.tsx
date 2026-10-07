@@ -64,6 +64,18 @@ export default function StudioHomeScreen() {
             description={t('mobile.studio.hub.verificationDescription')}
             href="/studio/verification"
           />
+          <HubEntry
+            testID="studio-entry-requests"
+            title={t('mobile.studio.hub.requestsTitle')}
+            description={t('mobile.studio.hub.requestsDescription')}
+            href="/studio/requests"
+          />
+          <HubEntry
+            testID="studio-entry-quotes"
+            title={t('mobile.studio.hub.quotesTitle')}
+            description={t('mobile.studio.hub.quotesDescription')}
+            href="/studio/quotes"
+          />
         </View>
       </ScrollView>
     </StudioFrame>

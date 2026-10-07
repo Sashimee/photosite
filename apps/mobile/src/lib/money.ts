@@ -45,3 +45,21 @@ export function requireMoney(money: Money | null | undefined, context: string): 
   }
   return money;
 }
+
+// The API's quote preview and quote DTOs carry the subtotal and the platform
+// fee but never the net, so the payout is the difference of two numbers the
+// server already computed, not a fee recomputation.
+export function payoutAmount(subtotal: Money, platformFee: Money): Money {
+  if (subtotal.currency !== platformFee.currency) {
+    throw new Error(
+      `payoutAmount: currency mismatch (${subtotal.currency} vs ${platformFee.currency})`,
+    );
+  }
+  const amountCents = subtotal.amountCents - platformFee.amountCents;
+  if (amountCents < 0) {
+    throw new Error(
+      `payoutAmount: fee ${String(platformFee.amountCents)} exceeds subtotal ${String(subtotal.amountCents)}`,
+    );
+  }
+  return { amountCents, currency: subtotal.currency };
+}
