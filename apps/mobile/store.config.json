@@ -1,0 +1,124 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "copyright": "2026 Photoo",
+    "categories": ["PHOTO_AND_VIDEO", "LIFESTYLE"],
+    "info": {
+      "en-US": {
+        "title": "Photoo",
+        "subtitle": "Find and book photographers",
+        "description": "Photoo connects people who need photos with photographers and professionals in Luxembourg.\n\nFIND THE RIGHT PERSON\nBrowse photographers by category, language and location, look through their portfolios and read their offers. Categories include weddings, portraits, events, products, real estate and corporate work.\n\nASK FOR QUOTES\nDescribe what you need, with the date, place and purpose, and receive quotes from photographers. Compare them side by side and accept the one that suits you.\n\nTALK DIRECTLY\nChat with photographers inside the app, share images and documents, and get notified when someone replies.\n\nBOOK WITH CONFIDENCE\nPay securely in the app. Your payment is held until the work is delivered, and only then released to the photographer. Receipts are available in the app.\n\nVERIFIED PHOTOGRAPHERS\nPhotographers can submit identity documents for verification, so you can see who has been checked.\n\nFOR PHOTOGRAPHERS AND PROFESSIONALS\nSet up your studio profile, upload your portfolio, define your products and prices, answer requests with quotes, manage your bookings and follow your payouts.\n\nYOUR DATA, YOUR CHOICE\nYou can download your data and delete your account from the Account tab at any time.\n\nPhotoo is available in English, French, German, Portuguese and Spanish.",
+        "keywords": [
+          "photographer",
+          "photography",
+          "wedding",
+          "portrait",
+          "event",
+          "booking",
+          "quote",
+          "Luxembourg",
+          "studio",
+          "real estate"
+        ],
+        "releaseNotes": "First release of the Photoo app.",
+        "marketingUrl": "https://photoo.lu/en",
+        "supportUrl": "https://photoo.lu/en/legal/imprint",
+        "privacyPolicyUrl": "https://photoo.lu/en/legal/privacy"
+      },
+      "fr-FR": {
+        "title": "Photoo",
+        "subtitle": "Réservez un photographe",
+        "description": "Photoo met en relation les personnes qui ont besoin de photos avec des photographes et des professionnels au Luxembourg.\n\nTROUVEZ LA BONNE PERSONNE\nParcourez les photographes par catégorie, langue et lieu, consultez leurs portfolios et leurs offres. Les catégories comprennent les mariages, portraits, événements, produits, immobilier et travaux pour entreprises.\n\nDEMANDEZ DES DEVIS\nDécrivez votre besoin avec la date, le lieu et l’usage, puis recevez des devis de photographes. Comparez-les et acceptez celui qui vous convient.\n\nÉCHANGEZ DIRECTEMENT\nDiscutez avec les photographes dans l’application, partagez des images et des documents, et soyez averti dès qu’on vous répond.\n\nRÉSERVEZ EN CONFIANCE\nPayez en toute sécurité dans l’application. Votre paiement est conservé jusqu’à la livraison du travail, puis seulement versé au photographe. Les reçus sont disponibles dans l’application.\n\nPHOTOGRAPHES VÉRIFIÉS\nLes photographes peuvent soumettre des pièces d’identité pour vérification, afin que vous voyiez qui a été contrôlé.\n\nPOUR LES PHOTOGRAPHES ET PROFESSIONNELS\nCréez votre profil de studio, ajoutez votre portfolio, définissez vos produits et tarifs, répondez aux demandes par des devis, gérez vos réservations et suivez vos versements.\n\nVOS DONNÉES, VOTRE CHOIX\nVous pouvez télécharger vos données et supprimer votre compte à tout moment depuis l’onglet Compte.\n\nPhotoo est disponible en anglais, français, allemand, portugais et espagnol.",
+        "keywords": [
+          "photographe",
+          "photographie",
+          "mariage",
+          "portrait",
+          "événement",
+          "réservation",
+          "devis",
+          "Luxembourg",
+          "studio",
+          "immobilier"
+        ],
+        "releaseNotes": "Première version de l’application Photoo.",
+        "marketingUrl": "https://photoo.lu/fr",
+        "supportUrl": "https://photoo.lu/fr/legal/imprint",
+        "privacyPolicyUrl": "https://photoo.lu/fr/legal/privacy"
+      },
+      "de-DE": {
+        "title": "Photoo",
+        "subtitle": "Fotografen finden und buchen",
+        "description": "Photoo bringt Menschen, die Fotos brauchen, mit Fotografen und Profis in Luxemburg zusammen.\n\nDIE RICHTIGE PERSON FINDEN\nDurchsuchen Sie Fotografen nach Kategorie, Sprache und Ort, sehen Sie sich Portfolios an und lesen Sie ihre Angebote. Zu den Kategorien gehören Hochzeiten, Porträts, Events, Produkte, Immobilien und Unternehmensaufträge.\n\nANGEBOTE ANFRAGEN\nBeschreiben Sie, was Sie brauchen, mit Datum, Ort und Verwendungszweck, und erhalten Sie Angebote von Fotografen. Vergleichen Sie sie und nehmen Sie das passende an.\n\nDIREKT SCHREIBEN\nChatten Sie in der App mit Fotografen, teilen Sie Bilder und Dokumente und werden Sie benachrichtigt, sobald jemand antwortet.\n\nSICHER BUCHEN\nBezahlen Sie sicher in der App. Ihre Zahlung wird bis zur Lieferung der Arbeit zurückgehalten und erst dann an den Fotografen ausgezahlt. Belege finden Sie in der App.\n\nVERIFIZIERTE FOTOGRAFEN\nFotografen können Ausweisdokumente zur Prüfung einreichen, sodass Sie sehen, wer geprüft wurde.\n\nFÜR FOTOGRAFEN UND PROFIS\nRichten Sie Ihr Studioprofil ein, laden Sie Ihr Portfolio hoch, legen Sie Produkte und Preise fest, beantworten Sie Anfragen mit Angeboten, verwalten Sie Ihre Buchungen und verfolgen Sie Ihre Auszahlungen.\n\nIHRE DATEN, IHRE WAHL\nIm Tab Konto können Sie jederzeit Ihre Daten herunterladen und Ihr Konto löschen.\n\nPhotoo gibt es auf Englisch, Französisch, Deutsch, Portugiesisch und Spanisch.",
+        "keywords": [
+          "Fotograf",
+          "Fotografie",
+          "Hochzeit",
+          "Porträt",
+          "Event",
+          "Buchung",
+          "Angebot",
+          "Luxemburg",
+          "Studio",
+          "Immobilien"
+        ],
+        "releaseNotes": "Erste Version der Photoo-App.",
+        "marketingUrl": "https://photoo.lu/de",
+        "supportUrl": "https://photoo.lu/de/legal/imprint",
+        "privacyPolicyUrl": "https://photoo.lu/de/legal/privacy"
+      },
+      "pt-PT": {
+        "title": "Photoo",
+        "subtitle": "Encontre e reserve fotógrafos",
+        "description": "A Photoo liga quem precisa de fotografias a fotógrafos e profissionais no Luxemburgo.\n\nENCONTRE A PESSOA CERTA\nExplore fotógrafos por categoria, idioma e localização, veja os portfólios e leia as suas ofertas. As categorias incluem casamentos, retratos, eventos, produtos, imobiliário e trabalhos para empresas.\n\nPEÇA ORÇAMENTOS\nDescreva o que precisa, com data, local e finalidade, e receba orçamentos de fotógrafos. Compare-os e aceite o que lhe convém.\n\nFALE DIRETAMENTE\nConverse com os fotógrafos na aplicação, partilhe imagens e documentos e receba uma notificação quando alguém responder.\n\nRESERVE COM CONFIANÇA\nPague com segurança na aplicação. O pagamento fica retido até o trabalho ser entregue e só então é libertado para o fotógrafo. Os recibos estão disponíveis na aplicação.\n\nFOTÓGRAFOS VERIFICADOS\nOs fotógrafos podem submeter documentos de identificação para verificação, para que veja quem foi verificado.\n\nPARA FOTÓGRAFOS E PROFISSIONAIS\nConfigure o seu perfil de estúdio, carregue o portfólio, defina produtos e preços, responda a pedidos com orçamentos, gira as reservas e acompanhe os pagamentos.\n\nOS SEUS DADOS, A SUA ESCOLHA\nPode descarregar os seus dados e eliminar a conta a qualquer momento no separador Conta.\n\nA Photoo está disponível em inglês, francês, alemão, português e espanhol.",
+        "keywords": [
+          "fotógrafo",
+          "fotografia",
+          "casamento",
+          "retrato",
+          "evento",
+          "reserva",
+          "orçamento",
+          "Luxemburgo",
+          "estúdio",
+          "imobiliário"
+        ],
+        "releaseNotes": "Primeira versão da aplicação Photoo.",
+        "marketingUrl": "https://photoo.lu/pt",
+        "supportUrl": "https://photoo.lu/pt/legal/imprint",
+        "privacyPolicyUrl": "https://photoo.lu/pt/legal/privacy"
+      },
+      "es-ES": {
+        "title": "Photoo",
+        "subtitle": "Encuentra y reserva fotógrafos",
+        "description": "Photoo conecta a quienes necesitan fotografías con fotógrafos y profesionales en Luxemburgo.\n\nENCUENTRA A LA PERSONA ADECUADA\nExplora fotógrafos por categoría, idioma y ubicación, consulta sus portafolios y lee sus ofertas. Las categorías incluyen bodas, retratos, eventos, productos, inmobiliaria y trabajos para empresas.\n\nPIDE PRESUPUESTOS\nDescribe lo que necesitas, con fecha, lugar y finalidad, y recibe presupuestos de fotógrafos. Compáralos y acepta el que más te convenga.\n\nHABLA DIRECTAMENTE\nChatea con los fotógrafos en la aplicación, comparte imágenes y documentos y recibe un aviso cuando alguien responda.\n\nRESERVA CON CONFIANZA\nPaga de forma segura en la aplicación. Tu pago se retiene hasta que el trabajo se entrega y solo entonces se libera al fotógrafo. Los recibos están disponibles en la aplicación.\n\nFOTÓGRAFOS VERIFICADOS\nLos fotógrafos pueden enviar documentos de identidad para su verificación, para que veas quién ha sido comprobado.\n\nPARA FOTÓGRAFOS Y PROFESIONALES\nCrea tu perfil de estudio, sube tu portafolio, define tus productos y precios, responde a las solicitudes con presupuestos, gestiona tus reservas y sigue tus pagos.\n\nTUS DATOS, TU DECISIÓN\nPuedes descargar tus datos y eliminar tu cuenta en cualquier momento desde la pestaña Cuenta.\n\nPhotoo está disponible en inglés, francés, alemán, portugués y español.",
+        "keywords": [
+          "fotógrafo",
+          "fotografía",
+          "boda",
+          "retrato",
+          "evento",
+          "reserva",
+          "presupuesto",
+          "Luxemburgo",
+          "estudio",
+          "inmobiliaria"
+        ],
+        "releaseNotes": "Primera versión de la aplicación Photoo.",
+        "marketingUrl": "https://photoo.lu/es",
+        "supportUrl": "https://photoo.lu/es/legal/imprint",
+        "privacyPolicyUrl": "https://photoo.lu/es/legal/privacy"
+      }
+    },
+    "review": {
+      "firstName": "TODO-ALEX",
+      "lastName": "TODO-ALEX",
+      "email": "TODO-ALEX@example.invalid",
+      "phone": "+352TODO-ALEX",
+      "demoRequired": true,
+      "demoUsername": "TODO-ALEX-demo-account-email",
+      "demoPassword": "TODO-ALEX-demo-account-password",
+      "notes": "Account deletion is in the Account tab, at the bottom of the screen (\"Delete account\"). A demo account is required to review the app: sign in with the credentials above."
+    }
+  }
+}
