@@ -22,6 +22,13 @@ interface ProfileRow {
   stripeAccountId: string | null;
   stripeOnboardingComplete: boolean;
   stripePayoutsEnabled: boolean;
+  deletedAt: Date | null;
+}
+
+interface UserState {
+  status: 'active' | 'suspended' | 'deleted';
+  roles: string[];
+  pendingDeletion: boolean;
 }
 
 function profileRow(overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -34,12 +41,21 @@ function profileRow(overrides: Partial<ProfileRow> = {}): ProfileRow {
     stripeAccountId: null,
     stripeOnboardingComplete: false,
     stripePayoutsEnabled: false,
+    deletedAt: null,
     ...overrides,
   };
 }
 
-function setup(options: { profile?: ProfileRow | null; env?: Partial<Env> } = {}) {
+function setup(
+  options: { profile?: ProfileRow | null; user?: Partial<UserState>; env?: Partial<Env> } = {},
+) {
   let row = options.profile === undefined ? profileRow() : options.profile;
+  const user: UserState = {
+    status: 'active',
+    roles: ['photographer'],
+    pendingDeletion: false,
+    ...options.user,
+  };
   const tx = {
     $queryRaw: vi.fn((_query: TemplateStringsArray, stripeAccountId: string) =>
       Promise.resolve(row?.stripeAccountId === stripeAccountId ? [{ id: row.id }] : []),
@@ -51,9 +67,36 @@ function setup(options: { profile?: ProfileRow | null; env?: Partial<Env> } = {}
         }
         return Promise.resolve({ ...row });
       }),
+      findUnique: vi.fn(({ where }: { where: { id: string } }) =>
+        Promise.resolve(
+          row?.id === where.id
+            ? {
+                verificationStatus: row.verificationStatus,
+                stripePayoutsEnabled: row.stripePayoutsEnabled,
+                isPublished: row.isPublished,
+                deletedAt: row.deletedAt,
+                user: {
+                  status: user.status,
+                  roles: user.roles,
+                  dataRequests: user.pendingDeletion ? [{ id: 'dr-1' }] : [],
+                },
+              }
+            : null,
+        ),
+      ),
       updateMany: vi.fn(
-        ({ where, data }: { where: { stripeAccountId: null }; data: Partial<ProfileRow> }) => {
-          if (row?.stripeAccountId !== where.stripeAccountId) {
+        ({
+          where,
+          data,
+        }: {
+          where: { stripeAccountId: null } | { isPublished: false };
+          data: Partial<ProfileRow>;
+        }) => {
+          const matches =
+            'stripeAccountId' in where
+              ? row?.stripeAccountId === where.stripeAccountId
+              : row?.isPublished === where.isPublished;
+          if (!row || !matches) {
             return Promise.resolve({ count: 0 });
           }
           row = { ...row, ...data };
@@ -353,18 +396,18 @@ describe('StripeConnectService.handleAccountUpdated', () => {
     expect(ctx.prisma.client.$transaction).not.toHaveBeenCalled();
   });
 
-  describe('when onboarding completes', () => {
+  describe('when onboarding completes on a verified profile', () => {
     beforeEach(() => {
       ctx = setup({ profile: profileRow({ stripeAccountId: 'acct_1' }) });
     });
 
-    it('mirrors the flags, audits, and does not notify', async () => {
+    it('mirrors the flags, publishes, audits the publish, and does not notify', async () => {
       await mirror(ENABLED);
 
       expect(ctx.current()).toMatchObject({
         stripeOnboardingComplete: true,
         stripePayoutsEnabled: true,
-        isPublished: false,
+        isPublished: true,
       });
       expect(ctx.tx.auditLog.create.mock.lastCall?.[0]).toMatchObject({
         data: {
@@ -382,7 +425,7 @@ describe('StripeConnectService.handleAccountUpdated', () => {
             stripeAccountId: 'acct_1',
             stripeOnboardingComplete: true,
             stripePayoutsEnabled: true,
-            isPublished: false,
+            isPublished: true,
           },
         },
       });
@@ -390,12 +433,33 @@ describe('StripeConnectService.handleAccountUpdated', () => {
       expect(ctx.notifications.enqueue).not.toHaveBeenCalled();
     });
 
+    it('publishes only after the payout flag is stored', async () => {
+      await mirror(ENABLED);
+
+      expect(ctx.tx.photographerProfile.update.mock.invocationCallOrder[0]).toBeLessThan(
+        ctx.tx.photographerProfile.findUnique.mock.invocationCallOrder[0] ?? 0,
+      );
+      expect(ctx.tx.photographerProfile.updateMany).toHaveBeenCalledOnce();
+    });
+
     it('treats a replay of the same state as a no-op', async () => {
       await mirror(ENABLED);
       await mirror(ENABLED);
 
+      expect(ctx.current()).toMatchObject({ isPublished: true });
       expect(ctx.tx.photographerProfile.update).toHaveBeenCalledOnce();
+      expect(ctx.tx.photographerProfile.updateMany).toHaveBeenCalledOnce();
       expect(ctx.tx.auditLog.create).toHaveBeenCalledOnce();
+    });
+
+    it('does not publish while payouts stay disabled', async () => {
+      await mirror({ ...ENABLED, payoutsEnabled: false });
+
+      expect(ctx.current()).toMatchObject({ stripeOnboardingComplete: true, isPublished: false });
+      expect(ctx.tx.photographerProfile.updateMany).not.toHaveBeenCalled();
+      expect(ctx.tx.auditLog.create.mock.lastCall?.[0]).toMatchObject({
+        data: { after: { stripePayoutsEnabled: false, isPublished: false } },
+      });
     });
 
     it('requires both details submitted and charges enabled for onboarding complete', async () => {
@@ -403,6 +467,35 @@ describe('StripeConnectService.handleAccountUpdated', () => {
       expect(ctx.current()).toMatchObject({
         stripeOnboardingComplete: false,
         stripePayoutsEnabled: true,
+      });
+    });
+  });
+
+  describe.each<[string, { profile?: Partial<ProfileRow>; user?: Partial<UserState> }]>([
+    ['the profile is not verified', { profile: { verificationStatus: 'pending' } }],
+    ['the user is suspended', { user: { status: 'suspended' } }],
+    ['a deletion is pending', { user: { status: 'deleted', pendingDeletion: true } }],
+    ['the profile was taken down', { profile: { deletedAt: new Date('2026-01-01T00:00:00Z') } }],
+    ['the photographer role was removed', { user: { roles: ['client'] } }],
+  ])('when payouts get enabled but %s', (_name, state) => {
+    beforeEach(() => {
+      ctx = setup({
+        profile: profileRow({ stripeAccountId: 'acct_1', ...state.profile }),
+        ...(state.user ? { user: state.user } : {}),
+      });
+    });
+
+    it('mirrors the flags without publishing and audits the profile as unpublished', async () => {
+      await mirror(ENABLED);
+
+      expect(ctx.current()).toMatchObject({ stripePayoutsEnabled: true, isPublished: false });
+      expect(ctx.tx.photographerProfile.updateMany).not.toHaveBeenCalled();
+      expect(ctx.tx.auditLog.create).toHaveBeenCalledOnce();
+      expect(ctx.tx.auditLog.create.mock.lastCall?.[0]).toMatchObject({
+        data: {
+          before: { stripePayoutsEnabled: false, isPublished: false },
+          after: { stripePayoutsEnabled: true, isPublished: false },
+        },
       });
     });
   });
@@ -478,6 +571,10 @@ describe('StripeConnectService.handleAccountUpdated', () => {
       await mirror({ ...ENABLED, detailsSubmitted: false });
 
       expect(ctx.current()).toMatchObject({ stripeOnboardingComplete: false, isPublished: true });
+      expect(ctx.tx.photographerProfile.updateMany).not.toHaveBeenCalled();
+      expect(ctx.tx.auditLog.create.mock.lastCall?.[0]).toMatchObject({
+        data: { before: { isPublished: true }, after: { isPublished: true } },
+      });
       expect(ctx.notifications.createNotification).not.toHaveBeenCalled();
     });
   });

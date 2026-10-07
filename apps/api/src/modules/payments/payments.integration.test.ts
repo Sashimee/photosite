@@ -5,6 +5,7 @@ import { Redis } from 'ioredis';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp } from '../../testing/create-test-app.js';
 import { waitForLinkInEmail } from '../../testing/mailpit.js';
+import { applyAccountDeletion } from '../gdpr/apply-account-deletion.js';
 import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
 import { TEST_ENV } from '../../testing/test-env.js';
 import { StripeConnectService } from './stripe-connect.service.js';
@@ -43,6 +44,7 @@ describe('payments (Stripe Connect onboarding) integration', () => {
   let prisma: PrismaClient;
   let redis: Redis;
   const createdUserIds: string[] = [];
+  const eventIds: string[] = [];
 
   function fastify() {
     return app.getHttpAdapter().getInstance();
@@ -159,6 +161,7 @@ describe('payments (Stripe Connect onboarding) integration', () => {
   });
 
   afterAll(async () => {
+    await prisma.stripeEvent.deleteMany({ where: { id: { in: eventIds } } });
     if (createdUserIds.length > 0) {
       const profiles = await prisma.photographerProfile.findMany({
         where: { userId: { in: createdUserIds } },
@@ -327,7 +330,168 @@ describe('payments (Stripe Connect onboarding) integration', () => {
       return { ...photographer, accountId: account.stripeAccountId };
     }
 
-    it('mirrors enabled flags without publishing or notifying', async () => {
+    const ENABLED = { chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true };
+
+    async function verifiedAccount(label: string) {
+      const photographer = await onboardedAccount(label);
+      await prisma.photographerProfile.update({
+        where: { id: photographer.profileId },
+        data: { verificationStatus: 'verified' },
+      });
+      return photographer;
+    }
+
+    function profileOf(profileId: string) {
+      return prisma.photographerProfile.findUniqueOrThrow({ where: { id: profileId } });
+    }
+
+    function updateAudits(profileId: string) {
+      return prisma.auditLog.findMany({
+        where: { action: 'stripe_account.updated', targetId: profileId },
+      });
+    }
+
+    function sendAccountUpdated(accountId: string, eventId = `evt_it_${randomUUID()}`) {
+      eventIds.push(eventId);
+      const payload = JSON.stringify({
+        id: eventId,
+        object: 'event',
+        type: 'account.updated',
+        livemode: false,
+        account: accountId,
+        data: {
+          object: {
+            id: accountId,
+            object: 'account',
+            charges_enabled: true,
+            payouts_enabled: true,
+            details_submitted: true,
+          },
+        },
+      });
+      return fastify().inject({
+        method: 'POST',
+        url: '/v1/stripe/webhook',
+        remoteAddress: FAKE_IP,
+        headers: {
+          'content-type': 'application/json',
+          'stripe-signature': gateway().signPayload(payload),
+        },
+        payload,
+      });
+    }
+
+    it('publishes a verified profile once payouts get enabled and audits the publish', async () => {
+      const photographer = await verifiedAccount('publish');
+      gateway().updateAccount(photographer.accountId, ENABLED);
+
+      await app.get(StripeConnectService).handleAccountUpdated(photographer.accountId);
+
+      expect(await profileOf(photographer.profileId)).toMatchObject({
+        stripePayoutsEnabled: true,
+        isPublished: true,
+      });
+      const audits = await updateAudits(photographer.profileId);
+      expect(audits).toHaveLength(1);
+      expect(audits[0]).toMatchObject({
+        before: { stripePayoutsEnabled: false, isPublished: false },
+        after: { stripePayoutsEnabled: true, isPublished: true },
+      });
+    });
+
+    it('publishes once when the same webhook event is delivered twice or a new event repeats the state', async () => {
+      const photographer = await verifiedAccount('publish-replay');
+      gateway().updateAccount(photographer.accountId, ENABLED);
+      const eventId = `evt_it_${randomUUID()}`;
+
+      const responses = [
+        await sendAccountUpdated(photographer.accountId, eventId),
+        await sendAccountUpdated(photographer.accountId, eventId),
+        await sendAccountUpdated(photographer.accountId),
+      ];
+
+      expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 200]);
+      expect(await profileOf(photographer.profileId)).toMatchObject({ isPublished: true });
+      const audits = await updateAudits(photographer.profileId);
+      expect(audits).toHaveLength(1);
+      expect(audits[0]?.after).toMatchObject({ isPublished: true });
+      const stored = await prisma.stripeEvent.findUniqueOrThrow({ where: { id: eventId } });
+      expect(stored.processedAt).not.toBeNull();
+    });
+
+    it('unpublishes when payouts get disabled and publishes again when they come back', async () => {
+      const photographer = await verifiedAccount('publish-cycle');
+      const connect = app.get(StripeConnectService);
+      const seen = new Set<string>();
+      async function mirror(payoutsEnabled: boolean) {
+        gateway().updateAccount(photographer.accountId, { ...ENABLED, payoutsEnabled });
+        await connect.handleAccountUpdated(photographer.accountId);
+        const fresh = (await updateAudits(photographer.profileId)).filter(
+          (audit) => !seen.has(audit.id),
+        );
+        fresh.forEach((audit) => seen.add(audit.id));
+        return {
+          profile: await profileOf(photographer.profileId),
+          audits: fresh.map((audit) => audit.after),
+        };
+      }
+
+      expect(await mirror(true)).toMatchObject({
+        profile: { isPublished: true },
+        audits: [{ stripePayoutsEnabled: true, isPublished: true }],
+      });
+      expect(await mirror(false)).toMatchObject({
+        profile: { isPublished: false },
+        audits: [{ stripePayoutsEnabled: false, isPublished: false }],
+      });
+      expect(await mirror(true)).toMatchObject({
+        profile: { isPublished: true },
+        audits: [{ stripePayoutsEnabled: true, isPublished: true }],
+      });
+    });
+
+    it('does not publish a suspended photographer', async () => {
+      const photographer = await verifiedAccount('publish-suspended');
+      await prisma.user.update({ where: { id: photographer.id }, data: { status: 'suspended' } });
+      gateway().updateAccount(photographer.accountId, ENABLED);
+
+      await app.get(StripeConnectService).handleAccountUpdated(photographer.accountId);
+
+      expect(await profileOf(photographer.profileId)).toMatchObject({
+        stripePayoutsEnabled: true,
+        isPublished: false,
+      });
+      const [audit] = await updateAudits(photographer.profileId);
+      expect(audit?.after).toMatchObject({ stripePayoutsEnabled: true, isPublished: false });
+    });
+
+    it('does not publish a photographer whose deletion is pending', async () => {
+      const photographer = await verifiedAccount('publish-deleting');
+      await prisma.$transaction((tx) =>
+        applyAccountDeletion(tx, {
+          userId: photographer.id,
+          receivedAt: new Date(),
+          channel: 'in_app',
+          audit: {
+            actorType: 'user',
+            actorId: photographer.id,
+            action: 'data_request.deletion_requested',
+          },
+        }),
+      );
+      gateway().updateAccount(photographer.accountId, ENABLED);
+
+      await app.get(StripeConnectService).handleAccountUpdated(photographer.accountId);
+
+      expect(await profileOf(photographer.profileId)).toMatchObject({
+        stripePayoutsEnabled: true,
+        isPublished: false,
+      });
+      const [audit] = await updateAudits(photographer.profileId);
+      expect(audit?.after).toMatchObject({ stripePayoutsEnabled: true, isPublished: false });
+    });
+
+    it('mirrors enabled flags on an unverified profile without publishing or notifying', async () => {
       const photographer = await onboardedAccount('enable');
       const connect = app.get(StripeConnectService);
 
