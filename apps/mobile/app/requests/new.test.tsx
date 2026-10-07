@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { router } from 'expo-router';
 import { store } from 'expo-router/build/global-state/router-store';
-import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
+import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import type { ReactNode } from 'react';
 
 jest.mock('../../src/lib/auth-context', () => ({
@@ -39,6 +40,19 @@ const luxembourg = {
   countryCode: 'LU',
   photographerCount: 3,
   location: { lat: 49.6116, lng: 6.1319 },
+};
+
+const createdRequest = {
+  id: 'r1',
+  title: 'Wedding',
+  description: 'Two hundred guests',
+  eventDate: '2027-01-01T12:00:00.000Z',
+  address: { line1: '1 Rue Test', city: 'Luxembourg', postalCode: 'L-1111', countryCode: 'LU' },
+  budgetMin: { amountCents: 50000, currency: 'EUR' },
+  budgetMax: { amountCents: 90000, currency: 'EUR' },
+  usage: 'personal',
+  status: 'open',
+  quoteCount: 0,
 };
 
 function ok(data: unknown) {
@@ -81,7 +95,13 @@ beforeEach(() => {
     Promise.resolve(
       path === '/v1/countries'
         ? ok([{ code: 'LU', name: 'Luxembourg', currency: 'EUR', defaultLocale: 'fr' }])
-        : ok([luxembourg]),
+        : path === '/v1/requests/mine'
+          ? ok({ items: [], nextCursor: null })
+          : path === '/v1/requests/{id}'
+            ? ok(createdRequest)
+            : path === '/v1/requests/{requestId}/quotes'
+              ? ok({ items: [], nextCursor: null })
+              : ok([luxembourg]),
     )) as unknown as typeof api.GET);
 });
 
@@ -113,7 +133,7 @@ describe('new request screen', () => {
     expect(screen.getByTestId('request-currency').props.children).toBe('EUR');
     fireEvent.press(screen.getByTestId('request-submit'));
 
-    await waitFor(() => screen.getByTestId('requests-new'));
+    await waitFor(() => screen.getByTestId('request-detail'));
     expect(mockedPost).toHaveBeenCalledTimes(1);
     expect(mockedPost).toHaveBeenCalledWith(
       '/v1/requests',
@@ -226,10 +246,10 @@ describe('new request screen', () => {
 
     expect(mockedPost).toHaveBeenCalledTimes(1);
     finish(ok({ id: 'r1' }));
-    await waitFor(() => screen.getByTestId('requests-new'));
+    await waitFor(() => screen.getByTestId('request-detail'));
   });
 
-  it('returns to the requests tab without leaving a stale screen on the stack', async () => {
+  it('opens the new request detail above the tab without a stale form or a second tab group', async () => {
     mockedPost.mockResolvedValue(ok({ id: 'r1' }));
     renderRouter('./app', { initialUrl: '/requests' });
 
@@ -238,9 +258,47 @@ describe('new request screen', () => {
     await pickCity();
     fireEvent.press(screen.getByTestId('request-submit'));
 
-    await waitFor(() => screen.getByTestId('requests-new'));
+    await waitFor(() => screen.getByTestId('request-detail'));
     expect(screen.queryByTestId('request-submit')).toBeNull();
+    expect(mockedGet).toHaveBeenCalledWith(
+      '/v1/requests/{id}',
+      expect.objectContaining({ params: { path: { id: 'r1' } } }),
+    );
     const [root] = store.navigationRef.getRootState().routes;
-    expect(root?.state?.routes.map((route) => route.name)).toEqual(['(tabs)']);
+    expect(root?.state?.routes.map((route) => route.name)).toEqual(['(tabs)', 'requests/[id]']);
+  });
+
+  it('shows the new request in the list after going back from its detail', async () => {
+    let created = false;
+    mockedPost.mockImplementation((() => {
+      created = true;
+      return Promise.resolve(ok({ id: 'r1' }));
+    }) as unknown as typeof api.POST);
+    mockedGet.mockImplementation(((path: string) =>
+      Promise.resolve(
+        path === '/v1/countries'
+          ? ok([{ code: 'LU', name: 'Luxembourg', currency: 'EUR', defaultLocale: 'fr' }])
+          : path === '/v1/requests/mine'
+            ? ok({ items: created ? [createdRequest] : [], nextCursor: null })
+            : path === '/v1/requests/{id}'
+              ? ok(createdRequest)
+              : path === '/v1/requests/{requestId}/quotes'
+                ? ok({ items: [], nextCursor: null })
+                : ok([luxembourg]),
+      )) as unknown as typeof api.GET);
+    renderRouter('./app', { initialUrl: '/requests' });
+
+    await screen.findByTestId('requests-empty');
+    fireEvent.press(screen.getByTestId('requests-new'));
+    await fillEverythingButLocation();
+    await pickCity();
+    fireEvent.press(screen.getByTestId('request-submit'));
+    await screen.findByTestId('request-detail');
+    act(() => {
+      router.back();
+    });
+
+    await screen.findByTestId('request-row-r1');
+    expect(screen.queryByTestId('requests-empty')).toBeNull();
   });
 });

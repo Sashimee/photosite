@@ -139,7 +139,7 @@ function NewRequestForm() {
     inFlight.current = true;
     setIsSubmitting(true);
     try {
-      const { error, response } = await api.POST('/v1/requests', {
+      const { data, error, response } = await api.POST('/v1/requests', {
         body: { ...parsed.data, address: payload.address },
       });
       if (error) {
@@ -154,7 +154,7 @@ function NewRequestForm() {
         setSubmitError(requestErrorMessage(scopedRequestTranslate(t), apiError));
         return;
       }
-      router.dismissTo('/requests');
+      router.replace({ pathname: '/requests/[id]', params: { id: data.id } });
     } catch {
       setSubmitError(t('mobile.requests.form.submitFailed'));
     } finally {
