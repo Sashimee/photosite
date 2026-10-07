@@ -481,6 +481,22 @@ describe('BookingRefundService.refundAsAdmin', () => {
     ).rejects.toThrow(/exceeds the unrefunded amount/);
   });
 
+  it('records the admin reason on the reversal audit row', async () => {
+    const { service, audits, release } = await setup();
+    await release();
+
+    await service.refundAsAdmin(
+      admin,
+      'booking-1',
+      { amountCents: 1000, reason: 'Photographer no-show' },
+      null,
+    );
+
+    expect(audits.find((audit) => audit.action === 'booking.refund_reversal')?.after).toMatchObject(
+      { reason: 'Photographer no-show', amountCents: 1000 },
+    );
+  });
+
   it('returns 409 before release', async () => {
     const { service, reverseTransfer } = await setup();
     await expect(

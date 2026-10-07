@@ -335,6 +335,7 @@ export class BookingRefundService {
               refundKey: plan.refundKey,
               reversalId: reversal.id,
               amountCents: reversal.amountCents,
+              reason: input.reason,
             },
             ip,
           });
