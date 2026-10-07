@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { formatMoney } from './money';
+import { formatMoney, wholeUnitsToCents } from './money';
 
 describe('formatMoney', () => {
   it('formats integer cents as currency in the given locale', () => {
@@ -18,5 +18,16 @@ describe('formatMoney', () => {
   it('returns null for null or undefined money', () => {
     expect(formatMoney(null, 'en')).toBeNull();
     expect(formatMoney(undefined, 'en')).toBeNull();
+  });
+});
+
+describe('wholeUnitsToCents', () => {
+  it('converts whole currency units to integer cents', () => {
+    expect(wholeUnitsToCents('150')).toBe(15000);
+    expect(wholeUnitsToCents(' 0 ')).toBe(0);
+  });
+
+  it.each(['', '  ', '1.5', '1,5', '-3', 'abc', '1e3'])('rejects %j as NaN', (text) => {
+    expect(wholeUnitsToCents(text)).toBeNaN();
   });
 });
