@@ -14,11 +14,17 @@ export function BookingActions({
   status,
   transferId,
   currency,
+  refundedCents,
+  refundableCents,
+  reversedCents,
 }: {
   bookingId: string;
   status: string;
   transferId: string | null;
   currency: string;
+  refundedCents: number;
+  refundableCents: number;
+  reversedCents: number;
 }) {
   const t = useTranslations('admin.finance');
   const router = useRouter();
@@ -51,6 +57,8 @@ export function BookingActions({
           <RefundDialog
             bookingId={bookingId}
             currency={currency}
+            refundedCents={refundedCents}
+            refundableCents={refundableCents}
             disabled={outcomeUnknown}
             onDone={() => {
               done('refunded');
@@ -62,6 +70,7 @@ export function BookingActions({
           <ReverseTransferDialog
             bookingId={bookingId}
             currency={currency}
+            reversedCents={reversedCents}
             disabled={outcomeUnknown}
             onDone={() => {
               done('reversed');

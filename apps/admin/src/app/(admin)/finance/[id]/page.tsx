@@ -147,6 +147,9 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           status={booking.status}
           transferId={booking.transferId}
           currency={currency}
+          refundedCents={booking.refundedCents}
+          refundableCents={booking.refundableCents}
+          reversedCents={booking.reversedCents}
         />
       </div>
     </section>

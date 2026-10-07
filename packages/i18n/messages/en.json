@@ -1058,6 +1058,7 @@
         "twoFactorNotice": "Submitting asks for your second factor again. Anything typed here is cleared when you come back.",
         "amountLabel": "Amount ({currency})",
         "amountHint": "The API checks the maximum. After release, a refund cannot exceed what is left on the photographer's transfer; the platform fee is not refunded.",
+        "amountMax": "Refundable right now according to the API: {amount}.",
         "reasonLabel": "Internal reason (audit log only, not shown to the client or photographer)",
         "submit": "Refund",
         "submitting": "Refunding...",
@@ -1099,7 +1100,8 @@
         "invalid": "That request wasn't valid.",
         "unknownOutcome": "The outcome is unknown: the request may or may not have gone through. Reload the page and check the refunded and reversed figures before trying again. Refund and reverse stay disabled until you reload.",
         "conflict": "This booking is no longer in a state that allows that. Reload and check.",
-        "tooManyRequests": "Too many admin changes in a short time. Wait a moment, then reload to check the ledger before retrying."
+        "tooManyRequests": "Too many admin changes in a short time. Wait a moment, then reload to check the ledger before retrying.",
+        "ledgerChanged": "The booking changed since you opened it. Reload the page and check the refunded and reversed figures. Nothing was sent to Stripe."
       },
       "filters": {
         "formLabel": "Filter bookings",

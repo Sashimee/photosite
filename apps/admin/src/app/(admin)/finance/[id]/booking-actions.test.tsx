@@ -16,7 +16,15 @@ vi.mock('@/lib/api', () => ({ api: { POST: postMock } }));
 async function renderActions(status: string, transferId: string | null = 'tr_1') {
   const { BookingActions } = await import('./booking-actions');
   render(
-    <BookingActions bookingId="booking-1" status={status} transferId={transferId} currency="EUR" />,
+    <BookingActions
+      bookingId="booking-1"
+      status={status}
+      transferId={transferId}
+      currency="EUR"
+      refundedCents={2500}
+      refundableCents={9500}
+      reversedCents={1000}
+    />,
   );
 }
 

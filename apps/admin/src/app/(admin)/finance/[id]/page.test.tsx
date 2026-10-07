@@ -95,6 +95,9 @@ describe('BookingPage', () => {
       status: 'released',
       transferId: null,
       currency: 'EUR',
+      refundedCents: 2500,
+      refundableCents: 1500,
+      reversedCents: 1000,
     });
   });
 

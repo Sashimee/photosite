@@ -21,6 +21,7 @@ async function openDialog(onDone = vi.fn(), onUnknownOutcome = vi.fn()) {
     <ReverseTransferDialog
       bookingId="booking-1"
       currency="EUR"
+      reversedCents={1000}
       disabled={false}
       onDone={onDone}
       onUnknownOutcome={onUnknownOutcome}
@@ -65,7 +66,7 @@ describe('ReverseTransferDialog', () => {
     await waitFor(() => {
       expect(postMock).toHaveBeenCalledExactlyOnceWith('/v1/admin/bookings/{id}/reverse-transfer', {
         params: { path: { id: 'booking-1' } },
-        body: { reason: 'Lost chargeback' },
+        body: { reason: 'Lost chargeback', expectedReversedCents: 1000 },
       });
     });
     await waitFor(() => {
@@ -140,6 +141,20 @@ describe('ReverseTransferDialog', () => {
 
     expect(await screen.findByText(/not made because of a conflict/)).toHaveTextContent(message);
     expect(screen.queryByText(/no longer in a state/)).not.toBeInTheDocument();
+  });
+
+  it('shows the reload message on LEDGER_CHANGED and does not retry', async () => {
+    postMock.mockResolvedValueOnce(failure('LEDGER_CHANGED', 409, 'ledger moved'));
+    const onUnknownOutcome = vi.fn();
+    const events = await openDialog(vi.fn(), onUnknownOutcome);
+
+    await events.type(screen.getByLabelText(/^Internal reason/), 'x');
+    await events.click(screen.getByRole('button', { name: 'Reverse transfer' }));
+
+    expect(await screen.findByText(/changed since you opened it/)).toBeInTheDocument();
+    expect(screen.queryByText(/not made because of a conflict/)).not.toBeInTheDocument();
+    expect(postMock).toHaveBeenCalledTimes(1);
+    expect(onUnknownOutcome).not.toHaveBeenCalled();
   });
 
   it.each([

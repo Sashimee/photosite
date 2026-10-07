@@ -11,6 +11,9 @@ export function financeErrorMessage(
   if (error?.code === 'TOO_MANY_REQUESTS') {
     return tFinance('errors.tooManyRequests');
   }
+  if (error?.code === 'LEDGER_CHANGED') {
+    return tFinance('errors.ledgerChanged');
+  }
   if (error?.code === 'CONFLICT') {
     return tAction('errors.conflict', { detail: error.message ?? '' });
   }

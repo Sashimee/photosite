@@ -26,6 +26,8 @@ async function openDialog(
     <RefundDialog
       bookingId="booking-1"
       currency={currency}
+      refundedCents={2500}
+      refundableCents={9500}
       disabled={disabled}
       onDone={onDone}
       onUnknownOutcome={onUnknownOutcome}
@@ -83,7 +85,7 @@ describe('RefundDialog', () => {
     await waitFor(() => {
       expect(postMock).toHaveBeenCalledExactlyOnceWith('/v1/admin/bookings/{id}/refund', {
         params: { path: { id: 'booking-1' } },
-        body: { amountCents: 1234, reason: 'Photographer no-show' },
+        body: { amountCents: 1234, reason: 'Photographer no-show', expectedRefundedCents: 2500 },
       });
     });
     await waitFor(() => {
@@ -104,7 +106,9 @@ describe('RefundDialog', () => {
     await waitFor(() => {
       expect(postMock).toHaveBeenCalledWith(
         '/v1/admin/bookings/{id}/refund',
-        expect.objectContaining({ body: { amountCents: 30, reason: 'x' } }),
+        expect.objectContaining({
+          body: { amountCents: 30, reason: 'x', expectedRefundedCents: 2500 },
+        }),
       );
     });
   });
@@ -122,7 +126,9 @@ describe('RefundDialog', () => {
     await waitFor(() => {
       expect(postMock).toHaveBeenCalledWith(
         '/v1/admin/bookings/{id}/refund',
-        expect.objectContaining({ body: { amountCents: 500, reason: 'x' } }),
+        expect.objectContaining({
+          body: { amountCents: 500, reason: 'x', expectedRefundedCents: 2500 },
+        }),
       );
     });
   });
@@ -200,6 +206,29 @@ describe('RefundDialog', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  it('shows the reload message on LEDGER_CHANGED and does not retry', async () => {
+    postMock.mockResolvedValueOnce(failure('LEDGER_CHANGED', 409, 'ledger moved'));
+    const onUnknownOutcome = vi.fn();
+    const events = await openDialog(vi.fn(), 'EUR', onUnknownOutcome);
+
+    await fill(events, '5', 'reason');
+    await events.click(screen.getByRole('button', { name: 'Refund' }));
+
+    expect(await screen.findByText(/changed since you opened it/)).toBeInTheDocument();
+    expect(screen.queryByText(/not made because of a conflict/)).not.toBeInTheDocument();
+    expect(postMock).toHaveBeenCalledTimes(1);
+    expect(onUnknownOutcome).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('shows the refundable amount from the API as a hint', async () => {
+    await openDialog();
+
+    expect(
+      screen.getByText(/Refundable right now according to the API: €95.00/),
+    ).toBeInTheDocument();
+  });
+
   it('closes the dialog and reports an unknown outcome when the request throws', async () => {
     postMock.mockRejectedValueOnce(new TypeError('network'));
     const onDone = vi.fn();
@@ -252,6 +281,8 @@ describe('RefundDialog', () => {
       <RefundDialog
         bookingId="booking-1"
         currency="EUR"
+        refundedCents={0}
+        refundableCents={0}
         disabled
         onDone={vi.fn()}
         onUnknownOutcome={vi.fn()}
@@ -361,7 +392,9 @@ describe('RefundDialog', () => {
     await waitFor(() => {
       expect(postMock).toHaveBeenCalledWith(
         '/v1/admin/bookings/{id}/refund',
-        expect.objectContaining({ body: { amountCents: 9001, reason: 'over the hint' } }),
+        expect.objectContaining({
+          body: { amountCents: 9001, reason: 'over the hint', expectedRefundedCents: 2500 },
+        }),
       );
     });
   });
@@ -379,7 +412,9 @@ describe('RefundDialog', () => {
     await waitFor(() => {
       expect(postMock).toHaveBeenCalledWith(
         '/v1/admin/bookings/{id}/refund',
-        expect.objectContaining({ body: { amountCents: 1234, reason: 'x' } }),
+        expect.objectContaining({
+          body: { amountCents: 1234, reason: 'x', expectedRefundedCents: 2500 },
+        }),
       );
     });
   });
