@@ -1391,7 +1391,13 @@
     },
     "requests": {
       "list": {
-        "newRequest": "New request"
+        "newRequest": "New request",
+        "title": "My requests",
+        "empty": "You haven't sent any requests yet.",
+        "quoteCount": "{count, plural, =0 {No quotes yet} one {# quote} other {# quotes}}",
+        "quotesReceived": "Quotes received",
+        "loadFailed": "We couldn't load your requests.",
+        "retry": "Try again"
       },
       "new": {
         "title": "Tell photographers what you need",
@@ -1439,6 +1445,36 @@
         "notFound": "This request could not be found.",
         "tooManyRequests": "You're doing that too fast. Slow down and try again.",
         "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      },
+      "status": {
+        "open": "Open",
+        "quoted": "Quoted",
+        "booked": "Booked",
+        "closed": "Closed",
+        "cancelled": "Cancelled"
+      },
+      "detail": {
+        "title": "Request",
+        "eventDateLabel": "Event date",
+        "budgetLabel": "Budget",
+        "budgetRange": "{min} to {max}",
+        "usageLabel": "Usage",
+        "addressLabel": "Address",
+        "quotesHeading": "Quotes",
+        "noQuotes": "No quotes yet. Matching photographers can send one any time.",
+        "quotesFailed": "We couldn't load the quotes for this request.",
+        "retry": "Try again",
+        "loadFailed": "We couldn't load this request.",
+        "back": "Back",
+        "cancelCta": "Cancel request",
+        "cancelConfirmTitle": "Cancel this request?",
+        "cancelConfirmDescription": "Photographers won't be able to send new quotes once it's cancelled.",
+        "cancelConfirmCta": "Yes, cancel request",
+        "cancelPending": "Cancelling…",
+        "cancelDismissCta": "Keep request",
+        "cancelledNotice": "This request has been cancelled.",
+        "cancelFailed": "The request was not cancelled. Check your connection and try again.",
+        "notFound": "This request doesn't exist, or it isn't yours."
       }
     },
     "auth": {
@@ -1528,6 +1564,65 @@
         "submit": "Reset password",
         "success": "Password updated. You can now sign in.",
         "signInLink": "Sign in"
+      }
+    },
+    "quotes": {
+      "list": {
+        "title": "Quotes",
+        "intro": "Quotes photographers have sent you.",
+        "empty": "You haven't received any quotes yet.",
+        "loadFailed": "We couldn't load your quotes.",
+        "retry": "Try again"
+      },
+      "card": {
+        "validUntil": "Valid until {date}"
+      },
+      "status": {
+        "draft": "Draft",
+        "sent": "Sent",
+        "accepted": "Accepted",
+        "declined": "Declined",
+        "expired": "Expired",
+        "withdrawn": "Withdrawn"
+      },
+      "detail": {
+        "title": "Quote",
+        "validUntilLabel": "Valid until",
+        "lineItemsHeading": "What's included",
+        "lineItem": "{qty} × {unit}",
+        "totalLabel": "Total",
+        "messageHeading": "Message from the photographer",
+        "photographerRating": "{ratingAvg} ({ratingCount, plural, one {# review} other {# reviews}})",
+        "loadFailed": "We couldn't load this quote.",
+        "retry": "Try again",
+        "back": "Back",
+        "notFound": "This quote doesn't exist, or it isn't yours.",
+        "acceptCta": "Accept quote",
+        "declineCta": "Decline quote",
+        "acceptConfirmTitle": "Accept this quote?",
+        "acceptConfirmDescription": "Accepting records your choice. Payment is a separate step and nothing is charged now.",
+        "acceptConfirmCta": "Yes, accept quote",
+        "acceptPending": "Accepting…",
+        "acceptDismissCta": "Not yet",
+        "declineConfirmTitle": "Decline this quote?",
+        "declineConfirmDescription": "The photographer will be notified that you declined.",
+        "declineConfirmCta": "Yes, decline quote",
+        "declinePending": "Declining…",
+        "declineDismissCta": "Keep quote",
+        "acceptedNotice": "Quote accepted. Payment will be available soon. Nothing has been charged.",
+        "declinedNotice": "Quote declined.",
+        "withdrawnNotice": "This quote was withdrawn by the photographer.",
+        "expiredNotice": "This quote has expired."
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "conflict": "This quote is no longer available.",
+        "invalid": "This quote can't be changed right now.",
+        "forbidden": "You don't have access to this quote.",
+        "notFound": "This quote could not be found.",
+        "actionFailed": "That didn't go through and the quote is unchanged. Check your connection and try again.",
+        "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
       }
     }
   },
