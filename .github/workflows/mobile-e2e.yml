@@ -1,0 +1,255 @@
+name: Mobile E2E
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - apps/mobile/**
+      - packages/**
+      - .github/workflows/mobile-e2e.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  maestro:
+    runs-on: ubuntu-latest
+    # Non-blocking during burn-in, same as ci.yml's `e2e` job
+    # (docs/steps/1C.10-mobile-e2e.md). It is not a required check.
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DATABASE_URL: postgresql://photoo:photoo_dev_password@127.0.0.1:5432/photoo_test
+      SHADOW_DATABASE_URL: postgresql://photoo:photoo_dev_password@127.0.0.1:5432/photoo_shadow
+      REDIS_URL: redis://127.0.0.1:6379
+      SEED_USER_PASSWORD: correct-horse-battery-staple
+      VERIFICATION_ENCRYPTION_KEY: 9DsORuh9HI1DUnXKM0DKVcgw36Y9NfbLBSlfPmQxwYs=
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_REGION: eu-west-1
+      S3_ACCESS_KEY_ID: photoo_dev
+      S3_SECRET_ACCESS_KEY: photoo_dev_password
+      S3_FORCE_PATH_STYLE: 'true'
+      S3_PRIVATE_BUCKET: photoo-private
+      S3_PUBLIC_BUCKET: photoo-public
+      S3_PUBLIC_BASE_URL: http://127.0.0.1:9000/photoo-public
+      PORT: 4000
+      PUBLIC_API_URL: http://127.0.0.1:4000
+      WEB_ORIGINS: http://127.0.0.1:3000
+      WEB_APP_URL: http://127.0.0.1:3000
+      NODE_ENV: development
+      TRUSTED_PROXIES: ''
+      AUTH_SECRET: dev-only-auth-secret-change-me-please-32-chars-min
+      AUTH_ENCRYPTION_KEY: qA5jxlkWykGDbMKLOSqgSGG+lbzsuDkUWUS8nV9twig=
+      STRIPE_FAKE: 'true'
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: '1025'
+      SMTP_SECURE: 'false'
+      SMTP_FROM: dev@photoo.test
+    services:
+      postgres:
+        image: postgis/postgis:16-3.5
+        env:
+          POSTGRES_USER: photoo
+          POSTGRES_PASSWORD: photoo_dev_password
+          POSTGRES_DB: photoo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U photoo -d photoo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      mailpit:
+        image: axllent/mailpit:v1.31.1
+        ports:
+          - 1025:1025
+          - 8025:8025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: pnpm install --frozen-lockfile
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Start MinIO, create buckets and allow anonymous reads of photoo-public
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=photoo_dev \
+            -e MINIO_ROOT_PASSWORD=photoo_dev_password \
+            ghcr.io/sashimee/minio:RELEASE.2025-09-07T16-13-09Z@sha256:321a615934fc2e251df8155f378a99b4b89caec2e3488a99ccd97d1f9b6135be server /data
+          timeout 60 bash -c 'until curl -sf http://127.0.0.1:9000/minio/health/ready; do sleep 1; done'
+          cat > /tmp/photoo-public-anonymous-policy.json <<'EOF'
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {"AWS": ["*"]},
+                "Action": ["s3:GetObject"],
+                "Resource": ["arn:aws:s3:::photoo-public/*"]
+              }
+            ]
+          }
+          EOF
+          docker run --rm --network host \
+            --entrypoint sh \
+            -e MC_HOST_local=http://photoo_dev:photoo_dev_password@127.0.0.1:9000 \
+            -v /tmp/photoo-public-anonymous-policy.json:/tmp/photoo-public-anonymous-policy.json \
+            ghcr.io/sashimee/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a0b9f1a75dc9ca1e96db9055a391bbf72ffbf7e9e5d3329e506fdcf4149cdbd3 \
+            -c "mc mb --ignore-existing local/photoo-private local/photoo-public && mc anonymous set none local/photoo-private && mc anonymous set-json /tmp/photoo-public-anonymous-policy.json local/photoo-public"
+      - name: Start ClamAV in the background
+        run: |
+          docker run -d --name clamav -p 3310:3310 clamav/clamav:1.5.4-debian13-slim
+      - name: Create the test database
+        env:
+          PGPASSWORD: photoo_dev_password
+        run: |
+          psql -h 127.0.0.1 -U photoo -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE photoo_test;'
+          psql -h 127.0.0.1 -U photoo -d photoo_test -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS postgis;'
+      - name: Build the workspace packages the seed and the app bundle import
+        run: pnpm turbo run build --filter='@photoo/db^...' --filter='@photoo/mobile^...'
+      - name: Apply Prisma migrations and seed the test database
+        run: pnpm --filter @photoo/db run migrate:deploy && pnpm --filter @photoo/db run seed
+      - name: Build the api and worker
+        run: pnpm exec turbo run build --filter=@photoo/api... --filter=@photoo/worker...
+      - name: Start api and worker, wait until both answer
+        run: |
+          pnpm --filter @photoo/api start &
+          pnpm --filter @photoo/worker start &
+
+          wait_for() {
+            local url="$1" deadline=$((SECONDS + 60)) body status
+            body="$(mktemp)"
+            while true; do
+              status="$(curl -sS --max-time 5 -o "$body" -w '%{http_code}' "$url" 2>"$body.err")" \
+                && [ "$status" = 200 ] && { rm -f "$body" "$body.err"; return 0; }
+              if [ "$SECONDS" -ge "$deadline" ]; then
+                echo "::error::$url did not answer with HTTP 200 within 60s (last status: ${status:-none, see curl error below})"
+                echo '--- curl stderr ---'; cat "$body.err"
+                echo '--- response body ---'; cat "$body"
+                rm -f "$body" "$body.err"
+                return 1
+              fi
+              sleep 1
+            done
+          }
+
+          wait_for_clamd() {
+            local deadline=$((SECONDS + 180)) output
+            while true; do
+              output="$(docker exec clamav clamdcheck.sh 2>&1)" && return 0
+              if [ "$SECONDS" -ge "$deadline" ]; then
+                echo "::error::clamd did not become ready within 180s (clamdcheck.sh: ${output})"
+                echo '--- clamav container logs ---'; docker logs clamav
+                return 1
+              fi
+              sleep 2
+            done
+          }
+
+          wait_for_clamd
+          wait_for http://127.0.0.1:4000/health
+          wait_for http://127.0.0.1:4100/ready
+      - name: Check the api is reachable on every interface, as the emulator's 10.0.2.2 needs
+        run: |
+          host_ip="$(hostname -I | awk '{print $1}')"
+          curl -sSf --max-time 5 "http://${host_ip}:4000/health"
+      - name: Cache Gradle
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'apps/mobile/package.json', 'apps/mobile/app.config.ts') }}
+          restore-keys: gradle-${{ runner.os }}-
+      - name: Prebuild the Android project with cleartext HTTP allowed
+        working-directory: apps/mobile
+        env:
+          E2E_BUILD: '1'
+          EXPO_PUBLIC_API_URL: http://10.0.2.2:4000
+        run: npx expo prebuild --platform android --clean
+      - name: Assemble the release APK, signed with the template's debug keystore
+        working-directory: apps/mobile/android
+        env:
+          NODE_ENV: production
+          EXPO_PUBLIC_API_URL: http://10.0.2.2:4000
+          SENTRY_DISABLE_AUTO_UPLOAD: 'true'
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
+      - name: Install the Maestro CLI
+        env:
+          MAESTRO_VERSION: 2.11.0
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Cache the AVD
+        id: avd-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api34-x86_64-${{ runner.os }}
+      - name: Create the AVD and its snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: false
+          script: echo "AVD snapshot generated"
+      - name: Run the Maestro flows on the emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            adb install -r apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+            maestro test apps/mobile/e2e
+      - name: Upload the Maestro reports and screenshots
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: maestro-tests
+          path: ~/.maestro/tests
+          retention-days: 7

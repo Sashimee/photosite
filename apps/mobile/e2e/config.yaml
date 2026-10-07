@@ -1,0 +1,6 @@
+flows:
+  - flows/*
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - Launch and answer the consent prompt

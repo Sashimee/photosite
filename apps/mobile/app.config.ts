@@ -2,6 +2,7 @@ import type { ExpoConfig } from 'expo/config';
 
 const easProjectId = process.env.EAS_PROJECT_ID;
 const stripeMerchantIdentifier = process.env.EXPO_PUBLIC_STRIPE_MERCHANT_IDENTIFIER;
+const e2eBuild = process.env.E2E_BUILD === '1';
 
 function collectedData(type: string, { linked = true }: { linked?: boolean } = {}) {
   return {
@@ -113,6 +114,7 @@ const config: ExpoConfig = {
       },
     ],
     '@sentry/react-native',
+    ...(e2eBuild ? ['./plugins/with-cleartext-traffic'] : []),
   ],
   experiments: {
     typedRoutes: true,
