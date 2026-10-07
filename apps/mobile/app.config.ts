@@ -37,6 +37,7 @@ const config: ExpoConfig = {
     'expo-localization',
     'expo-status-bar',
     'expo-image',
+    'expo-web-browser',
     [
       'expo-splash-screen',
       {

@@ -1372,7 +1372,9 @@
         "requestsTitle": "Incoming requests",
         "requestsDescription": "Client requests that match you, and the quotes you can send.",
         "quotesTitle": "Your quotes",
-        "quotesDescription": "Quotes you've sent, their status and payout."
+        "quotesDescription": "Quotes you've sent, their status and payout.",
+        "payoutsTitle": "Payouts",
+        "payoutsDescription": "Connect your bank account with Stripe to get paid."
       },
       "profile": {
         "title": "Your profile",
@@ -1722,6 +1724,38 @@
           "invalid": "This quote can't be changed right now.",
           "forbidden": "You don't have access to this quote.",
           "notFound": "This quote could not be found.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "payouts": {
+        "title": "Payouts",
+        "intro": "Payouts go through Stripe. Photoo never sees your bank details.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Payouts are connected to your photographer profile, so set that up first.",
+        "needsProfileCta": "Create your profile",
+        "status": {
+          "notStarted": "Not started",
+          "incomplete": "In review",
+          "enabled": "Payouts enabled"
+        },
+        "description": {
+          "notStarted": "Connect a bank account with Stripe so you can get paid for bookings.",
+          "incomplete": "Stripe is reviewing your details. This can take a little while. If Stripe asks for more information, continue setup.",
+          "enabled": "Payouts are enabled. Your earnings go to your bank account."
+        },
+        "setupCta": "Set up payouts",
+        "continueCta": "Continue setup",
+        "pending": "Opening Stripe…",
+        "returnedNotice": "You're back from Stripe. Verification can take a moment. Refresh to see the latest status.",
+        "refreshCta": "Refresh status",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "Payouts setup is not available right now. Try again later.",
+          "invalid": "Check your details and try again.",
+          "forbidden": "You don't have access to payouts.",
+          "notFound": "Your photographer profile could not be found.",
+          "emailNotVerified": "Verify your email address before setting up payouts.",
           "tooManyRequests": "You're doing that too fast. Slow down and try again.",
           "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
         }
