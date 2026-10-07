@@ -1,0 +1,153 @@
+appId: lu.photoo.app
+name: Request a photographer, receive a quote and accept it
+---
+- runScript:
+    file: ../scripts/create-user.js
+- runScript:
+    file: ../scripts/mailpit-token.js
+    env:
+      EMAIL: ${output.email}
+      VERIFY: 'true'
+- runFlow: ../subflows/fresh-start.yaml
+- runFlow: ../subflows/open-sign-in.yaml
+- tapOn:
+    id: sign-in-email
+- inputText: ${output.email}
+- tapOn:
+    id: sign-in-password
+- inputText: ${output.password}
+- hideKeyboard
+- tapOn:
+    id: sign-in-submit
+- extendedWaitUntil:
+    visible:
+      id: account-email
+    timeout: 20000
+
+- openLink: photoo:///photographers/sofia-martins
+- scrollUntilVisible:
+    element:
+      id: profile-request-quote
+    timeout: 30000
+- tapOn:
+    id: profile-request-quote
+- extendedWaitUntil:
+    visible:
+      id: new-request-photographer-notice
+    timeout: 10000
+
+- tapOn:
+    id: request-title
+- inputText: E2E wedding coverage
+- tapOn:
+    id: request-category-wedding
+- tapOn:
+    id: request-description
+- inputText: Full day wedding coverage requested by the Maestro e2e flow.
+- hideKeyboard
+
+- scrollUntilVisible:
+    element:
+      id: request-event-date-open
+- tapOn:
+    id: request-event-date-open
+- tapOn: Next month
+- tapOn: 15( .*)?
+- tapOn:
+    id: android:id/button1
+- tapOn:
+    id: android:id/button1
+
+- scrollUntilVisible:
+    element:
+      id: city-autocomplete-input
+- tapOn:
+    id: city-autocomplete-input
+- inputText: Luxembourg
+- extendedWaitUntil:
+    visible:
+      id: city-suggestion-luxembourg-city
+    timeout: 15000
+- tapOn:
+    id: city-suggestion-luxembourg-city
+- assertVisible:
+    id: request-location-set
+- hideKeyboard
+
+- scrollUntilVisible:
+    element:
+      id: request-address-line1
+- tapOn:
+    id: request-address-line1
+- inputText: 1 Place Guillaume II
+- tapOn:
+    id: request-address-postal-code
+- inputText: L-1648
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: request-budget-min
+- tapOn:
+    id: request-budget-min
+- inputText: '1000'
+- tapOn:
+    id: request-budget-max
+- inputText: '3000'
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: request-usage-personal
+- tapOn:
+    id: request-usage-personal
+- scrollUntilVisible:
+    element:
+      id: request-submit
+- tapOn:
+    id: request-submit
+- extendedWaitUntil:
+    visible:
+      id: request-detail
+    timeout: 30000
+- assertVisible:
+    id: request-quotes-empty
+- assertNotVisible:
+    id: new-request-error
+
+- runScript:
+    file: ../scripts/send-quote.js
+    env:
+      CLIENT_EMAIL: ${output.email}
+      CLIENT_PASSWORD: ${output.password}
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD}
+
+- openLink: photoo:///quotes/${output.quoteId}
+- extendedWaitUntil:
+    visible:
+      id: quote-detail
+    timeout: 20000
+- assertVisible:
+    id: quote-line-items
+- scrollUntilVisible:
+    element:
+      id: quote-accept
+- tapOn:
+    id: quote-accept
+- extendedWaitUntil:
+    visible:
+      id: quote-accept-confirm
+    timeout: 10000
+- tapOn:
+    id: quote-accept-confirm
+- extendedWaitUntil:
+    visible:
+      id: booking-detail
+    timeout: 30000
+- assertVisible:
+    id: booking-timeline-step-pending_payment
+    selected: true
+- assertVisible:
+    id: booking-pay-panel
+- assertNotVisible:
+    id: booking-detail-error
+- assertNotVisible:
+    id: booking-detail-not-found
