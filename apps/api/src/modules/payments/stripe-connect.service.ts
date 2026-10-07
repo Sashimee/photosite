@@ -6,6 +6,7 @@ import { Logger } from 'nestjs-pino';
 import type { z } from 'zod';
 import { requireRole } from '../../common/auth/require-role.js';
 import { requireVerifiedEmail } from '../../common/auth/require-verified-email.js';
+import { publishIfEligible } from '../../common/publish/publish-if-eligible.js';
 import { PublishPolicy } from '../../common/publish/publish-policy.js';
 import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -249,6 +250,8 @@ export class StripeConnectService {
         data: { isPublished: false },
       });
     }
+    const published = payoutsEnabled && (await publishIfEligible(tx, profile.id));
+    const isPublished = published || (updated.isPublished && !unpublished);
     await tx.auditLog.create({
       data: {
         actorType: 'system',
@@ -266,7 +269,7 @@ export class StripeConnectService {
           stripeAccountId: account.id,
           stripeOnboardingComplete: onboardingComplete,
           stripePayoutsEnabled: payoutsEnabled,
-          isPublished: unpublished ? false : updated.isPublished,
+          isPublished,
         },
         ip: null,
       },
@@ -283,6 +286,7 @@ export class StripeConnectService {
           stripeAccountId: account.id,
           onboardingComplete,
           payoutsEnabled,
+          published,
           unpublished,
           notificationId,
         },

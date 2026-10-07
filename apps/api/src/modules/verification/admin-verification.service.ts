@@ -7,6 +7,7 @@ import type {
 } from '@photoo/shared';
 import type { z } from 'zod';
 import { AuditLogService } from '../../common/audit/audit-log.service.js';
+import { publishIfEligible } from '../../common/publish/publish-if-eligible.js';
 import { PublishPolicy } from '../../common/publish/publish-policy.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { StorageService } from '../../storage/storage.service.js';
@@ -182,10 +183,11 @@ export class AdminVerificationService {
           throw conflict('Verification case is not in review');
         }
 
-        await tx.photographerProfile.update({
+        const profile = await tx.photographerProfile.update({
           where: { userId: existing.userId },
           data: { verificationStatus: 'verified' },
         });
+        const isPublished = await publishIfEligible(tx, profile.id);
 
         await tx.auditLog.create({
           data: {
@@ -194,8 +196,8 @@ export class AdminVerificationService {
             action: 'verification_case.approved',
             targetType: 'VerificationCase',
             targetId: id,
-            before: { status: 'in_review' },
-            after: { status: 'approved' },
+            before: { status: 'in_review', isPublished: profile.isPublished },
+            after: { status: 'approved', isPublished: profile.isPublished || isPublished },
             ip: ip ?? null,
           },
         });
