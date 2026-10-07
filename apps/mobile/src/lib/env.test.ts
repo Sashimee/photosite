@@ -7,7 +7,7 @@ function loadWith(values: Record<string, string>) {
   const base = Object.fromEntries(
     Object.entries(originalEnv).filter(([key]) => !key.startsWith('EXPO_PUBLIC_STRIPE')),
   );
-  process.env = { ...base, ...values };
+  process.env = { ...base, ...values } as NodeJS.ProcessEnv;
   return jest.requireActual<typeof import('./env')>('./env').env;
 }
 
