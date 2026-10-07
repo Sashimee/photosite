@@ -21,7 +21,7 @@ export function QuoteActions({
   onChanged,
 }: {
   quote: Quote;
-  onChanged: (quote: Quote, action: Action) => void;
+  onChanged: (quote: Quote, action: Action, bookingId: string | null) => void;
 }) {
   const { t } = useTranslation();
   const inFlight = useRef(false);
@@ -49,7 +49,7 @@ export function QuoteActions({
         params: { path: { id: quote.id } },
       });
       if (data) {
-        onChanged(data, action);
+        onChanged(data, action, 'bookingId' in data ? data.bookingId : null);
       } else {
         setError(
           requestErrorMessage(

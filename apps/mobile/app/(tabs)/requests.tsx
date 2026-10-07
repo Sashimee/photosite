@@ -91,6 +91,18 @@ function RequestsList() {
             {t('mobile.requests.list.quotesReceived')}
           </Text>
         </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            router.push('/bookings');
+          }}
+          testID="requests-bookings"
+          className="min-h-11 items-center justify-center"
+        >
+          <Text className="text-sm font-medium text-foreground underline">
+            {t('mobile.requests.list.bookings')}
+          </Text>
+        </Pressable>
       </View>
       {list.isLoading ? (
         <ActivityIndicator testID="requests-loading" />
