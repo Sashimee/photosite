@@ -15,5 +15,7 @@ name: Launch and answer the consent prompt
     timeout: 10000
 - extendedWaitUntil:
     visible:
-      id: discover-results
-    timeout: 60000
+      id: photographer-row-.*
+    timeout: 90000
+- assertNotVisible:
+    id: discover-error
