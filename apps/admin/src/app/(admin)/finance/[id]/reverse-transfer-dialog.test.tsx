@@ -143,6 +143,31 @@ describe('ReverseTransferDialog', () => {
     expect(screen.queryByText(/no longer in a state/)).not.toBeInTheDocument();
   });
 
+  it('shows a distinct message when the money lock is held', async () => {
+    postMock.mockResolvedValueOnce(failure('BOOKING_BUSY'));
+    const events = await openDialog();
+
+    await events.type(screen.getByLabelText(/^Internal reason/), 'reason');
+    await events.click(screen.getByRole('button', { name: 'Reverse transfer' }));
+
+    expect(await screen.findByText(/still running/)).toBeInTheDocument();
+    expect(postMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the booking state when it does not allow a reversal', async () => {
+    postMock.mockResolvedValueOnce({
+      error: { code: 'BOOKING_STATE', details: { status: 'paid_held' } },
+      response: { ok: false, status: 409 },
+    });
+    const events = await openDialog();
+
+    await events.type(screen.getByLabelText(/^Internal reason/), 'reason');
+    await events.click(screen.getByRole('button', { name: 'Reverse transfer' }));
+
+    expect(await screen.findByText(/This booking is "Paid, held"/)).toBeInTheDocument();
+    expect(postMock).toHaveBeenCalledTimes(1);
+  });
+
   it('shows the reload message on LEDGER_CHANGED and does not retry', async () => {
     postMock.mockResolvedValueOnce(failure('LEDGER_CHANGED', 409, 'ledger moved'));
     const onUnknownOutcome = vi.fn();

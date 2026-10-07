@@ -342,41 +342,77 @@ const BookingStatusFilterSchema = z
 // Created dates are UTC calendar days and the range is half-open
 // `[createdFrom, createdTo)`; both bounds come together so every filtered
 // query has a bounded span.
-export const AdminBookingsQuerySchema = CursorPaginationQuerySchema.extend({
+const AdminBookingsFilterShape = {
   status: BookingStatusFilterSchema.optional(),
   createdFrom: z.iso.date().optional(),
   createdTo: z.iso.date().optional(),
   dispute: z.enum(ADMIN_BOOKING_DISPUTE_FILTERS).optional(),
-})
+};
+
+function refineCreatedRange(
+  query: { createdFrom?: string | undefined; createdTo?: string | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  const { createdFrom, createdTo } = query;
+  if (createdFrom === undefined && createdTo === undefined) {
+    return;
+  }
+  if (createdFrom === undefined || createdTo === undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      path: [createdFrom === undefined ? 'createdFrom' : 'createdTo'],
+      message: 'createdFrom and createdTo must be given together',
+    });
+    return;
+  }
+  const spanMs = Date.parse(createdTo) - Date.parse(createdFrom);
+  if (spanMs <= 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['createdTo'],
+      message: 'createdTo must be after createdFrom',
+    });
+  } else if (spanMs > ADMIN_BOOKINGS_MAX_CREATED_SPAN_DAYS * DAY_MS) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['createdTo'],
+      message: `the created range must span at most ${String(ADMIN_BOOKINGS_MAX_CREATED_SPAN_DAYS)} days`,
+    });
+  }
+}
+
+export const AdminBookingsQuerySchema = CursorPaginationQuerySchema.extend(AdminBookingsFilterShape)
   .strict()
-  .superRefine((query, ctx) => {
-    const { createdFrom, createdTo } = query;
-    if (createdFrom === undefined && createdTo === undefined) {
-      return;
-    }
-    if (createdFrom === undefined || createdTo === undefined) {
-      ctx.addIssue({
-        code: 'custom',
-        path: [createdFrom === undefined ? 'createdFrom' : 'createdTo'],
-        message: 'createdFrom and createdTo must be given together',
-      });
-      return;
-    }
-    const spanMs = Date.parse(createdTo) - Date.parse(createdFrom);
-    if (spanMs <= 0) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['createdTo'],
-        message: 'createdTo must be after createdFrom',
-      });
-    } else if (spanMs > ADMIN_BOOKINGS_MAX_CREATED_SPAN_DAYS * DAY_MS) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['createdTo'],
-        message: `the created range must span at most ${String(ADMIN_BOOKINGS_MAX_CREATED_SPAN_DAYS)} days`,
-      });
-    }
-  });
+  .superRefine(refineCreatedRange);
+
+// The list's filters without paging: the export streams every matching row
+// up to `ADMIN_BOOKINGS_EXPORT_ROW_CAP`.
+export const AdminBookingsExportQuerySchema = z
+  .object(AdminBookingsFilterShape)
+  .strict()
+  .superRefine(refineCreatedRange);
+
+export const ADMIN_BOOKINGS_EXPORT_ROW_CAP = 50_000;
+
+// Ends a capped export so a cut file is never mistaken for a complete one.
+export const ADMIN_BOOKINGS_EXPORT_TRUNCATED_LINE = '#truncated';
+
+export const ADMIN_BOOKINGS_EXPORT_COLUMNS = [
+  'id',
+  'status',
+  'currency',
+  'total',
+  'refunded',
+  'reversed',
+  'disputeStatus',
+  'createdAt',
+  'releasedAt',
+  'deliveredAt',
+  'cancelledAt',
+  'paymentIntentId',
+  'chargeId',
+  'transferId',
+] as const;
 
 // `refundedCents` and `reversedCents` are ledger sums (always >= 0), in the
 // booking's currency; `disputeStatus` is the latest Dispute's status, null
@@ -470,6 +506,71 @@ export const ReverseBookingTransferRequestSchema = z
     expectedReversedCents: z.int().nonnegative().optional(),
   })
   .strict();
+
+// The 409 codes the admin refund and reverse-transfer endpoints answer with,
+// each a distinct case the admin app handles differently.
+export const BOOKING_BUSY_ERROR_CODE = 'BOOKING_BUSY';
+export const BOOKING_STATE_ERROR_CODE = 'BOOKING_STATE';
+export const PENDING_REVERSAL_MISMATCH_ERROR_CODE = 'PENDING_REVERSAL_MISMATCH';
+export const LEDGER_CHANGED_ERROR_CODE = 'LEDGER_CHANGED';
+
+export const BookingStateErrorDetailsSchema = z
+  .object({ status: BookingStatusSchema })
+  .strict()
+  .openapi('BookingStateErrorDetails');
+
+// `pendingCents` is the amount an earlier attempt already reversed from the
+// transfer; retrying the refund with exactly that amount completes it.
+export const PendingReversalMismatchErrorDetailsSchema = z
+  .object({ pendingCents: z.int().positive() })
+  .strict()
+  .openapi('PendingReversalMismatchErrorDetails');
+
+function conflictErrorSchema<TCode extends string, TDetails extends z.ZodType | undefined>(
+  code: TCode,
+  details: TDetails,
+) {
+  return z
+    .object({
+      code: z.literal(code),
+      message: z.string(),
+      ...(details === undefined ? {} : { details }),
+      requestId: IdSchema,
+    })
+    .strict();
+}
+
+const LedgerChangedErrorSchema = conflictErrorSchema(LEDGER_CHANGED_ERROR_CODE, undefined).openapi(
+  'LedgerChangedError',
+);
+const BookingBusyErrorSchema = conflictErrorSchema(BOOKING_BUSY_ERROR_CODE, undefined).openapi(
+  'BookingBusyError',
+);
+const BookingStateErrorSchema = conflictErrorSchema(
+  BOOKING_STATE_ERROR_CODE,
+  BookingStateErrorDetailsSchema,
+).openapi('BookingStateError');
+const PendingReversalMismatchErrorSchema = conflictErrorSchema(
+  PENDING_REVERSAL_MISMATCH_ERROR_CODE,
+  PendingReversalMismatchErrorDetailsSchema,
+).openapi('PendingReversalMismatchError');
+
+export const AdminRefundConflictErrorSchema = z
+  .discriminatedUnion('code', [
+    LedgerChangedErrorSchema,
+    BookingBusyErrorSchema,
+    BookingStateErrorSchema,
+    PendingReversalMismatchErrorSchema,
+  ])
+  .openapi('AdminRefundConflictError');
+
+export const AdminReverseTransferConflictErrorSchema = z
+  .discriminatedUnion('code', [
+    LedgerChangedErrorSchema,
+    BookingBusyErrorSchema,
+    BookingStateErrorSchema,
+  ])
+  .openapi('AdminReverseTransferConflictError');
 
 // A free-text key/value editor on a table the API reads by key invites a
 // flag nothing reads, or a typo turning a live one off, so the known flags
@@ -1085,6 +1186,40 @@ registry.registerPath({
 
 registry.registerPath({
   method: 'get',
+  path: apiPath('/admin/bookings/export.csv'),
+  summary: 'Export bookings as CSV',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  description:
+    'Takes the list filters (`status`, `createdFrom`/`createdTo`, `dispute`, same rules as the list) without cursor or limit and streams every matching booking, newest first, as an RFC 4180 CSV attachment (`photoo-bookings-<from>-<to>.csv`; `<from>` is `all` and `<to>` the export day without a created range). Columns: ' +
+    ADMIN_BOOKINGS_EXPORT_COLUMNS.map((column) => `\`${column}\``).join(', ') +
+    ". Ids only, no names or emails. Money columns are decimal major units of the booking currency (`12.34`), times are ISO 8601 UTC, empty cells are absent values. Every cell is quoted, and one starting with `=`, `+`, `-`, `@`, a tab or a carriage return is prefixed with `'`. At most " +
+    String(ADMIN_BOOKINGS_EXPORT_ROW_CAP) +
+    ' rows; a capped export ends with a final `' +
+    ADMIN_BOOKINGS_EXPORT_TRUNCATED_LINE +
+    '` line. Call it with `fetch` from the admin origin: a browser navigation (`Sec-Fetch-Mode: navigate`) or a request whose `Sec-Fetch-Site` is present and not `same-origin`/`same-site` is refused with 403 `FORBIDDEN` before anything is audited or counted; requests without Sec-Fetch headers still need the permission and second factor. Needs a fresh second factor (403 `TWO_FACTOR_REQUIRED`), is audit-logged as `admin.bookings_exported`, and has its own per-admin export rate limit, separate from the refund and reverse-transfer money limit (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).',
+  ...adminOperation('finance', { requires2fa: true }),
+  request: {
+    query: AdminBookingsExportQuerySchema,
+  },
+  responses: {
+    '200': {
+      description: 'The CSV file, streamed',
+      headers: {
+        'Content-Disposition': {
+          description: 'attachment; filename="photoo-bookings-<from>-<to>.csv"',
+          schema: { type: 'string' },
+        },
+        'Cache-Control': { description: 'no-store', schema: { type: 'string' } },
+      },
+      content: { 'text/csv': { schema: z.string() } },
+    },
+    ...errorResponses([400, 401, 403, 429]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
   path: apiPath('/admin/bookings/{id}'),
   summary: 'Get a booking',
   tags: ['admin'],
@@ -1107,7 +1242,7 @@ registry.registerPath({
   path: apiPath('/admin/bookings/{id}/refund'),
   summary: 'Refund a booking after release',
   description:
-    'Released bookings only, otherwise 409. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. When `expectedRefundedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. Subject to the admin mutation rate limit (429).',
+    'Released bookings only, otherwise 409 `BOOKING_STATE` with `details.status`. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. When `expectedRefundedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. 409 `PENDING_REVERSAL_MISMATCH` when an earlier attempt reversed the transfer and failed to refund: `details.pendingCents` is the amount to retry with. Subject to the admin mutation rate limit and the admin money rate limit shared with reverse-transfer (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('finance', { requires2fa: true }),
@@ -1120,7 +1255,11 @@ registry.registerPath({
       description: 'Booking refunded',
       content: { 'application/json': { schema: AdminBookingDetailSchema } },
     },
-    ...errorResponses([400, 401, 403, 404, 409, 422, 429]),
+    ...errorResponses([400, 401, 403, 404, 422, 429]),
+    '409': {
+      description: 'Conflict, told apart by `code`',
+      content: { 'application/json': { schema: AdminRefundConflictErrorSchema } },
+    },
   },
 });
 
@@ -1129,7 +1268,7 @@ registry.registerPath({
   path: apiPath('/admin/bookings/{id}/reverse-transfer'),
   summary: 'Reverse the payout transfer for a booking',
   description:
-    'After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. When `expectedReversedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. The booking keeps its status. Subject to the admin mutation rate limit (429).',
+    'After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409 `BOOKING_STATE` with `details.status`. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. When `expectedReversedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. The booking keeps its status. Subject to the admin mutation rate limit and the admin money rate limit shared with refund (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('finance', { requires2fa: true }),
@@ -1142,7 +1281,11 @@ registry.registerPath({
       description: 'Transfer reversed',
       content: { 'application/json': { schema: AdminBookingDetailSchema } },
     },
-    ...errorResponses([400, 401, 403, 404, 409, 422, 429]),
+    ...errorResponses([400, 401, 403, 404, 422, 429]),
+    '409': {
+      description: 'Conflict, told apart by `code`',
+      content: { 'application/json': { schema: AdminReverseTransferConflictErrorSchema } },
+    },
   },
 });
 

@@ -1,6 +1,13 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import type { Prisma } from '@photoo/db';
-import type { BookingStatus, CreateRefundResponseSchema } from '@photoo/shared';
+import {
+  BOOKING_BUSY_ERROR_CODE,
+  BOOKING_STATE_ERROR_CODE,
+  LEDGER_CHANGED_ERROR_CODE,
+  PENDING_REVERSAL_MISMATCH_ERROR_CODE,
+  type BookingStatus,
+  type CreateRefundResponseSchema,
+} from '@photoo/shared';
 import { Logger } from 'nestjs-pino';
 import type { z } from 'zod';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -96,6 +103,20 @@ function conflict(message: string): HttpException {
   return new HttpException({ code: 'CONFLICT', message }, 409);
 }
 
+function bookingBusy(): HttpException {
+  return new HttpException(
+    {
+      code: BOOKING_BUSY_ERROR_CODE,
+      message: 'Another refund, reversal or release is in progress for this booking; retry shortly',
+    },
+    409,
+  );
+}
+
+function bookingState(status: BookingStatus, message: string): HttpException {
+  return new HttpException({ code: BOOKING_STATE_ERROR_CODE, message, details: { status } }, 409);
+}
+
 function unprocessable(message: string): HttpException {
   return new HttpException({ code: 'UNPROCESSABLE_ENTITY', message }, 422);
 }
@@ -108,7 +129,7 @@ function assertLedgerUnchanged(
   if (expectedCents !== undefined && expectedCents !== actualCents) {
     throw new HttpException(
       {
-        code: 'LEDGER_CHANGED',
+        code: LEDGER_CHANGED_ERROR_CODE,
         message: `The booking has ${String(actualCents)} ${label}, not the ${String(expectedCents)} you saw; reload it before trying again`,
       },
       409,
@@ -181,7 +202,7 @@ export class BookingRefundService {
     const result = await this.moneyLock.tryRun(bookingId, fn);
     if (!result.acquired) {
       this.logger.warn({ bookingId }, 'booking refund: refused, booking money lock is held');
-      throw conflict('Another refund or release is in progress for this booking; retry shortly');
+      throw bookingBusy();
     }
     return result.value;
   }
@@ -439,7 +460,8 @@ export class BookingRefundService {
           include: { quote: true },
         });
         if (booking.status !== 'released') {
-          throw conflict(
+          throw bookingState(
+            booking.status,
             `Booking is ${booking.status}; an admin refund is only possible after release`,
           );
         }
@@ -466,8 +488,13 @@ export class BookingRefundService {
           .find((amount) => amount !== null);
         if (pending !== undefined) {
           if (pending !== amountCents) {
-            throw conflict(
-              `A reversal of ${String(pending)} is waiting for its refund; retry the refund with that amount`,
+            throw new HttpException(
+              {
+                code: PENDING_REVERSAL_MISMATCH_ERROR_CODE,
+                message: `A reversal of ${String(pending)} is waiting for its refund; retry the refund with that amount`,
+                details: { pendingCents: pending },
+              },
+              409,
             );
           }
         } else {
@@ -560,7 +587,8 @@ export class BookingRefundService {
           booking.status === 'released' ||
           (booking.status === 'disputed' && booking.releasedAt !== null);
         if (!afterRelease || booking.transferId === null) {
-          throw conflict(
+          throw bookingState(
+            booking.status,
             `Booking is ${booking.status}; a transfer can only be reversed after release`,
           );
         }

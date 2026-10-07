@@ -1059,6 +1059,7 @@
         "amountLabel": "Amount ({currency})",
         "amountHint": "The API checks the maximum. After release, a refund cannot exceed what is left on the photographer's transfer; the platform fee is not refunded.",
         "amountMax": "Refundable right now according to the API: {amount}.",
+        "usePending": "Use {amount}",
         "reasonLabel": "Internal reason (audit log only, not shown to the client or photographer)",
         "submit": "Refund",
         "submitting": "Refunding...",
@@ -1101,7 +1102,10 @@
         "unknownOutcome": "The outcome is unknown: the request may or may not have gone through. Reload the page and check the refunded and reversed figures before trying again. Refund and reverse stay disabled until you reload.",
         "conflict": "This booking is no longer in a state that allows that. Reload and check.",
         "tooManyRequests": "Too many admin changes in a short time. Wait a moment, then reload to check the ledger before retrying.",
-        "ledgerChanged": "The booking changed since you opened it. Reload the page and check the refunded and reversed figures. Nothing was sent to Stripe."
+        "ledgerChanged": "The booking changed since you opened it. Reload the page and check the refunded and reversed figures. Nothing was sent to Stripe.",
+        "bookingBusy": "Another money operation on this booking is still running. Wait a few seconds, reload to check the ledger, then try again.",
+        "bookingState": "This booking is \"{status}\", which does not allow that. Reload and check.",
+        "pendingReversalMismatch": "A reversal of {amount} is waiting for its refund, so this refund must be exactly that amount. Nothing was refunded."
       },
       "filters": {
         "formLabel": "Filter bookings",
@@ -1118,6 +1122,19 @@
         },
         "submit": "Apply filters",
         "clear": "Clear filters"
+      },
+      "export": {
+        "action": "Export CSV",
+        "exporting": "Exporting...",
+        "notice": "Exports the bookings matching the filters above. It asks for your second factor again and counts toward the limit of 5 refunds, reversals and exports per 10 minutes.",
+        "truncated": "The export hit the 50,000-row cap, so the file is incomplete. It was saved anyway; narrow the filters and export again for the rest.",
+        "errors": {
+          "generic": "The export failed and no file was saved. Try again.",
+          "forbidden": "You don't have permission to export bookings.",
+          "invalid": "Those filters can't be exported. Adjust them and try again.",
+          "tooManyRequests": "Too many refunds, reversals and exports in a short time. Try again later.",
+          "tooManyRequestsWithRetry": "Too many refunds, reversals and exports in a short time. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
       }
     }
   },

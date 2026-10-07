@@ -54,6 +54,12 @@ export function centsToMajorUnits(amountCents: number, currency: string): number
   return amountCents / 10 ** minorUnitDigits(currency);
 }
 
+export function centsToAmountInput(amountCents: number, currency: string): string {
+  const digits = minorUnitDigits(currency);
+  const padded = String(amountCents).padStart(digits + 1, '0');
+  return digits === 0 ? padded : `${padded.slice(0, -digits)}.${padded.slice(-digits)}`;
+}
+
 export function formatCents(
   format: Pick<ReturnType<typeof useFormatter>, 'number'>,
   amountCents: number,

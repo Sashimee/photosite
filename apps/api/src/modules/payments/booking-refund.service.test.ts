@@ -247,6 +247,18 @@ async function httpStatus(promise: Promise<unknown>): Promise<number> {
   throw new Error('expected the call to fail');
 }
 
+async function httpError(promise: Promise<unknown>): Promise<{ status: number; body: unknown }> {
+  try {
+    await promise;
+  } catch (error) {
+    if (error instanceof HttpException) {
+      return { status: error.getStatus(), body: error.getResponse() };
+    }
+    throw error;
+  }
+  throw new Error('expected the call to fail');
+}
+
 function ledgerSum(ledger: LedgerRow[]): number {
   return ledger.reduce((sum, entry) => sum + entry.amountCents, 0);
 }
@@ -344,8 +356,8 @@ describe('BookingRefundService.refundAsClient', () => {
     async (status) => {
       const { service, createRefund } = await setup({ status });
       await expect(
-        httpStatus(service.refundAsClient(client, 'booking-1', { reason: 'r' }, null)),
-      ).resolves.toBe(409);
+        httpError(service.refundAsClient(client, 'booking-1', { reason: 'r' }, null)),
+      ).resolves.toMatchObject({ status: 409, body: { code: 'CONFLICT' } });
       expect(createRefund).not.toHaveBeenCalled();
     },
   );
@@ -462,10 +474,18 @@ describe('BookingRefundService.refundAsAdmin', () => {
     expect(ledger.at(-1)).toMatchObject({ type: 'reversal', amountCents: 3000 });
 
     await expect(
-      httpStatus(
+      httpError(
         service.refundAsAdmin(admin, 'booking-1', { amountCents: 2000, reason: 'r' }, null),
       ),
-    ).resolves.toBe(409);
+    ).resolves.toEqual({
+      status: 409,
+      body: {
+        code: 'PENDING_REVERSAL_MISMATCH',
+        message: expect.stringContaining('3000') as unknown,
+        details: { pendingCents: 3000 },
+      },
+    });
+    expect(createRefund).toHaveBeenCalledTimes(1);
 
     await service.refundAsAdmin(admin, 'booking-1', { amountCents: 3000, reason: 'r' }, null);
     expect(reverseTransfer).toHaveBeenCalledTimes(1);
@@ -539,36 +559,53 @@ describe('BookingRefundService.refundAsAdmin', () => {
     expect(ledger.at(-1)).toMatchObject({ type: 'refund', amountCents: -500 });
   });
 
-  it('returns 409 before release', async () => {
+  it('returns 409 BOOKING_STATE with the status before release', async () => {
     const { service, reverseTransfer } = await setup();
     await expect(
-      httpStatus(
-        service.refundAsAdmin(admin, 'booking-1', { amountCents: 100, reason: 'r' }, null),
-      ),
-    ).resolves.toBe(409);
+      httpError(service.refundAsAdmin(admin, 'booking-1', { amountCents: 100, reason: 'r' }, null)),
+    ).resolves.toMatchObject({
+      status: 409,
+      body: { code: 'BOOKING_STATE', details: { status: 'delivered' } },
+    });
     expect(reverseTransfer).not.toHaveBeenCalled();
   });
+
+  it.each(['refunded', 'disputed', 'cancelled'])(
+    'returns 409 BOOKING_STATE for a %s booking',
+    async (status) => {
+      const { service, createRefund, reverseTransfer } = await setup({ status });
+      await expect(
+        httpError(
+          service.refundAsAdmin(admin, 'booking-1', { amountCents: 100, reason: 'r' }, null),
+        ),
+      ).resolves.toMatchObject({
+        status: 409,
+        body: { code: 'BOOKING_STATE', details: { status } },
+      });
+      expect(createRefund).not.toHaveBeenCalled();
+      expect(reverseTransfer).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('booking money lock', () => {
-  it('returns 409 without calling Stripe while a release or refund holds the lock', async () => {
+  it('returns 409 BOOKING_BUSY without calling Stripe while a release or refund holds the lock', async () => {
     const { service, ledger, row, createRefund, reverseTransfer, moneyLock, release } =
       await setup();
     moneyLock.held.add('booking-1');
+    const busy = { status: 409, body: { code: 'BOOKING_BUSY' } };
 
     await expect(
-      httpStatus(service.refundAsClient(client, 'booking-1', { reason: 'r' }, null)),
-    ).resolves.toBe(409);
+      httpError(service.refundAsClient(client, 'booking-1', { reason: 'r' }, null)),
+    ).resolves.toMatchObject(busy);
     await expect(
-      httpStatus(
-        service.refundAsAdmin(admin, 'booking-1', { amountCents: 100, reason: 'r' }, null),
-      ),
-    ).resolves.toBe(409);
+      httpError(service.refundAsAdmin(admin, 'booking-1', { amountCents: 100, reason: 'r' }, null)),
+    ).resolves.toMatchObject(busy);
     await release();
     const ledgerBefore = ledger.length;
     await expect(
-      httpStatus(service.reverseTransferAsAdmin(admin, 'booking-1', { reason: 'r' }, null)),
-    ).resolves.toBe(409);
+      httpError(service.reverseTransferAsAdmin(admin, 'booking-1', { reason: 'r' }, null)),
+    ).resolves.toMatchObject(busy);
 
     expect(createRefund).not.toHaveBeenCalled();
     expect(reverseTransfer).not.toHaveBeenCalled();
@@ -649,7 +686,21 @@ describe('BookingRefundService.reverseTransferAsAdmin', () => {
 
     const held = await setup({ status: 'disputed' });
     await expect(
-      httpStatus(held.service.reverseTransferAsAdmin(admin, 'booking-1', { reason: 'r' }, null)),
-    ).resolves.toBe(409);
+      httpError(held.service.reverseTransferAsAdmin(admin, 'booking-1', { reason: 'r' }, null)),
+    ).resolves.toMatchObject({
+      status: 409,
+      body: { code: 'BOOKING_STATE', details: { status: 'disputed' } },
+    });
+    expect(held.reverseTransfer).not.toHaveBeenCalled();
+
+    const delivered = await setup();
+    await expect(
+      httpError(
+        delivered.service.reverseTransferAsAdmin(admin, 'booking-1', { reason: 'r' }, null),
+      ),
+    ).resolves.toMatchObject({
+      status: 409,
+      body: { code: 'BOOKING_STATE', details: { status: 'delivered' } },
+    });
   });
 });

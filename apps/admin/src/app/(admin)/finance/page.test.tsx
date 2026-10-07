@@ -17,6 +17,10 @@ vi.mock('./bookings-table', () => ({
   BookingsTable: () => <div data-testid="bookings-table" />,
 }));
 
+vi.mock('./export-button', () => ({
+  ExportButton: () => <div data-testid="export-button" />,
+}));
+
 describe('FinancePage', () => {
   it('renders the title and the bookings table', async () => {
     const FinancePage = (await import('./page')).default;

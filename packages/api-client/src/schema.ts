@@ -5532,7 +5532,7 @@ export interface paths {
         put?: never;
         /**
          * Request a refund for a booking before release
-         * @description Client only, before release (paid_held, in_progress or delivered), otherwise 409. `amountCents` omitted refunds whatever is left; a cumulative refund above the charged total is 422. A full refund moves the booking to `refunded`, a partial one keeps its state. After release a refund requires a transfer reversal and is admin-only (POST /v1/admin/bookings/{id}/refund).
+         * @description Client only, before release (paid_held, in_progress or delivered), otherwise 409. 409 `BOOKING_BUSY` while another refund or the release holds the booking; retry shortly. `amountCents` omitted refunds whatever is left; a cumulative refund above the charged total is 422. A full refund moves the booking to `refunded`, a partial one keeps its state. After release a refund requires a transfer reversal and is admin-only (POST /v1/admin/bookings/{id}/refund).
          */
         post: {
             parameters: {
@@ -9519,6 +9519,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/bookings/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export bookings as CSV
+         * @description Takes the list filters (`status`, `createdFrom`/`createdTo`, `dispute`, same rules as the list) without cursor or limit and streams every matching booking, newest first, as an RFC 4180 CSV attachment (`photoo-bookings-<from>-<to>.csv`; `<from>` is `all` and `<to>` the export day without a created range). Columns: `id`, `status`, `currency`, `total`, `refunded`, `reversed`, `disputeStatus`, `createdAt`, `releasedAt`, `deliveredAt`, `cancelledAt`, `paymentIntentId`, `chargeId`, `transferId`. Ids only, no names or emails. Money columns are decimal major units of the booking currency (`12.34`), times are ISO 8601 UTC, empty cells are absent values. Every cell is quoted, and one starting with `=`, `+`, `-`, `@`, a tab or a carriage return is prefixed with `'`. At most 50000 rows; a capped export ends with a final `#truncated` line. Call it with `fetch` from the admin origin: a browser navigation (`Sec-Fetch-Mode: navigate`) or a request whose `Sec-Fetch-Site` is present and not `same-origin`/`same-site` is refused with 403 `FORBIDDEN` before anything is audited or counted; requests without Sec-Fetch headers still need the permission and second factor. Needs a fresh second factor (403 `TWO_FACTOR_REQUIRED`), is audit-logged as `admin.bookings_exported`, and has its own per-admin export rate limit, separate from the refund and reverse-transfer money limit (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    status?: ("pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled") | ("pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled")[];
+                    createdFrom?: string;
+                    createdTo?: string;
+                    dispute?: "any" | "open" | "none";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The CSV file, streamed */
+                200: {
+                    headers: {
+                        /** @description attachment; filename="photoo-bookings-<from>-<to>.csv" */
+                        "Content-Disposition"?: string;
+                        /** @description no-store */
+                        "Cache-Control"?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/csv": string;
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/bookings/{id}": {
         parameters: {
             query?: never;
@@ -9596,7 +9680,7 @@ export interface paths {
         put?: never;
         /**
          * Refund a booking after release
-         * @description Released bookings only, otherwise 409. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. When `expectedRefundedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. Subject to the admin mutation rate limit (429).
+         * @description Released bookings only, otherwise 409 `BOOKING_STATE` with `details.status`. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. When `expectedRefundedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. 409 `PENDING_REVERSAL_MISMATCH` when an earlier attempt reversed the transfer and failed to refund: `details.pendingCents` is the amount to retry with. Subject to the admin mutation rate limit and the admin money rate limit shared with reverse-transfer (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).
          */
         post: {
             parameters: {
@@ -9663,13 +9747,13 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                /** @description Conflict */
+                /** @description Conflict, told apart by `code` */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiError"];
+                        "application/json": components["schemas"]["AdminRefundConflictError"];
                     };
                 };
                 /** @description Unprocessable entity */
@@ -9709,7 +9793,7 @@ export interface paths {
         put?: never;
         /**
          * Reverse the payout transfer for a booking
-         * @description After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. When `expectedReversedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. The booking keeps its status. Subject to the admin mutation rate limit (429).
+         * @description After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409 `BOOKING_STATE` with `details.status`. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. When `expectedReversedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. The booking keeps its status. Subject to the admin mutation rate limit and the admin money rate limit shared with refund (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).
          */
         post: {
             parameters: {
@@ -9775,13 +9859,13 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                /** @description Conflict */
+                /** @description Conflict, told apart by `code` */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApiError"];
+                        "application/json": components["schemas"]["AdminReverseTransferConflictError"];
                     };
                 };
                 /** @description Unprocessable entity */
@@ -13741,6 +13825,73 @@ export interface components {
             payoutsEnabled: boolean;
             entries: components["schemas"]["AdminLedgerEntry"][];
         } | null;
+        AdminRefundConflictError: components["schemas"]["LedgerChangedError"] | components["schemas"]["BookingBusyError"] | components["schemas"]["BookingStateError"] | components["schemas"]["PendingReversalMismatchError"];
+        LedgerChangedError: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "LEDGER_CHANGED";
+            message: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            requestId: string;
+        };
+        BookingBusyError: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "BOOKING_BUSY";
+            message: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            requestId: string;
+        };
+        BookingStateError: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "BOOKING_STATE";
+            message: string;
+            details: components["schemas"]["BookingStateErrorDetails"];
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            requestId: string;
+        };
+        BookingStateErrorDetails: {
+            /** @enum {string} */
+            status: "pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled";
+        };
+        PendingReversalMismatchError: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "PENDING_REVERSAL_MISMATCH";
+            message: string;
+            details: components["schemas"]["PendingReversalMismatchErrorDetails"];
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            requestId: string;
+        };
+        PendingReversalMismatchErrorDetails: {
+            pendingCents: number;
+        };
+        AdminReverseTransferConflictError: components["schemas"]["LedgerChangedError"] | components["schemas"]["BookingBusyError"] | components["schemas"]["BookingStateError"];
         AdminReport: {
             /**
              * Format: uuid

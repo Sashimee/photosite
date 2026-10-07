@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { centsToMajorUnits, minorUnitDigits, parseAmountToCents } from './money';
+import {
+  centsToAmountInput,
+  centsToMajorUnits,
+  minorUnitDigits,
+  parseAmountToCents,
+} from './money';
 
 describe('parseAmountToCents', () => {
   it.each([
@@ -103,5 +108,50 @@ describe('centsToMajorUnits', () => {
   it('scales by the currency minor unit', () => {
     expect(centsToMajorUnits(1234, 'EUR')).toBe(12.34);
     expect(centsToMajorUnits(1000, 'JPY')).toBe(1000);
+  });
+});
+
+describe('centsToAmountInput', () => {
+  it('writes exact decimals that parse back to the same cents', () => {
+    expect(centsToAmountInput(1234, 'EUR')).toBe('12.34');
+    expect(centsToAmountInput(5, 'EUR')).toBe('0.05');
+    expect(centsToAmountInput(1000, 'JPY')).toBe('1000');
+    expect(centsToAmountInput(1, 'KWD')).toBe('0.001');
+    expect(parseAmountToCents(centsToAmountInput(2500, 'EUR'), 'EUR')).toEqual({
+      ok: true,
+      amountCents: 2500,
+    });
+  });
+
+  it.each([
+    [0, 'EUR', '0.00'],
+    [1, 'EUR', '0.01'],
+    [10, 'EUR', '0.10'],
+    [99, 'EUR', '0.99'],
+    [100, 'EUR', '1.00'],
+    [101, 'EUR', '1.01'],
+    [Number.MAX_SAFE_INTEGER, 'EUR', '90071992547409.91'],
+    [0, 'JPY', '0'],
+    [1, 'JPY', '1'],
+    [100, 'JPY', '100'],
+    [0, 'KWD', '0.000'],
+    [1, 'KWD', '0.001'],
+    [1000, 'KWD', '1.000'],
+  ])('writes %i minor units of %s as %s', (cents, currency, expected) => {
+    expect(centsToAmountInput(cents, currency)).toBe(expected);
+  });
+
+  it.each([
+    [0, 'EUR'],
+    [1, 'EUR'],
+    [100, 'EUR'],
+    [999_999_999, 'EUR'],
+    [1, 'KWD'],
+    [12345, 'JPY'],
+  ])('round-trips %i of %s through the amount parser', (cents, currency) => {
+    const result = parseAmountToCents(centsToAmountInput(cents, currency), currency);
+    expect(result).toEqual(
+      cents === 0 ? { ok: false, reason: 'notPositive' } : { ok: true, amountCents: cents },
+    );
   });
 });

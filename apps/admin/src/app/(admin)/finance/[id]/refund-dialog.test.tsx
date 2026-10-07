@@ -206,6 +206,62 @@ describe('RefundDialog', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  it('shows a distinct message when the money lock is held', async () => {
+    postMock.mockResolvedValueOnce(failure('BOOKING_BUSY'));
+    const events = await openDialog();
+
+    await fill(events, '5', 'reason');
+    await events.click(screen.getByRole('button', { name: 'Refund' }));
+
+    expect(await screen.findByText(/still running/)).toBeInTheDocument();
+    expect(screen.queryByText(/not made because of a conflict/)).not.toBeInTheDocument();
+    expect(postMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the booking state when it does not allow a refund', async () => {
+    postMock.mockResolvedValueOnce({
+      error: { code: 'BOOKING_STATE', details: { status: 'disputed' } },
+      response: { ok: false, status: 409 },
+    });
+    const events = await openDialog();
+
+    await fill(events, '5', 'reason');
+    await events.click(screen.getByRole('button', { name: 'Refund' }));
+
+    expect(await screen.findByText(/This booking is "Disputed"/)).toBeInTheDocument();
+    expect(postMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the pending amount and prefills it without submitting', async () => {
+    postMock.mockResolvedValueOnce({
+      error: { code: 'PENDING_REVERSAL_MISMATCH', details: { pendingCents: 2505 } },
+      response: { ok: false, status: 409 },
+    });
+    const events = await openDialog();
+
+    await fill(events, '5', 'reason');
+    await events.click(screen.getByRole('button', { name: 'Refund' }));
+
+    expect(await screen.findByText(/reversal of €25\.05 is waiting/)).toBeInTheDocument();
+    await events.click(screen.getByRole('button', { name: 'Use €25.05' }));
+
+    expect(screen.getByLabelText(/^Amount/)).toHaveValue('25.05');
+    expect(screen.getByLabelText(/^Internal reason/)).toHaveValue('reason');
+    expect(postMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('offers no prefill when the pending amount is missing', async () => {
+    postMock.mockResolvedValueOnce(failure('PENDING_REVERSAL_MISMATCH'));
+    const events = await openDialog();
+
+    await fill(events, '5', 'reason');
+    await events.click(screen.getByRole('button', { name: 'Refund' }));
+
+    expect(await screen.findByText(/no longer in a state/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Use / })).not.toBeInTheDocument();
+  });
+
   it('shows the reload message on LEDGER_CHANGED and does not retry', async () => {
     postMock.mockResolvedValueOnce(failure('LEDGER_CHANGED', 409, 'ledger moved'));
     const onUnknownOutcome = vi.fn();

@@ -18,9 +18,9 @@ import { FieldError, FormNotice } from '@/components/ui/form-message';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
-import { formatCents, minorUnitDigits, parseAmountToCents } from '@/lib/money';
+import { centsToAmountInput, formatCents, minorUnitDigits, parseAmountToCents } from '@/lib/money';
 
-import { financeErrorMessage, isUnknownOutcome } from '../finance-errors';
+import { financeErrorMessage, isUnknownOutcome, pendingReversalCents } from '../finance-errors';
 import { ReasonField } from '../reason-field';
 
 interface Errors {
@@ -54,6 +54,7 @@ export function RefundDialog({
   const [reason, setReason] = useState('');
   const [errors, setErrors] = useState<Errors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [pendingCents, setPendingCents] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const inFlight = useRef(false);
 
@@ -73,6 +74,7 @@ export function RefundDialog({
     setReason('');
     setErrors({});
     setSubmitError(null);
+    setPendingCents(null);
   }
 
   function amountError(): string | undefined {
@@ -123,6 +125,7 @@ export function RefundDialog({
     }
     setErrors({});
     setSubmitError(null);
+    setPendingCents(null);
     inFlight.current = true;
     setSubmitting(true);
     try {
@@ -140,7 +143,10 @@ export function RefundDialog({
         return;
       }
       if (error || !response.ok) {
-        setSubmitError(financeErrorMessage(tFinance, t, error));
+        setSubmitError(
+          financeErrorMessage(tFinance, t, error, (cents) => formatCents(format, cents, currency)),
+        );
+        setPendingCents(pendingReversalCents(error) ?? null);
         return;
       }
       close();
@@ -175,6 +181,18 @@ export function RefundDialog({
         </p>
         <FormNotice>{t('twoFactorNotice')}</FormNotice>
         {submitError ? <FormNotice tone="error">{submitError}</FormNotice> : null}
+        {pendingCents === null ? null : (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setAmount(centsToAmountInput(pendingCents, currency));
+              setErrors({});
+            }}
+          >
+            {t('usePending', { amount: formatCents(format, pendingCents, currency) })}
+          </Button>
+        )}
         <form
           noValidate
           onSubmit={(event) => {

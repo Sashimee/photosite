@@ -1,8 +1,21 @@
+import type { Readable } from 'node:stream';
 import { HttpException } from '@nestjs/common';
-import { ADMIN_BOOKING_LEDGER_LIMIT, AdminBookingsQuerySchema } from '@photoo/shared';
+import {
+  ADMIN_BOOKING_LEDGER_LIMIT,
+  ADMIN_BOOKINGS_EXPORT_COLUMNS,
+  AdminBookingsExportQuerySchema,
+  AdminBookingsQuerySchema,
+} from '@photoo/shared';
 import { describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
-import { AdminBookingsService, filterFingerprint, moneyHints } from './admin-bookings.service.js';
+import { AdminAuditService } from '../admin/admin-audit.service.js';
+import {
+  AdminBookingsService,
+  csvCell,
+  exportFilename,
+  filterFingerprint,
+  moneyHints,
+} from './admin-bookings.service.js';
 import { EMPTY_LEDGER_TOTALS } from './booking-ledger.js';
 
 const ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
@@ -83,9 +96,15 @@ function setup(options: { rows?: ReturnType<typeof bookingRow>[]; ledger?: Ledge
   ];
   const client = {
     $queryRaw: vi.fn(() => Promise.resolve([])),
+    auditLog: { create: vi.fn((args: unknown) => Promise.resolve(args)) },
     booking: {
-      findMany: vi.fn<(args: { where: unknown }) => Promise<typeof rows>>(() =>
-        Promise.resolve(rows),
+      findMany: vi.fn<(args: { where: { AND: unknown[] }; take?: number }) => Promise<typeof rows>>(
+        (args) => {
+          const start = startAfterKeyset(rows, args.where.AND);
+          return Promise.resolve(
+            rows.slice(start, args.take === undefined ? undefined : start + args.take),
+          );
+        },
       ),
       findUnique: vi.fn(() => Promise.resolve(rows[0] ?? null)),
     },
@@ -125,13 +144,26 @@ function setup(options: { rows?: ReturnType<typeof bookingRow>[]; ledger?: Ledge
     },
   };
   const transaction = vi.fn(
-    (fn: (tx: typeof client) => Promise<unknown>, options: { isolationLevel: string }) =>
-      options.isolationLevel === 'RepeatableRead'
+    (fn: (tx: typeof client) => Promise<unknown>, options?: { isolationLevel: string }) =>
+      options === undefined || options.isolationLevel === 'RepeatableRead'
         ? fn(client)
         : Promise.reject(new Error(`unexpected isolation level ${options.isolationLevel}`)),
   );
   const prisma = { client: { ...client, $transaction: transaction } } as unknown as PrismaService;
-  return { service: new AdminBookingsService(prisma), client, transaction };
+  return {
+    service: new AdminBookingsService(prisma, new AdminAuditService()),
+    client,
+    transaction,
+  };
+}
+
+// The mocked rows are already in keyset order, so continuing after a key is
+// starting after that row's index.
+function startAfterKeyset(rows: { id: string }[], where: unknown[]): number {
+  const keyset = where
+    .map((clause) => (clause as { OR?: [unknown, { id?: { gt?: string } }] }).OR?.[1]?.id?.gt)
+    .findLast((id) => id !== undefined);
+  return keyset === undefined ? 0 : rows.findIndex((row) => row.id === keyset) + 1;
 }
 
 function query(input: Record<string, unknown> = {}) {
@@ -375,5 +407,257 @@ describe('AdminBookingsService.get', () => {
   it('answers 404 for an unknown booking', async () => {
     const { service } = setup({ rows: [] });
     expect((await rejection(service.get(ID))).getStatus()).toBe(404);
+  });
+});
+
+function exportQuery(input: Record<string, unknown> = {}) {
+  return AdminBookingsExportQuerySchema.parse(input);
+}
+
+async function readAll(body: Readable): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of body) {
+    chunks.push(Buffer.from(chunk as Buffer));
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+function idAt(n: number): string {
+  return `0199${String(n).padStart(4, '0')}-0000-7000-8000-000000000000`;
+}
+
+const HEADER_LINE = `${ADMIN_BOOKINGS_EXPORT_COLUMNS.map((column) => `"${column}"`).join(',')}\r\n`;
+
+describe('csvCell', () => {
+  it('quotes every value and doubles embedded quotes', () => {
+    expect(csvCell('pi_1')).toBe('"pi_1"');
+    expect(csvCell('say "hi", then\r\nleave')).toBe('"say ""hi"", then\r\nleave"');
+    expect(csvCell('')).toBe('""');
+    expect(csvCell(null)).toBe('""');
+  });
+
+  it('prefixes a cell that a spreadsheet would read as a formula', () => {
+    for (const lead of ['=', '+', '-', '@', '\t', '\r']) {
+      expect(csvCell(`${lead}SUM(A1)`)).toBe(`"'${lead}SUM(A1)"`);
+    }
+    expect(csvCell('=HYPERLINK("x")')).toBe(`"'=HYPERLINK(""x"")"`);
+    expect(csvCell('12.34')).toBe('"12.34"');
+    expect(csvCell('a=b')).toBe('"a=b"');
+  });
+});
+
+describe('exportFilename', () => {
+  it('names the created range, or all up to the export day', () => {
+    const now = new Date('2026-10-07T23:59:00.000Z');
+    expect(
+      exportFilename(exportQuery({ createdFrom: '2026-09-01', createdTo: '2026-10-01' }), now),
+    ).toBe('photoo-bookings-2026-09-01-2026-10-01.csv');
+    expect(exportFilename(exportQuery({ status: 'released' }), now)).toBe(
+      'photoo-bookings-all-2026-10-07.csv',
+    );
+  });
+});
+
+describe('AdminBookingsService.exportCsv', () => {
+  const admin = { id: ID };
+
+  it('writes the header and one quoted row per booking with decimal money', async () => {
+    const { service } = setup({
+      ledger: [
+        ledgerRow('transfer', -23797, 1),
+        ledgerRow('reversal', 4000, 2),
+        ledgerRow('refund', -4000, 3),
+      ],
+    });
+
+    const { filename, body } = await service.exportCsv(admin, exportQuery(), '203.0.113.9');
+
+    expect(filename).toMatch(/^photoo-bookings-all-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(await readAll(body)).toBe(
+      HEADER_LINE +
+        [
+          ID,
+          'released',
+          'EUR',
+          '250.50',
+          '40.00',
+          '40.00',
+          'won',
+          '2026-10-01T09:00:00.000Z',
+          '2026-10-01T09:00:00.000Z',
+          '',
+          '',
+          'pi_1',
+          'ch_1',
+          'tr_1',
+        ]
+          .map((cell) => `"${cell}"`)
+          .join(',') +
+        '\r\n',
+    );
+  });
+
+  it('prefixes a Stripe id that starts with a formula character', async () => {
+    const { service } = setup({ rows: [bookingRow({ chargeId: '=cmd|calc' })] });
+    const text = await readAll((await service.exportCsv(admin, exportQuery(), null)).body);
+    expect(text).toContain(`"'=cmd|calc"`);
+    expect(text).not.toContain(`,"=cmd`);
+  });
+
+  it.each([
+    ['JPY', 25050, '25050', 4000, '4000'],
+    ['KWD', 25050, '25.050', 4005, '4.005'],
+  ])(
+    'writes %s money in its own minor units',
+    async (currency, totalCents, total, movedCents, moved) => {
+      const { service } = setup({
+        rows: [bookingRow({ quote: { totalCents, currency } })],
+        ledger: [
+          { ...ledgerRow('reversal', movedCents, 1), currency },
+          { ...ledgerRow('refund', -movedCents, 2), currency },
+        ],
+      });
+
+      const text = await readAll((await service.exportCsv(admin, exportQuery(), null)).body);
+
+      const cells = (text.split('\r\n')[1] ?? '').slice(1, -1).split('","');
+      expect(cells.slice(2, 6)).toEqual([currency, total, moved, moved]);
+    },
+  );
+
+  it('writes zero refunded and reversed as a zero amount in the booking currency', async () => {
+    const { service } = setup({
+      rows: [bookingRow({ quote: { totalCents: 100, currency: 'JPY' } })],
+    });
+
+    const text = await readAll((await service.exportCsv(admin, exportQuery(), null)).body);
+
+    const cells = (text.split('\r\n')[1] ?? '').slice(1, -1).split('","');
+    expect(cells.slice(2, 6)).toEqual(['JPY', '100', '0', '0']);
+  });
+
+  it('writes only the header row when nothing matches', async () => {
+    const { service } = setup({ rows: [] });
+    const text = await readAll((await service.exportCsv(admin, exportQuery(), null)).body);
+    expect(text).toBe(HEADER_LINE);
+  });
+
+  it('applies the filters and the list order to every batch', async () => {
+    const { service, client } = setup({ rows: [] });
+    await readAll(
+      (
+        await service.exportCsv(
+          admin,
+          exportQuery({
+            status: 'released',
+            createdFrom: '2026-10-01',
+            createdTo: '2026-11-01',
+            dispute: 'none',
+          }),
+          null,
+        )
+      ).body,
+    );
+    expect(client.booking.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            { status: { in: ['released'] } },
+            {
+              createdAt: {
+                gte: new Date('2026-10-01T00:00:00.000Z'),
+                lt: new Date('2026-11-01T00:00:00.000Z'),
+              },
+            },
+            { disputes: { none: {} } },
+          ],
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        take: 501,
+      }),
+    );
+  });
+
+  it('pages through keyset batches until the rows run out', async () => {
+    const rows = Array.from({ length: 5 }, (_, n) => bookingRow({ id: idAt(n) }));
+    const { service, client } = setup({ rows });
+
+    const text = await readAll(
+      (await service.exportCsv(admin, exportQuery(), null, { batchSize: 2, cap: 100 })).body,
+    );
+
+    const lines = text.split('\r\n').filter((line) => line !== '');
+    expect(lines.slice(1).map((line) => line.slice(1, 37))).toEqual(rows.map((row) => row.id));
+    expect(lines.at(-1)).not.toBe('#truncated');
+    expect(client.booking.findMany).toHaveBeenCalledTimes(3);
+    expect(client.booking.findMany.mock.calls[1]?.[0]?.where.AND).toEqual([
+      { OR: [{ createdAt: { lt: CREATED } }, { createdAt: CREATED, id: { gt: idAt(1) } }] },
+    ]);
+  });
+
+  it('stops at the cap and ends with the truncated line', async () => {
+    const rows = Array.from({ length: 5 }, (_, n) => bookingRow({ id: idAt(n) }));
+    const { service } = setup({ rows });
+
+    const text = await readAll(
+      (await service.exportCsv(admin, exportQuery(), null, { batchSize: 2, cap: 3 })).body,
+    );
+
+    const lines = text.split('\r\n');
+    expect(lines.slice(1, 4).map((line) => line.slice(1, 37))).toEqual([idAt(0), idAt(1), idAt(2)]);
+    expect(lines.slice(4)).toEqual(['#truncated', '']);
+  });
+
+  it('does not mark an export truncated when the rows end exactly at the cap', async () => {
+    const rows = Array.from({ length: 3 }, (_, n) => bookingRow({ id: idAt(n) }));
+    const { service } = setup({ rows });
+    const text = await readAll(
+      (await service.exportCsv(admin, exportQuery(), null, { batchSize: 2, cap: 3 })).body,
+    );
+    expect(text).not.toContain('#truncated');
+    expect(text.split('\r\n')).toHaveLength(5);
+  });
+
+  it('audits the canonical filters and the cap before reading any booking', async () => {
+    const { service, client } = setup();
+
+    await service.exportCsv(
+      admin,
+      exportQuery({
+        status: ['released', 'disputed'],
+        createdFrom: '2026-10-01',
+        createdTo: '2026-11-01',
+      }),
+      '203.0.113.9',
+    );
+
+    expect(client.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        actorType: 'admin',
+        actorId: ID,
+        action: 'admin.bookings_exported',
+        targetType: 'Booking',
+        targetId: null,
+        ip: '203.0.113.9',
+        after: {
+          filters: {
+            status: ['disputed', 'released'],
+            createdFrom: '2026-10-01',
+            createdTo: '2026-11-01',
+            dispute: null,
+          },
+          cap: 50_000,
+        },
+      },
+    });
+    expect(client.auditLog.create.mock.invocationCallOrder[0]).toBeLessThan(
+      client.booking.findMany.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  it('fails before any byte when the first batch cannot be read', async () => {
+    const { service, client } = setup();
+    client.booking.findMany.mockRejectedValueOnce(new Error('database down'));
+    await expect(service.exportCsv(admin, exportQuery(), null)).rejects.toThrow('database down');
   });
 });

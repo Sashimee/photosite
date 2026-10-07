@@ -1,17 +1,24 @@
 import { createHash } from 'node:crypto';
+import { Readable } from 'node:stream';
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import type { Prisma } from '@photoo/db';
 import {
   ADMIN_BOOKING_LEDGER_LIMIT,
+  ADMIN_BOOKINGS_EXPORT_COLUMNS,
+  ADMIN_BOOKINGS_EXPORT_ROW_CAP,
+  ADMIN_BOOKINGS_EXPORT_TRUNCATED_LINE,
   IdSchema,
+  formatMinorUnits,
   type AdminBookingDetailSchema,
   type AdminBookingSchema,
+  type AdminBookingsExportQuerySchema,
   type AdminBookingsQuerySchema,
   type AdminLedgerEntrySchema,
 } from '@photoo/shared';
 import { z } from 'zod';
 import { decodeCursor, encodeCursor } from '../../common/pagination/cursor.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { AdminAuditService } from '../admin/admin-audit.service.js';
 import { BOOKING_INCLUDE, toBookingDtos, type BookingRow } from '../bookings/booking-dto.js';
 import {
   EMPTY_LEDGER_TOTALS,
@@ -23,6 +30,8 @@ export type AdminBookingDto = z.infer<typeof AdminBookingSchema>;
 export type AdminBookingDetailDto = z.infer<typeof AdminBookingDetailSchema>;
 type AdminLedgerEntryDto = z.infer<typeof AdminLedgerEntrySchema>;
 type ListQuery = z.infer<typeof AdminBookingsQuerySchema>;
+type FilterQuery = z.infer<typeof AdminBookingsExportQuerySchema>;
+type ExportColumn = (typeof ADMIN_BOOKINGS_EXPORT_COLUMNS)[number];
 type Db = PrismaService['client'] | Prisma.TransactionClient;
 
 const LEDGER_ENTRY_SELECT = {
@@ -33,6 +42,15 @@ const LEDGER_ENTRY_SELECT = {
   stripeObjectId: true,
   occurredAt: true,
 } as const;
+
+const KEYSET_ORDER: Prisma.BookingOrderByWithRelationInput[] = [
+  { createdAt: 'desc' },
+  { id: 'asc' },
+];
+
+export const EXPORT_BATCH_SIZE = 500;
+
+const CSV_INJECTION_LEAD = /^[=+\-@\t\r]/;
 
 const FilteredCursorSchema = z
   .object({
@@ -52,7 +70,7 @@ export function filterFingerprint(query: ListQuery): string {
   return createHash('sha256').update(canonical).digest('base64url').slice(0, 22);
 }
 
-function filterWhere(query: ListQuery): Prisma.BookingWhereInput[] {
+function filterWhere(query: FilterQuery): Prisma.BookingWhereInput[] {
   const where: Prisma.BookingWhereInput[] = [];
   if (query.status) {
     where.push({ status: { in: query.status } });
@@ -85,6 +103,74 @@ function filterWhere(query: ListQuery): Prisma.BookingWhereInput[] {
   return where;
 }
 
+function afterKey(createdAt: Date, id: string): Prisma.BookingWhereInput {
+  return {
+    OR: [{ createdAt: { lt: createdAt } }, { createdAt, id: { gt: id } }],
+  };
+}
+
+// Spreadsheet apps evaluate a cell that starts with a formula character even
+// inside quotes, so the `'` prefix is what stops a crafted id or reason from
+// running as a formula on the finance team's machine.
+export function csvCell(value: string | null): string {
+  if (value === null) {
+    return '""';
+  }
+  const safe = CSV_INJECTION_LEAD.test(value) ? `'${value}` : value;
+  return `"${safe.replaceAll('"', '""')}"`;
+}
+
+export function csvLine(values: readonly (string | null)[]): string {
+  return `${values.map(csvCell).join(',')}\r\n`;
+}
+
+export function exportFilters(query: FilterQuery) {
+  return {
+    status: query.status ?? null,
+    createdFrom: query.createdFrom ?? null,
+    createdTo: query.createdTo ?? null,
+    dispute: query.dispute ?? null,
+  };
+}
+
+export function exportFilename(query: FilterQuery, now: Date): string {
+  const from = query.createdFrom ?? 'all';
+  const to = query.createdTo ?? now.toISOString().slice(0, 10);
+  return `photoo-bookings-${from}-${to}.csv`;
+}
+
+function exportRecord(dto: AdminBookingDto, createdAt: Date): string[] {
+  const { currency } = dto.total;
+  const cells: Record<ExportColumn, string | null> = {
+    id: dto.id,
+    status: dto.status,
+    currency,
+    total: formatMinorUnits(dto.total.amountCents, currency),
+    refunded: formatMinorUnits(dto.refundedCents, currency),
+    reversed: formatMinorUnits(dto.reversedCents, currency),
+    disputeStatus: dto.disputeStatus,
+    createdAt: createdAt.toISOString(),
+    releasedAt: dto.releasedAt,
+    deliveredAt: dto.deliveredAt,
+    cancelledAt: dto.cancelledAt,
+    paymentIntentId: dto.paymentIntentId,
+    chargeId: dto.chargeId,
+    transferId: dto.transferId,
+  };
+  return ADMIN_BOOKINGS_EXPORT_COLUMNS.map((column) => cells[column] ?? '');
+}
+
+export interface ExportLimits {
+  batchSize: number;
+  cap: number;
+}
+
+interface ExportBatch {
+  rows: BookingRow[];
+  dtos: AdminBookingDto[];
+  hasMore: boolean;
+}
+
 export function moneyHints(
   status: AdminBookingDto['status'],
   totalCents: number,
@@ -115,7 +201,10 @@ function notFound(): HttpException {
 
 @Injectable()
 export class AdminBookingsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(AdminAuditService) private readonly adminAudit: AdminAuditService,
+  ) {}
 
   async list(query: ListQuery): Promise<{ items: AdminBookingDto[]; nextCursor: string | null }> {
     const fingerprint = filterFingerprint(query);
@@ -131,17 +220,12 @@ export class AdminBookingsService {
           400,
         );
       }
-      where.push({
-        OR: [
-          { createdAt: { lt: new Date(cursor.createdAt) } },
-          { createdAt: new Date(cursor.createdAt), id: { gt: cursor.id } },
-        ],
-      });
+      where.push(afterKey(new Date(cursor.createdAt), cursor.id));
     }
     const rows = await this.prisma.client.booking.findMany({
       where: { AND: where },
       include: BOOKING_INCLUDE,
-      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      orderBy: KEYSET_ORDER,
       take: query.limit + 1,
     });
     const hasMore = rows.length > query.limit;
@@ -157,6 +241,84 @@ export class AdminBookingsService {
               filter: fingerprint,
             })
           : null,
+    };
+  }
+
+  // The audit row and the first batch are written and read before any byte is
+  // sent, so a failure there still answers with the JSON error shape instead
+  // of a cut file. Later batches are separate reads: holding one snapshot
+  // open for the whole download would pin a connection for as long as the
+  // client takes to read it.
+  async exportCsv(
+    admin: { id: string },
+    query: FilterQuery,
+    ip: string | null,
+    limits: ExportLimits = { batchSize: EXPORT_BATCH_SIZE, cap: ADMIN_BOOKINGS_EXPORT_ROW_CAP },
+  ): Promise<{ filename: string; body: Readable }> {
+    await this.prisma.client.$transaction((tx) =>
+      this.adminAudit.record(tx, {
+        actorId: admin.id,
+        action: 'admin.bookings_exported',
+        targetType: 'Booking',
+        targetId: null,
+        after: { filters: exportFilters(query), cap: limits.cap },
+        ip,
+      }),
+    );
+    const where = filterWhere(query);
+    const first = await this.exportBatch(where, Math.min(limits.batchSize, limits.cap));
+    return {
+      filename: exportFilename(query, new Date()),
+      body: Readable.from(this.csvChunks(where, first, limits), { objectMode: false }),
+    };
+  }
+
+  private async *csvChunks(
+    where: Prisma.BookingWhereInput[],
+    first: ExportBatch,
+    limits: ExportLimits,
+  ): AsyncGenerator<string> {
+    yield csvLine(ADMIN_BOOKINGS_EXPORT_COLUMNS);
+    let batch = first;
+    let written = 0;
+    for (;;) {
+      yield batch.dtos
+        .map((dto, index) => {
+          const row = batch.rows[index];
+          if (!row) {
+            throw new Error(`admin bookings export: no row for booking ${dto.id}`);
+          }
+          return csvLine(exportRecord(dto, row.createdAt));
+        })
+        .join('');
+      written += batch.rows.length;
+      const last = batch.rows.at(-1);
+      if (!batch.hasMore || !last) {
+        return;
+      }
+      if (written >= limits.cap) {
+        yield `${ADMIN_BOOKINGS_EXPORT_TRUNCATED_LINE}\r\n`;
+        return;
+      }
+      batch = await this.exportBatch(
+        [...where, afterKey(last.createdAt, last.id)],
+        Math.min(limits.batchSize, limits.cap - written),
+      );
+    }
+  }
+
+  private async exportBatch(where: Prisma.BookingWhereInput[], size: number): Promise<ExportBatch> {
+    const rows = await this.prisma.client.booking.findMany({
+      where: { AND: where },
+      include: BOOKING_INCLUDE,
+      orderBy: KEYSET_ORDER,
+      take: size + 1,
+    });
+    const page = rows.slice(0, size);
+    return {
+      rows: page,
+      dtos: await this.toDtos(this.prisma.client, page),
+      hasMore: rows.length > size,
     };
   }
 
