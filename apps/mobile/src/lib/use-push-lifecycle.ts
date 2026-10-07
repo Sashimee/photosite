@@ -28,7 +28,7 @@ export function useNotificationRouting(): void {
     const href = pendingHrefRef.current;
     pendingHrefRef.current = null;
     if (href) {
-      router.push(href);
+      router.push(href, { dangerouslySingular: true });
     }
   }, [router]);
 

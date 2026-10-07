@@ -48,7 +48,7 @@ describe('useNotificationRouting', () => {
     rerender({});
 
     expect(mockPush).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith(`/messages/${ID}`);
+    expect(mockPush).toHaveBeenCalledWith(`/messages/${ID}`, { dangerouslySingular: true });
   });
 
   it('opens the conversation straight away for a tap while signed in', () => {
@@ -59,7 +59,7 @@ describe('useNotificationRouting', () => {
 
     mockListeners[0]?.(tap('n2', { url: `/de/messages/${ID}` }));
 
-    expect(mockPush).toHaveBeenCalledWith(`/messages/${ID}`);
+    expect(mockPush).toHaveBeenCalledWith(`/messages/${ID}`, { dangerouslySingular: true });
   });
 
   it('does not navigate for a malformed or foreign payload', () => {
