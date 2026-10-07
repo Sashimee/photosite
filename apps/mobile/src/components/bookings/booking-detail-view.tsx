@@ -9,8 +9,11 @@ import { formatMoney, requireMoney } from '../../lib/money';
 import type { BookingViewer } from '../../lib/use-bookings-list';
 import { FormNotice } from '../form/form-notice';
 import { BookingAcceptDelivery } from './booking-accept-delivery';
+import { BookingCancel } from './booking-cancel';
 import { BookingDeliveryForm } from './booking-delivery-form';
+import { BookingDocumentButton } from './booking-document-button';
 import { BookingPayPanel } from './booking-pay-panel';
+import { BookingRefund } from './booking-refund';
 import { BookingStatusTimeline } from './booking-status-timeline';
 
 export function BookingDetailView({
@@ -69,6 +72,16 @@ export function BookingDetailView({
       {viewer === 'client' && onBookingChanged ? (
         <BookingAcceptDelivery booking={booking} onBookingChanged={onBookingChanged} />
       ) : null}
+      {viewer === 'client' && onBookingChanged ? (
+        <BookingRefund booking={booking} onBookingChanged={onBookingChanged} />
+      ) : null}
+      {onBookingChanged ? (
+        <BookingCancel booking={booking} onBookingChanged={onBookingChanged} />
+      ) : null}
+      <BookingDocumentButton
+        booking={booking}
+        document={viewer === 'client' ? 'receipt' : 'fee-invoice'}
+      />
       {booking.status === 'delivered' && booking.releaseDueAt ? (
         <FormNotice tone="info" testID="booking-release-due">
           {t(`${roleScope}.releaseDue`, { date: formatDateTime(booking.releaseDueAt, locale) })}

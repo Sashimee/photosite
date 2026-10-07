@@ -2049,6 +2049,57 @@
           "notFound": "This booking could not be found."
         }
       },
+      "refund": {
+        "cta": "Request a refund",
+        "title": "Request a refund",
+        "description": "Leave the amount empty to refund everything still refundable. A partial refund doesn't stop the scheduled release: the photographer receives the reduced amount. A full refund ends the booking.",
+        "amountLabel": "Amount",
+        "amountPlaceholder": "Full amount",
+        "reasonLabel": "Reason",
+        "submitCta": "Request refund",
+        "pending": "Requesting…",
+        "dismissCta": "Cancel",
+        "invalidAmount": "Enter an amount above zero with at most 2 decimal places.",
+        "donePartial": "Refund of {amount} recorded. Refunded so far: {total}. The booking stays open, and the scheduled release still goes ahead with the reduced amount.",
+        "doneFull": "Refund of {amount} recorded. The booking is now refunded in full.",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "busy": "Another refund or the payment release is in progress for this booking. Try again in a moment.",
+          "conflict": "This booking can't be refunded right now. It may have changed, have an open dispute, or its payment may not have settled yet. Refresh to see its current status.",
+          "invalid": "This amount can't be refunded. It may be more than what's still refundable, or leave too little of the booking behind. Try another amount, or leave it empty to refund everything that's left.",
+          "forbidden": "Only the client of this booking can request a refund.",
+          "notFound": "This booking could not be found.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "cancel": {
+        "cta": "Cancel booking",
+        "confirmTitle": "Cancel this booking?",
+        "confirmDescription": "The booking won't go ahead. This can't be undone.",
+        "reasonLabel": "Reason (optional)",
+        "confirmCta": "Cancel booking",
+        "pending": "Cancelling…",
+        "dismissCta": "Keep booking",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "This booking can't be cancelled anymore. Refresh to see its current status.",
+          "invalid": "Check the reason and try again.",
+          "forbidden": "You don't have access to this booking.",
+          "notFound": "This booking could not be found."
+        }
+      },
+      "documents": {
+        "receiptCta": "Download receipt",
+        "feeInvoiceCta": "Download fee invoice",
+        "pending": "Preparing…",
+        "preparing": "This document is being prepared. Try again shortly.",
+        "errors": {
+          "generic": "We couldn't open the document. Try again.",
+          "forbidden": "You don't have access to this document.",
+          "notFound": "This booking could not be found."
+        }
+      },
       "pay": {
         "title": "Pay for this booking",
         "description": "Pay by card, Apple Pay or Google Pay. The payment is held until the photographer delivers.",

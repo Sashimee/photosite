@@ -58,6 +58,7 @@ function StudioBookingDetail({ id }: { id: string }) {
     <BookingDetailView
       booking={booking.state.booking}
       viewer="photographer"
+      onBookingChanged={booking.replaceBooking}
       onDelivered={booking.reload}
     />
   ) : (

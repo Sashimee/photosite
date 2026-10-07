@@ -190,6 +190,39 @@ describe('studio booking detail', () => {
     );
   });
 
+  it('offers the fee invoice, and neither the receipt nor a refund, on a released booking', async () => {
+    mockWorld({ booking: () => ok(makeBooking('b1', { status: 'released' })) });
+    open('/studio/bookings/b1');
+
+    await screen.findByTestId('booking-document-fee-invoice');
+    expect(screen.queryByTestId('booking-document-receipt')).toBeNull();
+    expect(screen.queryByTestId('booking-refund')).toBeNull();
+  });
+
+  it('offers no refund to the photographer on a paid booking', async () => {
+    mockWorld({ booking: () => ok(makeBooking('b1', { status: 'paid_held' })) });
+    open('/studio/bookings/b1');
+
+    await screen.findByTestId('booking-delivery-form');
+    expect(screen.queryByTestId('booking-refund')).toBeNull();
+  });
+
+  it('cancels a booking awaiting payment and re-renders from the returned booking', async () => {
+    mockWorld({ booking: () => ok(makeBooking('b1', { status: 'pending_payment' })) });
+    mockedPost.mockReturnValue(ok(makeBooking('b1', { status: 'cancelled' })));
+    open('/studio/bookings/b1');
+
+    fireEvent.press(await screen.findByTestId('booking-cancel'));
+    fireEvent.press(screen.getByTestId('booking-cancel-confirm'));
+
+    await screen.findByTestId('booking-timeline-exit');
+    expect(screen.queryByTestId('booking-cancel')).toBeNull();
+    expect(mockedPost).toHaveBeenCalledWith('/v1/bookings/{id}/cancel', {
+      params: { path: { id: 'b1' } },
+      body: {},
+    });
+  });
+
   it('offers no accept-delivery button to the photographer', async () => {
     mockWorld({ booking: () => ok(makeBooking('b1', { status: 'delivered' })) });
     open('/studio/bookings/b1');
