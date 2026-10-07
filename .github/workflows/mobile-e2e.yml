@@ -43,6 +43,8 @@ jobs:
       S3_PUBLIC_BASE_URL: http://127.0.0.1:9000/photoo-public
       PORT: 4000
       PUBLIC_API_URL: http://127.0.0.1:4000
+      WEB_ORIGINS: http://127.0.0.1:3000
+      WEB_APP_URL: http://127.0.0.1:3000
       NODE_ENV: development
       TRUSTED_PROXIES: ''
       AUTH_SECRET: dev-only-auth-secret-change-me-please-32-chars-min
