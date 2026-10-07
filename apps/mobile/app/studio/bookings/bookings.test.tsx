@@ -158,7 +158,7 @@ describe('studio booking detail', () => {
     expect(screen.getByTestId('booking-release-due')).toHaveTextContent(
       /releases to you automatically/,
     );
-    expect(screen.queryByTestId('booking-pay-pending')).toBeNull();
+    expect(screen.queryByTestId('booking-pay-panel')).toBeNull();
   });
 
   it('explains a dispute to the photographer', async () => {

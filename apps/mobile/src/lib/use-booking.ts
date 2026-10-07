@@ -47,5 +47,9 @@ export function useBooking(id: string) {
     setAttempt((current) => current + 1);
   }, []);
 
-  return { state, reload };
+  const replaceBooking = useCallback((booking: Booking) => {
+    setState({ status: 'ready', booking });
+  }, []);
+
+  return { state, reload, replaceBooking };
 }

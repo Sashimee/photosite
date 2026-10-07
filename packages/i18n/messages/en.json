@@ -2017,7 +2017,6 @@
         "loadFailed": "We couldn't load this booking.",
         "retry": "Try again",
         "sessionExpired": "Your session has expired. Sign in again to see this booking.",
-        "payPending": "Awaiting payment. You can pay on photoo.lu for now; if you have already paid, it can take a moment to show here.",
         "releaseDue": "Payment releases to the photographer automatically on {date} unless you accept the delivery before then.",
         "disputed": "This payment has been disputed with your bank. Photoo is handling the dispute, and there's nothing you need to do in the app."
       },

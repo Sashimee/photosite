@@ -12,7 +12,7 @@ function ClientBookingDetail({ id }: { id: string }) {
   const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
-  const { state, reload } = useBooking(id);
+  const { state, reload, replaceBooking } = useBooking(id);
 
   function body() {
     switch (state.status) {
@@ -44,7 +44,11 @@ function ClientBookingDetail({ id }: { id: string }) {
         );
       case 'ready':
         return state.booking.clientId === user?.id ? (
-          <BookingDetailView booking={state.booking} viewer="client" />
+          <BookingDetailView
+            booking={state.booking}
+            viewer="client"
+            onBookingChanged={replaceBooking}
+          />
         ) : (
           <StudioMessage
             testID="booking-detail-not-found"

@@ -8,6 +8,7 @@ jest.mock('@stripe/stripe-react-native', () => {
   return {
     ...bundled,
     providerProps,
+    PaymentSheetError: { Failed: 'Failed', Canceled: 'Canceled', Timeout: 'Timeout' },
     StripeProvider: ({ children, ...props }) => {
       providerProps.push(props);
       return children;
