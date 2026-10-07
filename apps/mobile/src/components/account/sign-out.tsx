@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
+import { unregisterPushDevice } from '../../lib/push';
 import { FormNotice } from '../form/form-notice';
 import { ConfirmAction } from '../requests/confirm-action';
 import { PrimaryButton } from '../form/primary-button';
@@ -24,8 +25,7 @@ export function SignOut() {
     setPending(true);
     setError(null);
     try {
-      await api.POST('/v1/auth/sign-out').catch(() => undefined);
-      await signOut();
+      await signOut({ remote: true });
     } finally {
       inFlight.current = false;
       setPending(false);
@@ -40,6 +40,7 @@ export function SignOut() {
     setEverywherePending(true);
     setError(null);
     try {
+      await unregisterPushDevice();
       const { response } = await api.POST('/v1/auth/sessions/revoke-all');
       if (!response.ok && response.status !== 401) {
         setError(t('mobile.account.session.errors.generic'));

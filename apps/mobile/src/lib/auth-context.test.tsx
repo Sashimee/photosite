@@ -10,7 +10,7 @@ jest.mock('expo-secure-store', () => ({
 }));
 
 jest.mock('./api', () => ({
-  api: { GET: jest.fn(), DELETE: jest.fn() },
+  api: { GET: jest.fn(), POST: jest.fn(), DELETE: jest.fn() },
   setUnauthorizedListener: jest.fn(),
 }));
 
@@ -33,6 +33,7 @@ import { AuthProvider, useAuth, type AuthContextValue, type SessionUser } from '
 const mockedSecureStore = jest.mocked(SecureStore);
 const mockedGet = jest.mocked(api.GET);
 const mockedDelete = jest.mocked(api.DELETE);
+const mockedPost = jest.mocked(api.POST);
 const mockedSetUnauthorizedListener = jest.mocked(setUnauthorizedListener);
 
 const TOKEN_KEY = 'photoo.session.token';
@@ -272,7 +273,7 @@ describe('AuthProvider', () => {
   });
 
   describe('push device unregistration', () => {
-    let signOut: () => Promise<void>;
+    let signOut: (options?: { remote?: boolean }) => Promise<void>;
 
     function Capture() {
       signOut = useAuth().signOut;
@@ -326,6 +327,57 @@ describe('AuthProvider', () => {
       expect(deleteOrder).toBeLessThan(clearOrder);
       expect(resetChatSocket).toHaveBeenCalledTimes(1);
       screen.getByText('status:signed-out');
+    });
+
+    it('unregisters the device before ending the server session on a remote sign-out', async () => {
+      storeSignedInSession();
+      mockedDelete.mockResolvedValue({ response: new Response(null, { status: 204 }) });
+      mockedPost.mockResolvedValue({ response: new Response(null, { status: 204 }) });
+      renderCapture();
+      await waitFor(() => screen.getByText('status:signed-in'));
+
+      await act(async () => {
+        await signOut({ remote: true });
+      });
+
+      expect(mockedDelete).toHaveBeenCalledWith('/v1/me/devices/{id}', {
+        params: { path: { id: 'device-1' } },
+        signal: expect.anything(),
+      });
+      expect(mockedPost).toHaveBeenCalledWith('/v1/auth/sign-out');
+      expect(mockedDelete.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+        mockedPost.mock.invocationCallOrder[0] ?? 0,
+      );
+      expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith(TOKEN_KEY, expect.anything());
+      screen.getByText('status:signed-out');
+    });
+
+    it('still clears the session when the remote sign-out call cannot reach the API', async () => {
+      storeSignedInSession();
+      mockedDelete.mockResolvedValue({ response: new Response(null, { status: 204 }) });
+      mockedPost.mockRejectedValue(new Error('offline'));
+      renderCapture();
+      await waitFor(() => screen.getByText('status:signed-in'));
+
+      await act(async () => {
+        await signOut({ remote: true });
+      });
+
+      expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith(TOKEN_KEY, expect.anything());
+      screen.getByText('status:signed-out');
+    });
+
+    it('does not call POST /v1/auth/sign-out on a local sign-out', async () => {
+      storeSignedInSession();
+      mockedDelete.mockResolvedValue({ response: new Response(null, { status: 204 }) });
+      renderCapture();
+      await waitFor(() => screen.getByText('status:signed-in'));
+
+      await act(async () => {
+        await signOut();
+      });
+
+      expect(mockedPost).not.toHaveBeenCalled();
     });
 
     it('still clears the session and reports the failure when the DELETE rejects', async () => {

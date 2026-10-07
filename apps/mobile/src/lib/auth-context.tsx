@@ -28,7 +28,7 @@ export interface AuthContextValue {
   status: AuthStatus;
   user: SessionUser | null;
   signIn: (user: SessionUser, session: StoredSession) => Promise<void>;
-  signOut: () => Promise<void>;
+  signOut: (options?: { remote?: boolean }) => Promise<void>;
   updateUser: (user: SessionUser) => void;
   // Re-checks GET /v1/auth/session against whatever token is already stored,
   // for the "check your email" continue button: no-op when there is none.
@@ -48,13 +48,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const signingOutRef = useRef(false);
 
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(async (options?: { remote?: boolean }) => {
     if (signingOutRef.current) {
       return;
     }
     signingOutRef.current = true;
     try {
       await unregisterPushDevice();
+      if (options?.remote) {
+        await api.POST('/v1/auth/sign-out').catch(() => undefined);
+      }
       resetChatSocket();
       await clearStoredSession();
       setUser(null);

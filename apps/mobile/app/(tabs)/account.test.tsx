@@ -23,8 +23,14 @@ jest.mock('../../src/lib/api', () => ({
   setUnauthorizedListener: jest.fn(),
 }));
 
+jest.mock('../../src/lib/push', () => ({
+  registerPushDevice: jest.fn(),
+  unregisterPushDevice: jest.fn(),
+}));
+
 import '../../src/lib/i18n';
 import { api } from '../../src/lib/api';
+import { unregisterPushDevice } from '../../src/lib/push';
 
 function signedIn(roles: string[]) {
   return {
@@ -153,8 +159,7 @@ describe('account tab profile and roles', () => {
 });
 
 describe('account tab sign out', () => {
-  it('signs out through the API then clears the local session', async () => {
-    jest.mocked(api.POST).mockResolvedValue(reply(204));
+  it('delegates the whole sign-out sequence to the auth provider', async () => {
     renderRouter('./app', { initialUrl: '/account' });
 
     fireEvent.press(await screen.findByTestId('account-sign-out'));
@@ -162,29 +167,8 @@ describe('account tab sign out', () => {
     await waitFor(() => {
       expect(mockSignOut).toHaveBeenCalledTimes(1);
     });
-    expect(api.POST).toHaveBeenCalledWith('/v1/auth/sign-out');
-  });
-
-  it('clears the local session when the API answers 401', async () => {
-    jest.mocked(api.POST).mockResolvedValue(reply(401, { code: 'UNAUTHORIZED' }));
-    renderRouter('./app', { initialUrl: '/account' });
-
-    fireEvent.press(await screen.findByTestId('account-sign-out'));
-
-    await waitFor(() => {
-      expect(mockSignOut).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  it('clears the local session when the call cannot reach the API', async () => {
-    jest.mocked(api.POST).mockRejectedValue(new Error('offline'));
-    renderRouter('./app', { initialUrl: '/account' });
-
-    fireEvent.press(await screen.findByTestId('account-sign-out'));
-
-    await waitFor(() => {
-      expect(mockSignOut).toHaveBeenCalledTimes(1);
-    });
+    expect(mockSignOut).toHaveBeenCalledWith({ remote: true });
+    expect(api.POST).not.toHaveBeenCalled();
   });
 
   it('asks for confirmation before signing out everywhere', async () => {
@@ -211,6 +195,9 @@ describe('account tab sign out', () => {
       expect(mockSignOut).toHaveBeenCalledTimes(1);
     });
     expect(api.POST).toHaveBeenCalledWith('/v1/auth/sessions/revoke-all');
+    expect(jest.mocked(unregisterPushDevice).mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      jest.mocked(api.POST).mock.invocationCallOrder[0] ?? 0,
+    );
   });
 
   it('clears the local session when revoke-all answers 401', async () => {
