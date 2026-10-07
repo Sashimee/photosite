@@ -86,6 +86,10 @@ name: Request a photographer, receive a quote and accept it
 - tapOn:
     id: request-address-line1
 - inputText: 1 Place Guillaume II
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: request-address-postal-code
 - tapOn:
     id: request-address-postal-code
 - inputText: L-1648
@@ -96,6 +100,10 @@ name: Request a photographer, receive a quote and accept it
 - tapOn:
     id: request-budget-min
 - inputText: '1000'
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: request-budget-max
 - tapOn:
     id: request-budget-max
 - inputText: '3000'
