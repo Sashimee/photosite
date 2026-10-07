@@ -20,7 +20,11 @@ export async function configureApp(app: NestFastifyApplication, config: Env): Pr
   captureRawBodyOn(fastify, [STRIPE_WEBHOOK_PATH]);
 
   await app.register(helmet);
-  await app.register(cors, { origin: config.WEB_ORIGINS, credentials: true });
+  await app.register(cors, {
+    origin: config.WEB_ORIGINS,
+    credentials: true,
+    exposedHeaders: ['Content-Disposition'],
+  });
 
   app.setGlobalPrefix(API_PREFIX, { exclude: EXCLUDED_FROM_PREFIX });
 }
