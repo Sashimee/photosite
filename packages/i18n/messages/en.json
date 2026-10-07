@@ -974,6 +974,8 @@
           "total": "Total",
           "refunded": "Refunded so far",
           "reversed": "Reversed from the transfer so far",
+          "refundable": "Refundable now",
+          "reversible": "Reversible now",
           "limitHint": "The API checks the maximum refund when you submit. After release, a refund cannot exceed what is left on the photographer's transfer; the platform fee is not refunded."
         },
         "fields": {
@@ -994,6 +996,54 @@
           "charge": "Charge",
           "transfer": "Transfer",
           "hint": "Shown as text on purpose. Copy an id to look it up in the Stripe dashboard."
+        },
+        "ledger": {
+          "title": "Ledger",
+          "caption": "Ledger entries for this booking, oldest first",
+          "empty": "No ledger entries yet.",
+          "truncated": "Showing the oldest {count} entries. More exist and are not shown here.",
+          "columns": {
+            "occurredAt": "When",
+            "type": "Type",
+            "amount": "Amount",
+            "stripeObjectId": "Stripe object"
+          },
+          "types": {
+            "charge": "Charge",
+            "platform_fee": "Platform fee",
+            "transfer": "Transfer",
+            "refund": "Refund",
+            "reversal": "Reversal",
+            "payout": "Payout"
+          }
+        },
+        "disputes": {
+          "title": "Disputes",
+          "caption": "Disputes opened on this booking",
+          "empty": "No disputes on this booking.",
+          "columns": {
+            "id": "Dispute",
+            "status": "Status",
+            "reason": "Reason",
+            "resolution": "Resolution",
+            "amountRefunded": "Refunded",
+            "openedBy": "Opened by",
+            "admin": "Admin",
+            "openedAt": "Opened",
+            "updatedAt": "Updated"
+          }
+        },
+        "payout": {
+          "title": "Photographer payout",
+          "hint": "The Connect account as last reported by Stripe webhooks, not a live lookup.",
+          "none": "The photographer has no Connect account on record.",
+          "stripeAccountId": "Connect account",
+          "onboardingComplete": "Onboarding complete",
+          "payoutsEnabled": "Payouts enabled",
+          "yes": "Yes",
+          "no": "No",
+          "entriesCaption": "Payout ledger entries for this booking",
+          "noEntries": "No payout entries recorded for this booking."
         },
         "actions": {
           "title": "Actions",
