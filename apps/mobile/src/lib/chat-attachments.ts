@@ -1,6 +1,10 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
-import { MAX_ATTACHMENTS_PER_MESSAGE, UPLOAD_PURPOSE_LIMITS } from '@photoo/shared';
+import {
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  UPLOAD_PURPOSE_LIMITS,
+  type UploadPurpose,
+} from '@photoo/shared';
 
 import { api } from './api';
 import type { ApiErrorLike } from './auth-errors';
@@ -32,19 +36,23 @@ export type AttachmentRejection = 'unsupportedType' | 'tooLarge';
 
 export type UploadStage = 'uploading' | 'scanning';
 
-export type ChatUploadErrorKind = 'upload' | 'infected' | 'scanFailed' | 'scanTimeout';
+export type UploadErrorKind = 'upload' | 'infected' | 'scanFailed' | 'scanTimeout';
 
-export class ChatUploadError extends Error {
-  readonly kind: ChatUploadErrorKind;
+export type ChatUploadErrorKind = UploadErrorKind;
+
+export class UploadError extends Error {
+  readonly kind: UploadErrorKind;
   readonly apiError: ApiErrorLike | undefined;
 
-  constructor(kind: ChatUploadErrorKind, message: string, apiError?: ApiErrorLike) {
+  constructor(kind: UploadErrorKind, message: string, apiError?: ApiErrorLike) {
     super(message);
-    this.name = 'ChatUploadError';
+    this.name = 'UploadError';
     this.kind = kind;
     this.apiError = apiError;
   }
 }
+
+export { UploadError as ChatUploadError };
 
 export class AttachmentRejectedError extends Error {
   readonly reason: AttachmentRejection;
@@ -58,6 +66,13 @@ export class AttachmentRejectedError extends Error {
 
 const LIMITS = UPLOAD_PURPOSE_LIMITS.chat_attachment;
 const ALLOWED_MIME_TYPES: readonly string[] = LIMITS.mimeTypes;
+
+export interface UploadedFile {
+  uploadId: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+}
 
 export const MAX_ATTACHMENTS = MAX_ATTACHMENTS_PER_MESSAGE;
 export const MAX_ATTACHMENT_BYTES = LIMITS.maxSizeBytes;
@@ -143,6 +158,27 @@ export async function prepareFile(file: PickedFile): Promise<PreparedFile> {
   };
 }
 
+export async function prepareOriginalFile(
+  file: PickedFile,
+  purpose: UploadPurpose,
+): Promise<PreparedFile> {
+  const limits = UPLOAD_PURPOSE_LIMITS[purpose];
+  if (file.mimeType === undefined || !limits.mimeTypes.includes(file.mimeType)) {
+    throw new AttachmentRejectedError('unsupportedType');
+  }
+  const blob = await readBlob(file.uri);
+  if (blob.size > limits.maxSizeBytes) {
+    throw new AttachmentRejectedError('tooLarge');
+  }
+  return {
+    uri: file.uri,
+    name: file.name,
+    mimeType: file.mimeType,
+    sizeBytes: blob.size,
+    blob,
+  };
+}
+
 function putWithProgress(
   url: string,
   blob: Blob,
@@ -164,11 +200,11 @@ function putWithProgress(
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve();
       } else {
-        reject(new ChatUploadError('upload', `Upload failed with HTTP ${String(xhr.status)}`));
+        reject(new UploadError('upload', `Upload failed with HTTP ${String(xhr.status)}`));
       }
     };
     xhr.onerror = () => {
-      reject(new ChatUploadError('upload', 'Upload failed'));
+      reject(new UploadError('upload', 'Upload failed'));
     };
     xhr.send(blob);
   });
@@ -185,34 +221,35 @@ async function waitForScan(uploadId: string): Promise<void> {
       params: { path: { id: uploadId } },
     });
     if (!data) {
-      throw new ChatUploadError('upload', 'Could not check the scan status', error);
+      throw new UploadError('upload', 'Could not check the scan status', error);
     }
     if (data.status === 'clean' || data.status === 'processed') {
       return;
     }
     if (data.status === 'infected') {
-      throw new ChatUploadError('infected', 'The file failed the virus scan');
+      throw new UploadError('infected', 'The file failed the virus scan');
     }
     if (data.status === 'failed') {
-      throw new ChatUploadError('scanFailed', 'The scan could not complete');
+      throw new UploadError('scanFailed', 'The scan could not complete');
     }
     if (Date.now() >= deadline) {
-      throw new ChatUploadError('scanTimeout', 'The scan is taking too long');
+      throw new UploadError('scanTimeout', 'The scan is taking too long');
     }
     await sleep(SCAN_POLL_INTERVAL_MS);
   }
 }
 
-export async function uploadChatAttachment(
+export async function uploadFile(
+  purpose: UploadPurpose,
   file: PreparedFile,
   handlers: { onProgress: (percent: number) => void; onStageChange: (stage: UploadStage) => void },
-): Promise<PendingAttachment> {
+): Promise<UploadedFile> {
   handlers.onStageChange('uploading');
   const created = await api.POST('/v1/uploads', {
-    body: { purpose: 'chat_attachment', mimeType: file.mimeType, sizeBytes: file.sizeBytes },
+    body: { purpose, mimeType: file.mimeType, sizeBytes: file.sizeBytes },
   });
   if (!created.data) {
-    throw new ChatUploadError('upload', 'Could not start the upload', created.error);
+    throw new UploadError('upload', 'Could not start the upload', created.error);
   }
 
   await putWithProgress(created.data.url, file.blob, created.data.headers, handlers.onProgress);
@@ -221,7 +258,7 @@ export async function uploadChatAttachment(
     params: { path: { id: created.data.uploadId } },
   });
   if (!completed.data) {
-    throw new ChatUploadError('upload', 'Could not confirm the upload', completed.error);
+    throw new UploadError('upload', 'Could not confirm the upload', completed.error);
   }
 
   handlers.onStageChange('scanning');
@@ -232,4 +269,11 @@ export async function uploadChatAttachment(
     mimeType: file.mimeType,
     sizeBytes: file.sizeBytes,
   };
+}
+
+export function uploadChatAttachment(
+  file: PreparedFile,
+  handlers: { onProgress: (percent: number) => void; onStageChange: (stage: UploadStage) => void },
+): Promise<PendingAttachment> {
+  return uploadFile('chat_attachment', file, handlers);
 }

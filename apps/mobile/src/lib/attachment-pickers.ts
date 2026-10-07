@@ -41,26 +41,42 @@ export async function pickAttachments(source: PickSource, remaining: number): Pr
     };
   }
 
-  const permission =
-    source === 'camera'
-      ? await ImagePicker.requestCameraPermissionsAsync()
-      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (source === 'camera') {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      return { status: 'denied', canAskAgain: permission.canAskAgain };
+    }
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'] });
+    return result.canceled
+      ? { status: 'cancelled' }
+      : { status: 'picked', files: fromImageAssets(result.assets) };
+  }
+
+  return pickFromLibrary(Math.max(1, Math.min(remaining, MAX_ATTACHMENTS)), {});
+}
+
+async function pickFromLibrary(
+  selectionLimit: number,
+  options: ImagePicker.ImagePickerOptions,
+): Promise<PickResult> {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
     return { status: 'denied', canAskAgain: permission.canAskAgain };
   }
-
-  const result =
-    source === 'camera'
-      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'] })
-      : await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'],
-          allowsMultipleSelection: true,
-          selectionLimit: Math.max(1, Math.min(remaining, MAX_ATTACHMENTS)),
-        });
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsMultipleSelection: true,
+    selectionLimit,
+    ...options,
+  });
   if (result.canceled) {
     return { status: 'cancelled' };
   }
   return { status: 'picked', files: fromImageAssets(result.assets) };
+}
+
+export function pickPortfolioPhotos(selectionLimit: number): Promise<PickResult> {
+  return pickFromLibrary(selectionLimit, { quality: 1 });
 }
 
 export async function openAppSettings(): Promise<void> {
