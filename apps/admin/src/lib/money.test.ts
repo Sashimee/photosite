@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { centsToMajorUnits, minorUnitDigits, parseAmountToCents } from './money';
+import {
+  centsToAmountInput,
+  centsToMajorUnits,
+  minorUnitDigits,
+  parseAmountToCents,
+} from './money';
 
 describe('parseAmountToCents', () => {
   it.each([
@@ -103,5 +108,18 @@ describe('centsToMajorUnits', () => {
   it('scales by the currency minor unit', () => {
     expect(centsToMajorUnits(1234, 'EUR')).toBe(12.34);
     expect(centsToMajorUnits(1000, 'JPY')).toBe(1000);
+  });
+});
+
+describe('centsToAmountInput', () => {
+  it('writes exact decimals that parse back to the same cents', () => {
+    expect(centsToAmountInput(1234, 'EUR')).toBe('12.34');
+    expect(centsToAmountInput(5, 'EUR')).toBe('0.05');
+    expect(centsToAmountInput(1000, 'JPY')).toBe('1000');
+    expect(centsToAmountInput(1, 'KWD')).toBe('0.001');
+    expect(parseAmountToCents(centsToAmountInput(2500, 'EUR'), 'EUR')).toEqual({
+      ok: true,
+      amountCents: 2500,
+    });
   });
 });
