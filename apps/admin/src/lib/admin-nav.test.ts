@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { resolveNavSections } from './admin-nav';
+import type { AdminPermission } from '@photoo/shared';
+
+import { canOpenSection, resolveNavSections } from './admin-nav';
 
 function fakeT() {
   return vi.fn((key: string, values?: Record<string, unknown>) =>
@@ -76,5 +78,40 @@ describe('resolveNavSections', () => {
       'data-requests',
       'settings',
     ]);
+  });
+});
+
+describe('canOpenSection', () => {
+  it.each([
+    ['verification', 'verification'],
+    ['provenance', 'moderation'],
+    ['moderation', 'moderation'],
+    ['data-requests', 'support'],
+    ['finance', 'finance'],
+  ] as const)('opens %s only with the %s permission', (id, permission) => {
+    const others = (['verification', 'moderation', 'support', 'finance'] as const).filter(
+      (candidate) => candidate !== permission,
+    );
+
+    expect(canOpenSection(id, [permission])).toBe(true);
+    expect(canOpenSection(id, [])).toBe(false);
+    expect(canOpenSection(id, others)).toBe(false);
+  });
+
+  it.each(['dashboard', 'health', 'users', 'settings'])(
+    'opens %s with no permission at all',
+    (id) => {
+      expect(canOpenSection(id, [])).toBe(true);
+    },
+  );
+
+  it('does not treat superadmin as a grant for another section', () => {
+    const permissions: AdminPermission[] = ['superadmin'];
+
+    expect(canOpenSection('verification', permissions)).toBe(false);
+  });
+
+  it('throws on an unknown section id instead of defaulting to open', () => {
+    expect(() => canOpenSection('nope', ['finance'])).toThrow(/Unknown admin nav section: nope/);
   });
 });
