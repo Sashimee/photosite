@@ -21,11 +21,15 @@ function fromImageAssets(assets: ImagePicker.ImagePickerAsset[]): PickedFile[] {
   }));
 }
 
-export async function pickAttachments(source: PickSource, remaining: number): Promise<PickResult> {
+export async function pickAttachments(
+  source: PickSource,
+  remaining: number,
+  options: { single?: boolean } = {},
+): Promise<PickResult> {
   if (source === 'files') {
     const result = await DocumentPicker.getDocumentAsync({
       type: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
-      multiple: true,
+      multiple: !options.single,
       copyToCacheDirectory: true,
     });
     if (result.canceled) {
@@ -52,7 +56,13 @@ export async function pickAttachments(source: PickSource, remaining: number): Pr
       : { status: 'picked', files: fromImageAssets(result.assets) };
   }
 
-  return pickFromLibrary(Math.max(1, Math.min(remaining, MAX_ATTACHMENTS)), {});
+  return pickFromLibrary(Math.max(1, Math.min(remaining, MAX_ATTACHMENTS)), {
+    allowsMultipleSelection: !options.single,
+  });
+}
+
+export function pickVerificationDocument(source: PickSource): Promise<PickResult> {
+  return pickAttachments(source, 1, { single: true });
 }
 
 async function pickFromLibrary(

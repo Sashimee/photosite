@@ -64,9 +64,9 @@ const config: ExpoConfig = {
       'expo-image-picker',
       {
         photosPermission:
-          'Photoo accesses your photos only when you choose one to attach to a message or add to your portfolio.',
+          'Photoo accesses your photos only when you choose one to attach to a message, add to your portfolio or use as a verification document.',
         cameraPermission:
-          'Photoo uses the camera only when you take a photo to attach to a message.',
+          'Photoo uses the camera only when you take a photo to attach to a message or to capture a verification document.',
         microphonePermission: false,
       },
     ],

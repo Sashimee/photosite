@@ -133,9 +133,13 @@ async function readBlob(uri: string): Promise<Blob> {
   return response.blob();
 }
 
-export async function prepareFile(file: PickedFile): Promise<PreparedFile> {
+export async function prepareFile(
+  file: PickedFile,
+  purpose: UploadPurpose = 'chat_attachment',
+): Promise<PreparedFile> {
+  const limits = UPLOAD_PURPOSE_LIMITS[purpose];
   const isImage = file.mimeType === undefined || isImageMimeType(file.mimeType);
-  if (!isImage && !isAllowedAttachmentType(file.mimeType)) {
+  if (!isImage && (file.mimeType === undefined || !limits.mimeTypes.includes(file.mimeType))) {
     throw new AttachmentRejectedError('unsupportedType');
   }
 
@@ -146,7 +150,7 @@ export async function prepareFile(file: PickedFile): Promise<PreparedFile> {
     blob = await readBlob(candidate.uri);
   }
 
-  if (blob.size > MAX_ATTACHMENT_BYTES) {
+  if (blob.size > limits.maxSizeBytes) {
     throw new AttachmentRejectedError('tooLarge');
   }
   return {
