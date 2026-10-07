@@ -197,12 +197,6 @@ jobs:
           E2E_BUILD: '1'
           EXPO_PUBLIC_API_URL: http://10.0.2.2:4000
         run: npx expo prebuild --platform android --clean
-      - name: Bundle the JS once, outside Gradle, to fail fast
-        working-directory: apps/mobile
-        env:
-          NODE_ENV: production
-          EXPO_PUBLIC_API_URL: http://10.0.2.2:4000
-        run: npx expo export --platform android --output-dir "$RUNNER_TEMP/export"
       - name: Assemble the release APK, signed with the template's debug keystore
         working-directory: apps/mobile/android
         env:
