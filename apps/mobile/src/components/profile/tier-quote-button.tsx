@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
 
@@ -26,15 +26,20 @@ export function TierQuoteButton({
   const { t } = useTranslation();
   const router = useRouter();
   const { status } = useAuth();
+  const inFlight = useRef(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handlePress() {
+    if (inFlight.current) {
+      return;
+    }
     if (status !== 'signed-in') {
       router.push(signInHref(`/photographers/${slug}`));
       return;
     }
 
+    inFlight.current = true;
     setPending(true);
     setError(null);
     const result = await api
@@ -43,6 +48,7 @@ export function TierQuoteButton({
         body: { productTierId: tierId },
       })
       .catch(() => null);
+    inFlight.current = false;
     setPending(false);
 
     if (!result) {

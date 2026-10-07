@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { router } from 'expo-router';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 
 import { CATALOGS } from '@photoo/i18n';
@@ -65,6 +66,21 @@ const PROFILE = {
     { id: 'i1', url: 'https://cdn.example/1.jpg', width: 800, height: 600, order: 0 },
     { id: 'i3', url: 'https://cdn.example/3.jpg', width: 800, height: 600, order: 2 },
   ],
+};
+
+const SUMMARY = {
+  id: 'p1',
+  slug: 'jane-doe',
+  displayName: 'Jane Doe Photography',
+  headline: null,
+  avatarUrl: null,
+  categories: [],
+  languages: [],
+  city: 'Luxembourg',
+  countryCode: 'LU',
+  ratingAvg: 0,
+  ratingCount: 0,
+  startingPrice: null,
 };
 
 const PRODUCTS = [
@@ -275,6 +291,92 @@ describe('photographer profile', () => {
 
     await screen.findByTestId('profile-request-quote');
     expect(screen.getByText('Jane Doe Photography')).toBeTruthy();
+  });
+
+  it('pops back to the existing profile after sign-in without duplicating it', async () => {
+    mockProfileApi();
+    mockedGet.mockImplementation(((path: string) => {
+      if (path === '/v1/photographers') {
+        return Promise.resolve(res({ items: [SUMMARY], nextCursor: null }));
+      }
+      return Promise.resolve(res(path.endsWith('products') ? PRODUCTS : PROFILE));
+    }) as never);
+    mockedPost.mockResolvedValue(
+      res({ user: USER, session: { token: 'tok', expiresAt: '2999-01-01T00:00:00.000Z' } }),
+    );
+    renderRouter('./app', { initialUrl: '/' });
+
+    fireEvent.press(await screen.findByTestId('photographer-row-p1'));
+    await pressWhenReady('profile-request-quote');
+    await screen.findByTestId('sign-in-submit');
+    fireEvent.changeText(screen.getByTestId('sign-in-email'), 'client@example.com');
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct horse battery staple');
+    fireEvent.press(screen.getByTestId('sign-in-submit'));
+
+    await screen.findByTestId('profile-screen');
+    act(() => {
+      router.back();
+    });
+
+    await screen.findByTestId('discover-results');
+    expect(router.canGoBack()).toBe(false);
+  });
+
+  it('pops back to the existing profile after a two-factor sign-in', async () => {
+    mockedGet.mockImplementation(((path: string) => {
+      if (path === '/v1/photographers') {
+        return Promise.resolve(res({ items: [SUMMARY], nextCursor: null }));
+      }
+      return Promise.resolve(res(path.endsWith('products') ? PRODUCTS : PROFILE));
+    }) as never);
+    mockedPost
+      .mockResolvedValueOnce(res({ twoFactorRequired: true }))
+      .mockResolvedValueOnce(
+        res({ user: USER, session: { token: 'tok', expiresAt: '2999-01-01T00:00:00.000Z' } }),
+      );
+    renderRouter('./app', { initialUrl: '/' });
+
+    fireEvent.press(await screen.findByTestId('photographer-row-p1'));
+    await pressWhenReady('profile-request-quote');
+    await screen.findByTestId('sign-in-submit');
+    fireEvent.changeText(screen.getByTestId('sign-in-email'), 'client@example.com');
+    fireEvent.changeText(screen.getByTestId('sign-in-password'), 'correct horse battery staple');
+    fireEvent.press(screen.getByTestId('sign-in-submit'));
+    fireEvent.changeText(await screen.findByTestId('two-factor-code'), '123456');
+    fireEvent.press(screen.getByTestId('two-factor-submit'));
+
+    await screen.findByTestId('profile-screen');
+    act(() => {
+      router.back();
+    });
+
+    await screen.findByTestId('discover-results');
+    expect(router.canGoBack()).toBe(false);
+  });
+
+  it('sends only one request for a double tap on a tier quote', async () => {
+    mockToken = 'tok';
+    mockProfileApi();
+    let release: (value: unknown) => void = () => undefined;
+    mockedPost.mockReturnValue(new Promise((resolve) => (release = resolve)));
+    renderRouter('./app', { initialUrl: '/photographers/jane-doe' });
+
+    await screen.findByTestId('tier-quote-tier1');
+    await waitFor(() => {
+      expect(screen.getByTestId('tier-quote-tier1')).toBeEnabled();
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('tier-quote-tier1'));
+      fireEvent.press(screen.getByTestId('tier-quote-tier1'));
+      await Promise.resolve();
+    });
+
+    expect(mockedPost).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      release(res({ id: 'q1' }, 201));
+      await Promise.resolve();
+    });
+    await screen.findByTestId('quote-detail-not-found');
   });
 
   it('ignores a return destination that is not an in-app path', async () => {
