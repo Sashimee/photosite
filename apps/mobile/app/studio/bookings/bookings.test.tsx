@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { fireEvent, renderRouter, screen } from 'expo-router/testing-library';
+import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import type { ReactNode } from 'react';
 
 jest.mock('../../../src/lib/auth-context', () => ({
@@ -17,6 +17,7 @@ import { api } from '../../../src/lib/api';
 import { makeBooking } from '../../../src/testing/booking-fixtures';
 
 const mockedGet = jest.mocked(api.GET);
+const mockedPost = jest.mocked(api.POST);
 
 function ok(data: unknown) {
   return Promise.resolve({ data, error: undefined, response: new Response(null, { status: 200 }) });
@@ -159,6 +160,43 @@ describe('studio booking detail', () => {
       /releases to you automatically/,
     );
     expect(screen.queryByTestId('booking-pay-panel')).toBeNull();
+  });
+
+  it('delivers a paid booking and reloads it', async () => {
+    let status = 'paid_held';
+    mockWorld({ booking: () => ok(makeBooking('b1', { status })) });
+    mockedPost.mockImplementation((() => {
+      status = 'delivered';
+      return ok({ delivery: { id: 'd1' } });
+    }) as never);
+    open('/studio/bookings/b1');
+
+    fireEvent.changeText(await screen.findByTestId('booking-delivery-message'), 'Done');
+    fireEvent.changeText(
+      screen.getByTestId('booking-delivery-link'),
+      'https://files.example.com/x',
+    );
+    fireEvent.press(screen.getByTestId('booking-delivery-submit'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('booking-delivery-form')).toBeNull();
+    });
+    expect(screen.getByTestId('booking-timeline-step-delivered').props).toMatchObject({
+      accessibilityState: { selected: true },
+    });
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/v1/bookings/{id}/delivery',
+      expect.objectContaining({ params: { path: { id: 'b1' } } }),
+    );
+  });
+
+  it('offers no accept-delivery button to the photographer', async () => {
+    mockWorld({ booking: () => ok(makeBooking('b1', { status: 'delivered' })) });
+    open('/studio/bookings/b1');
+
+    await screen.findByTestId('booking-detail');
+    expect(screen.queryByTestId('booking-accept-delivery')).toBeNull();
+    expect(screen.queryByTestId('booking-delivery-form')).toBeNull();
   });
 
   it('explains a dispute to the photographer', async () => {

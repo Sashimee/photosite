@@ -55,7 +55,11 @@ function StudioBookingDetail({ id }: { id: string }) {
     return <StudioLoading testID="booking-detail-loading" />;
   }
   return booking.state.booking.photographerId === profile.state.profile.id ? (
-    <BookingDetailView booking={booking.state.booking} viewer="photographer" />
+    <BookingDetailView
+      booking={booking.state.booking}
+      viewer="photographer"
+      onDelivered={booking.reload}
+    />
   ) : (
     notFound
   );

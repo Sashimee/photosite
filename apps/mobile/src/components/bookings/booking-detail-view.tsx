@@ -8,6 +8,8 @@ import { formatDateTime } from '../../lib/date-format';
 import { formatMoney, requireMoney } from '../../lib/money';
 import type { BookingViewer } from '../../lib/use-bookings-list';
 import { FormNotice } from '../form/form-notice';
+import { BookingAcceptDelivery } from './booking-accept-delivery';
+import { BookingDeliveryForm } from './booking-delivery-form';
 import { BookingPayPanel } from './booking-pay-panel';
 import { BookingStatusTimeline } from './booking-status-timeline';
 
@@ -15,10 +17,12 @@ export function BookingDetailView({
   booking,
   viewer,
   onBookingChanged,
+  onDelivered,
 }: {
   booking: Booking;
   viewer: BookingViewer;
   onBookingChanged?: (booking: Booking) => void;
+  onDelivered?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const locale = resolveLocale(i18n.language);
@@ -58,6 +62,12 @@ export function BookingDetailView({
 
       {booking.status === 'pending_payment' && viewer === 'client' && onBookingChanged ? (
         <BookingPayPanel bookingId={booking.id} onBookingChanged={onBookingChanged} />
+      ) : null}
+      {viewer === 'photographer' && onDelivered ? (
+        <BookingDeliveryForm booking={booking} onDelivered={onDelivered} />
+      ) : null}
+      {viewer === 'client' && onBookingChanged ? (
+        <BookingAcceptDelivery booking={booking} onBookingChanged={onBookingChanged} />
       ) : null}
       {booking.status === 'delivered' && booking.releaseDueAt ? (
         <FormNotice tone="info" testID="booking-release-due">

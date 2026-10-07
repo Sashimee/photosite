@@ -43,6 +43,10 @@ export function scopedRequestTranslate(t: TFunction): TranslateFn {
     values ? t(`mobile.requests.${key}`, values) : t(`mobile.requests.${key}`);
 }
 
+export function scopedPrefixTranslate(t: TFunction, prefix: string): TranslateFn {
+  return (key, values) => (values ? t(`${prefix}.${key}`, values) : t(`${prefix}.${key}`));
+}
+
 export function scopedQuoteTranslate(t: TFunction): TranslateFn {
   return (key, values) => (values ? t(`mobile.quotes.${key}`, values) : t(`mobile.quotes.${key}`));
 }
