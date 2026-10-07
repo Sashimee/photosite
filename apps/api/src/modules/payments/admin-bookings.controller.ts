@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
-  CursorPaginationQuerySchema,
+  AdminBookingsQuerySchema,
   IdSchema,
   RefundBookingRequestSchema,
   ReverseBookingTransferRequestSchema,
@@ -39,8 +39,8 @@ export class AdminBookingsController {
 
   @Get()
   async list(
-    @Query(new ZodValidationPipe(CursorPaginationQuerySchema))
-    query: ReturnType<(typeof CursorPaginationQuerySchema)['parse']>,
+    @Query(new ZodValidationPipe(AdminBookingsQuerySchema))
+    query: ReturnType<(typeof AdminBookingsQuerySchema)['parse']>,
     @Req() request: FastifyRequest,
   ) {
     await this.adminAccess.requirePermission(request, 'finance');
