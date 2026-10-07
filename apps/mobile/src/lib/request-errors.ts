@@ -42,3 +42,7 @@ export function scopedRequestTranslate(t: TFunction): TranslateFn {
   return (key, values) =>
     values ? t(`mobile.requests.${key}`, values) : t(`mobile.requests.${key}`);
 }
+
+export function scopedQuoteTranslate(t: TFunction): TranslateFn {
+  return (key, values) => (values ? t(`mobile.quotes.${key}`, values) : t(`mobile.quotes.${key}`));
+}

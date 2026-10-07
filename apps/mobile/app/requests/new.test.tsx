@@ -41,6 +41,19 @@ const luxembourg = {
   location: { lat: 49.6116, lng: 6.1319 },
 };
 
+const createdRequest = {
+  id: 'r1',
+  title: 'Wedding',
+  description: 'Two hundred guests',
+  eventDate: '2027-01-01T12:00:00.000Z',
+  address: { line1: '1 Rue Test', city: 'Luxembourg', postalCode: 'L-1111', countryCode: 'LU' },
+  budgetMin: { amountCents: 50000, currency: 'EUR' },
+  budgetMax: { amountCents: 90000, currency: 'EUR' },
+  usage: 'personal',
+  status: 'open',
+  quoteCount: 0,
+};
+
 function ok(data: unknown) {
   return { data, error: undefined, response: new Response(null, { status: 200 }) };
 }
@@ -81,7 +94,13 @@ beforeEach(() => {
     Promise.resolve(
       path === '/v1/countries'
         ? ok([{ code: 'LU', name: 'Luxembourg', currency: 'EUR', defaultLocale: 'fr' }])
-        : ok([luxembourg]),
+        : path === '/v1/requests/mine'
+          ? ok({ items: [], nextCursor: null })
+          : path === '/v1/requests/{id}'
+            ? ok(createdRequest)
+            : path === '/v1/requests/{requestId}/quotes'
+              ? ok({ items: [], nextCursor: null })
+              : ok([luxembourg]),
     )) as unknown as typeof api.GET);
 });
 
@@ -113,7 +132,7 @@ describe('new request screen', () => {
     expect(screen.getByTestId('request-currency').props.children).toBe('EUR');
     fireEvent.press(screen.getByTestId('request-submit'));
 
-    await waitFor(() => screen.getByTestId('requests-new'));
+    await waitFor(() => screen.getByTestId('request-detail'));
     expect(mockedPost).toHaveBeenCalledTimes(1);
     expect(mockedPost).toHaveBeenCalledWith(
       '/v1/requests',
@@ -226,10 +245,10 @@ describe('new request screen', () => {
 
     expect(mockedPost).toHaveBeenCalledTimes(1);
     finish(ok({ id: 'r1' }));
-    await waitFor(() => screen.getByTestId('requests-new'));
+    await waitFor(() => screen.getByTestId('request-detail'));
   });
 
-  it('returns to the requests tab without leaving a stale screen on the stack', async () => {
+  it('opens the new request detail above the tab without a stale form or a second tab group', async () => {
     mockedPost.mockResolvedValue(ok({ id: 'r1' }));
     renderRouter('./app', { initialUrl: '/requests' });
 
@@ -238,9 +257,13 @@ describe('new request screen', () => {
     await pickCity();
     fireEvent.press(screen.getByTestId('request-submit'));
 
-    await waitFor(() => screen.getByTestId('requests-new'));
+    await waitFor(() => screen.getByTestId('request-detail'));
     expect(screen.queryByTestId('request-submit')).toBeNull();
+    expect(mockedGet).toHaveBeenCalledWith(
+      '/v1/requests/{id}',
+      expect.objectContaining({ params: { path: { id: 'r1' } } }),
+    );
     const [root] = store.navigationRef.getRootState().routes;
-    expect(root?.state?.routes.map((route) => route.name)).toEqual(['(tabs)']);
+    expect(root?.state?.routes.map((route) => route.name)).toEqual(['(tabs)', 'requests/[id]']);
   });
 });
