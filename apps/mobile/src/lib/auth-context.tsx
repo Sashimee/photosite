@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
@@ -10,6 +11,8 @@ import {
 import type { components } from '@photoo/api-client';
 
 import { api, setUnauthorizedListener } from './api';
+import { resetChatSocket } from './chat-socket';
+import { unregisterPushDevice } from './push';
 import {
   clearStoredSession,
   getStoredSession,
@@ -42,10 +45,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<SessionUser | null>(null);
 
+  const signingOutRef = useRef(false);
+
   const signOut = useCallback(async () => {
-    await clearStoredSession();
-    setUser(null);
-    setStatus('signed-out');
+    if (signingOutRef.current) {
+      return;
+    }
+    signingOutRef.current = true;
+    try {
+      await unregisterPushDevice();
+      resetChatSocket();
+      await clearStoredSession();
+      setUser(null);
+      setStatus('signed-out');
+    } finally {
+      signingOutRef.current = false;
+    }
   }, []);
 
   const signIn = useCallback(async (nextUser: SessionUser, session: StoredSession) => {

@@ -3,7 +3,7 @@ module.exports = {
   preset: 'jest-expo',
   testTimeout: 30000,
   testPathIgnorePatterns: ['/node_modules/', '/dist/'],
-  setupFiles: ['<rootDir>/jest/setup-env.js'],
+  setupFiles: ['<rootDir>/jest/setup-env.js', '<rootDir>/jest/mock-notifications.js'],
   moduleNameMapper: {
     '\\.css$': '<rootDir>/jest/style-mock.js',
   },
