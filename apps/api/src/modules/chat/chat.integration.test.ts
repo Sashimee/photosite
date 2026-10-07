@@ -971,6 +971,26 @@ describe('chat integration', () => {
       const socket = await connectSocket({ token: user.token });
       expect(socket.connected).toBe(true);
     });
+
+    it('accepts a bearer token with the API origin, as sent by native WebSocket clients', async () => {
+      const user = await signUpAndSignIn(['client'], 'bearer-api-origin');
+      const socket = await connectSocket({ token: user.token, origin: 'http://localhost:4000' });
+      expect(socket.connected).toBe(true);
+    });
+
+    it('rejects a bearer token with an unrelated origin', async () => {
+      const user = await signUpAndSignIn(['client'], 'bearer-evil-origin');
+      await expect(
+        connectSocket({ token: user.token, origin: 'https://evil.example' }),
+      ).rejects.toBeTruthy();
+    });
+
+    it('rejects cookie-only auth with the API origin', async () => {
+      const user = await signUpAndSignIn(['client'], 'cookie-api-origin');
+      await expect(
+        connectSocket({ cookie: user.cookie, origin: 'http://localhost:4000' }),
+      ).rejects.toBeTruthy();
+    });
   });
 
   describe('socket: membership, messaging, read and typing', () => {
