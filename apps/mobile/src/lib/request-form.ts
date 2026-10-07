@@ -51,7 +51,7 @@ export function buildCreateRequestPayload(
     title: values.title.trim(),
     category: values.category,
     description: values.description.trim(),
-    eventDate: values.eventDate ? values.eventDate.toISOString() : '',
+    eventDate: values.eventDate?.toISOString(),
     dateFlexible: values.dateFlexible,
     location: location
       ? { lat: roundCoordinate(location.lat), lng: roundCoordinate(location.lng) }

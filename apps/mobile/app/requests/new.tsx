@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 
@@ -41,8 +41,6 @@ type CitySummary = components['schemas']['CitySummary'];
 type CountrySummary = components['schemas']['CountrySummary'];
 type LocationSource = 'city' | 'device';
 
-const DEFAULT_LEAD_MS = 24 * 60 * 60 * 1000;
-
 function NewRequestForm() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
@@ -50,10 +48,8 @@ function NewRequestForm() {
   const fromPhotographer = SlugSchema.safeParse(photographer).success;
   const locale = resolveLocale(i18n.language);
 
-  const [values, setValues] = useState<RequestFormValues>(() => ({
-    ...EMPTY_REQUEST_FORM_VALUES,
-    eventDate: new Date(Date.now() + DEFAULT_LEAD_MS),
-  }));
+  const [values, setValues] = useState<RequestFormValues>(EMPTY_REQUEST_FORM_VALUES);
+  const inFlight = useRef(false);
   const [location, setLocation] = useState<Coordinates | null>(null);
   const [locationSource, setLocationSource] = useState<LocationSource | null>(null);
   const [cityText, setCityText] = useState('');
@@ -66,16 +62,15 @@ function NewRequestForm() {
 
   const loadCountries = useCallback(async () => {
     setCountriesFailed(false);
-    try {
-      const { data } = await api.GET('/v1/countries');
-      if (data) {
-        setCountries(data);
-        return;
-      }
-    } catch {
-      // handled by the shared failure state below
+    const data = await api
+      .GET('/v1/countries')
+      .then((result) => result.data)
+      .catch(() => undefined);
+    if (data) {
+      setCountries(data);
+    } else {
+      setCountriesFailed(true);
     }
-    setCountriesFailed(true);
   }, []);
 
   useEffect(() => {
@@ -119,6 +114,9 @@ function NewRequestForm() {
   }
 
   async function handleSubmit() {
+    if (inFlight.current) {
+      return;
+    }
     setSubmitError(null);
     setLocationError(null);
 
@@ -138,6 +136,7 @@ function NewRequestForm() {
     }
 
     setErrors({});
+    inFlight.current = true;
     setIsSubmitting(true);
     try {
       const { error, response } = await api.POST('/v1/requests', {
@@ -155,10 +154,11 @@ function NewRequestForm() {
         setSubmitError(requestErrorMessage(scopedRequestTranslate(t), apiError));
         return;
       }
-      router.replace('/requests');
+      router.dismissTo('/requests');
     } catch {
       setSubmitError(t('mobile.requests.form.submitFailed'));
     } finally {
+      inFlight.current = false;
       setIsSubmitting(false);
     }
   }

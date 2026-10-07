@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { store } from 'expo-router/build/global-state/router-store';
 import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import type { ReactNode } from 'react';
 
@@ -52,7 +53,7 @@ function renderForm(url = '/requests/new') {
   return renderRouter('./app', { initialUrl: url });
 }
 
-async function fillEverythingButLocation() {
+async function fillEverythingButLocation({ chooseDate = true } = {}) {
   await waitFor(() => screen.getByTestId('request-address-country-LU'));
   fireEvent.changeText(screen.getByTestId('request-title'), 'Wedding');
   fireEvent.press(screen.getByTestId('request-category-wedding'));
@@ -64,6 +65,9 @@ async function fillEverythingButLocation() {
   fireEvent.changeText(screen.getByTestId('request-budget-min'), '500');
   fireEvent.changeText(screen.getByTestId('request-budget-max'), '900');
   fireEvent.press(screen.getByTestId('request-usage-personal'));
+  if (chooseDate) {
+    fireEvent.press(screen.getByTestId('request-event-date-open'));
+  }
 }
 
 async function pickCity() {
@@ -193,5 +197,50 @@ describe('new request screen', () => {
     await waitFor(() => screen.getByTestId('new-request-error'));
     expect(screen.getByTestId('request-description').props.value).toBe('Two hundred guests');
     expect(screen.getByTestId('request-submit')).toBeEnabled();
+  });
+
+  it('requires an event date to be chosen', async () => {
+    renderForm();
+
+    await fillEverythingButLocation({ chooseDate: false });
+    await pickCity();
+    fireEvent.press(screen.getByTestId('request-submit'));
+
+    await waitFor(() => screen.getByText('This field is required.'));
+    expect(mockedPost).not.toHaveBeenCalled();
+  });
+
+  it('sends one request when submit is pressed twice quickly', async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    mockedPost.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }) as ReturnType<typeof api.POST>,
+    );
+    renderForm();
+
+    await fillEverythingButLocation();
+    await pickCity();
+    fireEvent.press(screen.getByTestId('request-submit'));
+    fireEvent.press(screen.getByTestId('request-submit'));
+
+    expect(mockedPost).toHaveBeenCalledTimes(1);
+    finish(ok({ id: 'r1' }));
+    await waitFor(() => screen.getByTestId('requests-new'));
+  });
+
+  it('returns to the requests tab without leaving a stale screen on the stack', async () => {
+    mockedPost.mockResolvedValue(ok({ id: 'r1' }));
+    renderRouter('./app', { initialUrl: '/requests' });
+
+    fireEvent.press(await screen.findByTestId('requests-new'));
+    await fillEverythingButLocation();
+    await pickCity();
+    fireEvent.press(screen.getByTestId('request-submit'));
+
+    await waitFor(() => screen.getByTestId('requests-new'));
+    expect(screen.queryByTestId('request-submit')).toBeNull();
+    const [root] = store.navigationRef.getRootState().routes;
+    expect(root?.state?.routes.map((route) => route.name)).toEqual(['(tabs)']);
   });
 });

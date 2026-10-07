@@ -1,6 +1,8 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Platform, Pressable, Text, View } from 'react-native';
 
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
 export function DateTimeField({
   label,
   value,
@@ -56,10 +58,22 @@ export function DateTimeField({
         >
           <Text className="text-base text-foreground">{display}</Text>
         </Pressable>
+      ) : value === null ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          onPress={() => {
+            onChange(new Date(minimumDate.getTime() + ONE_HOUR_MS));
+          }}
+          testID={testID ? `${testID}-open` : undefined}
+          className="min-h-11 justify-center rounded-md border border-input bg-background px-3 py-2"
+        >
+          <Text className="text-base text-foreground">{placeholder}</Text>
+        </Pressable>
       ) : (
         <View className="items-start">
           <DateTimePicker
-            value={value ?? minimumDate}
+            value={value}
             mode="datetime"
             display="compact"
             minimumDate={minimumDate}
