@@ -1798,14 +1798,14 @@
       "deletion": {
         "cta": "Delete account",
         "confirmTitle": "Delete your account?",
-        "confirmDescription": "Your account is deactivated immediately and you are signed out on every device. After a 30-day grace period, your personal data is deleted or anonymised, except records we must keep by law or to handle disputes (e.g. invoices, identity verification and booking records). Your chat messages are deleted 90 days after your request. We'll email you a link to cancel the deletion at any time before the grace period ends. Deletion can't start while a verification is in review or a recently accepted quote is still inside the withdrawal period.",
+        "confirmDescription": "Your account is deactivated immediately and you are signed out on every device. After a 30-day grace period, your personal data is deleted or anonymised, except records we must keep by law or to handle disputes (e.g. invoices, identity verification and booking records). Your chat messages are deleted 90 days after your request. We'll email you a link to cancel the deletion at any time before the grace period ends. Your open requests, quotes, job offers and applications are cancelled straight away and are not restored if you cancel the deletion; your public profile is hidden. Deletion can't start while a verification is in review or a recently accepted quote is still inside the withdrawal period.",
         "confirmCta": "Yes, delete my account",
         "pending": "Deleting…",
         "dismissCta": "Cancel",
         "errors": {
           "generic": "Something went wrong. Please try again.",
           "conflict": "Your account can't be deleted right now.",
-          "verificationInReview": "Your account can't be deleted while an identity verification is in review. Wait for the decision or withdraw it, then try again.",
+          "verificationInReview": "Your account can't be deleted while an identity verification is in review. Try again once it has been decided, or contact support.",
           "acceptedQuoteWithdrawalWindow": "Your account can't be deleted while an accepted quote is still inside the withdrawal period. Try again once it has ended.",
           "invalid": "We couldn't process this request. Please try again.",
           "unauthorized": "Your session has ended. Please sign in again.",
