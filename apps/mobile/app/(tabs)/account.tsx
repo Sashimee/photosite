@@ -1,7 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
+import { DataExport } from '../../src/components/account/data-export';
+import { DeleteAccount } from '../../src/components/account/delete-account';
 import { useAuth } from '../../src/lib/auth-context';
 import { signInHref } from '../../src/lib/return-path';
 
@@ -62,7 +64,7 @@ function AccountContent() {
   const isPhotographer = user?.roles.includes('photographer') === true;
 
   return (
-    <View className="flex-1 bg-background px-6 pt-12">
+    <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 pb-12 pt-12">
       <Text className="pb-4 text-2xl font-semibold text-foreground">
         {t('mobile.tabs.account')}
       </Text>
@@ -84,7 +86,9 @@ function AccountContent() {
         </Pressable>
       ) : null}
       <ConsentEntry />
-    </View>
+      <DataExport />
+      <DeleteAccount />
+    </ScrollView>
   );
 }
 
