@@ -78,7 +78,20 @@ beforeEach(() => {
 });
 
 describe('consent settings screen', () => {
-  it('shows the server state per category, treating ads and marketing as one toggle only when both are granted', async () => {
+  it('shows the device decision that governs this device, not the server state', async () => {
+    mockDevice.current = {
+      policyVersion: null,
+      decidedAt: '2026-10-01T10:00:00.000Z',
+      categories: { analytics: true, adsMarketing: false },
+    };
+    mockedGet.mockImplementation((() =>
+      Promise.resolve({
+        data: {
+          consents: [entry('analytics', false), entry('ads', true), entry('marketing', true)],
+        },
+        error: undefined,
+        response: new Response(null, { status: 200 }),
+      })) as never);
     renderRouter('./app', { initialUrl: '/consent' });
 
     await screen.findByTestId('consent-analytics');
