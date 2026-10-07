@@ -80,12 +80,24 @@ export function isScanningError(error: ApiErrorLike | undefined): boolean {
   return error?.code === 'UNPROCESSABLE_ENTITY' && /scanning/i.test(error.message ?? '');
 }
 
-async function renderResizedJpeg(file: PickedFile): Promise<PickedFile> {
+async function readDimensions(file: PickedFile): Promise<{ width: number; height: number }> {
+  if (file.width && file.height) {
+    return { width: file.width, height: file.height };
+  }
+  const probe = await ImageManipulator.manipulate(file.uri).renderAsync();
+  return { width: probe.width, height: probe.height };
+}
+
+async function reencodeAsJpeg(file: PickedFile): Promise<PickedFile> {
+  const { width, height } = await readDimensions(file);
   const context = ImageManipulator.manipulate(file.uri);
-  const longEdgeIsWidth = (file.width ?? 0) >= (file.height ?? 0);
-  const resized = context.resize(
-    longEdgeIsWidth ? { width: MAX_IMAGE_EDGE_PX } : { height: MAX_IMAGE_EDGE_PX },
-  );
+  const longEdge = Math.max(width, height);
+  const resized =
+    longEdge > MAX_IMAGE_EDGE_PX
+      ? context.resize(
+          width >= height ? { width: MAX_IMAGE_EDGE_PX } : { height: MAX_IMAGE_EDGE_PX },
+        )
+      : context;
   const rendered = await resized.renderAsync();
   const saved = await rendered.saveAsync({
     format: SaveFormat.JPEG,
@@ -106,11 +118,6 @@ async function readBlob(uri: string): Promise<Blob> {
   return response.blob();
 }
 
-function needsResize(file: PickedFile, sizeBytes: number): boolean {
-  const longEdge = Math.max(file.width ?? 0, file.height ?? 0);
-  return longEdge > MAX_IMAGE_EDGE_PX || sizeBytes > MAX_ATTACHMENT_BYTES;
-}
-
 export async function prepareFile(file: PickedFile): Promise<PreparedFile> {
   const isImage = file.mimeType === undefined || isImageMimeType(file.mimeType);
   if (!isImage && !isAllowedAttachmentType(file.mimeType)) {
@@ -119,8 +126,8 @@ export async function prepareFile(file: PickedFile): Promise<PreparedFile> {
 
   let candidate = file;
   let blob = await readBlob(file.uri);
-  if (isImage && (!isAllowedAttachmentType(file.mimeType) || needsResize(file, blob.size))) {
-    candidate = await renderResizedJpeg(file);
+  if (isImage) {
+    candidate = await reencodeAsJpeg(file);
     blob = await readBlob(candidate.uri);
   }
 

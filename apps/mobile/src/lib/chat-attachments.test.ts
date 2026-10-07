@@ -13,6 +13,7 @@ jest.mock('./api', () => ({
 }));
 
 const mockManipulate = jest.fn();
+const mockProbeSize = { current: { width: 1000, height: 800 } };
 const mockSaveAsync = jest.fn<() => Promise<{ uri: string; width: number; height: number }>>();
 const mockResize = jest.fn();
 jest.mock('expo-image-manipulator', () => ({
@@ -21,9 +22,13 @@ jest.mock('expo-image-manipulator', () => ({
     manipulate: (uri: string) => {
       mockManipulate(uri);
       return {
+        renderAsync: () => Promise.resolve({ saveAsync: mockSaveAsync, ...mockProbeSize.current }),
         resize: (size: unknown) => {
           mockResize(size);
-          return { renderAsync: () => Promise.resolve({ saveAsync: mockSaveAsync }) };
+          return {
+            renderAsync: () =>
+              Promise.resolve({ saveAsync: mockSaveAsync, ...mockProbeSize.current }),
+          };
         },
       };
     },
@@ -45,6 +50,7 @@ const xhr = installFakeXhr();
 beforeEach(() => {
   jest.clearAllMocks();
   xhr.reset();
+  mockProbeSize.current = { width: 1000, height: 800 };
   mockSaveAsync.mockResolvedValue({ uri: 'file:///resized.jpg', width: 2048, height: 1536 });
 });
 
@@ -83,19 +89,39 @@ describe('prepareFile', () => {
     expect(mockResize).toHaveBeenCalledWith({ height: MAX_IMAGE_EDGE_PX });
   });
 
-  it('leaves a small supported photo untouched', async () => {
-    installFakeFetch({ 'file:///small.png': 40_000 });
+  it('re-encodes a small photo without resizing so metadata is stripped', async () => {
+    installFakeFetch({ 'file:///small.jpg': 40_000, 'file:///resized.jpg': 30_000 });
 
     const prepared = await prepareFile({
-      uri: 'file:///small.png',
-      name: 'small.png',
-      mimeType: 'image/png',
+      uri: 'file:///small.jpg',
+      name: 'small.jpg',
+      mimeType: 'image/jpeg',
       width: 800,
       height: 600,
     });
 
-    expect(mockManipulate).not.toHaveBeenCalled();
-    expect(prepared).toMatchObject({ uri: 'file:///small.png', mimeType: 'image/png' });
+    expect(mockSaveAsync).toHaveBeenCalledTimes(1);
+    expect(mockResize).not.toHaveBeenCalled();
+    expect(prepared).toMatchObject({ uri: 'file:///resized.jpg', sizeBytes: 30_000 });
+  });
+
+  it('re-encodes a document-picker image that has no dimensions, reading them first', async () => {
+    installFakeFetch({});
+    mockProbeSize.current = { width: 1200, height: 900 };
+
+    await prepareFile({ uri: 'file:///doc.jpg', name: 'doc.jpg', mimeType: 'image/jpeg' });
+
+    expect(mockSaveAsync).toHaveBeenCalledTimes(1);
+    expect(mockResize).not.toHaveBeenCalled();
+  });
+
+  it('resizes a document-picker image whose probed dimensions are over the limit', async () => {
+    installFakeFetch({});
+    mockProbeSize.current = { width: 3000, height: 4000 };
+
+    await prepareFile({ uri: 'file:///doc.jpg', name: 'doc.jpg', mimeType: 'image/jpeg' });
+
+    expect(mockResize).toHaveBeenCalledWith({ height: MAX_IMAGE_EDGE_PX });
   });
 
   it('converts an unsupported image format to JPEG', async () => {
@@ -111,6 +137,7 @@ describe('prepareFile', () => {
 
     expect(prepared.mimeType).toBe('image/jpeg');
     expect(prepared.name).toBe('photo.jpg');
+    expect(mockResize).not.toHaveBeenCalled();
   });
 
   it('rejects a file type the API does not accept', async () => {
