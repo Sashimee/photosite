@@ -26,13 +26,20 @@ Reports and screenshots land in `~/.maestro/tests`.
 
 ## Fixtures and the auth flows
 
-`e2e/scripts/` holds Maestro `runScript` files (GraalJS, `http` global). They run in the Maestro JVM on the host, not inside the emulator, so they reach the API at `http://localhost:4000` and Mailpit at `http://localhost:8025`, while the app itself uses `10.0.2.2:4000`. Override with `maestro test -e API_URL=... -e MAILPIT_URL=... e2e`.
+`e2e/scripts/` holds Maestro `runScript` files (GraalJS, `http` global). They run in the Maestro JVM on the host, not inside the emulator, so they reach the API at `http://localhost:4000` and Mailpit at `http://localhost:8025`, while the app itself uses `10.0.2.2:4000`. Override with `maestro test -e API_URL=... -e MAILPIT_URL=... e2e`. Flows that sign in as a seeded user need `-e SEED_USER_PASSWORD=...` (the workflow passes it; locally use the value you seeded with).
 
 - `create-user.js` generates a unique `e2e-mobile-<role>-<id>@photoo.test` identity and signs it up through the API (`REGISTER=false` only generates it). Outputs `email` and `password`. Seeded users are never touched.
 - `mailpit-token.js` polls Mailpit for the verification email to `EMAIL` and outputs the `token` from its `verify-email#token=` link. With `VERIFY=true` it also posts the token to `/v1/auth/verify-email`, which is how the sign-in flow gets a verified account without a second UI pass.
+- `send-quote.js` signs in as the client (`CLIENT_EMAIL`, `CLIENT_PASSWORD`) to read its newest request from `/v1/requests/mine`, signs in as the seeded photographer (`sofia.martins@photoo.test`, password `SEED_USER_PASSWORD`) and posts a quote on it to `/v1/quotes`. Outputs `requestId` and `quoteId`. Any non-2xx response throws with the status and body.
 
 Every auth flow starts from `subflows/fresh-start.yaml` (clear state, decline consent) and `subflows/open-sign-in.yaml` (Account tab, Sign in), so each flow is independent and gets a fresh email.
 
 Email verification: the link in the email points at the web app (`WEB_APP_URL/verify-email#token=...`), which an emulator-only run has no site to open. The sign-up flow therefore reads the token from the same email and types it into the app's own "verification code" field (`verify-email-token`), which posts it to the API. This exercises the app's verification screen rather than a server-side shortcut.
+
+## Request, quote, accept
+
+`flows/request-quote-accept.yaml` signs a fresh verified client in, opens the seeded photographer's profile by deep link (`photoo:///photographers/sofia-martins`), taps "Request a quote" and fills the request form: category, a city picked from the autocomplete (which sets the location, country and so the EUR currency), address, budget and usage. The event date goes through Android's native date and time dialogs (next month, the 15th, then OK twice) because the date must be in the future. After the app shows the created request with no quotes, `send-quote.js` sends the quote as the photographer, the flow opens it by deep link (`photoo:///quotes/<id>`) and accepts it. The pass condition is the booking screen the app navigates to once `POST /v1/quotes/{id}/accept` returns a booking id: the `pending_payment` timeline step is selected and the pay panel is present. The error variants of that screen have their own `testID`s and are asserted absent. The flow stops there; paying is 1C.10e.
+
+The only seeded data it touches is one request and one quote on Sofia Martins, created under a throwaway client.
 
 Not covered yet: sign out everywhere, role addition and locale switching on the account tab (jest covers them).

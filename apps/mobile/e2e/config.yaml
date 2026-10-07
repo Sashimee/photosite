@@ -7,4 +7,5 @@ executionOrder:
     - Sign up and verify the email with the emailed token
     - Sign in with a verified account
     - Sign out from the account tab
+    - Request a photographer, receive a quote and accept it
     - Refuse sign-in for an unverified account
