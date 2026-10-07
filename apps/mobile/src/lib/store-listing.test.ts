@@ -38,6 +38,15 @@ describe('App Store listing (store.config.json)', () => {
     expect(config.configVersion).toBe(0);
   });
 
+  it('holds no review contact, demo credentials or TODO placeholders', () => {
+    expect(config.apple).not.toHaveProperty('review');
+    expect(readFileSync(join(mobileRoot, 'store.config.json'), 'utf8')).not.toMatch(/TODO/);
+  });
+
+  it.each(LOCALES)('%s matches the Play full description', (locale) => {
+    expect(infoFor(locale).description.trim()).toBe(playText(locale, 'full_description.txt'));
+  });
+
   it('has exactly the supported locales', () => {
     expect(Object.keys(config.apple.info).sort()).toEqual([...LOCALES].sort());
   });

@@ -19,6 +19,6 @@ POUR LES PHOTOGRAPHES ET PROFESSIONNELS
 Créez votre profil de studio, ajoutez votre portfolio, définissez vos produits et tarifs, répondez aux demandes par des devis, gérez vos réservations et suivez vos versements.
 
 VOS DONNÉES, VOTRE CHOIX
-Vous pouvez télécharger vos données et supprimer votre compte à tout moment depuis l’onglet Compte.
+Vous pouvez télécharger vos données et supprimer votre compte à tout moment depuis l’onglet Account.
 
-Photoo est disponible en anglais, français, allemand, portugais et espagnol.
+L’application est actuellement en anglais.

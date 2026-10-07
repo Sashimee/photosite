@@ -19,6 +19,6 @@ PARA FOTÓGRAFOS E PROFISSIONAIS
 Configure o seu perfil de estúdio, carregue o portfólio, defina produtos e preços, responda a pedidos com orçamentos, gira as reservas e acompanhe os pagamentos.
 
 OS SEUS DADOS, A SUA ESCOLHA
-Pode descarregar os seus dados e eliminar a conta a qualquer momento no separador Conta.
+Pode descarregar os seus dados e eliminar a conta a qualquer momento no separador Account.
 
-A Photoo está disponível em inglês, francês, alemão, português e espanhol.
+A aplicação está atualmente em inglês.
