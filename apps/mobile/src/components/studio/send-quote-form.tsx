@@ -8,6 +8,7 @@ import { CreateQuoteRequestSchema, resolveLocale } from '@photoo/shared';
 
 import { api } from '../../lib/api';
 import { fieldErrorMessages } from '../../lib/form-errors';
+import { rememberIncomingRequests } from '../../lib/incoming-request-store';
 import { formatMoney, payoutAmount, requireMoney } from '../../lib/money';
 import {
   apiErrorWithStatus,
@@ -156,6 +157,7 @@ export function SendQuoteForm({ request }: { request: RequestSummary }) {
     try {
       const { error, response } = await api.POST('/v1/quotes', { body: payload });
       if (!error) {
+        rememberIncomingRequests([{ ...request, hasQuoted: true }]);
         router.replace('/studio/quotes');
         return;
       }

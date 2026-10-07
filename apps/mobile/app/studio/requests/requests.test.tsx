@@ -30,6 +30,7 @@ jest.mock('@react-native-community/datetimepicker', () => {
 
 import '../../../src/lib/i18n';
 import { api } from '../../../src/lib/api';
+import { clearIncomingRequests } from '../../../src/lib/incoming-request-store';
 import { renderedText } from '../../../src/testing/rendered-text';
 
 const mockedGet = jest.mocked(api.GET);
@@ -116,6 +117,7 @@ function fillItem(label = 'Full day', qty = '2', price = '120.5') {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  clearIncomingRequests();
 });
 
 describe('incoming requests list', () => {
@@ -125,7 +127,7 @@ describe('incoming requests list', () => {
         items: [makeRequest('a'), makeRequest('b', { hasQuoted: true, status: 'quoted' })],
         nextCursor: null,
       }),
-      request: ok(makeRequest('a')),
+      request: failed(404),
     });
     open('/studio/requests');
 
@@ -139,6 +141,8 @@ describe('incoming requests list', () => {
 
     await screen.findByTestId('incoming-request-detail');
     expect(current.getPathname()).toBe('/studio/requests/a');
+    expect(screen.getByTestId('send-quote-form')).toBeTruthy();
+    expect(mockedGet).not.toHaveBeenCalledWith('/v1/requests/{id}', expect.anything());
   });
 
   it('shows an empty state', async () => {
@@ -218,12 +222,12 @@ describe('incoming request detail', () => {
   it('shows an error with retry', async () => {
     let calls = 0;
     mockedGet.mockImplementation((() =>
-      calls++ === 0 ? failed(500) : ok(makeRequest(REQUEST_ID))) as never);
+      calls++ === 0 ? failed(500) : ok(makeRequest(REQUEST_ID, { hasQuoted: true }))) as never);
     open(`/studio/requests/${REQUEST_ID}`);
 
     fireEvent.press(await screen.findByTestId('incoming-request-retry'));
 
-    await screen.findByTestId('send-quote-form');
+    await screen.findByTestId('incoming-request-detail');
   });
 
   it('shows a session message on 401', async () => {
@@ -242,8 +246,15 @@ describe('incoming request detail', () => {
   });
 
   it('offers no form for an expired request', async () => {
-    mockWorld({ request: ok(makeRequest(REQUEST_ID, { expiresAt: '2020-01-01T00:00:00.000Z' })) });
-    open(`/studio/requests/${REQUEST_ID}`);
+    mockWorld({
+      feed: ok({
+        items: [makeRequest(REQUEST_ID, { expiresAt: '2020-01-01T00:00:00.000Z' })],
+        nextCursor: null,
+      }),
+      request: failed(404),
+    });
+    open('/studio/requests');
+    fireEvent.press(await screen.findByTestId(`incoming-request-${REQUEST_ID}`));
 
     await screen.findByTestId('incoming-request-not-quotable');
     expect(screen.queryByTestId('send-quote-form')).toBeNull();
@@ -252,8 +263,12 @@ describe('incoming request detail', () => {
 
 describe('send quote', () => {
   async function openForm(overrides: Record<string, unknown> = {}) {
-    mockWorld({ request: ok(makeRequest(REQUEST_ID, overrides)) });
-    open(`/studio/requests/${REQUEST_ID}`);
+    mockWorld({
+      feed: ok({ items: [makeRequest(REQUEST_ID, overrides)], nextCursor: null }),
+      request: failed(404),
+    });
+    open('/studio/requests');
+    fireEvent.press(await screen.findByTestId(`incoming-request-${REQUEST_ID}`));
     await screen.findByTestId('send-quote-form');
   }
 
@@ -299,6 +314,7 @@ describe('send quote', () => {
     await waitFor(() => {
       expect(current.getPathname()).toBe('/studio/quotes');
     });
+    expect(mockedGet).not.toHaveBeenCalledWith('/v1/requests/{id}', expect.anything());
   });
 
   it('invalidates the preview when an amount changes and requires a new review', async () => {

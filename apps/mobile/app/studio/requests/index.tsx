@@ -10,6 +10,7 @@ import { IncomingRequestSummary } from '../../../src/components/studio/incoming-
 import { PublishedProfileGate } from '../../../src/components/studio/published-profile-gate';
 import { StudioFrame, StudioMessage } from '../../../src/components/studio/studio-frame';
 import { api } from '../../../src/lib/api';
+import { rememberIncomingRequests } from '../../../src/lib/incoming-request-store';
 import { useCursorList } from '../../../src/lib/use-cursor-list';
 
 type RequestSummary = components['schemas']['RequestSummary'];
@@ -47,6 +48,7 @@ function IncomingRequestsList() {
       }
       throw new Error(`requests failed: HTTP ${String(response.status)}`);
     }
+    rememberIncomingRequests(data.items);
     return data;
   }, []);
 

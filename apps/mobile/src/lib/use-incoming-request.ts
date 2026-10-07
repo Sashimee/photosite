@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { components } from '@photoo/api-client';
 
 import { api } from './api';
+import { recallIncomingRequest } from './incoming-request-store';
 
 type Request = components['schemas']['Request'];
 type RequestSummary = components['schemas']['RequestSummary'];
@@ -19,6 +20,10 @@ function isRequestSummary(body: Request | RequestSummary): body is RequestSummar
 }
 
 async function load(id: string): Promise<IncomingRequestState> {
+  const remembered = recallIncomingRequest(id);
+  if (remembered) {
+    return { status: 'ready', request: remembered };
+  }
   const { data, response } = await api.GET('/v1/requests/{id}', { params: { path: { id } } });
   if (response.status === 401) {
     return { status: 'unauthorized' };
@@ -26,19 +31,25 @@ async function load(id: string): Promise<IncomingRequestState> {
   if (!data) {
     return { status: response.status === 404 || response.status === 403 ? 'notFound' : 'error' };
   }
-  // The endpoint returns the full `Request` to its owner and the photographer
-  // `RequestSummary` to a matched photographer; only the latter is quotable here.
+  // Outside the feed this endpoint answers 404 until the photographer has a
+  // quote on the request, and returns the full `Request` to its owner; only a
+  // `RequestSummary` is usable here.
   const body: Request | RequestSummary = data;
   return isRequestSummary(body) ? { status: 'ready', request: body } : { status: 'notFound' };
 }
 
 export function useIncomingRequest(id: string) {
-  const [state, setState] = useState<IncomingRequestState>({ status: 'loading' });
+  const [state, setState] = useState<IncomingRequestState>(() => {
+    const remembered = recallIncomingRequest(id);
+    return remembered ? { status: 'ready', request: remembered } : { status: 'loading' };
+  });
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    setState({ status: 'loading' });
+    if (!recallIncomingRequest(id)) {
+      setState({ status: 'loading' });
+    }
     load(id)
       .then((next) => {
         if (!cancelled) {
