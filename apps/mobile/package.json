@@ -57,6 +57,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@babel/plugin-transform-react-jsx": "7.29.7",
     "@jest/globals": "29.7.0",
     "@photoo/config": "workspace:*",
     "@react-native/jest-preset": "0.86.3",
