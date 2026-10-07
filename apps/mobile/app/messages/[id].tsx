@@ -10,6 +10,7 @@ import { MessageComposer } from '../../src/components/chat/message-composer';
 import { FormNotice } from '../../src/components/form/form-notice';
 import { RequireSession } from '../../src/components/require-session';
 import { useAuth } from '../../src/lib/auth-context';
+import { isScanningError } from '../../src/lib/chat-attachments';
 import { findOtherParticipant, participantDisplayName } from '../../src/lib/chat-participant';
 import { formatDay } from '../../src/lib/date-format';
 import { groupMessages } from '../../src/lib/message-grouping';
@@ -208,11 +209,17 @@ function Thread({ id }: { id: string }) {
       />
       {failedPending?.error ? (
         <View className="px-4 pb-1">
-          <Text className="text-xs text-destructive" testID="thread-send-error">
-            {requestErrorMessage(
-              (key, values) => (values ? t(`mobile.chat.${key}`, values) : t(`mobile.chat.${key}`)),
-              failedPending.error,
-            )}
+          <Text
+            className={`text-xs ${isScanningError(failedPending.error) ? 'text-muted-foreground' : 'text-destructive'}`}
+            testID="thread-send-error"
+          >
+            {isScanningError(failedPending.error)
+              ? t('mobile.chat.attachments.stillScanning')
+              : requestErrorMessage(
+                  (key, values) =>
+                    values ? t(`mobile.chat.${key}`, values) : t(`mobile.chat.${key}`),
+                  failedPending.error,
+                )}
           </Text>
         </View>
       ) : null}

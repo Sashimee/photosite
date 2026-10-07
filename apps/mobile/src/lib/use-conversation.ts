@@ -10,6 +10,7 @@ import {
 
 import { api } from './api';
 import type { ApiErrorLike } from './auth-errors';
+import type { PendingAttachment } from './chat-attachments';
 import { useChatSocket } from './chat-socket';
 
 type Message = components['schemas']['Message'];
@@ -25,9 +26,15 @@ export type ConnectionState = 'connecting' | 'connected' | 'disconnected';
 export interface PendingMessage {
   localId: string;
   body: string;
+  attachments: PendingAttachment[];
   status: 'sending' | 'failed';
   createdAt: string;
   error?: ApiErrorLike | undefined;
+}
+
+export interface SendMessageInput {
+  body: string;
+  attachments: PendingAttachment[];
 }
 
 export type SendMessageResult =
@@ -268,14 +275,20 @@ export function useConversation(conversationId: string, isVisible: boolean) {
   }, [nextCursor, loadingOlder, conversationId, commitMessages]);
 
   const dispatchSend = useCallback(
-    async (body: string): Promise<DispatchResult> => {
+    async (body: string, attachments: PendingAttachment[]): Promise<DispatchResult> => {
+      const payload = {
+        ...(body ? { body } : {}),
+        ...(attachments.length > 0
+          ? { attachmentIds: attachments.map((attachment) => attachment.uploadId) }
+          : {}),
+      };
       if (socket.connected) {
         try {
           const ack = (await socket
             .timeout(ACK_TIMEOUT_MS)
             .emitWithAck(CLIENT_SOCKET_EVENTS.MESSAGE_SEND, {
               conversationId,
-              body,
+              ...payload,
             })) as SocketAck<{ message: Message }>;
           return ack.ok ? { ok: true, message: ack.data.message } : { ok: false, error: ack.error };
         } catch {
@@ -285,7 +298,7 @@ export function useConversation(conversationId: string, isVisible: boolean) {
       try {
         const { data, error } = await api.POST('/v1/conversations/{id}/messages', {
           params: { path: { id: conversationId } },
-          body: { body },
+          body: payload,
         });
         return data ? { ok: true, message: data } : { ok: false, error };
       } catch {
@@ -312,19 +325,21 @@ export function useConversation(conversationId: string, isVisible: boolean) {
   );
 
   const sendMessage = useCallback(
-    async (rawBody: string): Promise<SendMessageResult> => {
+    async ({ body: rawBody, attachments }: SendMessageInput): Promise<SendMessageResult> => {
       const parsed = MessageBodySchema.safeParse(rawBody);
-      if (!parsed.success) {
+      const hasBody = rawBody.trim().length > 0;
+      if ((hasBody && !parsed.success) || (!hasBody && attachments.length === 0)) {
         return { ok: false, kind: 'invalid' };
       }
+      const body = parsed.success ? parsed.data : '';
       pendingCounter += 1;
       const localId = `pending-${String(Date.now())}-${String(pendingCounter)}`;
       setPending((previous) => [
         ...previous,
-        { localId, body: parsed.data, status: 'sending', createdAt: new Date().toISOString() },
+        { localId, body, attachments, status: 'sending', createdAt: new Date().toISOString() },
       ]);
       notifyTyping(false);
-      const result = await dispatchSend(parsed.data);
+      const result = await dispatchSend(body, attachments);
       settle(localId, result);
       return result.ok ? { ok: true } : { ok: false, kind: 'failed', error: result.error };
     },
@@ -347,7 +362,7 @@ export function useConversation(conversationId: string, isVisible: boolean) {
         ),
       );
       try {
-        settle(localId, await dispatchSend(entry.body));
+        settle(localId, await dispatchSend(entry.body, entry.attachments));
       } finally {
         retryingRef.current.delete(localId);
       }

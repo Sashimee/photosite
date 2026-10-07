@@ -6,7 +6,8 @@ import type { Locale } from '@photoo/shared';
 
 import { formatTime } from '../../lib/date-format';
 import type { PendingMessage } from '../../lib/use-conversation';
-import { AttachmentChip } from './attachment-chip';
+import { isImageMimeType, isScanningError } from '../../lib/chat-attachments';
+import { AttachmentChip, formatBytes } from './attachment-chip';
 
 type Message = components['schemas']['Message'];
 
@@ -63,7 +64,15 @@ export function MessageBubble(props: MessageBubbleProps) {
                     messageId={props.message.id}
                   />
                 ))
-              : null}
+              : props.pending.attachments.map((attachment) => (
+                  <Text
+                    key={attachment.uploadId}
+                    className={`text-xs ${isOwn ? 'text-primary-foreground' : 'text-foreground'}`}
+                    testID={`pending-attachment-${attachment.uploadId}`}
+                  >
+                    {`${isImageMimeType(attachment.mimeType) ? t('mobile.chat.attachments.kindImage') : t('mobile.chat.attachments.kindPdf')} · ${attachment.name} · ${formatBytes(t, attachment.sizeBytes)}`}
+                  </Text>
+                ))}
           </>
         )}
       </View>
@@ -76,7 +85,13 @@ export function MessageBubble(props: MessageBubbleProps) {
         ) : null}
         {props.kind === 'pending' && props.pending.status === 'failed' ? (
           <>
-            <Text className="text-xs text-destructive">{t('mobile.chat.thread.failedStatus')}</Text>
+            <Text
+              className={`text-xs ${isScanningError(props.pending.error) ? 'text-muted-foreground' : 'text-destructive'}`}
+            >
+              {isScanningError(props.pending.error)
+                ? t('mobile.chat.attachments.stillScanningStatus')
+                : t('mobile.chat.thread.failedStatus')}
+            </Text>
             <Pressable
               accessibilityRole="button"
               onPress={props.onRetry}

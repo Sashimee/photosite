@@ -60,6 +60,17 @@ const config: ExpoConfig = {
         isAndroidBackgroundLocationEnabled: false,
       },
     ],
+    [
+      'expo-image-picker',
+      {
+        photosPermission:
+          'Photoo accesses your photos only when you choose one to attach to a message.',
+        cameraPermission:
+          'Photoo uses the camera only when you take a photo to attach to a message.',
+        microphonePermission: false,
+      },
+    ],
+    'expo-document-picker',
     '@sentry/react-native',
   ],
   experiments: {
