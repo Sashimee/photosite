@@ -199,6 +199,8 @@ jobs:
         run: npx expo prebuild --platform android --clean
       - name: Assemble the release APK, signed with the template's debug keystore
         working-directory: apps/mobile/android
+        env:
+          SENTRY_DISABLE_AUTO_UPLOAD: 'true'
         run: ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
       - name: Install the Maestro CLI
         env:
