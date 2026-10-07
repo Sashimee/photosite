@@ -1373,6 +1373,8 @@
         "requestsDescription": "Client requests that match you, and the quotes you can send.",
         "quotesTitle": "Your quotes",
         "quotesDescription": "Quotes you've sent, their status and payout.",
+        "bookingsTitle": "Bookings",
+        "bookingsDescription": "Bookings from quotes clients accepted, and where each stands.",
         "payoutsTitle": "Payouts",
         "payoutsDescription": "Connect your bank account with Stripe to get paid."
       },
@@ -1728,6 +1730,16 @@
           "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
         }
       },
+      "bookings": {
+        "title": "Bookings",
+        "intro": "Bookings from quotes clients accepted.",
+        "empty": "No client has booked you yet.",
+        "loadMoreFailed": "We couldn't load more bookings.",
+        "detailTitle": "Booking",
+        "notFound": "This booking doesn't exist, or it isn't yours.",
+        "releaseDue": "Payment releases to you automatically on {date} unless the client acts before then.",
+        "disputed": "The client's bank has disputed this payment. Payouts for this booking are on hold until the dispute is resolved."
+      },
       "payouts": {
         "title": "Payouts",
         "intro": "Payouts go through Stripe. Photoo never sees your bank details.",
@@ -1810,6 +1822,7 @@
         "empty": "You haven't sent any requests yet.",
         "quoteCount": "{count, plural, =0 {No quotes yet} one {# quote} other {# quotes}}",
         "quotesReceived": "Quotes received",
+        "bookings": "My bookings",
         "loadFailed": "We couldn't load your requests.",
         "retry": "Try again"
       },
@@ -1980,6 +1993,45 @@
         "signInLink": "Sign in"
       }
     },
+    "bookings": {
+      "list": {
+        "title": "Bookings",
+        "intro": "Bookings from quotes you've accepted.",
+        "empty": "You don't have any bookings yet.",
+        "loadFailed": "We couldn't load your bookings.",
+        "retry": "Try again",
+        "sessionExpired": "Your session has expired. Sign in again to see your bookings."
+      },
+      "detail": {
+        "title": "Booking",
+        "back": "Back",
+        "totalLabel": "Total",
+        "scheduleLabel": "Scheduled for",
+        "notScheduled": "Not scheduled yet",
+        "locationLabel": "Location",
+        "noLocation": "No location set",
+        "coordinates": "{latitude}, {longitude}",
+        "timelineLabel": "Booking status",
+        "timelineExited": "This booking left the normal process:",
+        "notFound": "This booking doesn't exist, or it isn't yours.",
+        "loadFailed": "We couldn't load this booking.",
+        "retry": "Try again",
+        "sessionExpired": "Your session has expired. Sign in again to see this booking.",
+        "payPending": "Payment isn't available in the app yet. Nothing has been charged.",
+        "releaseDue": "Payment releases to the photographer automatically on {date} unless you accept the delivery before then.",
+        "disputed": "This payment has been disputed with your bank. Photoo is handling the dispute, and there's nothing you need to do in the app."
+      },
+      "status": {
+        "pending_payment": "Awaiting payment",
+        "paid_held": "Paid, held until delivery",
+        "in_progress": "In progress",
+        "delivered": "Delivered",
+        "released": "Released",
+        "refunded": "Refunded",
+        "disputed": "Disputed",
+        "cancelled": "Cancelled"
+      }
+    },
     "quotes": {
       "list": {
         "title": "Quotes",
@@ -2023,7 +2075,8 @@
         "declineConfirmCta": "Yes, decline quote",
         "declinePending": "Declining…",
         "declineDismissCta": "Keep quote",
-        "acceptedNotice": "Quote accepted. Payment will be available soon. Nothing has been charged.",
+        "acceptedNotice": "Quote accepted. Nothing has been charged yet.",
+        "viewBookingsCta": "View my bookings",
         "declinedNotice": "Quote declined.",
         "withdrawnNotice": "This quote was withdrawn by the photographer.",
         "expiredNotice": "This quote has expired."
