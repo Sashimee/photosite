@@ -34,3 +34,14 @@ export function wholeUnitsToCents(text: string): number {
   const trimmed = text.trim();
   return WHOLE_UNITS.test(trimmed) ? Number(trimmed) * 100 : Number.NaN;
 }
+
+// The generated `Money` type is nullable because the OpenAPI component is
+// shared with PhotographerSummary.startingPrice; Product.basePrice and
+// ProductTier.price are always present in practice, so a missing one is a
+// loud failure instead of a hidden branch.
+export function requireMoney(money: Money | null | undefined, context: string): Money {
+  if (!money) {
+    throw new Error(`Expected ${context} to have a price`);
+  }
+  return money;
+}
