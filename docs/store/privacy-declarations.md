@@ -52,6 +52,7 @@ Tracking: **No** (no data is combined with third-party data for ads or shared wi
 | Email address | Yes | Yes | No | App functionality | Sign-up, `app/(auth)/sign-up.tsx`; contract basis, `docs/COMPLIANCE.md` Lawful bases |
 | Name | Yes | Yes | No | App functionality | Display name on photographer and professional profiles, `src/lib/studio-profile-form.ts` |
 | Physical address | Yes | Yes | No | App functionality | Request address lines, `src/lib/request-form.ts`; `docs/DATA-MODEL.md` Request |
+| Precise location | Yes | Yes | No | App functionality | Portfolio originals are uploaded unedited with EXIF GPS (`src/lib/chat-attachments.ts:165`, `portfolio-upload.ts`); the worker extracts it (`apps/worker/src/processing/exif-extractor.ts:25,43-48`) and stores it in `Upload.exif` against the photographer's account (`image-process.processor.ts:93`). Stopping this is open in #589; if GPS is stripped before upload or not stored, this row becomes No (and the Play precise-location row below) |
 | Coarse location | Yes | Yes | No | App functionality | Rounded to ~1 km, `src/lib/location.ts`; stored on requests and studio profiles; a "Near me" search coordinate is a query parameter and not persisted by the app |
 | Photos or videos | Yes | Yes | No | App functionality | Portfolio originals (#589), avatars, covers, chat images, `src/lib/portfolio-upload.ts`, `chat-attachments.ts` |
 | Emails or text messages | Yes | Yes | No | App functionality | Chat messages, `src/lib/chat-socket.ts`; retention row for chat in `docs/COMPLIANCE.md` |
@@ -63,7 +64,7 @@ Tracking: **No** (no data is combined with third-party data for ads or shared wi
 | Crash data | Yes | No | No | App functionality | Sentry, `src/lib/sentry.ts`; no user is set |
 | Other diagnostic data | Yes | No | No | App functionality | Sentry event context (device model, OS, app version) |
 | Product interaction, advertising data, usage data | No | | | | No analytics or ad SDK until 1C.8c |
-| Contacts, health, browsing and search history, sensitive info, financial info other than payment, precise location | No | | | | No code path |
+| Contacts, health, browsing and search history, sensitive info, financial info other than payment | No | | | | No code path |
 
 ## Google Play data safety
 
@@ -76,16 +77,19 @@ Shared with third parties: **No** for every row. Stripe, Sentry, Expo push and s
 | Personal info: email address | Yes | Required | App functionality, account management | Sign-up |
 | Personal info: name | Yes | Optional | App functionality | Profile display name (photographers and professionals) |
 | Personal info: address | Yes | Required for a request | App functionality | Request form |
+| Personal info: user IDs | Yes | Required | App functionality, account management | Account ID, `docs/DATA-MODEL.md` |
 | Personal info: other (verification identity details) | Yes | Optional, required to be verified | App functionality, compliance | Verification documents (#595), `docs/COMPLIANCE.md` |
 | Financial info: payment info | Yes | Optional, required to pay | App functionality, fraud prevention | Stripe SDK |
 | Financial info: purchase history | Yes | Required to book | App functionality | Bookings and ledger |
 | Location: approximate location | Yes | Optional | App functionality | "Near me", request and studio location; foreground only |
+| Location: precise location | Yes | Optional (only present when a photo carries EXIF GPS) | App functionality | Portfolio originals keep EXIF GPS, extracted and stored with the upload (#589); becomes No if GPS is dropped |
 | Photos and videos | Yes | Optional | App functionality | Portfolio, avatar, chat |
 | Files and docs | Yes | Optional | App functionality | PDF verification documents and chat documents (`expo-document-picker`) |
 | Messages: other in-app messages | Yes | Optional | App functionality | Chat |
+| App activity: other user-generated content | Yes | Optional, required to request, quote or be verified | App functionality | Request titles and descriptions, quote text, studio bio, cancel and refund reasons, verification business name, VAT number and registration number (`src/lib/verification-form.ts`) |
 | App info and performance: crash logs, diagnostics | Yes | Required (not user-switchable) | Analytics (app stability) | Sentry |
 | Device or other IDs | Yes | Optional (push opt-in) | App functionality | Expo push token; consent ID |
-| App activity, web browsing, health, contacts, calendar, audio, advertising ID | No | | | No code path; analytics stays "not collected" until 1C.8c |
+| Web browsing, health, contacts, calendar, audio, advertising ID | No | | | No code path; analytics stays "not collected" until 1C.8c |
 
 ## Not verifiable from this repo
 
