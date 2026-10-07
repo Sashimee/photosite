@@ -1700,6 +1700,7 @@
       "errors": {
         "generic": "Something went wrong. Try again.",
         "conflict": "This message can't be changed right now.",
+        "invalidBody": "This message is empty, too long or contains characters that can't be sent.",
         "invalid": "One of the attachments has a problem. Remove it and try again.",
         "forbidden": "You don't have access to this conversation.",
         "notFound": "This conversation is no longer available.",
