@@ -6,4 +6,5 @@ executionOrder:
     - Launch and answer the consent prompt
     - Sign up and verify the email with the emailed token
     - Sign in with a verified account
+    - Sign out from the account tab
     - Refuse sign-in for an unverified account
