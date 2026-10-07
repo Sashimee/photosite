@@ -1786,5 +1786,166 @@ describe('stripe webhook integration', () => {
       expect(completed.statusCode).toBe(200);
       expect(completed.json()).toMatchObject({ refundedCents: 3000, reversedCents: 3000 });
     });
+
+    const EXPORT_DAY_MS = 24 * 60 * 60 * 1000;
+    const EXPORT_BASE_MS = Date.UTC(1970, 0, 1) + (RUN_SEED % 5000) * EXPORT_DAY_MS;
+
+    function exportDay(offsetDays: number): string {
+      return new Date(EXPORT_BASE_MS + offsetDays * EXPORT_DAY_MS).toISOString().slice(0, 10);
+    }
+
+    function exportCsv(admin: { headers: Record<string, string> }, search: string) {
+      return fastify().inject({
+        method: 'GET',
+        url: `/v1/admin/bookings/export.csv?${search}`,
+        remoteAddress: FAKE_IP,
+        headers: admin.headers,
+      });
+    }
+
+    it('streams the filtered bookings as CSV and audits the export first', async () => {
+      const admin = await adminWithTwoFactor('export', true);
+      const released = await releasedBooking('export-released');
+      await clearRateLimitKeys();
+      const held = await paidBooking('export-held');
+      await prisma.booking.update({
+        where: { id: released.bookingId },
+        data: { createdAt: new Date(EXPORT_BASE_MS + 1000) },
+      });
+      await prisma.booking.update({
+        where: { id: held.bookingId },
+        data: { createdAt: new Date(EXPORT_BASE_MS + 2000) },
+      });
+      const range = `createdFrom=${exportDay(0)}&createdTo=${exportDay(1)}`;
+
+      const response = await exportCsv(admin, `${range}&status=released`);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['content-type']).toBe('text/csv; charset=utf-8');
+      expect(response.headers['content-disposition']).toBe(
+        `attachment; filename="photoo-bookings-${exportDay(0)}-${exportDay(1)}.csv"`,
+      );
+      expect(response.headers['cache-control']).toBe('no-store');
+      const lines = response.body.split('\r\n');
+      expect(lines[0]).toBe(
+        '"id","status","currency","total","refunded","reversed","disputeStatus","createdAt","releasedAt","deliveredAt","cancelledAt","paymentIntentId","chargeId","transferId"',
+      );
+      expect(lines).toHaveLength(3);
+      expect(lines[2]).toBe('');
+      const cells = (lines[1] ?? '').slice(1, -1).split('","');
+      expect(cells.slice(0, 8)).toEqual([
+        released.bookingId,
+        'released',
+        'EUR',
+        '250.50',
+        '0.00',
+        '0.00',
+        '',
+        new Date(EXPORT_BASE_MS + 1000).toISOString(),
+      ]);
+      expect(cells.slice(11)).toEqual([
+        released.paymentIntentId,
+        released.chargeId,
+        released.transferId,
+      ]);
+
+      const both = await exportCsv(admin, range);
+      expect(
+        both.body
+          .split('\r\n')
+          .slice(1, 3)
+          .map((line) => line.slice(1, 37)),
+      ).toEqual([held.bookingId, released.bookingId]);
+
+      const audits = await prisma.auditLog.findMany({
+        where: { actorId: admin.id, action: 'admin.bookings_exported' },
+        orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
+      });
+      expect(audits.map((row) => row.after)).toEqual([
+        {
+          filters: {
+            status: ['released'],
+            createdFrom: exportDay(0),
+            createdTo: exportDay(1),
+            dispute: null,
+          },
+          cap: 50_000,
+        },
+        {
+          filters: {
+            status: null,
+            createdFrom: exportDay(0),
+            createdTo: exportDay(1),
+            dispute: null,
+          },
+          cap: 50_000,
+        },
+      ]);
+      expect(audits.every((row) => row.targetId === null && row.targetType === 'Booking')).toBe(
+        true,
+      );
+    });
+
+    it('refuses an export without finance, with a stale 2FA or with invalid filters', async () => {
+      const support = await adminWithTwoFactor('export-nofinance', false);
+      const stale = await adminWithTwoFactor('export-stale', true);
+      await prisma.session.updateMany({
+        where: { userId: stale.id },
+        data: { twoFactorVerifiedAt: new Date(Date.now() - 20 * 60 * 1000) },
+      });
+      const finance = await adminWithTwoFactor('export-invalid', true);
+
+      const forbidden = await exportCsv(support, '');
+      expect(forbidden.statusCode).toBe(403);
+      expect(forbidden.headers['content-type']).toMatch(/^application\/json/);
+
+      const reverify = await exportCsv(stale, '');
+      expect(reverify.statusCode).toBe(403);
+      expect(reverify.json()).toMatchObject({ code: 'TWO_FACTOR_REQUIRED' });
+
+      for (const search of [
+        `createdFrom=${exportDay(0)}`,
+        `createdFrom=${exportDay(2)}&createdTo=${exportDay(1)}`,
+        'status=paid',
+        'cursor=abc',
+        'limit=10',
+      ]) {
+        const invalid = await exportCsv(finance, search);
+        expect(invalid.statusCode, search).toBe(400);
+        expect(invalid.json(), search).toMatchObject({ code: 'VALIDATION_ERROR' });
+      }
+
+      expect(
+        await prisma.auditLog.count({
+          where: {
+            actorId: { in: [support.id, stale.id, finance.id] },
+            action: 'admin.bookings_exported',
+          },
+        }),
+      ).toBe(0);
+    });
+
+    it('counts exports against the money budget shared with refunds', async () => {
+      const admin = await adminWithTwoFactor('export-limit', true);
+      const held = await paidBooking('export-limit');
+
+      for (let n = 0; n < 4; n += 1) {
+        expect((await exportCsv(admin, 'dispute=open')).statusCode).toBe(200);
+      }
+      expect(
+        (await adminPost(admin, held.bookingId, 'refund', { amountCents: 100 })).statusCode,
+      ).toBe(409);
+      const limited = await exportCsv(admin, 'dispute=open');
+      expect(limited.statusCode).toBe(429);
+      expect(limited.json<{ code: string }>().code).toBe('TOO_MANY_REQUESTS');
+      expect(
+        (await adminPost(admin, held.bookingId, 'refund', { amountCents: 100 })).statusCode,
+      ).toBe(429);
+      expect(
+        await prisma.auditLog.count({
+          where: { actorId: admin.id, action: 'admin.bookings_exported' },
+        }),
+      ).toBe(4);
+    });
   });
 });

@@ -8,15 +8,17 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import {
+  AdminBookingsExportQuerySchema,
   AdminBookingsQuerySchema,
   IdSchema,
   RefundBookingRequestSchema,
   ReverseBookingTransferRequestSchema,
 } from '@photoo/shared';
-import type { FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe.js';
 import { AdminAccessService } from '../admin/admin-access.service.js';
 import { AdminMutationRateLimitService } from '../admin/admin-mutation-rate-limit.service.js';
@@ -45,6 +47,23 @@ export class AdminBookingsController {
   ) {
     await this.adminAccess.requirePermission(request, 'finance');
     return this.adminBookings.list(query);
+  }
+
+  @Get('export.csv')
+  async export(
+    @Query(new ZodValidationPipe(AdminBookingsExportQuerySchema))
+    query: ReturnType<(typeof AdminBookingsExportQuerySchema)['parse']>,
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: false }) reply: FastifyReply,
+  ): Promise<void> {
+    const { user } = await this.adminAccess.requirePermission(request, 'finance', REQUIRES_2FA);
+    await this.rateLimit.enforceMoney(user.id);
+    const { filename, body } = await this.adminBookings.exportCsv(user, query, request.ip);
+    reply
+      .header('Content-Type', 'text/csv; charset=utf-8')
+      .header('Content-Disposition', `attachment; filename="${filename}"`)
+      .header('Cache-Control', 'no-store')
+      .send(body);
   }
 
   @Get(':id')
