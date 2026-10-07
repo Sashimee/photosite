@@ -9,12 +9,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '../src/lib/auth-context';
 import { initSentry } from '../src/lib/sentry';
+import { useNotificationRouting, usePushRegistration } from '../src/lib/use-push-lifecycle';
 
 initSentry();
 void SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { status } = useAuth();
+  usePushRegistration();
+  useNotificationRouting();
 
   useEffect(() => {
     if (status !== 'loading') {
