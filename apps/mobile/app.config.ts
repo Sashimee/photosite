@@ -54,7 +54,7 @@ const config: ExpoConfig = {
         locationAlwaysAndWhenInUsePermission: false,
         locationAlwaysPermission: false,
         locationWhenInUsePermission:
-          'Photoo uses your location, rounded to about 1 km, to sort photographers near you when you tap "Near me". It is never stored.',
+          'Photoo uses your location, rounded to about 1 km, only when you tap "Near me": to find photographers near you, or to set your request or studio location.',
         motionUsagePermission: false,
         isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
