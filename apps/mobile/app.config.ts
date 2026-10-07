@@ -54,7 +54,7 @@ const config: ExpoConfig = {
         locationAlwaysAndWhenInUsePermission: false,
         locationAlwaysPermission: false,
         locationWhenInUsePermission:
-          'Photoo uses your location, rounded to about 1 km, to sort photographers near you when you tap "Near me". It is never stored.',
+          'Photoo uses your location, rounded to about 1 km, only when you tap "Near me": to find photographers near you, or to set your request or studio location.',
         motionUsagePermission: false,
         isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
@@ -64,7 +64,7 @@ const config: ExpoConfig = {
       'expo-image-picker',
       {
         photosPermission:
-          'Photoo accesses your photos only when you choose one to attach to a message.',
+          'Photoo accesses your photos only when you choose one to attach to a message or add to your portfolio.',
         cameraPermission:
           'Photoo uses the camera only when you take a photo to attach to a message.',
         microphonePermission: false,

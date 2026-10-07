@@ -46,3 +46,8 @@ export function scopedRequestTranslate(t: TFunction): TranslateFn {
 export function scopedQuoteTranslate(t: TFunction): TranslateFn {
   return (key, values) => (values ? t(`mobile.quotes.${key}`, values) : t(`mobile.quotes.${key}`));
 }
+
+export function scopedStudioTranslate(t: TFunction, section: 'profile' | 'portfolio'): TranslateFn {
+  return (key, values) =>
+    values ? t(`mobile.studio.${section}.${key}`, values) : t(`mobile.studio.${section}.${key}`);
+}

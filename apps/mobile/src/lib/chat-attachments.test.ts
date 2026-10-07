@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
+import { UPLOAD_PURPOSE_LIMITS } from '@photoo/shared';
+
 import { installFakeFetch, installFakeXhr } from '../testing/fake-upload';
 
 type ApiCall = (path: string, init?: unknown) => Promise<unknown>;
@@ -42,7 +44,9 @@ import {
   MAX_IMAGE_EDGE_PX,
   isScanningError,
   prepareFile,
+  prepareOriginalFile,
   uploadChatAttachment,
+  uploadFile,
 } from './chat-attachments';
 
 const xhr = installFakeXhr();
@@ -234,6 +238,80 @@ describe('uploadChatAttachment', () => {
 
     await expect(outcome).rejects.toBeInstanceOf(ChatUploadError);
     await expect(outcome).rejects.toMatchObject({ kind: 'infected' });
+  });
+});
+
+describe('prepareOriginalFile', () => {
+  const picked = {
+    uri: 'file:///orig.jpg',
+    name: 'orig.jpg',
+    mimeType: 'image/jpeg',
+    width: 6000,
+    height: 4000,
+  };
+
+  it('keeps the picked file untouched so provenance metadata survives', async () => {
+    installFakeFetch({ 'file:///orig.jpg': 12_000_000 });
+
+    const prepared = await prepareOriginalFile(picked, 'portfolio');
+
+    expect(mockManipulate).not.toHaveBeenCalled();
+    expect(mockSaveAsync).not.toHaveBeenCalled();
+    expect(prepared).toMatchObject({
+      uri: 'file:///orig.jpg',
+      name: 'orig.jpg',
+      mimeType: 'image/jpeg',
+      sizeBytes: 12_000_000,
+    });
+  });
+
+  it('rejects a file over the purpose size limit', async () => {
+    installFakeFetch({ 'file:///orig.jpg': UPLOAD_PURPOSE_LIMITS.portfolio.maxSizeBytes + 1 });
+
+    await expect(prepareOriginalFile(picked, 'portfolio')).rejects.toMatchObject({
+      reason: 'tooLarge',
+    });
+  });
+
+  it('rejects a type the purpose does not allow, including a missing type', async () => {
+    installFakeFetch({});
+
+    await expect(
+      prepareOriginalFile({ ...picked, mimeType: 'application/pdf' }, 'portfolio'),
+    ).rejects.toMatchObject({ reason: 'unsupportedType' });
+    await expect(
+      prepareOriginalFile({ ...picked, mimeType: undefined }, 'portfolio'),
+    ).rejects.toMatchObject({ reason: 'unsupportedType' });
+  });
+});
+
+describe('uploadFile', () => {
+  it('declares the given purpose when creating the upload', async () => {
+    mockedPost.mockImplementation((path: string) =>
+      Promise.resolve(
+        path === '/v1/uploads'
+          ? { data: { uploadId: 'up1', url: 'https://s3.example.com/put', headers: {} } }
+          : { data: { id: 'up1' } },
+      ),
+    );
+    mockedGet.mockResolvedValueOnce({ data: { id: 'up1', status: 'processed' } });
+
+    const result = await uploadFile(
+      'portfolio',
+      {
+        uri: 'file:///a.jpg',
+        name: 'a.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 4096,
+        blob: { size: 4096 } as Blob,
+      },
+      { onProgress: jest.fn(), onStageChange: jest.fn() },
+    );
+
+    expect(mockedPost).toHaveBeenCalledWith('/v1/uploads', {
+      body: { purpose: 'portfolio', mimeType: 'image/jpeg', sizeBytes: 4096 },
+    });
+    expect(result.uploadId).toBe('up1');
   });
 });
 
