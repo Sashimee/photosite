@@ -1,4 +1,4 @@
-import type { Locale } from '@photoo/shared';
+import { payoutAmount as sharedPayoutAmount, type Locale } from '@photoo/shared';
 
 export interface Money {
   amountCents: number;
@@ -44,4 +44,22 @@ export function requireMoney(money: Money | null | undefined, context: string): 
     throw new Error(`Expected ${context} to have a price`);
   }
   return money;
+}
+
+// The API's quote preview and quote DTOs carry the subtotal and the platform
+// fee but never the net, so the payout is the difference of two numbers the
+// server already computed, not a fee recomputation.
+export function payoutAmount(subtotal: Money, platformFee: Money): Money {
+  if (subtotal.currency !== platformFee.currency) {
+    throw new Error(
+      `payoutAmount: currency mismatch (${subtotal.currency} vs ${platformFee.currency})`,
+    );
+  }
+  return {
+    amountCents: sharedPayoutAmount({
+      subtotalCents: subtotal.amountCents,
+      platformFeeCents: platformFee.amountCents,
+    }),
+    currency: subtotal.currency,
+  };
 }

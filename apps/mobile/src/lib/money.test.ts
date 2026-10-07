@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { formatMoney, requireMoney, wholeUnitsToCents } from './money';
+import { formatMoney, payoutAmount, requireMoney, wholeUnitsToCents } from './money';
 
 describe('formatMoney', () => {
   it('formats integer cents as currency in the given locale', () => {
@@ -39,5 +39,25 @@ describe('requireMoney', () => {
     expect(() => requireMoney(null, 'product "p1"')).toThrow(
       'Expected product "p1" to have a price',
     );
+  });
+});
+
+describe('payoutAmount', () => {
+  it('subtracts the server-computed fee from the subtotal', () => {
+    expect(
+      payoutAmount({ amountCents: 10000, currency: 'EUR' }, { amountCents: 500, currency: 'EUR' }),
+    ).toEqual({ amountCents: 9500, currency: 'EUR' });
+  });
+
+  it('throws on a currency mismatch', () => {
+    expect(() =>
+      payoutAmount({ amountCents: 10000, currency: 'EUR' }, { amountCents: 500, currency: 'USD' }),
+    ).toThrow('currency mismatch');
+  });
+
+  it('throws when the fee exceeds the subtotal', () => {
+    expect(() =>
+      payoutAmount({ amountCents: 100, currency: 'EUR' }, { amountCents: 500, currency: 'EUR' }),
+    ).toThrow('platformFeeCents must be between');
   });
 });
