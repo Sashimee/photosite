@@ -2320,7 +2320,7 @@
       },
       "analytics": {
         "title": "Analytics",
-        "description": "Lets us measure which screens are used and where the app crashes or is confusing, so we can fix and improve it."
+        "description": "Lets us measure which screens are used and where the app is confusing, so we can improve it."
       },
       "adsMarketing": {
         "title": "Ads and marketing",
