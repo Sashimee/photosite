@@ -3,6 +3,8 @@ import { store } from 'expo-router/build/global-state/router-store';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import type { ReactNode } from 'react';
 
+jest.mock('../../src/lib/use-unread-count', () => ({ useUnreadCount: () => 0 }));
+
 jest.mock('../../src/lib/auth-context', () => ({
   AuthProvider: ({ children }: { children: ReactNode }) => children,
   useAuth: () => ({ status: 'signed-in' }),

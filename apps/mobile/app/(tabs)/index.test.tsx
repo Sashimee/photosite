@@ -8,6 +8,8 @@ jest.mock('expo-secure-store', () => ({
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: 5,
 }));
 
+jest.mock('../../src/lib/use-unread-count', () => ({ useUnreadCount: () => 0 }));
+
 jest.mock('../../src/lib/api', () => ({
   api: { GET: jest.fn(), POST: jest.fn() },
   setUnauthorizedListener: jest.fn(),

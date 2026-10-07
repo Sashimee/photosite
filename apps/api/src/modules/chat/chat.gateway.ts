@@ -158,7 +158,11 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     const origin = socket.handshake.headers.origin;
 
     if (bearerToken) {
-      if (origin && !this.config.WEB_ORIGINS.includes(origin)) {
+      if (
+        origin &&
+        !this.config.WEB_ORIGINS.includes(origin) &&
+        origin !== new URL(this.config.PUBLIC_API_URL).origin
+      ) {
         throw new Error('origin not allowed');
       }
     } else if (!origin || !this.config.WEB_ORIGINS.includes(origin)) {

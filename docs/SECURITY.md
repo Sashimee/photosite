@@ -35,7 +35,7 @@ Checklist the security-reviewer agent enforces. Every item maps to a step in `PL
 ## Web security (must)
 
 - Helmet headers, strict CSP (nonce-based; GTM/GA allowed via nonce), HSTS preload, COOP/COEP where compatible, Referrer-Policy strict-origin-when-cross-origin.
-- CSRF (D21): `SameSite=Lax` cookies plus an Origin/`Sec-Fetch-Site` allow-list check on cookie-authenticated, non-GET requests, plus JSON-only request bodies (form content types rejected with 415), instead of a double-submit token; mobile uses bearer tokens without cookies and is exempt from the origin check.
+- CSRF (D21): `SameSite=Lax` cookies plus an Origin/`Sec-Fetch-Site` allow-list check on cookie-authenticated, non-GET requests, plus JSON-only request bodies (form content types rejected with 415), instead of a double-submit token; mobile uses bearer tokens without cookies and is exempt from the origin check; the chat socket handshake accepts a bearer token with no Origin, a web origin, or the API's own origin (what React Native sends by default), while cookie-authenticated handshakes require a web origin.
 - CORS allow-list: photoo.lu, admin.photoo.lu, staging hosts, Expo dev origin only in dev.
 - Dependency scanning (Dependabot + `pnpm audit` in CI), Docker images pinned by digest, non-root containers, read-only filesystem where possible.
 
