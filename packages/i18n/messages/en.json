@@ -1654,6 +1654,58 @@
         "next": "Next photo",
         "position": "{index} of {total}"
       }
+    },
+    "chat": {
+      "list": {
+        "title": "Messages",
+        "empty": "No conversations yet.",
+        "subjectQuote": "About: {title}",
+        "subjectQuoteUntitled": "About a quote",
+        "noMessagesYet": "No messages yet",
+        "unreadBadge": "{count, plural, one {# unread message} other {# unread messages}}",
+        "loadFailed": "We couldn't load your conversations.",
+        "retry": "Try again"
+      },
+      "thread": {
+        "title": "Conversation",
+        "back": "Back",
+        "loadFailed": "We couldn't load this conversation.",
+        "retry": "Try again",
+        "notFound": "This conversation doesn't exist, or it isn't yours.",
+        "typingIndicator": "{name} is typing…",
+        "loadOlderCta": "Load older messages",
+        "loadingOlder": "Loading…",
+        "deletedMessage": "This message was deleted.",
+        "sendingStatus": "Sending…",
+        "failedStatus": "Not sent.",
+        "retryCta": "Retry",
+        "reconnecting": "Reconnecting…"
+      },
+      "composer": {
+        "label": "Message",
+        "placeholder": "Write a message…",
+        "sendCta": "Send"
+      },
+      "attachments": {
+        "viewCta": "View attachment",
+        "downloadCta": "Open attachment",
+        "opening": "Opening…",
+        "openFailed": "Couldn't open this attachment. Try again.",
+        "imageAlt": "Shared image",
+        "closeCta": "Close"
+      },
+      "participant": {
+        "clientLabel": "Client"
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "conflict": "This message can't be changed right now.",
+        "invalid": "One of the attachments has a problem. Remove it and try again.",
+        "forbidden": "You don't have access to this conversation.",
+        "notFound": "This conversation is no longer available.",
+        "tooManyRequests": "You're sending messages too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're sending messages too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      }
     }
   },
   "push": {
