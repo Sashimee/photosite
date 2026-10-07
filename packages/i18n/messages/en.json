@@ -1122,6 +1122,19 @@
         },
         "submit": "Apply filters",
         "clear": "Clear filters"
+      },
+      "export": {
+        "action": "Export CSV",
+        "exporting": "Exporting...",
+        "notice": "Exports the bookings matching the filters above. It asks for your second factor again and counts toward the limit of 5 refunds, reversals and exports per 10 minutes.",
+        "truncated": "The export hit the 50,000-row cap, so the file is incomplete. It was saved anyway; narrow the filters and export again for the rest.",
+        "errors": {
+          "generic": "The export failed and no file was saved. Try again.",
+          "forbidden": "You don't have permission to export bookings.",
+          "invalid": "Those filters can't be exported. Adjust them and try again.",
+          "tooManyRequests": "Too many refunds, reversals and exports in a short time. Try again later.",
+          "tooManyRequestsWithRetry": "Too many refunds, reversals and exports in a short time. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
       }
     }
   },
