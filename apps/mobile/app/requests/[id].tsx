@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
@@ -23,6 +23,7 @@ import {
 type Request = components['schemas']['Request'];
 type Quote = components['schemas']['Quote'];
 
+const QUOTES_LIMIT = 100;
 const CANCELLABLE_STATUSES: readonly string[] = ['open', 'quoted'];
 
 type LoadState = 'loading' | 'ready' | 'notFound' | 'failed';
@@ -69,7 +70,9 @@ function RequestDetail({ id }: { id: string }) {
   const loadQuotes = useCallback(async () => {
     setQuotesFailed(false);
     const data = await api
-      .GET('/v1/requests/{requestId}/quotes', { params: { path: { requestId: id } } })
+      .GET('/v1/requests/{requestId}/quotes', {
+        params: { path: { requestId: id }, query: { limit: QUOTES_LIMIT } },
+      })
       .then((result) => result.data)
       .catch(() => undefined);
     if (data) {
@@ -101,6 +104,25 @@ function RequestDetail({ id }: { id: string }) {
     void load();
   }, [load]);
 
+  const hasFocusedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocusedOnce.current) {
+        hasFocusedOnce.current = true;
+        return;
+      }
+      void api
+        .GET('/v1/requests/{id}', { params: { path: { id } } })
+        .then(({ data }) => {
+          if (data) {
+            setRequest(data);
+            void loadQuotes();
+          }
+        })
+        .catch(() => undefined);
+    }, [id, loadQuotes]),
+  );
+
   async function cancelRequest() {
     if (inFlight.current) {
       return;
@@ -114,6 +136,7 @@ function RequestDetail({ id }: { id: string }) {
       });
       if (data) {
         setRequest(data);
+        void loadQuotes();
       } else {
         setCancelError(
           requestErrorMessage(

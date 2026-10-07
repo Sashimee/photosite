@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { router } from 'expo-router';
 import { store } from 'expo-router/build/global-state/router-store';
-import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
+import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import type { ReactNode } from 'react';
 
 jest.mock('../../src/lib/auth-context', () => ({
@@ -265,5 +266,39 @@ describe('new request screen', () => {
     );
     const [root] = store.navigationRef.getRootState().routes;
     expect(root?.state?.routes.map((route) => route.name)).toEqual(['(tabs)', 'requests/[id]']);
+  });
+
+  it('shows the new request in the list after going back from its detail', async () => {
+    let created = false;
+    mockedPost.mockImplementation((() => {
+      created = true;
+      return Promise.resolve(ok({ id: 'r1' }));
+    }) as unknown as typeof api.POST);
+    mockedGet.mockImplementation(((path: string) =>
+      Promise.resolve(
+        path === '/v1/countries'
+          ? ok([{ code: 'LU', name: 'Luxembourg', currency: 'EUR', defaultLocale: 'fr' }])
+          : path === '/v1/requests/mine'
+            ? ok({ items: created ? [createdRequest] : [], nextCursor: null })
+            : path === '/v1/requests/{id}'
+              ? ok(createdRequest)
+              : path === '/v1/requests/{requestId}/quotes'
+                ? ok({ items: [], nextCursor: null })
+                : ok([luxembourg]),
+      )) as unknown as typeof api.GET);
+    renderRouter('./app', { initialUrl: '/requests' });
+
+    await screen.findByTestId('requests-empty');
+    fireEvent.press(screen.getByTestId('requests-new'));
+    await fillEverythingButLocation();
+    await pickCity();
+    fireEvent.press(screen.getByTestId('request-submit'));
+    await screen.findByTestId('request-detail');
+    act(() => {
+      router.back();
+    });
+
+    await screen.findByTestId('request-row-r1');
+    expect(screen.queryByTestId('requests-empty')).toBeNull();
   });
 });

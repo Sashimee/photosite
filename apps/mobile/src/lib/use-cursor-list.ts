@@ -1,3 +1,4 @@
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface CursorPage<T> {
@@ -73,6 +74,16 @@ export function useCursorList<T extends { id: string }>(
   useEffect(() => {
     void reload('initial');
   }, [reload]);
+
+  const hasFocusedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (hasFocusedOnce.current) {
+        void reload('refresh');
+      }
+      hasFocusedOnce.current = true;
+    }, [reload]),
+  );
 
   const refresh = useCallback(() => reload('refresh'), [reload]);
 

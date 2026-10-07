@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { fireEvent, renderRouter, screen } from 'expo-router/testing-library';
+import { router } from 'expo-router';
+import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library';
 import type { ReactNode } from 'react';
 
 jest.mock('../../src/lib/auth-context', () => ({
@@ -41,7 +42,9 @@ const REQUEST = {
 const QUOTE = {
   id: 'q1',
   status: 'sent',
-  photographer: { displayName: 'Jane Doe Photography' },
+  photographer: { displayName: 'Jane Doe Photography', ratingAvg: 0, ratingCount: 0 },
+  lineItems: [{ label: 'Full day coverage', qty: 1, unitCents: 157500 }],
+  message: null,
   total: { amountCents: 157500, currency: 'EUR' },
   platformFee: { amountCents: 1234, currency: 'EUR' },
   validUntil: '2999-12-01T00:00:00.000Z',
@@ -138,5 +141,73 @@ describe('request detail', () => {
     renderRouter('./app', { initialUrl: '/requests/r1' });
 
     await screen.findByText("This request doesn't exist, or it isn't yours.");
+  });
+
+  it('reloads the request and quotes after accepting a quote and going back', async () => {
+    let accepted = false;
+    mockedGet.mockImplementation(((path: string) => {
+      if (path === '/v1/requests/{id}') {
+        return Promise.resolve(ok({ ...REQUEST, status: accepted ? 'booked' : 'quoted' }));
+      }
+      if (path === '/v1/quotes/{id}') {
+        return Promise.resolve(ok({ ...QUOTE, status: accepted ? 'accepted' : 'sent' }));
+      }
+      return Promise.resolve(
+        ok({ items: [{ ...QUOTE, status: accepted ? 'accepted' : 'sent' }], nextCursor: null }),
+      );
+    }) as unknown as typeof api.GET);
+    mockedPost.mockImplementation((() => {
+      accepted = true;
+      return Promise.resolve(ok({ ...QUOTE, status: 'accepted', bookingId: null }));
+    }) as unknown as typeof api.POST);
+    renderRouter('./app', { initialUrl: '/requests/r1' });
+
+    fireEvent.press(await screen.findByTestId('quote-card-q1'));
+    fireEvent.press(await screen.findByTestId('quote-accept'));
+    fireEvent.press(screen.getByTestId('quote-accept-confirm'));
+    await screen.findByTestId('quote-outcome');
+    act(() => {
+      router.back();
+    });
+
+    await screen.findByText('Booked');
+    expect(screen.getByText('Accepted')).toBeTruthy();
+    expect(screen.queryByTestId('request-cancel-action')).toBeNull();
+  });
+
+  it('reloads the quotes after a successful cancel', async () => {
+    let cancelled = false;
+    mockedGet.mockImplementation(((path: string) =>
+      Promise.resolve(
+        path === '/v1/requests/{id}'
+          ? ok(REQUEST)
+          : ok({
+              items: [{ ...QUOTE, status: cancelled ? 'declined' : 'sent' }],
+              nextCursor: null,
+            }),
+      )) as unknown as typeof api.GET);
+    mockedPost.mockImplementation((() => {
+      cancelled = true;
+      return Promise.resolve(ok({ ...REQUEST, status: 'cancelled' }));
+    }) as unknown as typeof api.POST);
+    renderRouter('./app', { initialUrl: '/requests/r1' });
+
+    fireEvent.press(await screen.findByTestId('request-cancel-action'));
+    fireEvent.press(screen.getByTestId('request-cancel-action-confirm'));
+
+    await screen.findByText('Declined');
+  });
+
+  it('asks the API for up to 100 quotes', async () => {
+    mockGets({});
+    renderRouter('./app', { initialUrl: '/requests/r1' });
+
+    await screen.findByTestId('quote-card-q1');
+    expect(mockedGet).toHaveBeenCalledWith(
+      '/v1/requests/{requestId}/quotes',
+      expect.objectContaining({
+        params: { path: { requestId: 'r1' }, query: { limit: 100 } },
+      }),
+    );
   });
 });
