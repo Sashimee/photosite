@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import type { TFunction } from 'i18next';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Modal, Pressable, Text, View } from 'react-native';
@@ -9,11 +10,17 @@ import { api } from '../../lib/api';
 
 type MessageAttachment = components['schemas']['MessageAttachment'];
 
-function formatBytes(sizeBytes: number): string {
+export function formatBytes(t: TFunction, sizeBytes: number): string {
   if (sizeBytes < 1024 * 1024) {
-    return `${String(Math.max(1, Math.round(sizeBytes / 1024)))} KB`;
+    return t('mobile.chat.attachments.sizeKb', {
+      size: String(Math.max(1, Math.round(sizeBytes / 1024))),
+    });
   }
-  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+  return t('mobile.chat.attachments.sizeMb', { size: (sizeBytes / (1024 * 1024)).toFixed(1) });
+}
+
+function isOpenableUrl(url: string): boolean {
+  return url.startsWith('https://') || (__DEV__ && url.startsWith('http://'));
 }
 
 export function AttachmentChip({
@@ -42,7 +49,7 @@ export function AttachmentChip({
         '/v1/conversations/{id}/messages/{messageId}/attachments/{attachmentId}/download',
         { params: { path: { id: conversationId, messageId, attachmentId: attachment.id } } },
       );
-      if (!data) {
+      if (!data || !isOpenableUrl(data.url)) {
         setFailed(true);
       } else if (isImage) {
         setImageUrl(data.url);
@@ -69,10 +76,10 @@ export function AttachmentChip({
         className="min-h-11 flex-row items-center gap-2 rounded-md border border-border px-3"
       >
         <Text className="text-xs font-medium uppercase text-foreground">
-          {isImage ? 'IMG' : 'PDF'}
+          {isImage ? t('mobile.chat.attachments.kindImage') : t('mobile.chat.attachments.kindPdf')}
         </Text>
         <Text className="text-xs text-muted-foreground">
-          {opening ? t('mobile.chat.attachments.opening') : formatBytes(attachment.sizeBytes)}
+          {opening ? t('mobile.chat.attachments.opening') : formatBytes(t, attachment.sizeBytes)}
         </Text>
       </Pressable>
       {failed ? (
@@ -93,6 +100,7 @@ export function AttachmentChip({
               source={{ uri: imageUrl }}
               style={{ flex: 1 }}
               contentFit="contain"
+              cachePolicy="memory"
               accessibilityLabel={t('mobile.chat.attachments.imageAlt')}
             />
             <Pressable

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import { Linking } from 'react-native';
 import type { ReactNode } from 'react';
@@ -15,6 +15,39 @@ jest.mock('../../src/lib/api', () => ({
 
 jest.mock('../../src/lib/use-unread-count', () => ({ useUnreadCount: () => 0 }));
 
+const mockRequestCamera = jest.fn<() => Promise<{ granted: boolean; canAskAgain: boolean }>>();
+const mockRequestLibrary = jest.fn<() => Promise<{ granted: boolean; canAskAgain: boolean }>>();
+const mockLaunchCamera = jest.fn();
+const mockLaunchLibrary = jest.fn<(options: unknown) => Promise<unknown>>();
+jest.mock('expo-image-picker', () => ({
+  requestCameraPermissionsAsync: () => mockRequestCamera(),
+  requestMediaLibraryPermissionsAsync: () => mockRequestLibrary(),
+  launchCameraAsync: (options: unknown) => mockLaunchCamera(options),
+  launchImageLibraryAsync: (options: unknown) => mockLaunchLibrary(options),
+}));
+
+const mockGetDocument = jest.fn<(options: unknown) => Promise<unknown>>();
+jest.mock('expo-document-picker', () => ({
+  getDocumentAsync: (options: unknown) => mockGetDocument(options),
+}));
+
+jest.mock('expo-image-manipulator', () => ({
+  SaveFormat: { JPEG: 'jpeg' },
+  ImageManipulator: {
+    manipulate: (uri: string) => {
+      const image = {
+        width: 1200,
+        height: 900,
+        saveAsync: () => Promise.resolve({ uri, width: 1200, height: 900 }),
+      };
+      return {
+        renderAsync: () => Promise.resolve(image),
+        resize: () => ({ renderAsync: () => Promise.resolve(image) }),
+      };
+    },
+  },
+}));
+
 const { createFakeSocket, installAppState } = jest.requireActual<
   typeof import('../../src/testing/fake-socket')
 >('../../src/testing/fake-socket');
@@ -25,6 +58,7 @@ jest.mock('socket.io-client', () => ({ io: () => mockFake.socket }));
 import '../../src/lib/i18n';
 import { api } from '../../src/lib/api';
 import { resetChatSocketForTesting } from '../../src/lib/chat-socket';
+import { installFakeFetch, installFakeXhr } from '../../src/testing/fake-upload';
 
 const mockedGet = jest.mocked(api.GET);
 
@@ -105,6 +139,9 @@ function installApi(conversationStatus = 200) {
           ? ok({ items: olderMessages, nextCursor: null })
           : ok({ items: [...serverMessages].reverse(), nextCursor }),
       );
+    }
+    if (path === '/v1/uploads/{id}') {
+      return Promise.resolve(ok({ id: 'up1', status: 'clean' }));
     }
     if (path.endsWith('/download')) {
       return Promise.resolve(
@@ -362,6 +399,268 @@ describe('message thread', () => {
       '/v1/conversations/{id}/messages/{messageId}/attachments/{attachmentId}/download',
       { params: { path: { id: 'c1', messageId: 'm7', attachmentId: 'a1' } } },
     );
+    openUrl.mockRestore();
+  });
+});
+
+describe('attachments', () => {
+  const xhr = installFakeXhr();
+  let uploadCounter: number;
+
+  function isDisabled(testID: string): boolean {
+    const props = screen.getByTestId(testID).props as {
+      accessibilityState?: { disabled?: boolean };
+    };
+    return props.accessibilityState?.disabled === true;
+  }
+
+  function photo(index: number) {
+    return {
+      uri: `file:///photo-${String(index)}.jpg`,
+      fileName: `photo-${String(index)}.jpg`,
+      mimeType: 'image/jpeg',
+      width: 1200,
+      height: 900,
+    };
+  }
+
+  beforeEach(() => {
+    xhr.reset();
+    uploadCounter = 0;
+    installFakeFetch({});
+    mockRequestCamera.mockResolvedValue({ granted: true, canAskAgain: true });
+    mockRequestLibrary.mockResolvedValue({ granted: true, canAskAgain: true });
+    jest.mocked(api.POST).mockImplementation(((path: string) => {
+      if (path === '/v1/uploads') {
+        uploadCounter += 1;
+        return Promise.resolve(
+          ok({
+            uploadId: `up${String(uploadCounter)}`,
+            url: `https://s3.example.com/put-${String(uploadCounter)}`,
+            headers: { 'Content-Type': 'image/jpeg' },
+          }),
+        );
+      }
+      return Promise.resolve(ok({ id: `up${String(uploadCounter)}` }));
+    }) as never);
+  });
+
+  function chooseFromLibrary(assets: ReturnType<typeof photo>[]) {
+    mockLaunchLibrary.mockResolvedValue({ canceled: false, assets });
+    fireEvent.press(screen.getByTestId('composer-attach'));
+    expect(screen.getByText('Photo library')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('attach-library'));
+  }
+
+  it('keeps chat usable when camera permission is denied and offers the settings', async () => {
+    mockRequestCamera.mockResolvedValue({ granted: false, canAskAgain: false });
+    const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue();
+    const stored = makeMessage('m9', '2026-10-06T10:00:00.000Z', {
+      senderId: 'me',
+      body: 'Still works',
+    });
+    mockFake.respondTo('message:send', () => ({ ok: true, data: { message: stored } }));
+    await openThread();
+
+    fireEvent.press(screen.getByTestId('composer-attach'));
+    fireEvent.press(screen.getByTestId('attach-camera'));
+
+    expect(await screen.findByTestId('composer-permission-denied')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Allow camera access in Settings to take a photo. You can still send messages and choose other files.',
+      ),
+    ).toBeTruthy();
+    expect(mockLaunchCamera).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('composer-open-settings'));
+    expect(openSettings).toHaveBeenCalledTimes(1);
+    openSettings.mockRestore();
+
+    send('Still works');
+    await waitFor(() => {
+      expect(mockFake.emittedEvents('message:send')).toHaveLength(1);
+    });
+    expect(mockFake.emittedEvents('message:send')[0]).toEqual({
+      conversationId: 'c1',
+      body: 'Still works',
+    });
+  });
+
+  it('uploads a picked photo, then sends the message with the upload id once', async () => {
+    const stored = makeMessage('m10', '2026-10-06T10:00:00.000Z', {
+      senderId: 'me',
+      body: null,
+      attachments: [{ id: 'att1', kind: 'image', mimeType: 'image/jpeg', sizeBytes: 1024 }],
+    });
+    mockFake.respondTo('message:send', () => ({ ok: true, data: { message: stored } }));
+    await openThread();
+
+    chooseFromLibrary([photo(1)]);
+
+    await screen.findByText('Ready');
+    expect(xhr.puts).toHaveLength(1);
+    expect(xhr.puts[0]?.url).toBe('https://s3.example.com/put-1');
+
+    fireEvent.press(screen.getByTestId('composer-send'));
+    fireEvent.press(screen.getByTestId('composer-send'));
+
+    await waitFor(() => {
+      expect(mockFake.emittedEvents('message:send')).toHaveLength(1);
+    });
+    expect(mockFake.emittedEvents('message:send')[0]).toEqual({
+      conversationId: 'c1',
+      attachmentIds: ['up1'],
+    });
+    await screen.findByTestId('message-m10');
+    expect(screen.queryByTestId('attachment-drafts')).toBeNull();
+  });
+
+  it('disables send while a file is still uploading', async () => {
+    jest
+      .mocked(api.POST)
+      .mockImplementation(((path: string) =>
+        path === '/v1/uploads' ? new Promise(() => undefined) : Promise.resolve(ok({}))) as never);
+    await openThread();
+
+    chooseFromLibrary([photo(1)]);
+
+    expect(await screen.findByTestId('composer-wait-uploads')).toBeTruthy();
+    fireEvent.changeText(screen.getByTestId('composer-input'), 'text');
+    expect(isDisabled('composer-send')).toBe(true);
+  });
+
+  it('shows a still-scanning state, not an error, when the send is refused with 422', async () => {
+    mockFake.respondTo('message:send', () => ({
+      ok: false,
+      error: {
+        code: 'UNPROCESSABLE_ENTITY',
+        message: 'An attachment has not finished scanning yet',
+      },
+    }));
+    await openThread();
+    chooseFromLibrary([photo(1)]);
+    await screen.findByText('Ready');
+
+    fireEvent.press(screen.getByTestId('composer-send'));
+
+    expect(await screen.findByText('Waiting for the file check.')).toBeTruthy();
+    expect(
+      screen.getByText('An attachment is still being checked. Try again in a moment.'),
+    ).toBeTruthy();
+    expect(screen.queryByText('Not sent.')).toBeNull();
+    expect(
+      screen.queryByText('One of the attachments has a problem. Remove it and try again.'),
+    ).toBeNull();
+
+    const stored = makeMessage('m11', '2026-10-06T10:00:00.000Z', { senderId: 'me', body: null });
+    mockFake.respondTo('message:send', () => ({ ok: true, data: { message: stored } }));
+    fireEvent.press(screen.getByText('Retry'));
+    await screen.findByTestId('message-m11');
+    expect(mockFake.emittedEvents('message:send')[1]).toEqual({
+      conversationId: 'c1',
+      attachmentIds: ['up1'],
+    });
+  });
+
+  it('caps a message at 10 attachments', async () => {
+    await openThread();
+
+    chooseFromLibrary(Array.from({ length: 11 }, (_, index) => photo(index + 1)));
+
+    expect(await screen.findByText('You can attach up to 10 files to a message.')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getAllByText('Ready')).toHaveLength(10);
+    });
+    expect(isDisabled('composer-attach')).toBe(true);
+  });
+
+  it('rejects a file type the API does not accept', async () => {
+    mockGetDocument.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///a.zip', name: 'a.zip', mimeType: 'application/zip' }],
+    });
+    await openThread();
+
+    fireEvent.press(screen.getByTestId('composer-attach'));
+    fireEvent.press(screen.getByTestId('attach-files'));
+
+    expect(
+      await screen.findByText("a.zip can't be attached. Use a JPEG, PNG, WebP or PDF file."),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('attachment-drafts')).toBeNull();
+    expect(jest.mocked(api.POST)).not.toHaveBeenCalled();
+  });
+
+  it('lets a failed upload be retried or removed', async () => {
+    xhr.failNextWith(500);
+    await openThread();
+    chooseFromLibrary([photo(1)]);
+
+    expect(await screen.findByText('Upload failed.')).toBeTruthy();
+    expect(isDisabled('composer-send')).toBe(true);
+
+    xhr.failNextWith(200);
+    fireEvent.press(screen.getByText('Retry'));
+    await screen.findByText('Ready');
+    expect(isDisabled('composer-send')).toBe(false);
+
+    fireEvent.press(screen.getByLabelText('Remove photo-1.jpg'));
+    expect(screen.queryByTestId('attachment-drafts')).toBeNull();
+  });
+});
+
+describe('attachment chip', () => {
+  const devFlag = globalThis as unknown as { __DEV__: boolean };
+  const originalDev = devFlag.__DEV__;
+
+  function serveDownloadUrl(url: string) {
+    serverMessages = [
+      makeMessage('m7', '2026-10-05T09:00:00.000Z', {
+        body: null,
+        attachments: [{ id: 'a1', kind: 'document', mimeType: 'application/pdf', sizeBytes: 2048 }],
+      }),
+    ];
+    mockedGet.mockImplementation(((path: string) => {
+      if (path.endsWith('/download')) {
+        return Promise.resolve(ok({ url, expiresAt: 'x' }));
+      }
+      if (path === '/v1/conversations/{id}') {
+        return Promise.resolve(ok(conversation));
+      }
+      return Promise.resolve(ok({ items: serverMessages, nextCursor: null }));
+    }) as never);
+  }
+
+  afterEach(() => {
+    devFlag.__DEV__ = originalDev;
+  });
+
+  it('does not open a download url that is not https in a release build', async () => {
+    devFlag.__DEV__ = false;
+    const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    serveDownloadUrl('http://files.example.com/doc.pdf');
+    await openThread();
+
+    expect(screen.getByText('PDF')).toBeTruthy();
+    expect(screen.getByText('2 KB')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('attachment-a1'));
+
+    expect(await screen.findByText("Couldn't open this attachment. Try again.")).toBeTruthy();
+    expect(openUrl).not.toHaveBeenCalled();
+    openUrl.mockRestore();
+  });
+
+  it('opens an http download url in a dev build', async () => {
+    devFlag.__DEV__ = true;
+    const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    serveDownloadUrl('http://192.168.1.20:9000/doc.pdf');
+    await openThread();
+
+    fireEvent.press(screen.getByTestId('attachment-a1'));
+
+    await waitFor(() => {
+      expect(openUrl).toHaveBeenCalledWith('http://192.168.1.20:9000/doc.pdf');
+    });
     openUrl.mockRestore();
   });
 });
