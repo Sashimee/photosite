@@ -13,6 +13,11 @@ const ADMIN_MUTATION_RULE: RateLimitRule = { windowSeconds: 60, max: 30 };
 // other admin mutations.
 const ADMIN_DELETE_MUTATION_RULE: RateLimitRule = { windowSeconds: 60, max: 5 };
 
+// Refunds, transfer reversals and the bookings CSV export move or bulk-read
+// money, so they share a budget far below the generic mutation limit
+// (docs/steps/1D.5-finance.md, 1D.5c).
+const ADMIN_MONEY_RULE: RateLimitRule = { windowSeconds: 10 * 60, max: 5 };
+
 @Injectable()
 export class AdminMutationRateLimitService {
   constructor(@Inject(RedisRateLimiter) private readonly limiter: RedisRateLimiter) {}
@@ -42,6 +47,20 @@ export class AdminMutationRateLimitService {
         {
           code: 'TOO_MANY_REQUESTS',
           message: 'Too many deletion requests. Try again later.',
+          details: { retryAfterSeconds: result.retryAfterSeconds },
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  async enforceMoney(adminId: string): Promise<void> {
+    const result = await this.limiter.consume('admin:mutation:money', adminId, ADMIN_MONEY_RULE);
+    if (!result.allowed) {
+      throw new HttpException(
+        {
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Too many refunds, reversals or exports. Try again later.',
           details: { retryAfterSeconds: result.retryAfterSeconds },
         },
         HttpStatus.TOO_MANY_REQUESTS,

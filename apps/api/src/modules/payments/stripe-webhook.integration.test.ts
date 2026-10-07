@@ -1670,4 +1670,44 @@ describe('stripe webhook integration', () => {
       expect(JSON.stringify(detail)).not.toContain(booking.client.email);
     });
   });
+
+  describe('admin finance money limit, 409 codes and export', () => {
+    function adminPost(
+      admin: { headers: Record<string, string> },
+      bookingId: string,
+      action: 'refund' | 'reverse-transfer',
+      payload: Record<string, unknown>,
+    ) {
+      return fastify().inject({
+        method: 'POST',
+        url: `/v1/admin/bookings/${bookingId}/${action}`,
+        remoteAddress: FAKE_IP,
+        headers: admin.headers,
+        payload: { reason: 'Photographer no-show confirmed', ...payload },
+      });
+    }
+
+    it('answers 429 once refunds and reversals spend the money budget', async () => {
+      const admin = await adminWithTwoFactor('money-limit', true);
+      const held = await paidBooking('money-limit');
+      const other = await adminWithTwoFactor('money-limit-other', true);
+
+      const payloads = { refund: { amountCents: 100 }, 'reverse-transfer': {} };
+      for (let n = 0; n < 5; n += 1) {
+        const action = n % 2 === 0 ? 'refund' : 'reverse-transfer';
+        const response = await adminPost(admin, held.bookingId, action, payloads[action]);
+        expect(response.statusCode).toBe(409);
+      }
+      for (const action of ['refund', 'reverse-transfer'] as const) {
+        const limited = await adminPost(admin, held.bookingId, action, payloads[action]);
+        expect(limited.statusCode).toBe(429);
+        const body = limited.json<{ code: string; details: { retryAfterSeconds: number } }>();
+        expect(body.code).toBe('TOO_MANY_REQUESTS');
+        expect(body.details.retryAfterSeconds).toBeGreaterThan(0);
+      }
+      expect(
+        (await adminPost(other, held.bookingId, 'refund', { amountCents: 100 })).statusCode,
+      ).toBe(409);
+    });
+  });
 });

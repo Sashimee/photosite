@@ -66,6 +66,7 @@ export class AdminBookingsController {
   ) {
     const { user } = await this.adminAccess.requirePermission(request, 'finance', REQUIRES_2FA);
     await this.rateLimit.enforce(user.id);
+    await this.rateLimit.enforceMoney(user.id);
     return this.refunds.refundAsAdmin(user, id, body, request.ip);
   }
 
@@ -79,6 +80,7 @@ export class AdminBookingsController {
   ) {
     const { user } = await this.adminAccess.requirePermission(request, 'finance', REQUIRES_2FA);
     await this.rateLimit.enforce(user.id);
+    await this.rateLimit.enforceMoney(user.id);
     return this.refunds.reverseTransferAsAdmin(user, id, body, request.ip);
   }
 }
