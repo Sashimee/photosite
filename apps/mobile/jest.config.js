@@ -7,6 +7,8 @@ module.exports = {
     '<rootDir>/jest/setup-env.js',
     '<rootDir>/jest/mock-notifications.js',
     '<rootDir>/jest/mock-stripe.js',
+    '<rootDir>/jest/mock-consent-policy.js',
+    '<rootDir>/jest/mock-expo-crypto.js',
   ],
   moduleNameMapper: {
     '\\.css$': '<rootDir>/jest/style-mock.js',

@@ -7,7 +7,9 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ConsentPrompt } from '../src/components/consent/consent-prompt';
 import { AuthProvider, useAuth } from '../src/lib/auth-context';
+import { ConsentProvider } from '../src/lib/consent-context';
 import { initSentry } from '../src/lib/sentry';
 import { useNotificationRouting, usePushRegistration } from '../src/lib/use-push-lifecycle';
 
@@ -25,7 +27,12 @@ function RootNavigator() {
     }
   }, [status]);
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false }} />
+      <ConsentPrompt />
+    </>
+  );
 }
 
 export default function RootLayout() {
@@ -33,7 +40,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AuthProvider>
-          <RootNavigator />
+          <ConsentProvider>
+            <RootNavigator />
+          </ConsentProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

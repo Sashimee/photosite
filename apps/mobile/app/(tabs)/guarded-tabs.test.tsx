@@ -29,9 +29,10 @@ describe('guarded tabs', () => {
     await waitFor(() => screen.getByTestId('sign-in-submit'));
   });
 
-  it('redirects account to sign-in while signed out', async () => {
+  it('keeps account reachable while signed out with sign-in and privacy choices', async () => {
     renderRouter('./app', { initialUrl: '/account' });
 
-    await waitFor(() => screen.getByTestId('sign-in-submit'));
+    await screen.findByTestId('account-sign-in');
+    expect(screen.getByTestId('account-consent-entry')).toBeTruthy();
   });
 });
