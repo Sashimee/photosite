@@ -1624,6 +1624,35 @@
         "tooManyRequests": "You're doing that too fast. Slow down and try again.",
         "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
       }
+    },
+    "profile": {
+      "title": "Photographer",
+      "avatarAlt": "{displayName}",
+      "languages": "Speaks: {languages}",
+      "rating": "{ratingAvg, number, ::.0} ({ratingCount, plural, one {# review} other {# reviews}})",
+      "portfolioHeading": "Portfolio",
+      "portfolioImageAlt": "Photo {index} by {displayName}",
+      "productsHeading": "Packages",
+      "noProducts": "No packages yet.",
+      "fromPrice": "From {price}",
+      "durationMinutes": "{minutes} min",
+      "requestQuoteCta": "Request a quote",
+      "requestTierQuote": "Request this quote",
+      "requestingTierQuote": "Sending...",
+      "tierQuoteLabel": "Request a quote for {product}, {usage}",
+      "loadFailed": "We couldn't load this profile.",
+      "retry": "Try again",
+      "notFound": {
+        "title": "Photographer not found",
+        "description": "This photographer profile doesn't exist, or isn't published yet.",
+        "backHome": "Back to discover"
+      },
+      "viewer": {
+        "close": "Close",
+        "previous": "Previous photo",
+        "next": "Next photo",
+        "position": "{index} of {total}"
+      }
     }
   },
   "push": {
