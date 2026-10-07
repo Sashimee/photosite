@@ -2,8 +2,10 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
+import { AccountProfile } from '../../src/components/account/account-profile';
 import { DataExport } from '../../src/components/account/data-export';
 import { DeleteAccount } from '../../src/components/account/delete-account';
+import { SignOut } from '../../src/components/account/sign-out';
 import { useAuth } from '../../src/lib/auth-context';
 import { signInHref } from '../../src/lib/return-path';
 
@@ -68,6 +70,7 @@ function AccountContent() {
       <Text className="pb-4 text-2xl font-semibold text-foreground">
         {t('mobile.tabs.account')}
       </Text>
+      <AccountProfile />
       {isPhotographer ? (
         <Pressable
           accessibilityRole="button"
@@ -88,6 +91,7 @@ function AccountContent() {
       <ConsentEntry />
       <DataExport />
       <DeleteAccount />
+      <SignOut />
     </ScrollView>
   );
 }

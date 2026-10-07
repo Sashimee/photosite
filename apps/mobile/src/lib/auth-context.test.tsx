@@ -28,7 +28,7 @@ import * as Sentry from '@sentry/react-native';
 
 import { api, setUnauthorizedListener } from './api';
 import { resetChatSocket } from './chat-socket';
-import { AuthProvider, useAuth } from './auth-context';
+import { AuthProvider, useAuth, type AuthContextValue, type SessionUser } from './auth-context';
 
 const mockedSecureStore = jest.mocked(SecureStore);
 const mockedGet = jest.mocked(api.GET);
@@ -49,6 +49,13 @@ const user = {
   status: 'active',
   twoFactorEnabled: false,
   lastLoginAt: null,
+};
+
+const sessionUser: SessionUser = {
+  ...user,
+  locale: 'en',
+  roles: ['client'],
+  status: 'active',
 };
 
 function Probe() {
@@ -226,6 +233,44 @@ describe('AuthProvider', () => {
     );
     await waitFor(() => screen.getByText('status:signed-in'));
   });
+  it('updateUser replaces the session user without touching the status', async () => {
+    let updateUser: AuthContextValue['updateUser'] | undefined;
+    function Capture() {
+      const auth = useAuth();
+      updateUser = auth.updateUser;
+      return <Text>{`${auth.status}:${auth.user?.roles.join(',') ?? 'none'}`}</Text>;
+    }
+    mockedSecureStore.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(
+        key === TOKEN_KEY
+          ? 'token-abc'
+          : key === EXPIRES_AT_KEY
+            ? new Date(Date.now() + 60_000).toISOString()
+            : null,
+      ),
+    );
+    mockedGet.mockResolvedValue({
+      data: { user: sessionUser },
+      error: undefined,
+      response: new Response(null, { status: 200 }),
+    });
+    render(
+      <AuthProvider>
+        <Capture />
+      </AuthProvider>,
+    );
+    await waitFor(() => screen.getByText('signed-in:client'));
+
+    act(() => {
+      updateUser?.({
+        ...sessionUser,
+        roles: ['client', 'photographer'],
+      });
+    });
+
+    expect(screen.getByText('signed-in:client,photographer')).toBeTruthy();
+  });
+
   describe('push device unregistration', () => {
     let signOut: () => Promise<void>;
 
