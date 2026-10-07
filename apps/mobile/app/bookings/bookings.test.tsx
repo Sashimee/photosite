@@ -19,6 +19,7 @@ import { api } from '../../src/lib/api';
 import { makeBooking } from '../../src/testing/booking-fixtures';
 
 const mockedGet = jest.mocked(api.GET);
+const mockedPost = jest.mocked(api.POST);
 
 function ok(data: unknown) {
   return Promise.resolve({ data, error: undefined, response: new Response(null, { status: 200 }) });
@@ -202,6 +203,31 @@ describe('client booking detail', () => {
       /payment is released to the photographer automatically on .*2027/,
     );
     expect(screen.queryByTestId('booking-pay-panel')).toBeNull();
+  });
+
+  it('shows the accept-delivery button on a delivered booking and re-renders from the returned booking', async () => {
+    mockedGet.mockReturnValue(ok(makeBooking('b1', { status: 'delivered' })));
+    mockedPost.mockReturnValue(ok(makeBooking('b1', { status: 'released' })));
+    open('/bookings/b1');
+
+    fireEvent.press(await screen.findByTestId('booking-accept-delivery'));
+    fireEvent.press(screen.getByTestId('booking-accept-delivery-confirm'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('booking-timeline-step-released').props).toMatchObject({
+        accessibilityState: { selected: true },
+      });
+    });
+    expect(screen.queryByTestId('booking-accept-delivery')).toBeNull();
+  });
+
+  it('offers no delivery actions to the client before delivery', async () => {
+    mockedGet.mockReturnValue(ok(makeBooking('b1', { status: 'paid_held' })));
+    open('/bookings/b1');
+
+    await screen.findByTestId('booking-detail');
+    expect(screen.queryByTestId('booking-accept-delivery')).toBeNull();
+    expect(screen.queryByTestId('booking-delivery-form')).toBeNull();
   });
 
   it.each(['cancelled', 'refunded', 'disputed'])(
