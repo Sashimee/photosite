@@ -193,6 +193,28 @@ describe('BookingRefundDialog', () => {
     expect(routerRefreshMock).not.toHaveBeenCalled();
   });
 
+  it('shows a mapped error when the request is rejected because the booking is busy', async () => {
+    apiPostMock.mockResolvedValue({ data: undefined, error: { code: 'BOOKING_BUSY' } });
+    const BookingRefundDialog = await loadBookingRefundDialog();
+    const user = userEvent.setup();
+
+    render(<BookingRefundDialog booking={baseBooking} />);
+    await openDialog(user);
+
+    await user.type(
+      screen.getByLabelText(translate('web.bookings.detail.refund', 'reasonLabel')),
+      'Refund while the booking is locked',
+    );
+    await user.click(
+      screen.getByRole('button', { name: translate('web.bookings.detail.refund', 'submitCta') }),
+    );
+
+    expect(
+      await screen.findByText(translate('web.bookings', 'errors.conflict')),
+    ).toBeInTheDocument();
+    expect(routerRefreshMock).not.toHaveBeenCalled();
+  });
+
   it('shows a mapped error and does not refresh when the request is rate-limited', async () => {
     apiPostMock.mockResolvedValue({
       data: undefined,

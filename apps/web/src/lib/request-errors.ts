@@ -6,6 +6,7 @@ export interface ApiErrorLike {
 
 const ERROR_CODE_KEYS: Record<string, string> = {
   CONFLICT: 'conflict',
+  BOOKING_BUSY: 'conflict',
   UNPROCESSABLE_ENTITY: 'invalid',
   VALIDATION_ERROR: 'invalid',
   FORBIDDEN: 'forbidden',
