@@ -170,13 +170,10 @@ export class AdminUsersService {
       });
 
       if (removesPhotographer) {
-        const profile = await tx.photographerProfile.findUnique({ where: { userId: id } });
-        if (profile?.isPublished) {
-          await tx.photographerProfile.update({
-            where: { id: profile.id },
-            data: { isPublished: false },
-          });
-        }
+        await tx.photographerProfile.updateMany({
+          where: { userId: id, isPublished: true },
+          data: { isPublished: false },
+        });
       }
 
       await this.auditService.record(tx, {

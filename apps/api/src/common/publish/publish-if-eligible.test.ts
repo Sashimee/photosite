@@ -31,6 +31,7 @@ function eligibleRow(
 function setup(initial: Row | null) {
   let row = initial;
   const tx = {
+    $queryRaw: vi.fn(() => Promise.resolve([])),
     photographerProfile: {
       findUnique: vi.fn(() => Promise.resolve(row ? structuredClone(row) : null)),
       updateMany: vi.fn(({ where }: { where: { isPublished: boolean } }) => {

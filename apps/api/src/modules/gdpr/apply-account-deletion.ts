@@ -34,7 +34,7 @@ export async function applyAccountDeletion(
 ): Promise<DataRequest> {
   const profile = await tx.photographerProfile.findUnique({
     where: { userId },
-    select: { id: true, isPublished: true },
+    select: { id: true },
   });
   const professional = await tx.professionalProfile.findUnique({
     where: { userId },
@@ -52,12 +52,11 @@ export async function applyAccountDeletion(
   await tx.session.deleteMany({ where: { userId } });
   await tx.device.deleteMany({ where: { userId } });
 
-  if (profile?.isPublished) {
-    await tx.photographerProfile.update({
-      where: { id: profile.id },
-      data: { isPublished: false },
-    });
-  }
+  const unpublished = await tx.photographerProfile.updateMany({
+    where: { userId, isPublished: true },
+    data: { isPublished: false },
+  });
+  const profileWasPublished = profile ? unpublished.count > 0 : null;
 
   const cancelledRequestIds = await cancelOwnRequests(tx, userId);
   const declinedQuoteIds = await cancelOwnQuotesAsClient(tx, userId);
@@ -83,7 +82,7 @@ export async function applyAccountDeletion(
       action: audit.action,
       targetType: 'DataRequest',
       targetId: row.id,
-      before: { userStatus: 'active', profileIsPublished: profile?.isPublished ?? null },
+      before: { userStatus: 'active', profileIsPublished: profileWasPublished },
       after: {
         userStatus: 'deleted',
         cancelledRequestIds,

@@ -5,6 +5,12 @@ export async function publishIfEligible(
   tx: Prisma.TransactionClient,
   profileId: string,
 ): Promise<boolean> {
+  await tx.$queryRaw`
+    SELECT u.id FROM "User" u
+    JOIN "PhotographerProfile" p ON p."userId" = u.id
+    WHERE p.id = ${profileId}
+    FOR SHARE OF u`;
+
   const profile = await tx.photographerProfile.findUnique({
     where: { id: profileId },
     select: {
