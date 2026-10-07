@@ -11,13 +11,15 @@ import {
 import { api } from '@/lib/api';
 import { formatCents, requireMoney } from '@/lib/money';
 
-function listBookings(cursor: string | undefined) {
-  return api.GET('/v1/admin/bookings', { params: { query: cursor ? { cursor } : {} } });
+import type { FinanceFilters } from './finance-search-params';
+
+function listBookings(query: FinanceFilters & { cursor?: string }) {
+  return api.GET('/v1/admin/bookings', { params: { query } });
 }
 
 type AdminBooking = NonNullable<Awaited<ReturnType<typeof listBookings>>['data']>['items'][number];
 
-export function BookingsTable() {
+export function BookingsTable({ status, createdFrom, createdTo, dispute }: FinanceFilters) {
   const t = useTranslations('admin.finance');
   const format = useFormatter();
 
@@ -75,8 +77,15 @@ export function BookingsTable() {
     },
   ];
 
+  const filtered = status !== undefined || createdFrom !== undefined || dispute !== undefined;
+
   function fetchPage(cursor: string | undefined): Promise<DataTableFetchResult<AdminBooking>> {
-    return listBookings(cursor);
+    return listBookings({
+      ...(status ? { status } : {}),
+      ...(createdFrom && createdTo ? { createdFrom, createdTo } : {}),
+      ...(dispute ? { dispute } : {}),
+      ...(cursor ? { cursor } : {}),
+    });
   }
 
   return (
@@ -87,8 +96,8 @@ export function BookingsTable() {
       caption={t('caption')}
       emptyState={
         <div className="flex flex-col gap-1">
-          <p>{t('empty.title')}</p>
-          <p className="text-xs">{t('empty.hint')}</p>
+          <p>{filtered ? t('empty.filteredTitle') : t('empty.title')}</p>
+          <p className="text-xs">{filtered ? t('empty.filteredHint') : t('empty.hint')}</p>
         </div>
       }
     />
