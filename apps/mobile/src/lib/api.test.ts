@@ -31,6 +31,15 @@ describe('api client', () => {
     expect(get()?.headers.get('Authorization')).toBe('Bearer token-123');
   });
 
+  it('sends requests with credentials omitted so the native cookie jar never attaches the session cookie', async () => {
+    mockedGetSessionToken.mockResolvedValue('token-123');
+    const { fetchStub, get } = captureRequest();
+
+    await api.POST('/v1/auth/sign-out', { fetch: fetchStub });
+
+    expect(get()?.credentials).toBe('omit');
+  });
+
   it('omits the Authorization header when there is no session', async () => {
     mockedGetSessionToken.mockResolvedValue(null);
     const { fetchStub, get } = captureRequest();

@@ -3,7 +3,10 @@ import { createApiClient } from '@photoo/api-client';
 import { env } from './env';
 import { getSessionToken } from './session';
 
-export const api = createApiClient({ baseUrl: env.EXPO_PUBLIC_API_URL });
+export const api = createApiClient({
+  baseUrl: env.EXPO_PUBLIC_API_URL,
+  credentials: 'omit',
+});
 
 type UnauthorizedListener = () => void;
 
