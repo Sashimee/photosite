@@ -51,6 +51,7 @@ function ok<T>(data: T) {
   return { data, error: undefined, response: new Response(null, { status: 200 }) };
 }
 
+let appState: ReturnType<typeof installAppState>;
 let unreadCountFromApi: number;
 let conversations: ReturnType<typeof makeConversation>[];
 
@@ -58,7 +59,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetChatSocketForTesting();
   mockFake.reset();
-  installAppState();
+  appState = installAppState();
   unreadCountFromApi = 7;
   conversations = [
     makeConversation('c1', 'Alice Photo', 2),
@@ -110,6 +111,18 @@ describe('messages tab', () => {
     await waitFor(() => {
       expect(screen.getByText('11')).toBeTruthy();
     });
+  });
+
+  it('reloads the rows when the app returns from the background', async () => {
+    renderRouter('./app', { initialUrl: '/messages' });
+    await screen.findByTestId('conversation-c1');
+
+    appState.set('background');
+    conversations = [makeConversation('c3', 'Carol Studio', 1), ...conversations];
+    expect(screen.queryByTestId('conversation-c3')).toBeNull();
+    appState.set('active');
+
+    await screen.findByTestId('conversation-c3');
   });
 
   it('shows an empty state', async () => {

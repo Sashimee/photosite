@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 
@@ -10,7 +10,7 @@ import { RequireSession } from '../../src/components/require-session';
 import { api } from '../../src/lib/api';
 import { useAuth } from '../../src/lib/auth-context';
 import { useChatSocket } from '../../src/lib/chat-socket';
-import { useScreenVisible } from '../../src/lib/use-screen-visible';
+import { useAppActive, useScreenVisible } from '../../src/lib/use-screen-visible';
 import { useCursorList } from '../../src/lib/use-cursor-list';
 
 const PAGE_SIZE = 20;
@@ -34,6 +34,15 @@ function ConversationList() {
 
   const list = useCursorList(fetchPage);
   const { refresh } = list;
+
+  const appActive = useAppActive();
+  const wasAppActive = useRef(appActive);
+  useEffect(() => {
+    if (appActive && !wasAppActive.current) {
+      void refresh();
+    }
+    wasAppActive.current = appActive;
+  }, [appActive, refresh]);
 
   useEffect(() => {
     function handleUpdated() {
