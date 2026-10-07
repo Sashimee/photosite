@@ -1,0 +1,19 @@
+appId: lu.photoo.app
+name: Launch and answer the consent prompt
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: consent-prompt
+    timeout: 60000
+- tapOn:
+    id: consent-decline-all
+- extendedWaitUntil:
+    notVisible:
+      id: consent-prompt
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: discover-results
+    timeout: 60000
