@@ -3,6 +3,15 @@ import type { ExpoConfig } from 'expo/config';
 const easProjectId = process.env.EAS_PROJECT_ID;
 const stripeMerchantIdentifier = process.env.EXPO_PUBLIC_STRIPE_MERCHANT_IDENTIFIER;
 
+function collectedData(type: string, { linked = true }: { linked?: boolean } = {}) {
+  return {
+    NSPrivacyCollectedDataType: `NSPrivacyCollectedDataType${type}`,
+    NSPrivacyCollectedDataTypeLinked: linked,
+    NSPrivacyCollectedDataTypeTracking: false,
+    NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+  };
+}
+
 const config: ExpoConfig = {
   name: 'Photoo',
   slug: 'photoo',
@@ -16,11 +25,33 @@ const config: ExpoConfig = {
     supportsTablet: false,
     usesAppleSignIn: false,
     privacyManifests: {
+      NSPrivacyTracking: false,
+      NSPrivacyTrackingDomains: [],
       NSPrivacyAccessedAPITypes: [
         {
           NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults',
           NSPrivacyAccessedAPITypeReasons: ['CA92.1'],
         },
+        {
+          NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryFileTimestamp',
+          NSPrivacyAccessedAPITypeReasons: ['3B52.1'],
+        },
+      ],
+      NSPrivacyCollectedDataTypes: [
+        collectedData('EmailAddress'),
+        collectedData('Name'),
+        collectedData('PhysicalAddress'),
+        collectedData('PreciseLocation'),
+        collectedData('CoarseLocation'),
+        collectedData('PhotosorVideos'),
+        collectedData('EmailsOrTextMessages'),
+        collectedData('OtherUserContent'),
+        collectedData('PaymentInfo'),
+        collectedData('PurchaseHistory'),
+        collectedData('UserID'),
+        collectedData('DeviceID'),
+        collectedData('CrashData', { linked: false }),
+        collectedData('OtherDiagnosticData', { linked: false }),
       ],
     },
   },
