@@ -15,6 +15,7 @@ jest.mock('../../src/lib/api', () => ({
 }));
 
 import '../../src/lib/i18n';
+import { api } from '../../src/lib/api';
 
 beforeEach(() => {
   mockAuth.current = { status: 'signed-in', user: { roles: ['client'] } };
@@ -47,5 +48,28 @@ describe('account tab studio entry', () => {
 
     await screen.findByTestId('studio-unavailable');
     expect(screen.queryByTestId('studio-entry-profile')).toBeNull();
+  });
+});
+
+describe('account tab data and deletion', () => {
+  it('shows export and deletion to a signed-in user', async () => {
+    jest.mocked(api.GET).mockResolvedValue({
+      data: [],
+      error: undefined,
+      response: new Response(null, { status: 200 }),
+    });
+    renderRouter('./app', { initialUrl: '/account' });
+
+    expect(await screen.findByTestId('account-export')).toBeTruthy();
+    expect(screen.getByTestId('account-deletion')).toBeTruthy();
+  });
+
+  it('hides export and deletion when signed out', async () => {
+    mockAuth.current = { status: 'signed-out', user: null } as never;
+    renderRouter('./app', { initialUrl: '/account' });
+
+    await screen.findByTestId('account-sign-in');
+    expect(screen.queryByTestId('account-export')).toBeNull();
+    expect(screen.queryByTestId('account-deletion')).toBeNull();
   });
 });
