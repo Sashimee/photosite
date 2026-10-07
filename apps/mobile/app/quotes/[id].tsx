@@ -165,6 +165,20 @@ function QuoteDetail({ id }: { id: string }) {
           {t(`mobile.quotes.detail.${outcome}Notice`)}
         </FormNotice>
       ) : null}
+      {outcome === 'accepted' ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            router.push('/bookings');
+          }}
+          testID="quote-view-bookings"
+          className="min-h-11 items-center justify-center"
+        >
+          <Text className="text-sm font-medium text-foreground underline">
+            {t('mobile.quotes.detail.viewBookingsCta')}
+          </Text>
+        </Pressable>
+      ) : null}
       {quote.status === 'withdrawn' ? (
         <FormNotice tone="info">{t('mobile.quotes.detail.withdrawnNotice')}</FormNotice>
       ) : null}
@@ -174,7 +188,11 @@ function QuoteDetail({ id }: { id: string }) {
 
       <QuoteActions
         quote={quote}
-        onChanged={(next, action) => {
+        onChanged={(next, action, bookingId) => {
+          if (action === 'accept' && bookingId) {
+            router.replace({ pathname: '/bookings/[id]', params: { id: bookingId } });
+            return;
+          }
           setQuote(next);
           setOutcome(action === 'accept' ? 'accepted' : 'declined');
         }}

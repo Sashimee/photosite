@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 jest.mock('../../src/lib/auth-context', () => ({
   AuthProvider: ({ children }: { children: ReactNode }) => children,
-  useAuth: () => ({ status: 'signed-in' }),
+  useAuth: () => ({ status: 'signed-in', user: { id: 'c1', roles: ['client'] } }),
 }));
 
 jest.mock('../../src/lib/api', () => ({
@@ -13,6 +13,7 @@ jest.mock('../../src/lib/api', () => ({
 }));
 
 import '../../src/lib/i18n';
+import { makeBooking } from '../../src/testing/booking-fixtures';
 import { renderedText } from '../../src/testing/rendered-text';
 import { api } from '../../src/lib/api';
 
@@ -138,6 +139,52 @@ describe('quote detail', () => {
     await screen.findByTestId('quote-outcome');
     expect(screen.getByText(/Nothing has been charged/)).toBeTruthy();
     expect(renderedText(screen.toJSON())).not.toMatch(/paid|payment received|charged to/i);
+  });
+
+  it('opens the booking after accepting a quote that created one', async () => {
+    mockedGet.mockImplementation(((path: string) =>
+      Promise.resolve(
+        ok(path === '/v1/bookings/{id}' ? makeBooking('b1', { quoteId: 'q1' }) : QUOTE),
+      )) as never);
+    mockedPost.mockResolvedValue(ok({ ...QUOTE, status: 'accepted', bookingId: 'b1' }));
+    const view = renderRouter('./app', { initialUrl: '/quotes/q1' });
+
+    fireEvent.press(await screen.findByTestId('quote-accept'));
+    fireEvent.press(screen.getByTestId('quote-accept-confirm'));
+
+    await screen.findByTestId('booking-detail');
+    expect(view.getPathname()).toBe('/bookings/b1');
+    expect(mockedGet).toHaveBeenCalledWith('/v1/bookings/{id}', {
+      params: { path: { id: 'b1' } },
+    });
+  });
+
+  it('links to the bookings list when the accepted quote has no booking id', async () => {
+    mockedGet.mockImplementation(((path: string) =>
+      Promise.resolve(
+        ok(path === '/v1/bookings' ? { items: [], nextCursor: null } : QUOTE),
+      )) as never);
+    mockedPost.mockResolvedValue(ok({ ...QUOTE, status: 'accepted', bookingId: null }));
+    const view = renderRouter('./app', { initialUrl: '/quotes/q1' });
+
+    fireEvent.press(await screen.findByTestId('quote-accept'));
+    fireEvent.press(screen.getByTestId('quote-accept-confirm'));
+    fireEvent.press(await screen.findByTestId('quote-view-bookings'));
+
+    await screen.findByTestId('bookings-empty');
+    expect(view.getPathname()).toBe('/bookings');
+  });
+
+  it('stays on the quote after declining', async () => {
+    mockedPost.mockResolvedValue(ok({ ...QUOTE, status: 'declined' }));
+    const view = renderQuote();
+
+    fireEvent.press(await screen.findByTestId('quote-decline'));
+    fireEvent.press(screen.getByTestId('quote-decline-confirm'));
+
+    await screen.findByTestId('quote-outcome');
+    expect(view.getPathname()).toBe('/quotes/q1');
+    expect(screen.queryByTestId('quote-view-bookings')).toBeNull();
   });
 
   it('dismissing the confirmation sends nothing', async () => {

@@ -77,6 +77,12 @@ export default function StudioHomeScreen() {
             href="/studio/quotes"
           />
           <HubEntry
+            testID="studio-entry-bookings"
+            title={t('mobile.studio.hub.bookingsTitle')}
+            description={t('mobile.studio.hub.bookingsDescription')}
+            href="/studio/bookings"
+          />
+          <HubEntry
             testID="studio-entry-payouts"
             title={t('mobile.studio.hub.payoutsTitle')}
             description={t('mobile.studio.hub.payoutsDescription')}
