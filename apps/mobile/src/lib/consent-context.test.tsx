@@ -226,7 +226,7 @@ describe('persistence', () => {
     });
     const bodies = bodiesOf(mockedPost);
     expect(new Set(bodies.map((body) => body.anonymousId)).size).toBe(1);
-    expect(typeof bodies[0]?.anonymousId).toBe('string');
+    expect(bodies[0]?.anonymousId).toMatch(/^00000000-0000-4000-8000-\d{12}$/);
     expect(pathsOf(mockedPost)).toEqual(['/v1/consents', '/v1/consents', '/v1/consents']);
     expect(mockedPut).not.toHaveBeenCalled();
   });

@@ -4,6 +4,7 @@ import {
   type ConsentCategoryGrants,
   type ConsentPurpose,
 } from '@photoo/shared';
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
 const DECISION_KEY = 'photoo.consent.decision';
@@ -80,7 +81,7 @@ export async function getOrCreateAnonymousId(): Promise<string> {
   if (existing) {
     return existing;
   }
-  const created = globalThis.crypto.randomUUID();
+  const created = Crypto.randomUUID();
   await SecureStore.setItemAsync(ANONYMOUS_ID_KEY, created, STORE_OPTIONS);
   return created;
 }
