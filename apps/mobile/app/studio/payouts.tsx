@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, Text, View } from 'react-native';
+import { AppState, ScrollView, Text, View, type NativeEventSubscription } from 'react-native';
 
 import type { components } from '@photoo/api-client';
 
@@ -38,10 +38,29 @@ function PayoutsPanel({
 }) {
   const { t } = useTranslation();
   const inFlight = useRef(false);
+  const returnSubscription = useRef<NativeEventSubscription | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const translate = scopedStudioTranslate(t, 'payouts');
   const state = payoutsState(profile);
+
+  useEffect(
+    () => () => {
+      returnSubscription.current?.remove();
+    },
+    [],
+  );
+
+  function onReturnToApp() {
+    returnSubscription.current?.remove();
+    returnSubscription.current = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        returnSubscription.current?.remove();
+        returnSubscription.current = null;
+        onOpened();
+      }
+    });
+  }
 
   function failureMessage(apiError: ApiErrorLike | undefined, status: number) {
     return apiError?.code === 'EMAIL_NOT_VERIFIED'
@@ -72,8 +91,17 @@ function PayoutsPanel({
         setError(t('mobile.studio.payouts.errors.generic'));
         return;
       }
-      await WebBrowser.openBrowserAsync(url);
-      onOpened();
+      const result = await WebBrowser.openBrowserAsync(url);
+      if (
+        result.type === WebBrowser.WebBrowserResultType.CANCEL ||
+        result.type === WebBrowser.WebBrowserResultType.DISMISS
+      ) {
+        onOpened();
+      } else if (result.type === WebBrowser.WebBrowserResultType.OPENED) {
+        onReturnToApp();
+      } else {
+        setError(t('mobile.studio.payouts.errors.generic'));
+      }
     } catch {
       setError(t('mobile.studio.payouts.errors.generic'));
     } finally {

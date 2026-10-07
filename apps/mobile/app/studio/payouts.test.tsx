@@ -12,12 +12,21 @@ jest.mock('../../src/lib/api', () => ({
   setUnauthorizedListener: jest.fn(),
 }));
 
-jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
+jest.mock('expo-web-browser', () => ({
+  openBrowserAsync: jest.fn(),
+  WebBrowserResultType: {
+    CANCEL: 'cancel',
+    DISMISS: 'dismiss',
+    OPENED: 'opened',
+    LOCKED: 'locked',
+  },
+}));
 
 import '../../src/lib/i18n';
 import * as WebBrowser from 'expo-web-browser';
 
 import { api } from '../../src/lib/api';
+import { installAppState } from '../../src/testing/fake-socket';
 
 const mockedGet = jest.mocked(api.GET);
 const mockedPost = jest.mocked(api.POST);
@@ -252,7 +261,7 @@ describe('starting onboarding', () => {
     expect(mockedPost).toHaveBeenCalledTimes(1);
     await act(async () => {
       resolveAccount({
-        data: { stripeAccountId: 'acct_1' },
+        data: { stripeAccountId: 'acct_1', onboardingComplete: false, payoutsEnabled: false },
         error: undefined,
         response: new Response(null, { status: 200 }),
       });
@@ -267,7 +276,7 @@ describe('starting onboarding', () => {
   it.each([
     ['EMAIL_NOT_VERIFIED', 403, 'Verify your email address before setting up payouts.'],
     ['FORBIDDEN', 403, "You don't have access to payouts."],
-    ['CONFLICT', 409, 'Payouts setup is not available right now. Try again later.'],
+    ['NOT_FOUND', 404, 'Your photographer profile could not be found.'],
     ['TOO_MANY_REQUESTS', 429, "You're doing that too fast. Slow down and try again."],
   ])(
     'shows the %s error from the account call and does not open the browser',
@@ -297,7 +306,7 @@ describe('starting onboarding', () => {
 
   it('shows the no-account conflict from the link call as an error state', async () => {
     mockProfiles(ok(profile({ stripeAccountConnected: true })));
-    mockStripe(() => failed(409, {}));
+    mockStripe(() => failed(409, { code: 'CONFLICT' }));
     open();
 
     fireEvent.press(await screen.findByTestId('payouts-start'));
@@ -322,6 +331,49 @@ describe('starting onboarding', () => {
       expect(mockedOpen).toHaveBeenCalledTimes(1);
     });
     expect(screen.queryByTestId('payouts-error')).toBeNull();
+  });
+
+  it('waits for the app to become active again after an Android browser opens', async () => {
+    const appState = installAppState();
+    mockProfiles(ok(profile()), ok(profile({ stripeAccountConnected: true })));
+    mockStripe();
+    mockedOpen.mockResolvedValue({ type: 'opened' } as never);
+    open();
+
+    fireEvent.press(await screen.findByTestId('payouts-start'));
+    await waitFor(() => {
+      expect(mockedOpen).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('payouts-start')).toBeTruthy();
+    });
+
+    expect(profileReads()).toBe(1);
+    expect(screen.queryByTestId('payouts-returned')).toBeNull();
+
+    appState.set('background');
+    expect(profileReads()).toBe(1);
+    appState.set('active');
+
+    await screen.findByTestId('payouts-returned');
+    expect(profileReads()).toBe(2);
+
+    appState.set('background');
+    appState.set('active');
+    expect(profileReads()).toBe(2);
+  });
+
+  it('shows the generic error and no return notice when the browser is locked', async () => {
+    mockProfiles(ok(profile()));
+    mockStripe();
+    mockedOpen.mockResolvedValue({ type: 'locked' } as never);
+    open();
+
+    fireEvent.press(await screen.findByTestId('payouts-start'));
+
+    await screen.findByTestId('payouts-error');
+    expect(screen.queryByTestId('payouts-returned')).toBeNull();
+    expect(profileReads()).toBe(1);
   });
 
   it('shows the generic error when the browser cannot open', async () => {
