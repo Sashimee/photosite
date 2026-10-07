@@ -177,7 +177,7 @@ describe('client booking detail', () => {
     open('/bookings/b1');
 
     await screen.findByTestId('booking-pay-pending');
-    expect(screen.getByText(/Nothing has been charged/)).toBeTruthy();
+    expect(screen.getByText(/Awaiting payment\. You can pay on photoo\.lu/)).toBeTruthy();
     expect(screen.getByTestId('booking-timeline-step-pending_payment').props).toMatchObject({
       accessibilityState: { selected: true },
     });
