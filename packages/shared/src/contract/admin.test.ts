@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AdminBookingDetailSchema,
   AdminBookingSchema,
+  AdminBookingsExportQuerySchema,
   AdminBookingsQuerySchema,
   AdminCountryLegalTextsResponseSchema,
   AdminCountrySchema,
@@ -12,6 +13,8 @@ import {
   AdminLogDataRequestBodySchema,
   AdminReportSchema,
   AdminReportsQuerySchema,
+  AdminRefundConflictErrorSchema,
+  AdminReverseTransferConflictErrorSchema,
   AdminUserSearchQuerySchema,
   AdminVerificationCasesQuerySchema,
   DirectTakedownRequestSchema,
@@ -409,6 +412,98 @@ describe('AdminBookingsQuerySchema', () => {
     for (const query of invalid) {
       expect(AdminBookingsQuerySchema.safeParse(query).success).toBe(false);
     }
+  });
+});
+
+describe('AdminBookingsExportQuerySchema', () => {
+  it('takes the list filters with the same rules', () => {
+    expect(
+      AdminBookingsExportQuerySchema.parse({
+        status: ['released', 'disputed'],
+        createdFrom: '2026-10-01',
+        createdTo: '2026-11-01',
+        dispute: 'open',
+      }),
+    ).toEqual({
+      status: ['disputed', 'released'],
+      createdFrom: '2026-10-01',
+      createdTo: '2026-11-01',
+      dispute: 'open',
+    });
+    expect(AdminBookingsExportQuerySchema.parse({})).toEqual({});
+    expect(AdminBookingsExportQuerySchema.safeParse({ createdFrom: '2026-10-01' }).success).toBe(
+      false,
+    );
+    expect(
+      AdminBookingsExportQuerySchema.safeParse({
+        createdFrom: '2026-01-01',
+        createdTo: '2027-01-03',
+      }).success,
+    ).toBe(false);
+    expect(AdminBookingsExportQuerySchema.safeParse({ status: 'paid' }).success).toBe(false);
+  });
+
+  it('rejects paging parameters', () => {
+    expect(AdminBookingsExportQuerySchema.safeParse({ cursor: 'abc' }).success).toBe(false);
+    expect(AdminBookingsExportQuerySchema.safeParse({ limit: '10' }).success).toBe(false);
+  });
+});
+
+describe('admin refund and reverse-transfer conflicts', () => {
+  const requestId = id;
+
+  it('tells the 409 codes apart with their details', () => {
+    expect(
+      AdminRefundConflictErrorSchema.parse({
+        code: 'BOOKING_STATE',
+        message: 'm',
+        details: { status: 'paid_held' },
+        requestId,
+      }),
+    ).toMatchObject({ details: { status: 'paid_held' } });
+    expect(
+      AdminRefundConflictErrorSchema.parse({
+        code: 'PENDING_REVERSAL_MISMATCH',
+        message: 'm',
+        details: { pendingCents: 3000 },
+        requestId,
+      }),
+    ).toMatchObject({ details: { pendingCents: 3000 } });
+    for (const code of ['BOOKING_BUSY', 'LEDGER_CHANGED']) {
+      expect(
+        AdminRefundConflictErrorSchema.safeParse({ code, message: 'm', requestId }).success,
+      ).toBe(true);
+    }
+  });
+
+  it('requires the details each code carries', () => {
+    expect(
+      AdminRefundConflictErrorSchema.safeParse({ code: 'BOOKING_STATE', message: 'm', requestId })
+        .success,
+    ).toBe(false);
+    expect(
+      AdminRefundConflictErrorSchema.safeParse({
+        code: 'PENDING_REVERSAL_MISMATCH',
+        message: 'm',
+        details: { pendingCents: 0 },
+        requestId,
+      }).success,
+    ).toBe(false);
+    expect(
+      AdminRefundConflictErrorSchema.safeParse({ code: 'CONFLICT', message: 'm', requestId })
+        .success,
+    ).toBe(false);
+  });
+
+  it('never answers a reverse-transfer with a pending reversal mismatch', () => {
+    expect(
+      AdminReverseTransferConflictErrorSchema.safeParse({
+        code: 'PENDING_REVERSAL_MISMATCH',
+        message: 'm',
+        details: { pendingCents: 3000 },
+        requestId,
+      }).success,
+    ).toBe(false);
   });
 });
 

@@ -3,4 +3,6 @@ export interface NotYetImplementedRoute {
   path: string;
 }
 
-export const NOT_YET_IMPLEMENTED: readonly NotYetImplementedRoute[] = [];
+export const NOT_YET_IMPLEMENTED: readonly NotYetImplementedRoute[] = [
+  { method: 'GET', path: '/v1/admin/bookings/export.csv' },
+];
