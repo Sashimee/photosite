@@ -48,7 +48,9 @@ jobs:
       WEB_ORIGINS: http://127.0.0.1:3000,http://10.0.2.2:4000
       WEB_APP_URL: http://127.0.0.1:3000
       NODE_ENV: development
-      TRUSTED_PROXIES: ''
+      # Fixture scripts present a forwarded client IP so they do not share the
+      # per-IP sign-in and sign-up limits (see apps/mobile/e2e/README.md).
+      TRUSTED_PROXIES: 127.0.0.1,::1
       AUTH_SECRET: dev-only-auth-secret-change-me-please-32-chars-min
       AUTH_ENCRYPTION_KEY: qA5jxlkWykGDbMKLOSqgSGG+lbzsuDkUWUS8nV9twig=
       STRIPE_FAKE: 'true'

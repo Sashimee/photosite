@@ -1,4 +1,14 @@
 var apiUrl = typeof API_URL === 'undefined' ? 'http://localhost:4000' : API_URL;
+// The api rate-limits sign-in and sign-up per client IP and every fixture call
+// arrives from 127.0.0.1; CI trusts that address as a proxy, so each script run
+// presents its own forwarded address instead of sharing the emulator's budget.
+var clientIp =
+  '10.' +
+  Math.floor(Math.random() * 256) +
+  '.' +
+  Math.floor(Math.random() * 256) +
+  '.' +
+  (1 + Math.floor(Math.random() * 254));
 var photographerEmail =
   typeof PHOTOGRAPHER_EMAIL === 'undefined' ? 'sofia.martins@photoo.test' : PHOTOGRAPHER_EMAIL;
 
@@ -13,7 +23,7 @@ if (typeof SEED_USER_PASSWORD === 'undefined' || SEED_USER_PASSWORD === '') {
 }
 
 function request(method, path, token, payload) {
-  var options = { headers: { 'Content-Type': 'application/json' } };
+  var options = { headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': clientIp } };
   if (token) {
     options.headers.Authorization = 'Bearer ' + token;
   }

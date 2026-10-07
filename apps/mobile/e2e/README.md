@@ -34,6 +34,8 @@ Reports and screenshots land in `~/.maestro/tests`.
 - `reply-in-chat.js` signs in as the seeded photographer once, optionally checks (`EXPECT_BODY`) that the app's message reached the server, and posts `REPLY_BODY` into `CONVERSATION_ID`. Outputs `replyMessageId`.
 - `send-quote.js` signs in as the client (`CLIENT_EMAIL`, `CLIENT_PASSWORD`) to read its newest request from `/v1/requests/mine`, signs in as the seeded photographer (`sofia.martins@photoo.test`, password `SEED_USER_PASSWORD`) and posts a quote on it to `/v1/quotes`. Outputs `requestId` and `quoteId`. Any non-2xx response throws with the status and body.
 
+The api limits sign-in (5/min) and sign-up (5/hour) per client IP, and the emulator and every script share 127.0.0.1. The workflow therefore sets `TRUSTED_PROXIES=127.0.0.1,::1` and each script sends a random `X-Forwarded-For`, so only the app's own requests count against the emulator's budget. Running locally without `TRUSTED_PROXIES` makes the scripts share it again.
+
 Every auth flow starts from `subflows/fresh-start.yaml` (clear state, decline consent) and `subflows/open-sign-in.yaml` (Account tab, Sign in), so each flow is independent and gets a fresh email.
 
 Email verification: the link in the email points at the web app (`WEB_APP_URL/verify-email#token=...`), which an emulator-only run has no site to open. The sign-up flow therefore reads the token from the same email and types it into the app's own "verification code" field (`verify-email-token`), which posts it to the API. This exercises the app's verification screen rather than a server-side shortcut.
