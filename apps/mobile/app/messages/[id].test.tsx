@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import { Linking } from 'react-native';
 import type { ReactNode } from 'react';
@@ -33,7 +33,19 @@ jest.mock('expo-document-picker', () => ({
 
 jest.mock('expo-image-manipulator', () => ({
   SaveFormat: { JPEG: 'jpeg' },
-  ImageManipulator: { manipulate: jest.fn() },
+  ImageManipulator: {
+    manipulate: (uri: string) => {
+      const image = {
+        width: 1200,
+        height: 900,
+        saveAsync: () => Promise.resolve({ uri, width: 1200, height: 900 }),
+      };
+      return {
+        renderAsync: () => Promise.resolve(image),
+        resize: () => ({ renderAsync: () => Promise.resolve(image) }),
+      };
+    },
+  },
 }));
 
 const { createFakeSocket, installAppState } = jest.requireActual<
@@ -598,8 +610,10 @@ describe('attachments', () => {
 });
 
 describe('attachment chip', () => {
-  it('does not open a download url that is not https', async () => {
-    const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+  const devFlag = globalThis as unknown as { __DEV__: boolean };
+  const originalDev = devFlag.__DEV__;
+
+  function serveDownloadUrl(url: string) {
     serverMessages = [
       makeMessage('m7', '2026-10-05T09:00:00.000Z', {
         body: null,
@@ -608,13 +622,23 @@ describe('attachment chip', () => {
     ];
     mockedGet.mockImplementation(((path: string) => {
       if (path.endsWith('/download')) {
-        return Promise.resolve(ok({ url: 'http://files.example.com/doc.pdf', expiresAt: 'x' }));
+        return Promise.resolve(ok({ url, expiresAt: 'x' }));
       }
       if (path === '/v1/conversations/{id}') {
         return Promise.resolve(ok(conversation));
       }
       return Promise.resolve(ok({ items: serverMessages, nextCursor: null }));
     }) as never);
+  }
+
+  afterEach(() => {
+    devFlag.__DEV__ = originalDev;
+  });
+
+  it('does not open a download url that is not https in a release build', async () => {
+    devFlag.__DEV__ = false;
+    const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    serveDownloadUrl('http://files.example.com/doc.pdf');
     await openThread();
 
     expect(screen.getByText('PDF')).toBeTruthy();
@@ -623,6 +647,20 @@ describe('attachment chip', () => {
 
     expect(await screen.findByText("Couldn't open this attachment. Try again.")).toBeTruthy();
     expect(openUrl).not.toHaveBeenCalled();
+    openUrl.mockRestore();
+  });
+
+  it('opens an http download url in a dev build', async () => {
+    devFlag.__DEV__ = true;
+    const openUrl = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    serveDownloadUrl('http://192.168.1.20:9000/doc.pdf');
+    await openThread();
+
+    fireEvent.press(screen.getByTestId('attachment-a1'));
+
+    await waitFor(() => {
+      expect(openUrl).toHaveBeenCalledWith('http://192.168.1.20:9000/doc.pdf');
+    });
     openUrl.mockRestore();
   });
 });

@@ -19,6 +19,10 @@ export function formatBytes(t: TFunction, sizeBytes: number): string {
   return t('mobile.chat.attachments.sizeMb', { size: (sizeBytes / (1024 * 1024)).toFixed(1) });
 }
 
+function isOpenableUrl(url: string): boolean {
+  return url.startsWith('https://') || (__DEV__ && url.startsWith('http://'));
+}
+
 export function AttachmentChip({
   attachment,
   conversationId,
@@ -45,7 +49,7 @@ export function AttachmentChip({
         '/v1/conversations/{id}/messages/{messageId}/attachments/{attachmentId}/download',
         { params: { path: { id: conversationId, messageId, attachmentId: attachment.id } } },
       );
-      if (!data?.url.startsWith('https://')) {
+      if (!data || !isOpenableUrl(data.url)) {
         setFailed(true);
       } else if (isImage) {
         setImageUrl(data.url);
