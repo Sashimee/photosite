@@ -98,7 +98,7 @@ export default function SignInScreen() {
       />
       <Text className="text-sm text-muted-foreground">
         {t('mobile.auth.signIn.noAccount')}{' '}
-        <Link href="/sign-up">
+        <Link href="/sign-up" testID="sign-in-sign-up-link">
           <Text className="font-medium text-foreground underline">
             {t('mobile.auth.signIn.signUpLink')}
           </Text>

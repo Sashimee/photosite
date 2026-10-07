@@ -23,7 +23,10 @@ export default function TabsLayout() {
             : {}),
         }}
       />
-      <Tabs.Screen name="account" options={{ title: t('mobile.tabs.account') }} />
+      <Tabs.Screen
+        name="account"
+        options={{ title: t('mobile.tabs.account'), tabBarButtonTestID: 'tab-account' }}
+      />
     </Tabs>
   );
 }
