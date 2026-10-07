@@ -1,6 +1,6 @@
 # Mobile end-to-end tests (Maestro)
 
-Flows in `e2e/flows/` run against an Android release build with the JS bundled in, talking to a local API. CI runs them in `.github/workflows/mobile-e2e.yml`; this is how to do the same locally. Selectors are `testID`s (Maestro `id:`), not copy.
+Flows in `e2e/flows/` run, ordered by `e2e/config.yaml`, against an Android release build with the JS bundled in, talking to a local API. CI runs them in `.github/workflows/mobile-e2e.yml`; this is how to do the same locally. Selectors are `testID`s (Maestro `id:`), not copy.
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ E2E_BUILD=1 EXPO_PUBLIC_API_URL=http://10.0.2.2:4000 npx expo prebuild --platfor
 (cd android && ./gradlew assembleRelease)
 emulator -avd photoo-e2e &
 adb install -r android/app/build/outputs/apk/release/app-release.apk
-maestro test e2e/flows
+maestro test e2e
 ```
 
 `E2E_BUILD=1` is the only thing that allows cleartext HTTP (`plugins/with-cleartext-traffic.ts`); no EAS profile sets it. `android/` is generated and gitignored. The release build is signed with the debug keystore the prebuild template ships.
