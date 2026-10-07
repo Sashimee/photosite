@@ -9,6 +9,7 @@ import { requireIntegrationEnv } from '../../testing/require-integration-env.js'
 import { TEST_ENV } from '../../testing/test-env.js';
 import { generateTotpCode } from '../../testing/totp.js';
 import { stripeDisputeReason } from './booking-money-events.service.js';
+import { BookingMoneyLockService } from './booking-money-lock.service.js';
 import { BookingReleaseService } from './booking-release.service.js';
 import { StripeEventSweepService } from './stripe-event-sweep.service.js';
 import { FakeStripeGateway } from './stripe/fake-stripe-gateway.js';
@@ -1256,7 +1257,15 @@ describe('stripe webhook integration', () => {
       const reversed = await adminPost(admin, held.bookingId, 'reverse-transfer', {});
 
       expect(refunded.statusCode).toBe(409);
+      expect(refunded.json()).toMatchObject({
+        code: 'BOOKING_STATE',
+        details: { status: 'paid_held' },
+      });
       expect(reversed.statusCode).toBe(409);
+      expect(reversed.json()).toMatchObject({
+        code: 'BOOKING_STATE',
+        details: { status: 'paid_held' },
+      });
       expect((await ledgerOf(held.bookingId)).map((row) => row.type)).toEqual(['charge']);
     });
 
@@ -1303,8 +1312,12 @@ describe('stripe webhook integration', () => {
       });
 
       const response = await adminPost(admin, booking.bookingId, 'refund', { amountCents: 1000 });
+      const reversed = await adminPost(admin, booking.bookingId, 'reverse-transfer', {});
 
       expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({ code: 'TWO_FACTOR_REQUIRED' });
+      expect(reversed.statusCode).toBe(403);
+      expect(reversed.json()).toMatchObject({ code: 'TWO_FACTOR_REQUIRED' });
       expect(
         (await ledgerOf(booking.bookingId)).filter((row) => row.type !== 'charge'),
       ).toHaveLength(2);
@@ -1708,6 +1721,70 @@ describe('stripe webhook integration', () => {
       expect(
         (await adminPost(other, held.bookingId, 'refund', { amountCents: 100 })).statusCode,
       ).toBe(409);
+    });
+
+    it('answers 409 BOOKING_BUSY on both POSTs while the booking money lock is held', async () => {
+      const admin = await adminWithTwoFactor('busy', true);
+      const booking = await releasedBooking('admin-busy');
+      const refundSpy = vi.spyOn(gateway(), 'createRefund');
+      const reverseSpy = vi.spyOn(gateway(), 'reverseTransfer');
+      let unlock: () => void = () => undefined;
+      const held = new Promise<void>((resolve) => {
+        unlock = resolve;
+      });
+      let markLocked: () => void = () => undefined;
+      const locked = new Promise<void>((resolve) => {
+        markLocked = resolve;
+      });
+      const holder = app.get(BookingMoneyLockService).tryRun(booking.bookingId, () => {
+        markLocked();
+        return held;
+      });
+      try {
+        await locked;
+        const refunded = await adminPost(admin, booking.bookingId, 'refund', {
+          amountCents: 1000,
+        });
+        const reversed = await adminPost(admin, booking.bookingId, 'reverse-transfer', {});
+        for (const response of [refunded, reversed]) {
+          expect(response.statusCode).toBe(409);
+          expect(response.json()).toMatchObject({ code: 'BOOKING_BUSY' });
+        }
+        expect(refundSpy).not.toHaveBeenCalled();
+        expect(reverseSpy).not.toHaveBeenCalled();
+      } finally {
+        unlock();
+        await holder;
+        refundSpy.mockRestore();
+        reverseSpy.mockRestore();
+      }
+    });
+
+    it('answers 409 PENDING_REVERSAL_MISMATCH with the amount that completes a stuck refund', async () => {
+      const admin = await adminWithTwoFactor('pending', true);
+      const booking = await releasedBooking('admin-pending');
+      const refundSpy = vi
+        .spyOn(gateway(), 'createRefund')
+        .mockRejectedValueOnce(new Error('stripe unavailable'));
+      try {
+        const failed = await adminPost(admin, booking.bookingId, 'refund', { amountCents: 3000 });
+        expect(failed.statusCode).toBe(500);
+      } finally {
+        refundSpy.mockRestore();
+      }
+
+      const mismatch = await adminPost(admin, booking.bookingId, 'refund', { amountCents: 2000 });
+      expect(mismatch.statusCode).toBe(409);
+      expect(mismatch.json()).toMatchObject({
+        code: 'PENDING_REVERSAL_MISMATCH',
+        details: { pendingCents: 3000 },
+      });
+
+      const completed = await adminPost(admin, booking.bookingId, 'refund', {
+        amountCents: mismatch.json<{ details: { pendingCents: number } }>().details.pendingCents,
+      });
+      expect(completed.statusCode).toBe(200);
+      expect(completed.json()).toMatchObject({ refundedCents: 3000, reversedCents: 3000 });
     });
   });
 });

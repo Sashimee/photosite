@@ -5532,7 +5532,7 @@ export interface paths {
         put?: never;
         /**
          * Request a refund for a booking before release
-         * @description Client only, before release (paid_held, in_progress or delivered), otherwise 409. `amountCents` omitted refunds whatever is left; a cumulative refund above the charged total is 422. A full refund moves the booking to `refunded`, a partial one keeps its state. After release a refund requires a transfer reversal and is admin-only (POST /v1/admin/bookings/{id}/refund).
+         * @description Client only, before release (paid_held, in_progress or delivered), otherwise 409. 409 `BOOKING_BUSY` while another refund or the release holds the booking; retry shortly. `amountCents` omitted refunds whatever is left; a cumulative refund above the charged total is 422. A full refund moves the booking to `refunded`, a partial one keeps its state. After release a refund requires a transfer reversal and is admin-only (POST /v1/admin/bookings/{id}/refund).
          */
         post: {
             parameters: {
