@@ -107,7 +107,7 @@ describe('uploadPortfolioImage', () => {
   it('rejects an unsupported type before any request', async () => {
     await expect(
       uploadPortfolioImage(
-        { ...picked, mimeType: 'image/heic' },
+        { ...picked, mimeType: 'application/pdf' },
         { onProgress: jest.fn(), onStageChange: jest.fn() },
       ),
     ).rejects.toMatchObject({ reason: 'unsupportedType' });

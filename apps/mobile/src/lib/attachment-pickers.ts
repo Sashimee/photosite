@@ -76,7 +76,11 @@ async function pickFromLibrary(
 }
 
 export function pickPortfolioPhotos(selectionLimit: number): Promise<PickResult> {
-  return pickFromLibrary(selectionLimit, { quality: 1 });
+  return pickFromLibrary(selectionLimit, {
+    quality: 1,
+    preferredAssetRepresentationMode:
+      ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+  });
 }
 
 export async function openAppSettings(): Promise<void> {
