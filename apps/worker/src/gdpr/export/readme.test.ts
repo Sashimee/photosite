@@ -12,4 +12,8 @@ describe('buildReadmeText', () => {
   it('mentions the provenance field of portfolio images', () => {
     expect(buildReadmeText()).toContain('provenance field');
   });
+
+  it('says the push token is left out of devices.json', () => {
+    expect(buildReadmeText()).toContain('push notification token');
+  });
 });
