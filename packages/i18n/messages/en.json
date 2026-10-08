@@ -2032,6 +2032,7 @@
         "twoFactorNotEnabled": "Two-factor authentication isn't enabled.",
         "tooManyAttempts": "Too many attempts. Request a new code.",
         "accountLocked": "Your account is temporarily locked. Try again later.",
+        "challengeExpired": "Your sign-in timed out. Enter your email and password again.",
         "roleAlreadyAssigned": "You already have this role.",
         "validationError": "Please check the highlighted fields.",
         "tooManyRequests": "Too many attempts. Try again later.",

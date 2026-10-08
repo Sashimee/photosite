@@ -1,5 +1,6 @@
 import { SignInTotpRequestSchema } from '@photoo/shared';
-import { useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Text } from 'react-native';
 
@@ -11,11 +12,13 @@ import { api } from '../../src/lib/api';
 import { authErrorMessage, scopedAuthTranslate } from '../../src/lib/auth-errors';
 import { useAuth } from '../../src/lib/auth-context';
 import { fieldErrorMessages } from '../../src/lib/form-errors';
+import { clearTwoFactorChallenge, getTwoFactorChallenge } from '../../src/lib/two-factor-challenge';
 
 type Mode = 'code' | 'backupCode';
 
 export default function TwoFactorScreen() {
   const { t } = useTranslation();
+  const router = useRouter();
   const { signIn } = useAuth();
   const [mode, setMode] = useState<Mode>('code');
   const [code, setCode] = useState('');
@@ -23,6 +26,17 @@ export default function TwoFactorScreen() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function restartSignIn() {
+    clearTwoFactorChallenge();
+    router.replace({ pathname: '/sign-in', params: { reason: 'challenge-expired' } });
+  }
+
+  useEffect(() => {
+    if (!getTwoFactorChallenge()) {
+      restartSignIn();
+    }
+  }, []);
 
   function toggleMode() {
     setFieldErrors({});
@@ -32,7 +46,13 @@ export default function TwoFactorScreen() {
   }
 
   async function handleSubmit() {
-    const body = mode === 'code' ? { code } : { backupCode };
+    const challengeToken = getTwoFactorChallenge();
+    if (!challengeToken) {
+      restartSignIn();
+      return;
+    }
+
+    const body = mode === 'code' ? { code, challengeToken } : { backupCode, challengeToken };
     const parsed = SignInTotpRequestSchema.safeParse(body);
     if (!parsed.success) {
       setFieldErrors(fieldErrorMessages((key) => t(`common.validation.${key}`), parsed.error));
@@ -44,14 +64,20 @@ export default function TwoFactorScreen() {
     setIsSubmitting(true);
     // `body` (not `parsed.data`) so the request never carries an explicit
     // `undefined` for the field the other mode would have used.
-    const { data, error } = await api.POST('/v1/auth/sign-in/totp', { body });
+    const { data, error, response } = await api.POST('/v1/auth/sign-in/totp', { body });
     setIsSubmitting(false);
+
+    if (response.status === 401) {
+      restartSignIn();
+      return;
+    }
 
     if (error) {
       setSubmitError(authErrorMessage(scopedAuthTranslate(t), error));
       return;
     }
 
+    clearTwoFactorChallenge();
     await signIn(data.user, data.session);
   }
 

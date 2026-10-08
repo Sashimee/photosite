@@ -20,7 +20,7 @@ const mockedPost = jest.mocked(api.POST);
 describe('sign-in screen', () => {
   it('routes to the two-factor screen when the API asks for a second factor', async () => {
     mockedPost.mockResolvedValue({
-      data: { twoFactorRequired: true },
+      data: { twoFactorRequired: true, challengeToken: 'challenge-1' },
       error: undefined,
       response: new Response(null, { status: 200 }),
     });

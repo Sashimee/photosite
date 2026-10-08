@@ -330,7 +330,7 @@ describe('photographer profile', () => {
       return Promise.resolve(res(path.endsWith('products') ? PRODUCTS : PROFILE));
     }) as never);
     mockedPost
-      .mockResolvedValueOnce(res({ twoFactorRequired: true }))
+      .mockResolvedValueOnce(res({ twoFactorRequired: true, challengeToken: 'challenge-1' }))
       .mockResolvedValueOnce(
         res({ user: USER, session: { token: 'tok', expiresAt: '2999-01-01T00:00:00.000Z' } }),
       );
