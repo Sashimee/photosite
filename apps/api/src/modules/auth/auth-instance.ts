@@ -10,6 +10,7 @@ import type { Env } from '../../config/env.js';
 import type { ChatSocketBridge } from '../chat/chat-socket-bridge.js';
 import { hardenAdapter } from './adapter/hardened-adapter.js';
 import { withEmailVerifiedBridge } from './adapter/user-email-verified-extension.js';
+import { scrubAuthLogMessage } from './auth-log.js';
 import { createBackupCodesCipher } from './crypto/backup-codes-cipher.js';
 import { DISABLED_BETTER_AUTH_PATHS } from './disabled-paths.js';
 import type { EmailQueueService } from './mailer/email-queue.service.js';
@@ -220,8 +221,9 @@ export function buildAuth({
     },
     logger: {
       disabled: false,
-      log: (level, message, ...args) => {
+      log: (level, rawMessage, ...args) => {
         const context = { context: 'BetterAuth', args };
+        const message = scrubAuthLogMessage(rawMessage);
         if (level === 'error') {
           logger.error(context, message);
         } else if (level === 'warn') {
