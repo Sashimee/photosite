@@ -15,9 +15,9 @@ overrides:
   deepmerge-ts: 8.0.2
   fastify: 5.12.5
   mysql2: 3.24.4
-  # GHSA-vcvr-r3jv-pc5j: apps/api never imports next, but better-auth's optional
-  # next peer was resolved to 16.3.5 independently of the web/admin pins.
-  'next@<16.3.6': 16.3.6
+  # GHSA-vcvr-r3jv-pc5j, GHSA-cjq9-62q9-8jv4: apps/api never imports next, but better-auth's optional
+  # next peer resolves independently of the web/admin pins.
+  'next@<16.3.8': 16.3.8
   # GHSA-pqg4-j6r4-53mv (shell-quote command injection, critical)
   'shell-quote@<1.11.0': ^1.11.0
   # GHSA-c475-qrg2-pj4r (basic-ftp quadratic-time DoS, high)
