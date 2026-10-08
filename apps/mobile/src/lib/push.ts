@@ -49,6 +49,10 @@ export async function dismissPrompt(): Promise<void> {
 }
 
 async function dropRevokedDevice(): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, UNREGISTER_TIMEOUT_MS);
   try {
     const deviceId = await SecureStore.getItemAsync(DEVICE_ID_KEY, STORE_OPTIONS);
     if (!deviceId) {
@@ -56,6 +60,7 @@ async function dropRevokedDevice(): Promise<void> {
     }
     const { response } = await api.DELETE('/v1/me/devices/{id}', {
       params: { path: { id: deviceId } },
+      signal: controller.signal,
     });
     if (response.ok || response.status === 404) {
       await SecureStore.deleteItemAsync(DEVICE_ID_KEY, STORE_OPTIONS);
@@ -67,6 +72,8 @@ async function dropRevokedDevice(): Promise<void> {
     );
   } catch (error) {
     Sentry.captureException(error);
+  } finally {
+    clearTimeout(timer);
   }
 }
 

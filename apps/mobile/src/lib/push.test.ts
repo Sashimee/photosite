@@ -75,6 +75,7 @@ describe('registerPushDevice', () => {
       'device-9',
       expect.anything(),
     );
+    expect(mockedDelete).not.toHaveBeenCalled();
   });
 
   it('never asks for a token or registers while permission is not granted', async () => {
@@ -95,11 +96,50 @@ describe('registerPushDevice', () => {
 
     expect(mockedDelete).toHaveBeenCalledWith('/v1/me/devices/{id}', {
       params: { path: { id: 'device-9' } },
+      signal: expect.any(AbortSignal),
     });
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
       'photoo.push.deviceId',
       expect.anything(),
     );
+  });
+
+  it('clears the device id when the server no longer knows the device', async () => {
+    mockPermissions.mockResolvedValue({ status: 'denied', canAskAgain: false });
+    jest.mocked(SecureStore.getItemAsync).mockResolvedValue('device-9');
+    mockedDelete.mockResolvedValue({ response: { ok: false, status: 404 } });
+
+    await expect(registerPushDevice()).resolves.toBe('permission-missing');
+
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
+      'photoo.push.deviceId',
+      expect.anything(),
+    );
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('aborts a stalled delete instead of blocking registration', async () => {
+    jest.useFakeTimers();
+    try {
+      mockPermissions.mockResolvedValue({ status: 'denied', canAskAgain: false });
+      jest.mocked(SecureStore.getItemAsync).mockResolvedValue('device-9');
+      mockedDelete.mockImplementation(
+        (_path: string, init?: unknown) =>
+          new Promise((_resolve, reject) => {
+            (init as { signal?: AbortSignal }).signal?.addEventListener('abort', () => {
+              reject(new Error('aborted'));
+            });
+          }),
+      );
+
+      const result = registerPushDevice();
+      await jest.runAllTimersAsync();
+
+      await expect(result).resolves.toBe('permission-missing');
+      expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('makes no delete call when permission was revoked and no device id is stored', async () => {
