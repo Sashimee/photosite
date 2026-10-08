@@ -47,6 +47,7 @@ Last updated: 2026-10-07.
 | Provenance checks are profiling-adjacent processing under legitimate interest | A DPIA screening and a legitimate-interest assessment (beside the job-board LIA) | Public launch | Checks only feed an admin review queue; no automatic takedown |
 | Reverse-search stores the URLs of matching third-party pages on `ProvenanceCheck` | Confirm we may store them, and for how long | Retention figure for provenance rows | URLs are stored and shown only to admins |
 | Art. 15(4): an access request would include provenance signals and match URLs that point at other people's sites | Confirm what the export may include | Provenance in the GDPR export | `apps/worker/src/gdpr/export/collect.ts` deliberately leaves provenance scores, vendors and matches out |
+| How long the provenance check of a taken-down image is kept as evidence (#445, #684). The sweep holds it while a report on the image or its profile is open, or for 180 days after one is resolved (our reading of the DSA Art. 20 complaint window) | Confirm the period with the lawyer | Nothing in code, `TAKEDOWN_HOLD_MS` in `apps/worker/src/gdpr/sweep/provenance-retention.ts` is a one-line change | 180 days |
 | On reject or flag the owner gets a DSA Art. 17 statement of reasons (#444) | Approve the reason categories and the notice wording, incl. the redress route | Real user-facing copy | Placeholder English copy in `packages/i18n` |
 
 ## Legal review (1A.12 GDPR)

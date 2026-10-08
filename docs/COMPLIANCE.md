@@ -40,7 +40,7 @@ photoo.lu is a Luxembourg platform (supervisory authority: CNPD). This document 
 | Ledger, receipts, fee invoices | 10 years |
 | Verification documents | account lifetime + 5 years, then deleted; encrypted at rest |
 | Chat messages and attachments | account lifetime; deleted 90 days after account deletion. A conversation is kept 3 years after its last message for dispute handling (proposal, pending the 0.7 lawyer brief). A sender-deleted message keeps its body in the database for that same window — only API responses and realtime events blank it — so moderation can still review a reported or disputed message; only the worker's account-deletion anonymisation job clears it early. |
-| Provenance vendor results | as long as the image is on the platform |
+| Provenance vendor results | deleted once the image is deleted (held while an open report concerns the image or its profile, or a report on it was resolved, e.g. by takedown, within the last 180 days, pending the lawyer); a passed check's raw vendor payload is cleared after 90 days |
 | Server logs | 30 days |
 | Consent records | 5 years after last update |
 | Notifications (in-app/email/push records) | 12 months, deleted by the worker's `notifications-cleanup` job |
