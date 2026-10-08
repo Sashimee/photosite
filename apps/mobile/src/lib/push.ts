@@ -48,12 +48,35 @@ export async function dismissPrompt(): Promise<void> {
   await SecureStore.setItemAsync(PROMPT_DISMISSED_KEY, '1', STORE_OPTIONS);
 }
 
+async function dropRevokedDevice(): Promise<void> {
+  try {
+    const deviceId = await SecureStore.getItemAsync(DEVICE_ID_KEY, STORE_OPTIONS);
+    if (!deviceId) {
+      return;
+    }
+    const { response } = await api.DELETE('/v1/me/devices/{id}', {
+      params: { path: { id: deviceId } },
+    });
+    if (response.ok || response.status === 404) {
+      await SecureStore.deleteItemAsync(DEVICE_ID_KEY, STORE_OPTIONS);
+      return;
+    }
+    Sentry.captureMessage(
+      `Push device removal after revoked permission failed with HTTP ${String(response.status)}`,
+      'warning',
+    );
+  } catch (error) {
+    Sentry.captureException(error);
+  }
+}
+
 export async function registerPushDevice(): Promise<RegisterResult> {
   if (!Device.isDevice || (Platform.OS !== 'ios' && Platform.OS !== 'android')) {
     return 'unavailable';
   }
   try {
     if ((await getPushPermission()) !== 'granted') {
+      await dropRevokedDevice();
       return 'permission-missing';
     }
     const projectId = easProjectId();
