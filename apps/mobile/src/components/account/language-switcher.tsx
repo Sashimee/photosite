@@ -10,19 +10,23 @@ import { FormNotice } from '../form/form-notice';
 
 export function LanguageSwitcher() {
   const { t, i18n } = useTranslation();
-  const { status, updateUser } = useAuth();
+  const { status, user, updateUser } = useAuth();
   const inFlight = useRef(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const current = isLocale(i18n.language) ? i18n.language : null;
+  const deviceLocale = isLocale(i18n.language) ? i18n.language : null;
+  const current = status === 'signed-in' && user ? user.locale : deviceLocale;
 
   async function select(locale: Locale) {
     if (inFlight.current || locale === current) {
       return;
     }
     setError(null);
-    if (status !== 'signed-in') {
+    if (status === 'signed-out') {
       await i18n.changeLanguage(locale);
+      return;
+    }
+    if (status !== 'signed-in') {
       return;
     }
     inFlight.current = true;

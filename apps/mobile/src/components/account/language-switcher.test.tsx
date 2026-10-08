@@ -18,7 +18,7 @@ import i18n from '../../lib/i18n';
 import { api } from '../../lib/api';
 import { LanguageSwitcher } from './language-switcher';
 
-const user = { email: 'a@example.com', roles: ['client'], locale: 'fr' };
+const user = { email: 'a@example.com', roles: ['client'], locale: 'en' };
 
 function reply(status: number, body?: unknown) {
   return {
@@ -41,7 +41,8 @@ afterEach(async () => {
 
 describe('LanguageSwitcher', () => {
   it('persists the locale, updates the user and switches the language', async () => {
-    jest.mocked(api.PATCH).mockResolvedValue(reply(200, { user }));
+    const updated = { ...user, locale: 'fr' };
+    jest.mocked(api.PATCH).mockResolvedValue(reply(200, { user: updated }));
     render(<LanguageSwitcher />);
 
     fireEvent.press(screen.getByTestId('account-locale-fr'));
@@ -50,7 +51,21 @@ describe('LanguageSwitcher', () => {
       expect(i18n.language).toBe('fr');
     });
     expect(api.PATCH).toHaveBeenCalledWith('/v1/me/locale', { body: { locale: 'fr' } });
-    expect(mockUpdateUser).toHaveBeenCalledWith(user);
+    expect(mockUpdateUser).toHaveBeenCalledWith(updated);
+  });
+
+  it('compares against the saved locale, so the device locale can be saved', async () => {
+    const savedUser = { ...user, locale: 'de' };
+    mockAuth.current = { status: 'signed-in', user: savedUser, updateUser: mockUpdateUser };
+    jest.mocked(api.PATCH).mockResolvedValue(reply(200, { user: { ...user, locale: 'en' } }));
+    render(<LanguageSwitcher />);
+
+    expect(screen.getByTestId('account-locale-de')).toBeChecked();
+    fireEvent.press(screen.getByTestId('account-locale-en'));
+
+    await waitFor(() => {
+      expect(api.PATCH).toHaveBeenCalledWith('/v1/me/locale', { body: { locale: 'en' } });
+    });
   });
 
   it('keeps the previous language and shows an error when the API rejects', async () => {
