@@ -43,10 +43,14 @@ jobs:
       S3_PUBLIC_BASE_URL: http://127.0.0.1:9000/photoo-public
       PORT: 4000
       PUBLIC_API_URL: http://127.0.0.1:4000
-      WEB_ORIGINS: http://127.0.0.1:3000
+      # React Native's WebSocket sends Origin: http://10.0.2.2:4000, which the chat
+      # gateway only admits when it is listed here.
+      WEB_ORIGINS: http://127.0.0.1:3000,http://10.0.2.2:4000
       WEB_APP_URL: http://127.0.0.1:3000
       NODE_ENV: development
-      TRUSTED_PROXIES: ''
+      # Fixture scripts present a forwarded client IP so they do not share the
+      # per-IP sign-in and sign-up limits (see apps/mobile/e2e/README.md).
+      TRUSTED_PROXIES: 127.0.0.1,::1
       AUTH_SECRET: dev-only-auth-secret-change-me-please-32-chars-min
       AUTH_ENCRYPTION_KEY: qA5jxlkWykGDbMKLOSqgSGG+lbzsuDkUWUS8nV9twig=
       STRIPE_FAKE: 'true'
@@ -143,8 +147,8 @@ jobs:
         run: pnpm exec turbo run build --filter=@photoo/api... --filter=@photoo/worker...
       - name: Start api and worker, wait until both answer
         run: |
-          pnpm --filter @photoo/api start &
-          pnpm --filter @photoo/worker start &
+          pnpm --filter @photoo/api start > "$RUNNER_TEMP/api.log" 2>&1 &
+          pnpm --filter @photoo/worker start > "$RUNNER_TEMP/worker.log" 2>&1 &
 
           wait_for() {
             local url="$1" deadline=$((SECONDS + 60)) body status
@@ -245,11 +249,15 @@ jobs:
           disable-animations: true
           script: |
             adb install -r apps/mobile/android/app/build/outputs/apk/release/app-release.apk
-            maestro test -e SEED_USER_PASSWORD="$SEED_USER_PASSWORD" apps/mobile/e2e
+            maestro test -e SEED_USER_PASSWORD="$SEED_USER_PASSWORD" apps/mobile/e2e; maestro_status=$?; adb logcat -d > "$RUNNER_TEMP/logcat.txt"; exit "$maestro_status"
       - name: Upload the Maestro reports and screenshots
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: maestro-tests
-          path: ~/.maestro/tests
+          path: |
+            ~/.maestro/tests
+            ${{ runner.temp }}/api.log
+            ${{ runner.temp }}/worker.log
+            ${{ runner.temp }}/logcat.txt
           retention-days: 7

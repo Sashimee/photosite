@@ -1,0 +1,79 @@
+appId: lu.photoo.app
+name: Send a chat message and receive the photographer's reply live
+---
+- runScript:
+    file: ../scripts/create-user.js
+- runScript:
+    file: ../scripts/mailpit-token.js
+    env:
+      EMAIL: ${output.email}
+      VERIFY: 'true'
+- runScript:
+    file: ../scripts/start-chat.js
+    env:
+      CLIENT_EMAIL: ${output.email}
+      CLIENT_PASSWORD: ${output.password}
+- runFlow: ../subflows/fresh-start.yaml
+- runFlow: ../subflows/open-sign-in.yaml
+- tapOn:
+    id: sign-in-email
+- inputText: ${output.email}
+- tapOn:
+    id: sign-in-password
+- inputText: ${output.password}
+- hideKeyboard
+- tapOn:
+    id: sign-in-submit
+- extendedWaitUntil:
+    visible:
+      id: account-email
+    timeout: 20000
+
+- tapOn:
+    id: tab-messages
+- extendedWaitUntil:
+    visible:
+      id: conversation-${output.conversationId}
+    timeout: 20000
+- tapOn:
+    id: conversation-${output.conversationId}
+- extendedWaitUntil:
+    visible:
+      id: composer-input
+    timeout: 20000
+- assertNotVisible:
+    id: thread-not-found
+- assertNotVisible:
+    id: thread-error
+
+- tapOn:
+    id: composer-input
+- inputText: Hello Sofia, this message comes from the app.
+- hideKeyboard
+- tapOn:
+    id: composer-send
+- extendedWaitUntil:
+    visible: Hello Sofia, this message comes from the app.
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: pending-.*
+    timeout: 20000
+- assertVisible: Hello Sofia, this message comes from the app.
+- assertVisible:
+    id: message-.*
+- assertNotVisible:
+    id: thread-send-error
+
+- runScript:
+    file: ../scripts/reply-in-chat.js
+    env:
+      CONVERSATION_ID: ${output.conversationId}
+      EXPECT_BODY: Hello Sofia, this message comes from the app.
+      REPLY_BODY: Hello from Sofia, replying through the API.
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD}
+- extendedWaitUntil:
+    visible: Hello from Sofia, replying through the API.
+    timeout: 20000
+- assertVisible: Hello from Sofia, replying through the API.
+- assertVisible: Hello Sofia, this message comes from the app.

@@ -15,6 +15,7 @@ export default function TabsLayout() {
         name="messages"
         options={{
           title: t('mobile.tabs.messages'),
+          tabBarButtonTestID: 'tab-messages',
           ...(unreadCount > 0
             ? {
                 tabBarBadge: unreadCount,
