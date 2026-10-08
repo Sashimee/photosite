@@ -1814,6 +1814,13 @@
           "tooManyRequests": "Too many attempts. Please try again later."
         }
       },
+      "language": {
+        "title": "Language",
+        "errors": {
+          "generic": "We couldn't save your language. Check your connection and try again.",
+          "unauthorized": "Your session has ended. Please sign in again."
+        }
+      },
       "session": {
         "signOut": "Sign out",
         "signingOut": "Signing out…",
