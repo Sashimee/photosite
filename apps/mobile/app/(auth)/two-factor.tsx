@@ -14,6 +14,11 @@ import { useAuth } from '../../src/lib/auth-context';
 import { fieldErrorMessages } from '../../src/lib/form-errors';
 import { clearTwoFactorChallenge, getTwoFactorChallenge } from '../../src/lib/two-factor-challenge';
 
+const DEAD_CHALLENGE_CODES = new Set([
+  'INVALID_TWO_FACTOR_COOKIE',
+  'TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE',
+]);
+
 type Mode = 'code' | 'backupCode';
 
 export default function TwoFactorScreen() {
@@ -64,15 +69,14 @@ export default function TwoFactorScreen() {
     setIsSubmitting(true);
     // `body` (not `parsed.data`) so the request never carries an explicit
     // `undefined` for the field the other mode would have used.
-    const { data, error, response } = await api.POST('/v1/auth/sign-in/totp', { body });
+    const { data, error } = await api.POST('/v1/auth/sign-in/totp', { body });
     setIsSubmitting(false);
 
-    if (response.status === 401) {
-      restartSignIn();
-      return;
-    }
-
     if (error) {
+      if (error.code && DEAD_CHALLENGE_CODES.has(error.code)) {
+        restartSignIn();
+        return;
+      }
       setSubmitError(authErrorMessage(scopedAuthTranslate(t), error));
       return;
     }

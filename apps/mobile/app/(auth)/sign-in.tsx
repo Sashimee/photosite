@@ -1,6 +1,6 @@
 import { SignInRequestSchema } from '@photoo/shared';
-import { Link, useGlobalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { Link, useFocusEffect, useGlobalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text } from 'react-native';
 
@@ -13,7 +13,7 @@ import { authErrorMessage, scopedAuthTranslate } from '../../src/lib/auth-errors
 import { useAuth } from '../../src/lib/auth-context';
 import { fieldErrorMessages } from '../../src/lib/form-errors';
 import { sanitizeReturnPath } from '../../src/lib/return-path';
-import { setTwoFactorChallenge } from '../../src/lib/two-factor-challenge';
+import { clearTwoFactorChallenge, setTwoFactorChallenge } from '../../src/lib/two-factor-challenge';
 
 export default function SignInScreen() {
   const { t } = useTranslation();
@@ -25,6 +25,12 @@ export default function SignInScreen() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      clearTwoFactorChallenge();
+    }, []),
+  );
 
   async function handleSubmit() {
     const parsed = SignInRequestSchema.safeParse({ email, password });

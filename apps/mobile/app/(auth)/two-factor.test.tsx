@@ -113,10 +113,31 @@ describe('two-factor screen', () => {
     expect(mockedPost).not.toHaveBeenCalled();
   });
 
-  it('returns to sign-in with an error when the API rejects the challenge', async () => {
+  it.each(['INVALID_TWO_FACTOR_COOKIE', 'TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE'])(
+    'returns to sign-in with an error and drops the token on %s',
+    async (code) => {
+      mockedPost.mockResolvedValue({
+        data: undefined,
+        error: { code, message: 'dead', requestId: 'req-2' },
+        response: new Response(null, { status: code === 'INVALID_TWO_FACTOR_COOKIE' ? 401 : 400 }),
+      });
+
+      renderRouter('./app', { initialUrl: '/two-factor' });
+
+      await waitFor(() => screen.getByTestId('two-factor-code'));
+      fireEvent.changeText(screen.getByTestId('two-factor-code'), '123456');
+      fireEvent.press(screen.getByTestId('two-factor-submit'));
+
+      await waitFor(() => screen.getByTestId('sign-in-challenge-expired'));
+      expect(screen.getByText(CHALLENGE_EXPIRED)).toBeTruthy();
+      expect(getTwoFactorChallenge()).toBeNull();
+    },
+  );
+
+  it('stays on the screen and keeps the token for a wrong code returned as 401', async () => {
     mockedPost.mockResolvedValue({
       data: undefined,
-      error: { code: 'UNAUTHORIZED', message: 'expired', requestId: 'req-2' },
+      error: { code: 'INVALID_CODE', message: 'nope', requestId: 'req-3' },
       response: new Response(null, { status: 401 }),
     });
 
@@ -126,8 +147,27 @@ describe('two-factor screen', () => {
     fireEvent.changeText(screen.getByTestId('two-factor-code'), '123456');
     fireEvent.press(screen.getByTestId('two-factor-submit'));
 
-    await waitFor(() => screen.getByTestId('sign-in-challenge-expired'));
-    expect(screen.getByText(CHALLENGE_EXPIRED)).toBeTruthy();
-    expect(getTwoFactorChallenge()).toBeNull();
+    await waitFor(() => screen.getByText("That code isn't correct."));
+    expect(screen.queryByTestId('sign-in-challenge-expired')).toBeNull();
+    expect(getTwoFactorChallenge()).toBe('challenge-1');
+  });
+
+  it('stays on the screen and keeps the token for a wrong backup code returned as 401', async () => {
+    mockedPost.mockResolvedValue({
+      data: undefined,
+      error: { code: 'INVALID_BACKUP_CODE', message: 'nope', requestId: 'req-4' },
+      response: new Response(null, { status: 401 }),
+    });
+
+    renderRouter('./app', { initialUrl: '/two-factor' });
+
+    await waitFor(() => screen.getByTestId('two-factor-toggle-mode'));
+    fireEvent.press(screen.getByTestId('two-factor-toggle-mode'));
+    await waitFor(() => screen.getByTestId('two-factor-backup-code'));
+    fireEvent.changeText(screen.getByTestId('two-factor-backup-code'), 'abcd-efgh');
+    fireEvent.press(screen.getByTestId('two-factor-submit'));
+
+    await waitFor(() => screen.getByText("That backup code isn't correct."));
+    expect(getTwoFactorChallenge()).toBe('challenge-1');
   });
 });
