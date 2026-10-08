@@ -9,6 +9,7 @@ import {
   TotpEnrollRequestSchema,
   TotpEnrollResponseSchema,
   TotpVerifyRequestSchema,
+  UpdateLocaleRequestSchema,
   UserSchema,
 } from './auth.js';
 
@@ -96,6 +97,26 @@ describe('SignInRequestSchema', () => {
         rememberMe: true,
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('UpdateLocaleRequestSchema', () => {
+  it('accepts a supported locale', () => {
+    expect(UpdateLocaleRequestSchema.safeParse({ locale: 'fr' }).success).toBe(true);
+  });
+
+  it('rejects an unsupported locale', () => {
+    expect(UpdateLocaleRequestSchema.safeParse({ locale: 'xx' }).success).toBe(false);
+  });
+
+  it('rejects a missing locale', () => {
+    expect(UpdateLocaleRequestSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects extra fields', () => {
+    expect(UpdateLocaleRequestSchema.safeParse({ locale: 'fr', roles: ['admin'] }).success).toBe(
+      false,
+    );
   });
 });
 

@@ -116,6 +116,8 @@ export const SignInTotpRequestSchema = z
     'exactly one of code or backupCode is required',
   );
 
+export const UpdateLocaleRequestSchema = z.object({ locale: LocaleSchema }).strict();
+
 export const SessionResponseSchema = z
   .object({
     user: UserSchema,
@@ -312,6 +314,24 @@ registry.registerPath({
       content: { 'application/json': { schema: SessionQueryResponseSchema } },
     },
     ...errorResponses([401]),
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: apiPath('/me/locale'),
+  summary: "Change the current user's locale",
+  tags: ['auth'],
+  security: AUTH_SECURITY,
+  request: {
+    body: { content: { 'application/json': { schema: UpdateLocaleRequestSchema } } },
+  },
+  responses: {
+    '200': {
+      description: 'The updated session user',
+      content: { 'application/json': { schema: SessionResponseSchema } },
+    },
+    ...errorResponses([400, 401]),
   },
 });
 

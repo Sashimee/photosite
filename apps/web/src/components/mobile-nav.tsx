@@ -24,6 +24,7 @@ export function MobileNav({
   menuTitle,
   switcherLabel,
   localeNames,
+  signedIn = false,
 }: {
   locale: Locale;
   links: NavLink[];
@@ -33,6 +34,7 @@ export function MobileNav({
   menuTitle: string;
   switcherLabel: string;
   localeNames: Record<Locale, string>;
+  signedIn?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -69,7 +71,12 @@ export function MobileNav({
           >
             {authLink.label}
           </Link>
-          <LocaleSwitcher currentLocale={locale} label={switcherLabel} localeNames={localeNames} />
+          <LocaleSwitcher
+            currentLocale={locale}
+            label={switcherLabel}
+            localeNames={localeNames}
+            signedIn={signedIn}
+          />
         </nav>
       </SheetContent>
     </Sheet>

@@ -10,13 +10,14 @@ import { AUTH_INSTANCE, authInstanceProvider } from './auth-instance.provider.js
 import type { Auth } from './auth-instance.js';
 import { AuthController } from './auth.controller.js';
 import { AuthRateLimitService } from './auth-rate-limit.service.js';
+import { MeController } from './me.controller.js';
 import { EmailQueueModule } from './mailer/email-queue.module.js';
 import { mountOAuthCallback } from './oauth-callback.js';
 import { OriginGuard } from './origin-guard.js';
 
 @Module({
   imports: [AuditLogModule, RateLimitModule, EmailQueueModule, ChatSocketBridgeModule],
-  controllers: [AuthController],
+  controllers: [AuthController, MeController],
   providers: [authInstanceProvider, AuthRateLimitService, OriginGuard],
   exports: [authInstanceProvider],
 })

@@ -229,6 +229,7 @@ export {
   TotpResponseSchema,
   TotpVerifyRequestSchema,
   TwoFactorRequiredResponseSchema,
+  UpdateLocaleRequestSchema,
   UserSchema,
   VerifyEmailRequestSchema,
 } from './contract/auth.js';

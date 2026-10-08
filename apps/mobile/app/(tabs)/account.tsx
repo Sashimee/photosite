@@ -5,6 +5,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { AccountProfile } from '../../src/components/account/account-profile';
 import { DataExport } from '../../src/components/account/data-export';
 import { DeleteAccount } from '../../src/components/account/delete-account';
+import { LanguageSwitcher } from '../../src/components/account/language-switcher';
 import { SignOut } from '../../src/components/account/sign-out';
 import { useAuth } from '../../src/lib/auth-context';
 import { signInHref } from '../../src/lib/return-path';
@@ -55,6 +56,9 @@ function SignedOutContent() {
         </Text>
       </Pressable>
       <ConsentEntry />
+      <View className="mt-3">
+        <LanguageSwitcher />
+      </View>
     </View>
   );
 }
@@ -88,6 +92,7 @@ function AccountContent() {
           </Text>
         </Pressable>
       ) : null}
+      <LanguageSwitcher />
       <ConsentEntry />
       <DataExport />
       <DeleteAccount />
