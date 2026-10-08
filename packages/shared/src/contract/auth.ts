@@ -97,6 +97,7 @@ export const SignedInResponseSchema = z
 export const TwoFactorRequiredResponseSchema = z
   .object({
     twoFactorRequired: z.literal(true),
+    challengeToken: z.string().min(1),
   })
   .strict();
 
@@ -109,6 +110,7 @@ export const SignInTotpRequestSchema = z
   .object({
     code: TotpCodeSchema.optional(),
     backupCode: z.string().min(1).optional(),
+    challengeToken: z.string().min(1).optional(),
   })
   .strict()
   .refine(
@@ -224,6 +226,7 @@ export const TotpDisableRequestSchema = z
 export const TotpResponseSchema = z
   .object({
     user: UserSchema,
+    session: AuthSessionSchema.optional(),
   })
   .strict();
 
