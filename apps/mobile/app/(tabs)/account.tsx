@@ -7,6 +7,7 @@ import { DataExport } from '../../src/components/account/data-export';
 import { DeleteAccount } from '../../src/components/account/delete-account';
 import { LanguageSwitcher } from '../../src/components/account/language-switcher';
 import { SignOut } from '../../src/components/account/sign-out';
+import { TwoFactorRow } from '../../src/components/account/two-factor-row';
 import { useAuth } from '../../src/lib/auth-context';
 import { signInHref } from '../../src/lib/return-path';
 
@@ -93,6 +94,7 @@ function AccountContent() {
         </Pressable>
       ) : null}
       <LanguageSwitcher />
+      <TwoFactorRow />
       <ConsentEntry />
       <DataExport />
       <DeleteAccount />
