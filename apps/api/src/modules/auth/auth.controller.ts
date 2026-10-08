@@ -102,17 +102,37 @@ export class AuthController {
   // Stamps the session that just proved a second factor, identified by its
   // (possibly rotated, see totpVerify) token - never every session the user
   // has open elsewhere.
-  private async stampTwoFactorVerified(token: string, headers: Headers): Promise<void> {
+  private async stampTwoFactorVerified(
+    token: string,
+    headers: Headers,
+  ): Promise<string | undefined> {
     const lookupHeaders = new Headers(headers);
     lookupHeaders.set('authorization', `Bearer ${token}`);
     const session = await this.auth.api.getSession({ headers: lookupHeaders });
     if (!session) {
-      return;
+      return undefined;
     }
+    const sessionId = (session.session as unknown as BetterAuthSessionRow).id;
     await this.prisma.client.session.update({
-      where: { id: (session.session as unknown as BetterAuthSessionRow).id },
+      where: { id: sessionId },
       data: { twoFactorVerifiedAt: new Date() },
     });
+    return sessionId;
+  }
+
+  // A session that predates 2FA must not keep admin access once it's on,
+  // but the session that just verified the code must survive it.
+  // auth.api.revokeOtherSessions can do neither here: it lists sessions
+  // by userId, hardened-adapter.ts refuses to hand back their tokens
+  // (see #127), and better-auth has no token to delete by. userId/id is
+  // the only field this can reliably revoke by.
+  private async revokeOtherCredentials(userId: string, keepSessionId: string): Promise<void> {
+    await this.prisma.client.$transaction([
+      this.prisma.client.session.deleteMany({
+        where: { userId, id: { not: keepSessionId } },
+      }),
+      this.prisma.client.device.deleteMany({ where: { userId } }),
+    ]);
   }
 
   private async twoFactorCookieName(): Promise<string> {
@@ -540,18 +560,6 @@ export class AuthController {
     await this.rateLimit.enforce('totp-verify', request.ip, user.id);
     const isEnabling = !user.twoFactorEnabled;
     try {
-      // A session that predates 2FA must not keep admin access once it's on,
-      // but the session that just called this endpoint must survive it.
-      // auth.api.revokeOtherSessions can do neither here: it lists sessions
-      // by userId, hardened-adapter.ts refuses to hand back their tokens
-      // (see #127), and better-auth has no token to delete by. userId/id is
-      // the only field this can reliably revoke by.
-      if (isEnabling) {
-        await this.prisma.client.session.deleteMany({
-          where: { userId: user.id, id: { not: session.id } },
-        });
-        await this.prisma.client.device.deleteMany({ where: { userId: user.id } });
-      }
       const response = await this.auth.api.verifyTOTP({
         body: { code: input.code },
         headers: toFetchHeaders(request),
@@ -566,14 +574,24 @@ export class AuthController {
       await applyFetchResponse(response, reply);
       const rotatedToken = response.headers.get('set-auth-token');
       let rotatedSession: { token: string; expiresAt: string } | undefined;
+      let currentSessionId = session.id;
       if (rotatedToken) {
-        await this.stampTwoFactorVerified(rotatedToken, toFetchHeaders(request));
+        const rotatedSessionId = await this.stampTwoFactorVerified(
+          rotatedToken,
+          toFetchHeaders(request),
+        );
         rotatedSession = (await this.signedInBody(rotatedToken, toFetchHeaders(request))).session;
+        if (rotatedSessionId) {
+          currentSessionId = rotatedSessionId;
+        }
       } else {
         await this.prisma.client.session.update({
           where: { id: session.id },
           data: { twoFactorVerifiedAt: new Date() },
         });
+      }
+      if (isEnabling) {
+        await this.revokeOtherCredentials(user.id, currentSessionId);
       }
       reply.status(200);
       reply.send({
