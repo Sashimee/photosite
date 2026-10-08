@@ -56,7 +56,9 @@ describe('PATCH /v1/me/locale integration', () => {
     return app.getHttpAdapter().getInstance();
   }
 
-  async function signedInUser(label: string): Promise<{ email: string; token: string }> {
+  async function signedInUser(
+    label: string,
+  ): Promise<{ email: string; token: string; cookie: string }> {
     const email = `me-${label}-${randomUUID()}@photoo.test`;
     createdEmails.push(email);
     const signUp = await fastify().inject({
@@ -72,7 +74,15 @@ describe('PATCH /v1/me/locale integration', () => {
       payload: { email, password: PASSWORD },
     });
     expect(signIn.statusCode).toBe(200);
-    return { email, token: signIn.json<{ session: { token: string } }>().session.token };
+    const sessionCookie = signIn.cookies.find((candidate) => candidate.name === 'photoo_session');
+    if (!sessionCookie) {
+      throw new Error('expected a photoo_session cookie on sign-in');
+    }
+    return {
+      email,
+      token: signIn.json<{ session: { token: string } }>().session.token,
+      cookie: `${sessionCookie.name}=${sessionCookie.value}`,
+    };
   }
 
   function patchLocale(token: string | null, payload: unknown) {
@@ -148,5 +158,35 @@ describe('PATCH /v1/me/locale integration', () => {
     const response = await patchLocale('not-a-session', { locale: 'fr' });
 
     expect(response.statusCode).toBe(401);
+  });
+
+  it('accepts a cookie session with a same-origin Origin header', async () => {
+    const caller = await signedInUser('cookie');
+
+    const response = await fastify().inject({
+      method: 'PATCH',
+      url: '/v1/me/locale',
+      headers: { cookie: caller.cookie, origin: 'http://localhost:3000' },
+      payload: { locale: 'pt' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ user: { locale: string } }>().user.locale).toBe('pt');
+  });
+
+  it('rejects a cookie session from a cross-site Origin with 403 and keeps the locale', async () => {
+    const caller = await signedInUser('csrf');
+
+    const response = await fastify().inject({
+      method: 'PATCH',
+      url: '/v1/me/locale',
+      headers: { cookie: caller.cookie, origin: 'https://evil.example' },
+      payload: { locale: 'es' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect((await prisma.user.findUniqueOrThrow({ where: { email: caller.email } })).locale).toBe(
+      'en',
+    );
   });
 });
