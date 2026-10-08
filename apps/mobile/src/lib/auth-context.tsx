@@ -120,7 +120,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       if (!stored || isExpired(stored.expiresAt)) {
         if (stored) {
-          await clearStoredSession();
+          try {
+            await clearStoredSession();
+          } catch (clearError) {
+            Sentry.captureException(clearError);
+          }
         }
         if (!cancelled) {
           setStatus('signed-out');

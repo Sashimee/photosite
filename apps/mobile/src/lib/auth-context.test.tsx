@@ -214,24 +214,20 @@ describe('AuthProvider', () => {
     expect(Sentry.captureException).toHaveBeenCalledWith(failure);
   });
 
-  it('does not update state after unmount when the restore throws', async () => {
-    let rejectRead: (reason: Error) => void = () => undefined;
-    mockedSecureStore.getItemAsync.mockReturnValue(
-      new Promise((_resolve, reject) => {
-        rejectRead = reject;
-      }),
-    );
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-
-    const view = renderProbe();
-    view.unmount();
-    await act(async () => {
-      rejectRead(new Error('late failure'));
-      await Promise.resolve();
+  it('resolves to signed-out when clearing an expired stored session throws', async () => {
+    mockedSecureStore.getItemAsync.mockImplementation((key: string) => {
+      if (key === TOKEN_KEY) return Promise.resolve('token-abc');
+      if (key === EXPIRES_AT_KEY) return Promise.resolve(new Date(Date.now() - 1000).toISOString());
+      return Promise.resolve(null);
     });
+    const clearFailure = new Error('delete failed');
+    mockedSecureStore.deleteItemAsync.mockRejectedValue(clearFailure);
 
-    expect(errorSpy).not.toHaveBeenCalled();
-    errorSpy.mockRestore();
+    renderProbe();
+
+    await waitFor(() => screen.getByText('status:signed-out'));
+    expect(mockedGet).not.toHaveBeenCalled();
+    expect(Sentry.captureException).toHaveBeenCalledWith(clearFailure);
   });
 
   it('checkSession reports false for an anonymous 200 response', async () => {
