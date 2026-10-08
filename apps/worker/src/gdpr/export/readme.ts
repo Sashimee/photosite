@@ -21,7 +21,9 @@ Each other .json file holds one type of record:
 - requests.json, quotes.json: photo requests and quotes you sent or
   received.
 - photographer-profile.json, products.json, portfolio-images.json: your
-  public photographer profile, if you have one.
+  public photographer profile, if you have one. Each portfolio image
+  carries the result of its automated check (verdict, check time and, for
+  a rejection, the reasons given to you) in its provenance field.
 - uploads.json: metadata about files you uploaded.
 - verification-cases.json: your professional verification case, if any.
   This file lists the documents you submitted by name and metadata only;

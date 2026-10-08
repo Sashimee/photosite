@@ -8,4 +8,8 @@ describe('buildReadmeText', () => {
     expect(text).toContain('contact support');
     expect(text).toContain('messages.json');
   });
+
+  it('mentions the provenance field of portfolio images', () => {
+    expect(buildReadmeText()).toContain('provenance field');
+  });
 });

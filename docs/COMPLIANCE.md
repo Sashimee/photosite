@@ -29,7 +29,7 @@ photoo.lu is a Luxembourg platform (supervisory authority: CNPD). This document 
 
 ## Data subject rights
 
-- Self-service export (`DataRequest.type = export`): worker builds a zip (profile, requests, quotes, bookings, messages, consents) within 30 days, usually minutes; download link expires in 7 days.
+- Self-service export (`DataRequest.type = export`): worker builds a zip (profile, requests, quotes, bookings, messages, consents, portfolio images with their provenance verdict, check time, review time and decision reasons; provenance scores, vendors, reverse-search matches, C2PA/EXIF signals, admin notes and raw payloads are withheld pending the Art. 15(4) lawyer answer) within 30 days, usually minutes; download link expires in 7 days.
 - Self-service deletion: account soft-deleted immediately, PII anonymised after 30 days grace, except data that must be kept (invoices/ledger 10 years under Luxembourg accounting law, verification records as required, dispute records).
 - Rectification through profile settings; admin can correct on request with audit log.
 
