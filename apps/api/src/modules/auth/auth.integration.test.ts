@@ -1101,6 +1101,65 @@ describe('auth integration', () => {
       expect(stale.statusCode).toBe(401);
     }, 20_000);
 
+    it('keeps other sessions and devices on a wrong code, revokes them once the code verifies (#676)', async () => {
+      const email = uniqueEmail('verify-order');
+      await signUp(email);
+      await verifyByEmail(email);
+      const deviceOwners = await seedDevices(email);
+      const signInBearer = async (): Promise<string> => {
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/auth/sign-in',
+          payload: { email, password: PASSWORD },
+        });
+        return response.json<{ session: { token: string } }>().session.token;
+      };
+      const callerBearer = await signInBearer();
+      const otherBearer = await signInBearer();
+      const sessionStatus = async (token: string): Promise<number> =>
+        (
+          await fastify().inject({
+            method: 'GET',
+            url: '/v1/auth/session',
+            headers: { authorization: `Bearer ${token}` },
+          })
+        ).statusCode;
+
+      const enroll = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/enroll',
+        headers: { authorization: `Bearer ${callerBearer}` },
+        payload: { password: PASSWORD },
+      });
+      const { secret } = enroll.json<{ secret: string }>();
+
+      const wrong = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/verify',
+        headers: { authorization: `Bearer ${callerBearer}` },
+        payload: { code: wrongCode(secret) },
+      });
+      expect(wrong.statusCode).toBe(401);
+      expect(await sessionStatus(otherBearer)).toBe(200);
+      expect(await sessionStatus(callerBearer)).toBe(200);
+      expect(await prisma.device.findMany({ where: { userId: deviceOwners.userId } })).toHaveLength(
+        1,
+      );
+
+      const verified = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/verify',
+        headers: { authorization: `Bearer ${callerBearer}` },
+        payload: { code: generateTotpCode(secret) },
+      });
+      expect(verified.statusCode).toBe(200);
+      const rotatedToken = verified.json<{ session: { token: string } }>().session.token;
+      expect(await sessionStatus(rotatedToken)).toBe(200);
+      expect(await sessionStatus(otherBearer)).toBe(401);
+      expect(await sessionStatus(callerBearer)).toBe(401);
+      await expectOnlyBystanderDevices(deviceOwners);
+    }, 30_000);
+
     it('does not return a session from totp/verify when the session was not rotated', async () => {
       const email = uniqueEmail('bearer-reverify');
       const { secret, bearer } = await enableTotpWithBearer(email);
