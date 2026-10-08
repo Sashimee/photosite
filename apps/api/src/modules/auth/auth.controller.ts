@@ -585,21 +585,29 @@ export class AuthController {
     }
   }
 
-  @HttpCode(200)
   @Post('totp/disable')
   async totpDisable(
     @Body(new ZodValidationPipe(TotpDisableRequestSchema)) body: unknown,
     @Req() request: FastifyRequest,
-  ): Promise<{ user: ReturnType<typeof mapUser> }> {
+    @Res({ passthrough: false }) reply: FastifyReply,
+  ): Promise<void> {
     const input = body as { code: string; password: string };
     const { user, headers } = await requireSession(this.auth, request);
     await this.rateLimit.enforce('totp-disable', request.ip, user.id);
     try {
       await this.auth.api.verifyTOTP({ body: { code: input.code }, headers });
-      await this.auth.api.disableTwoFactor({
+      // disableTwoFactor replaces the session and deletes the caller's own
+      // token, so the new one must reach both cookie and bearer clients.
+      const response = await this.auth.api.disableTwoFactor({
         body: { password: input.password },
         headers,
+        asResponse: true,
       });
+      await applyFetchResponse(response, reply);
+      const rotatedToken = response.headers.get('set-auth-token');
+      const rotatedSession = rotatedToken
+        ? (await this.signedInBody(rotatedToken, toFetchHeaders(request))).session
+        : undefined;
       await this.auditLog.record({
         actorType: 'user',
         actorId: user.id,
@@ -608,7 +616,11 @@ export class AuthController {
         targetId: user.id,
         ip: request.ip,
       });
-      return { user: mapUser({ ...user, twoFactorEnabled: false }) };
+      reply.status(200);
+      reply.send({
+        user: mapUser({ ...user, twoFactorEnabled: false }),
+        ...(rotatedSession ? { session: rotatedSession } : {}),
+      });
     } catch (error) {
       rethrowAsHttpException(error);
     }

@@ -498,6 +498,28 @@ describe('auth integration', () => {
     expect(
       disableResponse.json<{ user: { twoFactorEnabled: boolean } }>().user.twoFactorEnabled,
     ).toBe(false);
+    const disabledCookie = disableResponse.cookies.find(
+      (cookie) => cookie.name === 'photoo_session',
+    );
+    if (!disabledCookie) {
+      throw new Error('expected a rotated photoo_session cookie on the disable response');
+    }
+    expect(`${disabledCookie.name}=${disabledCookie.value}`).not.toBe(cookieHeader);
+
+    const afterDisable = await fastify().inject({
+      method: 'GET',
+      url: '/v1/auth/session',
+      headers: { cookie: `${disabledCookie.name}=${disabledCookie.value}` },
+    });
+    expect(afterDisable.statusCode).toBe(200);
+    expect(afterDisable.json<{ user: { email: string } | null }>().user?.email).toBe(email);
+
+    const staleAfterDisable = await fastify().inject({
+      method: 'GET',
+      url: '/v1/auth/session',
+      headers: { cookie: cookieHeader },
+    });
+    expect(staleAfterDisable.statusCode).toBe(401);
   }, 20_000);
 
   it('rate limits repeated bad sign-ins with a 429 ApiError', async () => {
@@ -1091,6 +1113,50 @@ describe('auth integration', () => {
       expect(again.statusCode).toBe(200);
       expect(again.json<Record<string, unknown>>().session).toBeUndefined();
     }, 20_000);
+
+    it('returns the rotated session from totp/disable and invalidates the old token', async () => {
+      const email = uniqueEmail('bearer-disable');
+      const { secret, bearer } = await enableTotpWithBearer(email);
+      const disable = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/disable',
+        headers: { authorization: `Bearer ${bearer}` },
+        payload: { code: generateTotpCode(secret), password: PASSWORD },
+      });
+      expect(disable.statusCode).toBe(200);
+      const body = disable.json<{
+        user: { twoFactorEnabled: boolean };
+        session?: { token: string; expiresAt: string };
+      }>();
+      expect(body.user.twoFactorEnabled).toBe(false);
+      const newToken = body.session?.token ?? '';
+      expect(newToken).toBeTruthy();
+      expect(newToken).not.toBe(bearer);
+
+      const fresh = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${newToken}` },
+      });
+      expect(fresh.statusCode).toBe(200);
+      expect(fresh.json<{ user: { email: string } | null }>().user?.email).toBe(email);
+
+      const stale = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${bearer}` },
+      });
+      expect(stale.statusCode).toBe(401);
+    }, 20_000);
+
+    it('rejects totp/disable without a session', async () => {
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/disable',
+        payload: { code: '123456', password: PASSWORD },
+      });
+      expect(response.statusCode).toBe(401);
+    });
 
     it('completes sign-in with a challengeToken, no Cookie and no Origin', async () => {
       const email = uniqueEmail('bearer-signin');
