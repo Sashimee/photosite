@@ -18,6 +18,12 @@ export const PROVENANCE_BATCH_SIZE = 500;
 // after 90 days. Measured from createdAt because updatedAt moves on admin review.
 const RAW_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
+// A takedown resolves the report and soft-deletes the image together, and
+// Report.resolution is free text, so any recently resolved report holds the
+// evidence. DSA Art. 20 requires a complaint window of at least six months;
+// the final value is pending the lawyer.
+const TAKEDOWN_HOLD_MS = 180 * 24 * 60 * 60 * 1000;
+
 export interface DeletedImageCandidate {
   checkId: string;
   imageId: string;
@@ -70,6 +76,7 @@ async function deleteChecksOfDeletedImages(
   const batchSize = deps.batchSize ?? PROVENANCE_BATCH_SIZE;
   let checksDeleted = 0;
   let checksHeld = 0;
+  const holdCutoff = new Date(Date.now() - TAKEDOWN_HOLD_MS);
   let cursor: string | undefined;
 
   for (;;) {
@@ -94,14 +101,16 @@ async function deleteChecksOfDeletedImages(
     }));
     const openReports = await db.report.findMany({
       where: {
-        status: 'open',
-        OR: [
-          { targetType: 'portfolio_image', targetId: { in: candidates.map((c) => c.imageId) } },
-          {
-            targetType: 'photographer_profile',
-            targetId: { in: candidates.map((c) => c.profileId) },
-          },
-        ],
+        OR: [{ status: 'open' }, { status: 'resolved', updatedAt: { gt: holdCutoff } }],
+        AND: {
+          OR: [
+            { targetType: 'portfolio_image', targetId: { in: candidates.map((c) => c.imageId) } },
+            {
+              targetType: 'photographer_profile',
+              targetId: { in: candidates.map((c) => c.profileId) },
+            },
+          ],
+        },
       },
       select: { targetType: true, targetId: true },
     });

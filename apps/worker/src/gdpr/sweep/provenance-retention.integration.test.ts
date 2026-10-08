@@ -19,6 +19,7 @@ function required<T>(value: T | undefined): T {
   return value;
 }
 
+const TWO_HUNDRED_DAYS_AGO = new Date(Date.now() - 200 * DAY_MS);
 const RAW = { vendor: 'payload' };
 
 describe('provenanceRetention against a real database', () => {
@@ -131,7 +132,9 @@ describe('provenanceRetention against a real database', () => {
     await createImage('deleted', profileAId, { deleted: true, raw: true });
     await createImage('live', profileAId, {});
     await createImage('heldByImageReport', profileAId, { deleted: true });
-    await createImage('resolvedReport', profileAId, { deleted: true });
+    await createImage('dismissedReport', profileAId, { deleted: true });
+    await createImage('recentTakedown', profileAId, { deleted: true });
+    await createImage('oldTakedown', profileAId, { deleted: true });
     await createImage('heldByProfileReport', profileBId, { deleted: true });
     await createImage('oldPass', profileAId, {
       raw: true,
@@ -161,9 +164,26 @@ describe('provenanceRetention against a real database', () => {
       prisma.report.create({
         data: {
           targetType: 'portfolio_image',
-          targetId: required(images.resolvedReport),
+          targetId: required(images.dismissedReport),
+          reason: 'fx',
+          status: 'dismissed',
+        },
+      }),
+      prisma.report.create({
+        data: {
+          targetType: 'portfolio_image',
+          targetId: required(images.recentTakedown),
           reason: 'fx',
           status: 'resolved',
+        },
+      }),
+      prisma.report.create({
+        data: {
+          targetType: 'portfolio_image',
+          targetId: required(images.oldTakedown),
+          reason: 'fx',
+          status: 'resolved',
+          updatedAt: TWO_HUNDRED_DAYS_AGO,
         },
       }),
       prisma.report.create({
@@ -193,12 +213,14 @@ describe('provenanceRetention against a real database', () => {
   it('removes the check of a deleted image and keeps the check of a live one', async () => {
     expect(await checkOf('deleted')).toBeNull();
     expect(await checkOf('live')).not.toBeNull();
-    expect(await checkOf('resolvedReport')).toBeNull();
+    expect(await checkOf('dismissedReport')).toBeNull();
+    expect(await checkOf('oldTakedown')).toBeNull();
   });
 
   it('keeps the check of a deleted image while an open report holds it', async () => {
     expect(await checkOf('heldByImageReport')).not.toBeNull();
     expect(await checkOf('heldByProfileReport')).not.toBeNull();
+    expect(await checkOf('recentTakedown')).not.toBeNull();
   });
 
   it('releases a held check on a later run once the report is closed', async () => {
