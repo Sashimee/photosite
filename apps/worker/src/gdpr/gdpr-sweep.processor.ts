@@ -8,6 +8,7 @@ import type { JobQueueLike } from '../queues/processors/types.js';
 import { anonymiseDeletions, type AnonymiseStorage } from './sweep/anonymise-deletions.js';
 import { expireExports, type ExpireExportsStorage } from './sweep/expire-exports.js';
 import { failStuckExports } from './sweep/fail-stuck-exports.js';
+import { provenanceRetention } from './sweep/provenance-retention.js';
 import { purgeChat, type PurgeChatStorage } from './sweep/purge-chat.js';
 
 export interface GdprSweepDeps {
@@ -21,7 +22,7 @@ export interface GdprSweepDeps {
   webAppUrl: string;
 }
 
-// Four independent phases behind one queue rather than three near-identical
+// Five independent phases behind one queue rather than three near-identical
 // repeatables (docs/steps/1A.12-gdpr.md "One repeatable sweep, explicit
 // phases"): each phase writes its own AuditLog with counts, and a failure
 // in one must not skip the others, so every phase is wrapped individually
@@ -43,6 +44,7 @@ export function createGdprSweepProcessor(deps: GdprSweepDeps): Processor {
         await runPhase(deps.logger, 'purge-chat', () => purgeChat(deps)),
         await runPhase(deps.logger, 'expire-exports', () => expireExports(deps)),
         await runPhase(deps.logger, 'fail-stuck-exports', () => failStuckExports(deps)),
+        await runPhase(deps.logger, 'provenance-retention', () => provenanceRetention(deps)),
       ];
       status = results.every(Boolean) ? 'ok' : 'error';
     } finally {
