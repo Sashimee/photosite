@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/en',
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 import { MobileNav } from './mobile-nav';
