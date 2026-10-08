@@ -70,7 +70,7 @@ export const SignUpRequestSchema = z
     // The anonymousId a pre-sign-in consent banner recorded consent under
     // (contract/gdpr.ts `CreateConsentRequestSchema`): passing it here lets
     // sign-up link those records to the new account.
-    anonymousId: z.string().min(1).max(100).optional(),
+    anonymousId: z.uuid().optional(),
   })
   .strict();
 

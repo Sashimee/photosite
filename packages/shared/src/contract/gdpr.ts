@@ -226,7 +226,7 @@ export const ConsentPurposeSchema = z.enum(CONSENT_PURPOSES).openapi({ example: 
 // "Consent records").
 export const CreateConsentRequestSchema = z
   .object({
-    anonymousId: z.string().min(1).max(100).optional(),
+    anonymousId: z.uuid().optional(),
     purpose: ConsentPurposeSchema,
     granted: z.boolean(),
   })
