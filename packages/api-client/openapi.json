@@ -6960,8 +6960,7 @@
                   },
                   "anonymousId": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100
+                    "format": "uuid"
                   }
                 },
                 "required": [
@@ -16836,8 +16835,7 @@
                 "properties": {
                   "anonymousId": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100
+                    "format": "uuid"
                   },
                   "purpose": {
                     "type": "string",

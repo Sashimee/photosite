@@ -196,7 +196,7 @@ export class AuthController {
       });
       const parsed = await applyFetchResponse<{ user: BetterAuthUserRow }>(response, reply);
       if (input.anonymousId) {
-        await this.linkAnonymousConsents(input.anonymousId, parsed.user.id);
+        await this.tryLinkAnonymousConsents(input.anonymousId, parsed.user.id);
       }
       reply.status(201);
       reply.send({ user: mapUser(parsed.user) });
@@ -219,6 +219,28 @@ export class AuthController {
       where: { anonymousId, userId: null },
       data: { userId, anonymousId: null },
     });
+  }
+
+  // Deliberate exception to fail-loudly: for an already-registered email
+  // Better Auth returns a fake user whose id has no row, and any failure here
+  // must not change the sign-up response or it reveals the account exists
+  // (docs/SECURITY.md "no user enumeration").
+  private async tryLinkAnonymousConsents(anonymousId: string, userId: string): Promise<void> {
+    try {
+      const created = await this.prisma.client.user.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      });
+      if (!created) {
+        return;
+      }
+      await this.linkAnonymousConsents(anonymousId, userId);
+    } catch (error) {
+      this.logger.warn(
+        { context: 'AuthController', errorName: error instanceof Error ? error.name : 'unknown' },
+        'Failed to link anonymous consents during sign-up',
+      );
+    }
   }
 
   @Post('sign-in')

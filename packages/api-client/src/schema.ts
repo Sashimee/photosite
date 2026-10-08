@@ -124,6 +124,7 @@ export interface paths {
                          * @enum {string}
                          */
                         locale: "en" | "fr" | "de" | "pt" | "es";
+                        /** Format: uuid */
                         anonymousId?: string;
                     };
                 };
@@ -7974,6 +7975,7 @@ export interface paths {
             requestBody?: {
                 content: {
                     "application/json": {
+                        /** Format: uuid */
                         anonymousId?: string;
                         /**
                          * @example analytics

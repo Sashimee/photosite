@@ -109,7 +109,7 @@ describe('consents integration', () => {
   }
 
   function newAnonymousId(): string {
-    const id = `anon-${randomUUID()}`;
+    const id = randomUUID();
     createdAnonymousIds.push(id);
     return id;
   }
