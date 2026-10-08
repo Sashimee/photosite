@@ -39,8 +39,12 @@ jest.mock('@sentry/react-native', () => ({
 
 type ApiCall = (path: string, init?: unknown) => Promise<unknown>;
 const mockedPost = jest.fn<ApiCall>();
+const mockedDelete = jest.fn<ApiCall>();
 jest.mock('./api', () => ({
-  api: { POST: (path: string, init?: unknown) => mockedPost(path, init) },
+  api: {
+    POST: (path: string, init?: unknown) => mockedPost(path, init),
+    DELETE: (path: string, init?: unknown) => mockedDelete(path, init),
+  },
 }));
 
 import * as Sentry from '@sentry/react-native';
@@ -54,6 +58,8 @@ beforeEach(() => {
   mockPermissions.mockResolvedValue({ status: 'granted', canAskAgain: true });
   mockGetToken.mockResolvedValue({ data: 'ExponentPushToken[abc]' });
   mockedPost.mockResolvedValue({ data: { id: 'device-9' } });
+  mockedDelete.mockResolvedValue({ response: { ok: true, status: 204 } });
+  jest.mocked(SecureStore.getItemAsync).mockResolvedValue(null);
 });
 
 describe('registerPushDevice', () => {
@@ -69,6 +75,7 @@ describe('registerPushDevice', () => {
       'device-9',
       expect.anything(),
     );
+    expect(mockedDelete).not.toHaveBeenCalled();
   });
 
   it('never asks for a token or registers while permission is not granted', async () => {
@@ -79,6 +86,95 @@ describe('registerPushDevice', () => {
     expect(mockRequestPermissions).not.toHaveBeenCalled();
     expect(mockGetToken).not.toHaveBeenCalled();
     expect(mockedPost).not.toHaveBeenCalled();
+  });
+
+  it('deletes the stored device and clears its id when permission was revoked', async () => {
+    mockPermissions.mockResolvedValue({ status: 'denied', canAskAgain: false });
+    jest.mocked(SecureStore.getItemAsync).mockResolvedValue('device-9');
+
+    await expect(registerPushDevice()).resolves.toBe('permission-missing');
+
+    expect(mockedDelete).toHaveBeenCalledWith('/v1/me/devices/{id}', {
+      params: { path: { id: 'device-9' } },
+      signal: expect.any(AbortSignal),
+    });
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
+      'photoo.push.deviceId',
+      expect.anything(),
+    );
+  });
+
+  it('clears the device id when the server no longer knows the device', async () => {
+    mockPermissions.mockResolvedValue({ status: 'denied', canAskAgain: false });
+    jest.mocked(SecureStore.getItemAsync).mockResolvedValue('device-9');
+    mockedDelete.mockResolvedValue({ response: { ok: false, status: 404 } });
+
+    await expect(registerPushDevice()).resolves.toBe('permission-missing');
+
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
+      'photoo.push.deviceId',
+      expect.anything(),
+    );
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('aborts a stalled delete instead of blocking registration', async () => {
+    jest.useFakeTimers();
+    try {
+      mockPermissions.mockResolvedValue({ status: 'denied', canAskAgain: false });
+      jest.mocked(SecureStore.getItemAsync).mockResolvedValue('device-9');
+      mockedDelete.mockImplementation(
+        (_path: string, init?: unknown) =>
+          new Promise((_resolve, reject) => {
+            (init as { signal?: AbortSignal }).signal?.addEventListener('abort', () => {
+              reject(new Error('aborted'));
+            });
+          }),
+      );
+
+      const result = registerPushDevice();
+      await jest.runAllTimersAsync();
+
+      await expect(result).resolves.toBe('permission-missing');
+      expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('makes no delete call when permission was revoked and no device id is stored', async () => {
+    mockPermissions.mockResolvedValue({ status: 'denied', canAskAgain: false });
+
+    await expect(registerPushDevice()).resolves.toBe('permission-missing');
+
+    expect(mockedDelete).not.toHaveBeenCalled();
+    expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+  });
+
+  it('keeps the device id for a retry and reports without the token when the delete fails', async () => {
+    mockPermissions.mockResolvedValue({ status: 'denied', canAskAgain: false });
+    jest.mocked(SecureStore.getItemAsync).mockResolvedValue('device-9');
+    mockedDelete.mockResolvedValue({ response: { ok: false, status: 500 } });
+
+    await expect(registerPushDevice()).resolves.toBe('permission-missing');
+
+    expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(jest.mocked(Sentry.captureMessage).mock.calls)).not.toContain(
+      'ExponentPushToken',
+    );
+  });
+
+  it('keeps the device id for a retry and reports instead of throwing when the delete rejects', async () => {
+    mockPermissions.mockResolvedValue({ status: 'denied', canAskAgain: false });
+    jest.mocked(SecureStore.getItemAsync).mockResolvedValue('device-9');
+    const failure = new Error('offline');
+    mockedDelete.mockRejectedValue(failure);
+
+    await expect(registerPushDevice()).resolves.toBe('permission-missing');
+
+    expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    expect(Sentry.captureException).toHaveBeenCalledWith(failure);
   });
 
   it('skips quietly with a breadcrumb when there is no EAS project id', async () => {

@@ -16,6 +16,8 @@ Each other .json file holds one type of record:
 
 - user.json, accounts.json: your account and linked sign-in methods.
 - sessions.json, devices.json: your active sign-in sessions and devices.
+  The push notification token of a device is left out of devices.json on
+  purpose: it is a delivery credential, not information about you.
 - consents.json: your consent choices.
 - notifications.json: notifications sent to you.
 - requests.json, quotes.json: photo requests and quotes you sent or

@@ -5,14 +5,14 @@ photoo.lu is a Luxembourg platform (supervisory authority: CNPD). This document 
 ## Roles and processors
 
 - Controller: the operating entity (open decision O2).
-- Processors with DPA to sign or accept: Stripe (payments, KYC), Brevo (email), Hetzner or chosen object storage (files), Sentry (errors), Google (GA4/GTM, Ads, Firebase, OAuth), Apple/Microsoft/Facebook (OAuth), AI-detection and reverse-search vendors (portfolio images), Expo (push), the VPS provider.
+- Processors with DPA to sign or accept: Stripe (payments, KYC), Brevo (email), Hetzner or chosen object storage (files), Sentry (errors), Google (GA4/GTM, Ads, Firebase, OAuth), Apple/Microsoft/Facebook (OAuth), AI-detection and reverse-search vendors (portfolio images), Expo (push, relaying to Apple APNs and Google FCM), the VPS provider.
 - Records of processing activities (RoPA) kept in `docs/legal/ropa.md` (created in Phase 2).
 
 ## Lawful bases
 
 | Processing | Basis |
 |-----------|-------|
-| Account, bookings, chat, payments | contract |
+| Account, bookings, chat, payments, push notifications about them | contract |
 | Photographer verification documents | legal obligation / legitimate interest (platform trust), retained only while the account is active + statutory period |
 | Provenance checks on portfolio images (sending images to third-party APIs) | legitimate interest, disclosed in the photographer terms; DPIA required (automated assessment with admin review, so no solely automated decision) |
 | Analytics (GA4), ads measurement | consent |
@@ -44,6 +44,7 @@ photoo.lu is a Luxembourg platform (supervisory authority: CNPD). This document 
 | Server logs | 30 days |
 | Consent records | 5 years after last update |
 | Notifications (in-app/email/push records) | 12 months, deleted by the worker's `notifications-cleanup` job |
+| Push devices (Expo token, platform, last seen) | until sign-out, uninstall (`DeviceNotRegistered`), revoked permission or account deletion, and at most 12 months after last seen; deleted by `notifications-cleanup` |
 | `AuditLog` rows, including refund and dispute reasons (the only place a refund reason is stored) | 10 years, with the ledger they explain (proposal, pending the 0.7 lawyer brief; free-text reasons may hold personal data, #471). No expiry job yet |
 
 ## Platform-specific obligations
