@@ -124,7 +124,7 @@ describe('collectExportData portfolio provenance against a real database', () =>
   });
 
   afterAll(async () => {
-    await prisma.photographerProfile.deleteMany({ where: { id: profileId } });
+    await prisma.photographerProfile.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.upload.deleteMany({ where: { ownerId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();
