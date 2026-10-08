@@ -16,7 +16,7 @@ import { twoFactorErrorMessage } from '../../src/lib/two-factor-errors';
 export default function DisableTwoFactorScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { updateUser } = useAuth();
+  const { updateUser, replaceSession, signOut } = useAuth();
   const inFlight = useRef(false);
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
@@ -38,11 +38,17 @@ export default function DisableTwoFactorScreen() {
     setFieldErrors({});
     setSubmitError(null);
     setIsSubmitting(true);
+    let sessionRotated = false;
     try {
       const { data, error } = await api.POST('/v1/auth/totp/disable', { body: parsed.data });
       if (error) {
         setSubmitError(twoFactorErrorMessage(t, error));
         return;
+      }
+      if (data.session) {
+        sessionRotated = true;
+        await replaceSession(data.session);
+        sessionRotated = false;
       }
       updateUser(data.user);
       if (router.canGoBack()) {
@@ -51,6 +57,10 @@ export default function DisableTwoFactorScreen() {
         router.replace('/account');
       }
     } catch {
+      if (sessionRotated) {
+        await signOut();
+        return;
+      }
       setSubmitError(t('mobile.auth.errors.generic'));
     } finally {
       inFlight.current = false;
