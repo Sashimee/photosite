@@ -115,8 +115,12 @@ describe('provenanceRetention against a real database', () => {
     });
   }
 
-  async function run() {
-    return provenanceRetention({ prisma: { client: prisma }, logger: fakeLogger() as never });
+  async function run(batchSize?: number) {
+    return provenanceRetention({
+      prisma: { client: prisma },
+      logger: fakeLogger() as never,
+      ...(batchSize === undefined ? {} : { batchSize }),
+    });
   }
 
   beforeAll(async () => {
@@ -172,6 +176,8 @@ describe('provenanceRetention against a real database', () => {
       }),
     ]);
     reportIds.push(...reports.map((report) => report.id));
+
+    await run();
   });
 
   afterAll(async () => {
@@ -185,7 +191,6 @@ describe('provenanceRetention against a real database', () => {
   });
 
   it('removes the check of a deleted image and keeps the check of a live one', async () => {
-    await run();
     expect(await checkOf('deleted')).toBeNull();
     expect(await checkOf('live')).not.toBeNull();
     expect(await checkOf('resolvedReport')).toBeNull();
@@ -220,5 +225,32 @@ describe('provenanceRetention against a real database', () => {
     expect(result.rawCleared).toBe(0);
     expect(await checkOf('recentPass')).toEqual(before);
     expect(await checkOf('heldByProfileReport')).not.toBeNull();
+  });
+
+  it('drains every batch of deletable checks in one run, skipping a held one in the middle', async () => {
+    const names = ['multi1', 'multi2', 'multi3', 'multi4', 'multi5'];
+    for (const name of names) {
+      await createImage(name, profileAId, { deleted: true });
+    }
+    const report = await prisma.report.create({
+      data: {
+        targetType: 'portfolio_image',
+        targetId: required(images.multi3),
+        reason: 'fx',
+        status: 'open',
+      },
+    });
+    reportIds.push(report.id);
+
+    const result = await run(2);
+
+    expect(result.checksDeleted).toBeGreaterThanOrEqual(4);
+    for (const name of names) {
+      if (name === 'multi3') {
+        expect(await checkOf(name)).not.toBeNull();
+      } else {
+        expect(await checkOf(name)).toBeNull();
+      }
+    }
   });
 });

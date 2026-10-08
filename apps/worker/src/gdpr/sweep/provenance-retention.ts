@@ -4,6 +4,7 @@ import type { Logger } from 'nestjs-pino';
 export interface ProvenanceRetentionDeps {
   prisma: { client: PrismaClient };
   logger: Logger;
+  batchSize?: number;
 }
 
 export interface ProvenanceRetentionResult {
@@ -66,17 +67,20 @@ async function deleteChecksOfDeletedImages(
   deps: ProvenanceRetentionDeps,
 ): Promise<{ checksDeleted: number; checksHeld: number }> {
   const db = deps.prisma.client;
+  const batchSize = deps.batchSize ?? PROVENANCE_BATCH_SIZE;
   let checksDeleted = 0;
   let checksHeld = 0;
   let cursor: string | undefined;
 
   for (;;) {
     const rows = await db.provenanceCheck.findMany({
-      where: { portfolioImage: { deletedAt: { not: null } } },
+      where: {
+        portfolioImage: { deletedAt: { not: null } },
+        ...(cursor === undefined ? {} : { id: { gt: cursor } }),
+      },
       select: { id: true, portfolioImageId: true, portfolioImage: { select: { profileId: true } } },
       orderBy: { id: 'asc' },
-      take: PROVENANCE_BATCH_SIZE,
-      ...(cursor === undefined ? {} : { cursor: { id: cursor }, skip: 1 }),
+      take: batchSize,
     });
     if (rows.length === 0) {
       break;
@@ -108,7 +112,7 @@ async function deleteChecksOfDeletedImages(
       const deleted = await db.provenanceCheck.deleteMany({ where: { id: { in: deletable } } });
       checksDeleted += deleted.count;
     }
-    if (rows.length < PROVENANCE_BATCH_SIZE) {
+    if (rows.length < batchSize) {
       break;
     }
   }
@@ -117,6 +121,7 @@ async function deleteChecksOfDeletedImages(
 
 async function clearStaleRaw(deps: ProvenanceRetentionDeps): Promise<number> {
   const db = deps.prisma.client;
+  const batchSize = deps.batchSize ?? PROVENANCE_BATCH_SIZE;
   const cutoff = rawRetentionCutoff(Date.now());
   let cleared = 0;
 
@@ -124,7 +129,7 @@ async function clearStaleRaw(deps: ProvenanceRetentionDeps): Promise<number> {
     const rows = await db.provenanceCheck.findMany({
       where: { verdict: 'pass', createdAt: { lte: cutoff }, raw: { not: Prisma.DbNull } },
       select: { id: true },
-      take: PROVENANCE_BATCH_SIZE,
+      take: batchSize,
     });
     if (rows.length === 0) {
       break;
@@ -134,7 +139,7 @@ async function clearStaleRaw(deps: ProvenanceRetentionDeps): Promise<number> {
       data: { raw: Prisma.DbNull },
     });
     cleared += updated.count;
-    if (rows.length < PROVENANCE_BATCH_SIZE) {
+    if (rows.length < batchSize) {
       break;
     }
   }
