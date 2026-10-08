@@ -227,6 +227,7 @@ export interface paths {
                         } | {
                             /** @enum {boolean} */
                             twoFactorRequired: true;
+                            challengeToken: string;
                         };
                     };
                 };
@@ -306,6 +307,7 @@ export interface paths {
                         /** @example 123456 */
                         code?: string;
                         backupCode?: string;
+                        challengeToken?: string;
                     };
                 };
             };
@@ -1087,6 +1089,7 @@ export interface paths {
                     content: {
                         "application/json": {
                             user: components["schemas"]["User"];
+                            session?: components["schemas"]["AuthSession"];
                         };
                     };
                 };
@@ -1170,6 +1173,7 @@ export interface paths {
                     content: {
                         "application/json": {
                             user: components["schemas"]["User"];
+                            session?: components["schemas"]["AuthSession"];
                         };
                     };
                 };

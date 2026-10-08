@@ -34,7 +34,13 @@ import type { Env } from '../../config/env.js';
 import { APP_CONFIG } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { ChatSocketBridge } from '../chat/chat-socket-bridge.js';
-import { applyFetchResponse, rethrowAsHttpException, toFetchHeaders } from './auth-http.js';
+import {
+  applyFetchResponse,
+  readSetCookieValue,
+  rethrowAsHttpException,
+  toFetchHeaders,
+  withCookie,
+} from './auth-http.js';
 import { AUTH_INSTANCE } from './auth-instance.provider.js';
 import type { Auth } from './auth-instance.js';
 import { AuthRateLimitService } from './auth-rate-limit.service.js';
@@ -107,6 +113,11 @@ export class AuthController {
       where: { id: (session.session as unknown as BetterAuthSessionRow).id },
       data: { twoFactorVerifiedAt: new Date() },
     });
+  }
+
+  private async twoFactorCookieName(): Promise<string> {
+    const context = await this.auth.$context;
+    return context.createAuthCookie('two_factor').name;
   }
 
   private async defaultCountryCode(): Promise<string> {
@@ -213,8 +224,15 @@ export class AuthController {
       }>(response, reply);
 
       if (parsed.twoFactorRedirect || !parsed.token) {
+        const challengeToken = readSetCookieValue(response, await this.twoFactorCookieName());
+        if (!challengeToken) {
+          throw new HttpException(
+            { code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' },
+            500,
+          );
+        }
         reply.status(200);
-        reply.send({ twoFactorRequired: true });
+        reply.send({ twoFactorRequired: true, challengeToken });
         return;
       }
 
@@ -233,10 +251,24 @@ export class AuthController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: false }) reply: FastifyReply,
   ): Promise<void> {
-    const input = body as { code?: string; backupCode?: string };
+    const input = body as { code?: string; backupCode?: string; challengeToken?: string };
     await this.rateLimit.enforce('sign-in-totp', request.ip);
-    const headers = toFetchHeaders(request);
+    let headers = toFetchHeaders(request);
     try {
+      if (input.challengeToken) {
+        const withChallenge = withCookie(
+          headers,
+          await this.twoFactorCookieName(),
+          input.challengeToken,
+        );
+        if (!withChallenge) {
+          throw new HttpException(
+            { code: 'INVALID_TWO_FACTOR_COOKIE', message: 'Invalid two factor cookie' },
+            401,
+          );
+        }
+        headers = withChallenge;
+      }
       const response = input.code
         ? await this.auth.api.verifyTOTP({ body: { code: input.code }, headers, asResponse: true })
         : await this.auth.api.verifyBackupCode({
@@ -529,12 +561,14 @@ export class AuthController {
       // on first verification, rotates the session (invalidating this
       // request's own bearer token/cookie), so the user is built from the
       // pre-fetched value above rather than a post-call lookup. The rotated
-      // token (if any) is only ever exposed via the `set-auth-token`
-      // response header, never the JSON body (see auth-instance.ts).
+      // token (if any) is returned in the body's `session` as well as via
+      // Set-Cookie, because a bearer-only client never sees the cookie.
       await applyFetchResponse(response, reply);
       const rotatedToken = response.headers.get('set-auth-token');
+      let rotatedSession: { token: string; expiresAt: string } | undefined;
       if (rotatedToken) {
         await this.stampTwoFactorVerified(rotatedToken, toFetchHeaders(request));
+        rotatedSession = (await this.signedInBody(rotatedToken, toFetchHeaders(request))).session;
       } else {
         await this.prisma.client.session.update({
           where: { id: session.id },
@@ -542,7 +576,10 @@ export class AuthController {
         });
       }
       reply.status(200);
-      reply.send({ user: mapUser({ ...user, twoFactorEnabled: true }) });
+      reply.send({
+        user: mapUser({ ...user, twoFactorEnabled: true }),
+        ...(rotatedSession ? { session: rotatedSession } : {}),
+      });
     } catch (error) {
       rethrowAsHttpException(error);
     }

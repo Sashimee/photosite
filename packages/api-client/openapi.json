@@ -7101,10 +7101,15 @@
                           "enum": [
                             true
                           ]
+                        },
+                        "challengeToken": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
                       "required": [
-                        "twoFactorRequired"
+                        "twoFactorRequired",
+                        "challengeToken"
                       ],
                       "additionalProperties": false
                     }
@@ -7184,6 +7189,10 @@
                     "example": "123456"
                   },
                   "backupCode": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "challengeToken": {
                     "type": "string",
                     "minLength": 1
                   }
@@ -8034,6 +8043,9 @@
                   "properties": {
                     "user": {
                       "$ref": "#/components/schemas/User"
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/AuthSession"
                     }
                   },
                   "required": [
@@ -8137,6 +8149,9 @@
                   "properties": {
                     "user": {
                       "$ref": "#/components/schemas/User"
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/AuthSession"
                     }
                   },
                   "required": [

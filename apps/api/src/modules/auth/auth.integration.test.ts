@@ -1002,6 +1002,249 @@ describe('auth integration', () => {
     }, 20_000);
   });
 
+  describe('issue #23: 2FA for bearer-only clients', () => {
+    async function enableTotpWithBearer(email: string): Promise<{
+      secret: string;
+      bearer: string;
+      verifyResponse: Awaited<ReturnType<ReturnType<typeof fastify>['inject']>>;
+      oldBearer: string;
+    }> {
+      await signUp(email);
+      await verifyByEmail(email);
+      const signIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const oldBearer = signIn.json<{ session: { token: string } }>().session.token;
+      const enroll = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/enroll',
+        headers: { authorization: `Bearer ${oldBearer}` },
+        payload: { password: PASSWORD },
+      });
+      const { secret } = enroll.json<{ secret: string }>();
+      const verifyResponse = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/verify',
+        headers: { authorization: `Bearer ${oldBearer}` },
+        payload: { code: generateTotpCode(secret) },
+      });
+      const bearer = verifyResponse.json<{ session?: { token: string } }>().session?.token ?? '';
+      return { secret, bearer, verifyResponse, oldBearer };
+    }
+
+    async function startChallenge(email: string): Promise<string> {
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ twoFactorRequired?: boolean; challengeToken?: string }>();
+      expect(body.twoFactorRequired).toBe(true);
+      if (!body.challengeToken) {
+        throw new Error('expected a challengeToken');
+      }
+      return body.challengeToken;
+    }
+
+    function wrongCode(secret: string): string {
+      return generateTotpCode(secret) === '000000' ? '111111' : '000000';
+    }
+
+    it('enabling TOTP with a bearer returns a working rotated session and revokes the old token', async () => {
+      const email = uniqueEmail('bearer-enable');
+      const { bearer, oldBearer, verifyResponse } = await enableTotpWithBearer(email);
+      expect(verifyResponse.statusCode).toBe(200);
+      const { session } = verifyResponse.json<{
+        session: { token: string; expiresAt: string };
+      }>();
+      expect(Date.parse(session.expiresAt)).toBeGreaterThan(Date.now());
+      expect(bearer).not.toBe(oldBearer);
+
+      const fresh = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${bearer}` },
+      });
+      expect(fresh.statusCode).toBe(200);
+      expect(fresh.json<{ user: { email: string } | null }>().user?.email).toBe(email);
+
+      const stale = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${oldBearer}` },
+      });
+      expect(stale.statusCode).toBe(401);
+    }, 20_000);
+
+    it('does not return a session from totp/verify when the session was not rotated', async () => {
+      const email = uniqueEmail('bearer-reverify');
+      const { secret, bearer } = await enableTotpWithBearer(email);
+      const again = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/verify',
+        headers: { authorization: `Bearer ${bearer}` },
+        payload: { code: generateTotpCode(secret) },
+      });
+      expect(again.statusCode).toBe(200);
+      expect(again.json<Record<string, unknown>>().session).toBeUndefined();
+    }, 20_000);
+
+    it('completes sign-in with a challengeToken, no Cookie and no Origin', async () => {
+      const email = uniqueEmail('bearer-signin');
+      const { secret } = await enableTotpWithBearer(email);
+      const challengeToken = await startChallenge(email);
+
+      const completion = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        payload: { code: generateTotpCode(secret), challengeToken },
+      });
+      expect(completion.statusCode).toBe(200);
+      const { session, user } = completion.json<{
+        session: { token: string };
+        user: { email: string };
+      }>();
+      expect(user.email).toBe(email);
+
+      const check = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${session.token}` },
+      });
+      expect(check.statusCode).toBe(200);
+      expect(check.json<{ user: { email: string } | null }>().user?.email).toBe(email);
+    }, 30_000);
+
+    it('accepts a backup code with a challengeToken', async () => {
+      const email = uniqueEmail('bearer-backup');
+      await signUp(email);
+      await verifyByEmail(email);
+      const signIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const first = signIn.json<{ session: { token: string } }>().session.token;
+      const enroll = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/enroll',
+        headers: { authorization: `Bearer ${first}` },
+        payload: { password: PASSWORD },
+      });
+      const { secret, backupCodes } = enroll.json<{ secret: string; backupCodes: string[] }>();
+      await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/verify',
+        headers: { authorization: `Bearer ${first}` },
+        payload: { code: generateTotpCode(secret) },
+      });
+      const challengeToken = await startChallenge(email);
+      const completion = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        payload: { backupCode: backupCodes[0], challengeToken },
+      });
+      expect(completion.statusCode).toBe(200);
+      expect(completion.json<{ session: { token: string } }>().session.token).toBeTruthy();
+    }, 30_000);
+
+    it('counts wrong codes toward the per-challenge limit of 5 attempts', async () => {
+      const email = uniqueEmail('bearer-attempts');
+      const { secret } = await enableTotpWithBearer(email);
+      const challengeToken = await startChallenge(email);
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const wrong = await fastify().inject({
+          method: 'POST',
+          url: '/v1/auth/sign-in/totp',
+          payload: { code: wrongCode(secret), challengeToken },
+        });
+        expect(wrong.statusCode).toBe(401);
+      }
+      await clearRateLimitKeys(redis);
+
+      const sixth = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        payload: { code: generateTotpCode(secret), challengeToken },
+      });
+      expect(sixth.statusCode).toBe(400);
+      expect(sixth.json<{ session?: unknown }>().session).toBeUndefined();
+    }, 30_000);
+
+    it('rejects a tampered challengeToken', async () => {
+      const email = uniqueEmail('bearer-tampered');
+      const { secret } = await enableTotpWithBearer(email);
+      const challengeToken = await startChallenge(email);
+      const tampered = `${challengeToken.slice(0, -4)}AAAA`;
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        payload: { code: generateTotpCode(secret), challengeToken: tampered },
+      });
+      expect(response.statusCode).toBe(401);
+    }, 20_000);
+
+    it('rejects a challengeToken that tries to inject extra cookies', async () => {
+      const email = uniqueEmail('bearer-inject');
+      const { secret } = await enableTotpWithBearer(email);
+      const challengeToken = await startChallenge(email);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        payload: { code: generateTotpCode(secret), challengeToken: `${challengeToken}; x=y` },
+      });
+      expect(response.statusCode).toBe(401);
+    }, 20_000);
+
+    it('rejects a request with neither a challengeToken nor a cookie', async () => {
+      const email = uniqueEmail('bearer-none');
+      const { secret } = await enableTotpWithBearer(email);
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        payload: { code: generateTotpCode(secret) },
+      });
+      expect(response.statusCode).toBe(401);
+    }, 20_000);
+
+    it('lets the body challengeToken win over a stale two-factor cookie', async () => {
+      const email = uniqueEmail('bearer-replace');
+      const { secret } = await enableTotpWithBearer(email);
+      const challengeToken = await startChallenge(email);
+      const cookieName = (await auth.$context).createAuthCookie('two_factor').name;
+
+      const completion = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        headers: { cookie: `${cookieName}=stale.value`, origin: 'http://localhost:3000' },
+        payload: { code: generateTotpCode(secret), challengeToken },
+      });
+      expect(completion.statusCode).toBe(200);
+    }, 30_000);
+
+    it('still hands the web a two-factor cookie alongside the challengeToken', async () => {
+      const email = uniqueEmail('bearer-web-cookie');
+      await enableTotpWithBearer(email);
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const cookieName = (await auth.$context).createAuthCookie('two_factor').name;
+      const cookie = response.cookies.find((c) => c.name === cookieName);
+      expect(cookie).toBeDefined();
+      expect(response.json<{ challengeToken: string }>().challengeToken).toBe(
+        encodeURIComponent(cookie?.value ?? ''),
+      );
+    }, 20_000);
+  });
+
   // Issue #127: hardened-adapter.ts used to hash a `where: { token }` value
   // only when it didn't already look like one of its own sha256 hashes, so a
   // hash round-tripped out of a userId-keyed `listSessions` read could be fed

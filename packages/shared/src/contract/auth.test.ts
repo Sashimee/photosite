@@ -8,6 +8,7 @@ import {
   TotpDisableRequestSchema,
   TotpEnrollRequestSchema,
   TotpEnrollResponseSchema,
+  TotpResponseSchema,
   TotpVerifyRequestSchema,
   UpdateLocaleRequestSchema,
   UserSchema,
@@ -146,7 +147,14 @@ describe('TotpVerifyRequestSchema', () => {
 
 describe('SignInResponseSchema', () => {
   it('accepts a two-factor-required response', () => {
-    expect(SignInResponseSchema.safeParse({ twoFactorRequired: true }).success).toBe(true);
+    expect(
+      SignInResponseSchema.safeParse({ twoFactorRequired: true, challengeToken: 'signed.value' })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects a two-factor-required response without a challengeToken', () => {
+    expect(SignInResponseSchema.safeParse({ twoFactorRequired: true }).success).toBe(false);
   });
 
   it('accepts a full signed-in response', () => {
@@ -160,7 +168,11 @@ describe('SignInResponseSchema', () => {
 
   it('rejects a mixed shape', () => {
     expect(
-      SignInResponseSchema.safeParse({ twoFactorRequired: true, user: validUser }).success,
+      SignInResponseSchema.safeParse({
+        twoFactorRequired: true,
+        challengeToken: 'signed.value',
+        user: validUser,
+      }).success,
     ).toBe(false);
   });
 });
@@ -182,6 +194,33 @@ describe('SignInTotpRequestSchema', () => {
 
   it('rejects neither', () => {
     expect(SignInTotpRequestSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('accepts an optional challengeToken', () => {
+    expect(
+      SignInTotpRequestSchema.safeParse({ code: '123456', challengeToken: 'signed.value' }).success,
+    ).toBe(true);
+  });
+
+  it('rejects an empty challengeToken', () => {
+    expect(SignInTotpRequestSchema.safeParse({ code: '123456', challengeToken: '' }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe('TotpResponseSchema', () => {
+  it('accepts a response without a session', () => {
+    expect(TotpResponseSchema.safeParse({ user: validUser }).success).toBe(true);
+  });
+
+  it('accepts a rotated session', () => {
+    expect(
+      TotpResponseSchema.safeParse({
+        user: validUser,
+        session: { token: 'tok', expiresAt: '2026-11-01T00:00:00.000Z' },
+      }).success,
+    ).toBe(true);
   });
 });
 
