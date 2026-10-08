@@ -751,6 +751,78 @@ describe('auth integration', () => {
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
       );
     }, 20_000);
+
+    describe('sign-up with anonymousId (#619)', () => {
+      function signUpWithAnonymousId(email: string, anonymousId: string) {
+        createdEmails.push(email);
+        return fastify().inject({
+          method: 'POST',
+          url: '/v1/auth/sign-up',
+          payload: { email, password: PASSWORD, roles: ['client'], locale: 'en', anonymousId },
+        });
+      }
+
+      async function recordAnonymousConsent(anonymousId: string) {
+        return prisma.consentRecord.create({
+          data: { anonymousId, purpose: 'analytics', granted: true, policyVersion: 'test' },
+        });
+      }
+
+      it('answers an existing email like a new one and leaves the existing user consents alone', async () => {
+        const email = uniqueEmail('enum-anon');
+        const first = await signUpWithAnonymousId(email, randomUUID());
+        expect(first.statusCode).toBe(201);
+        const existing = await prisma.user.findUniqueOrThrow({ where: { email } });
+        const ownConsent = await prisma.consentRecord.create({
+          data: {
+            userId: existing.id,
+            purpose: 'analytics',
+            granted: true,
+            policyVersion: 'test',
+          },
+        });
+
+        const anonymousId = randomUUID();
+        const pending = await recordAnonymousConsent(anonymousId);
+        const second = await signUpWithAnonymousId(email, anonymousId);
+        const fresh = await signUpWithAnonymousId(uniqueEmail('fresh-anon'), randomUUID());
+
+        expect(second.statusCode).toBe(201);
+        expect(Object.keys(second.json<{ user: object }>())).toEqual(
+          Object.keys(fresh.json<{ user: object }>()),
+        );
+        expect(Object.keys(second.json<{ user: object }>().user)).toEqual(
+          Object.keys(fresh.json<{ user: object }>().user),
+        );
+        const pendingAfter = await prisma.consentRecord.findUniqueOrThrow({
+          where: { id: pending.id },
+        });
+        expect(pendingAfter.userId).toBeNull();
+        expect(pendingAfter.anonymousId).toBe(anonymousId);
+        const ownAfter = await prisma.consentRecord.findUniqueOrThrow({
+          where: { id: ownConsent.id },
+        });
+        expect(ownAfter.userId).toBe(existing.id);
+        await prisma.consentRecord.deleteMany({
+          where: { id: { in: [pending.id, ownConsent.id] } },
+        });
+      }, 20_000);
+
+      it('still links the anonymous consents for a new email', async () => {
+        const email = uniqueEmail('link-anon');
+        const anonymousId = randomUUID();
+        const pending = await recordAnonymousConsent(anonymousId);
+
+        const response = await signUpWithAnonymousId(email, anonymousId);
+
+        expect(response.statusCode).toBe(201);
+        const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+        const linked = await prisma.consentRecord.findUniqueOrThrow({ where: { id: pending.id } });
+        expect(linked.userId).toBe(user.id);
+        expect(linked.anonymousId).toBeNull();
+        await prisma.consentRecord.delete({ where: { id: pending.id } });
+      }, 20_000);
+    });
   });
 
   // Backup codes must be stored through our own AES-256-GCM envelope
