@@ -1821,6 +1821,45 @@
           "unauthorized": "Your session has ended. Please sign in again."
         }
       },
+      "twoFactor": {
+        "rowTitle": "Two-factor authentication",
+        "rowOn": "On",
+        "rowOff": "Off",
+        "rowHintOff": "Ask for a code from an authenticator app when you sign in.",
+        "rowHintOn": "Your account asks for a code when you sign in.",
+        "enroll": {
+          "title": "Turn on two-factor authentication",
+          "passwordDescription": "Confirm your password to set up an authenticator app.",
+          "passwordLabel": "Password",
+          "passwordSubmit": "Continue",
+          "secretTitle": "Set up your authenticator app",
+          "secretDescription": "Add this key to your authenticator app. It won't be shown again once you continue.",
+          "secretLabel": "Setup key",
+          "copySecret": "Copy key",
+          "openAuthenticator": "Open in authenticator app",
+          "openAuthenticatorFailed": "No authenticator app could be opened. Enter the key manually.",
+          "backupCodesTitle": "Backup codes",
+          "backupCodesDescription": "Save these codes somewhere safe. Each works once if you lose your authenticator app. They won't be shown again.",
+          "copyBackupCodes": "Copy backup codes",
+          "copied": "Copied",
+          "copyFailed": "Couldn't copy. Write it down instead.",
+          "stored": "I stored these",
+          "codeTitle": "Enter the code",
+          "codeDescription": "Enter the 6-digit code your authenticator app shows to finish turning on two-factor authentication.",
+          "codeLabel": "Authenticator code",
+          "codeSubmit": "Turn on"
+        },
+        "disable": {
+          "title": "Turn off two-factor authentication",
+          "description": "Enter a code from your authenticator app and your password to turn it off.",
+          "codeLabel": "Authenticator code",
+          "passwordLabel": "Password",
+          "submit": "Turn off"
+        },
+        "errors": {
+          "invalidPassword": "That password isn't correct."
+        }
+      },
       "session": {
         "signOut": "Sign out",
         "signingOut": "Signing out…",

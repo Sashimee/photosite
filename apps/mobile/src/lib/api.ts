@@ -19,6 +19,17 @@ export function setUnauthorizedListener(listener: UnauthorizedListener | null): 
   unauthorizedListener = listener;
 }
 
+const CODES_THAT_KEEP_THE_SESSION = new Set(['INVALID_CODE']);
+
+async function isSessionRejection(response: Response): Promise<boolean> {
+  try {
+    const body = (await response.clone().json()) as { code?: unknown };
+    return typeof body.code !== 'string' || !CODES_THAT_KEEP_THE_SESSION.has(body.code);
+  } catch {
+    return true;
+  }
+}
+
 api.use({
   async onRequest({ request }) {
     const token = await getSessionToken();
@@ -27,8 +38,12 @@ api.use({
     }
     return request;
   },
-  onResponse({ request, response }) {
-    if (response.status === 401 && request.headers.has('Authorization')) {
+  async onResponse({ request, response }) {
+    if (
+      response.status === 401 &&
+      request.headers.has('Authorization') &&
+      (await isSessionRejection(response))
+    ) {
       unauthorizedListener?.();
     }
   },

@@ -292,6 +292,52 @@ describe('AuthProvider', () => {
     );
     await waitFor(() => screen.getByText('status:signed-in'));
   });
+  it('replaceSession writes the new token and expiry, keeps the user and resets the chat socket', async () => {
+    let replaceSession: AuthContextValue['replaceSession'] | undefined;
+    function Capture() {
+      const auth = useAuth();
+      replaceSession = auth.replaceSession;
+      return <Text>{`${auth.status}:${auth.user?.email ?? 'none'}`}</Text>;
+    }
+    mockedSecureStore.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(
+        key === TOKEN_KEY
+          ? 'old-token'
+          : key === EXPIRES_AT_KEY
+            ? new Date(Date.now() + 60_000).toISOString()
+            : null,
+      ),
+    );
+    mockedGet.mockResolvedValue({
+      data: { user: sessionUser },
+      error: undefined,
+      response: new Response(null, { status: 200 }),
+    });
+    render(
+      <AuthProvider>
+        <Capture />
+      </AuthProvider>,
+    );
+    await waitFor(() => screen.getByText('signed-in:client@example.com'));
+
+    await act(async () => {
+      await replaceSession?.({ token: 'new-token', expiresAt: '2030-01-01T00:00:00.000Z' });
+    });
+
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+      TOKEN_KEY,
+      'new-token',
+      expect.anything(),
+    );
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+      EXPIRES_AT_KEY,
+      '2030-01-01T00:00:00.000Z',
+      expect.anything(),
+    );
+    expect(resetChatSocket).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('signed-in:client@example.com')).toBeTruthy();
+  });
+
   it('updateUser replaces the session user without touching the status', async () => {
     let updateUser: AuthContextValue['updateUser'] | undefined;
     function Capture() {

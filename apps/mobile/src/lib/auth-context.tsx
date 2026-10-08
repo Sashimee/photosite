@@ -32,6 +32,7 @@ export interface AuthContextValue {
   signIn: (user: SessionUser, session: StoredSession) => Promise<void>;
   signOut: (options?: { remote?: boolean }) => Promise<void>;
   updateUser: (user: SessionUser) => void;
+  replaceSession: (session: StoredSession) => Promise<void>;
   // Re-checks GET /v1/auth/session against whatever token is already stored,
   // for the "check your email" continue button: no-op when there is none.
   checkSession: () => Promise<boolean>;
@@ -71,6 +72,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const updateUser = useCallback((nextUser: SessionUser) => {
     setUser(nextUser);
+  }, []);
+
+  const replaceSession = useCallback(async (session: StoredSession) => {
+    await setStoredSession(session);
+    resetChatSocket();
   }, []);
 
   const signIn = useCallback(async (nextUser: SessionUser, session: StoredSession) => {
@@ -169,7 +175,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ status, user, signIn, signOut, updateUser, checkSession }}>
+    <AuthContext.Provider
+      value={{ status, user, signIn, signOut, updateUser, replaceSession, checkSession }}
+    >
       {children}
     </AuthContext.Provider>
   );

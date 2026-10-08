@@ -32,10 +32,10 @@ import '../../src/lib/i18n';
 import { api } from '../../src/lib/api';
 import { unregisterPushDevice } from '../../src/lib/push';
 
-function signedIn(roles: string[]) {
+function signedIn(roles: string[], twoFactorEnabled = false) {
   return {
     status: 'signed-in',
-    user: { email: 'a@example.com', roles },
+    user: { email: 'a@example.com', roles, twoFactorEnabled },
     signOut: mockSignOut,
     updateUser: mockUpdateUser,
   };
@@ -221,5 +221,38 @@ describe('account tab sign out', () => {
 
     expect(await screen.findByTestId('account-sign-out-error')).toBeTruthy();
     expect(mockSignOut).not.toHaveBeenCalled();
+  });
+});
+
+describe('account tab two-factor row', () => {
+  it('offers to turn two-factor on and opens the enrol screen', async () => {
+    renderRouter('./app', { initialUrl: '/account' });
+
+    expect((await screen.findByTestId('account-two-factor-state')).props.children).toBe('Off');
+    fireEvent.press(screen.getByTestId('account-two-factor'));
+
+    await waitFor(() => {
+      expect(store.getRouteInfo().pathname).toBe('/account-security/enroll');
+    });
+  });
+
+  it('shows two-factor as on and opens the disable screen', async () => {
+    mockAuth.current = signedIn(['client'], true);
+    renderRouter('./app', { initialUrl: '/account' });
+
+    expect((await screen.findByTestId('account-two-factor-state')).props.children).toBe('On');
+    fireEvent.press(screen.getByTestId('account-two-factor'));
+
+    await waitFor(() => {
+      expect(store.getRouteInfo().pathname).toBe('/account-security/disable');
+    });
+  });
+
+  it('hides the row when signed out', async () => {
+    mockAuth.current = { status: 'signed-out', user: null };
+    renderRouter('./app', { initialUrl: '/account' });
+
+    await screen.findByTestId('account-sign-in');
+    expect(screen.queryByTestId('account-two-factor')).toBeNull();
   });
 });
