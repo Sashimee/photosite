@@ -8,6 +8,8 @@ import {
   type PropsWithChildren,
 } from 'react';
 
+import * as Sentry from '@sentry/react-native';
+
 import type { components } from '@photoo/api-client';
 
 import { api, setUnauthorizedListener } from './api';
@@ -100,7 +102,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let cancelled = false;
 
     async function restore() {
-      const stored = await getStoredSession();
+      let stored: StoredSession | null;
+      try {
+        stored = await getStoredSession();
+      } catch (error) {
+        Sentry.captureException(error);
+        try {
+          await clearStoredSession();
+        } catch (clearError) {
+          Sentry.captureException(clearError);
+        }
+        if (!cancelled) {
+          setStatus('signed-out');
+        }
+        return;
+      }
+
       if (!stored || isExpired(stored.expiresAt)) {
         if (stored) {
           await clearStoredSession();
@@ -111,7 +128,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return;
       }
 
-      const { data, response } = await api.GET('/v1/auth/session');
+      let result;
+      try {
+        result = await api.GET('/v1/auth/session');
+      } catch (error) {
+        Sentry.captureException(error);
+        if (!cancelled) {
+          setStatus('signed-out');
+        }
+        return;
+      }
+      const { data, response } = result;
       if (cancelled) {
         return;
       }

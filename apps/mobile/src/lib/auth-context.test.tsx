@@ -172,6 +172,68 @@ describe('AuthProvider', () => {
     expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
   });
 
+  it('resolves to signed-out and clears the stored session when reading it throws', async () => {
+    const failure = new Error('keystore unavailable');
+    mockedSecureStore.getItemAsync.mockRejectedValue(failure);
+    mockedSecureStore.deleteItemAsync.mockResolvedValue(undefined);
+
+    renderProbe();
+
+    await waitFor(() => screen.getByText('status:signed-out'));
+    expect(mockedGet).not.toHaveBeenCalled();
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(TOKEN_KEY, expect.anything());
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(EXPIRES_AT_KEY, expect.anything());
+    expect(Sentry.captureException).toHaveBeenCalledWith(failure);
+  });
+
+  it('still resolves to signed-out when clearing after a failed read also throws', async () => {
+    mockedSecureStore.getItemAsync.mockRejectedValue(new Error('keystore unavailable'));
+    const clearFailure = new Error('delete failed');
+    mockedSecureStore.deleteItemAsync.mockRejectedValue(clearFailure);
+
+    renderProbe();
+
+    await waitFor(() => screen.getByText('status:signed-out'));
+    expect(Sentry.captureException).toHaveBeenCalledWith(clearFailure);
+  });
+
+  it('resolves to signed-out and keeps the token when the session request throws', async () => {
+    mockedSecureStore.getItemAsync.mockImplementation((key: string) => {
+      if (key === TOKEN_KEY) return Promise.resolve('token-abc');
+      if (key === EXPIRES_AT_KEY)
+        return Promise.resolve(new Date(Date.now() + 60_000).toISOString());
+      return Promise.resolve(null);
+    });
+    const failure = new TypeError('Network request failed');
+    mockedGet.mockRejectedValue(failure);
+
+    renderProbe();
+
+    await waitFor(() => screen.getByText('status:signed-out'));
+    expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+    expect(Sentry.captureException).toHaveBeenCalledWith(failure);
+  });
+
+  it('does not update state after unmount when the restore throws', async () => {
+    let rejectRead: (reason: Error) => void = () => undefined;
+    mockedSecureStore.getItemAsync.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectRead = reject;
+      }),
+    );
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const view = renderProbe();
+    view.unmount();
+    await act(async () => {
+      rejectRead(new Error('late failure'));
+      await Promise.resolve();
+    });
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
   it('checkSession reports false for an anonymous 200 response', async () => {
     mockedGet.mockResolvedValue({
       data: { user: null },
