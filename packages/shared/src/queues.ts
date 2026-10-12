@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { IdSchema, IsoDateTimeSchema } from './contract/common.js';
+import { BOOKING_DOCUMENTS, type BookingDocument } from './enums.js';
 
 export const QUEUE_NAMES = [
   'email',
@@ -118,11 +119,25 @@ export const BookingReleaseJobSchema = z.object({}).strict();
 
 export type BookingReleaseJob = z.infer<typeof BookingReleaseJobSchema>;
 
-// Carries only the bookingId; the worker loads the booking, its quote and
-// its ledger entries at render time, so no financial data sits in Redis.
-export const ReceiptPdfJobSchema = z.object({ bookingId: IdSchema }).strict();
+// Carries only the bookingId and which document to render; the worker loads
+// the booking, its quote and its ledger entries at render time, so no
+// financial data sits in Redis. One job per document so a failed fee invoice
+// never re-renders an already stored receipt.
+export const ReceiptPdfJobSchema = z
+  .object({ bookingId: IdSchema, document: z.enum(BOOKING_DOCUMENTS) })
+  .strict();
 
 export type ReceiptPdfJob = z.infer<typeof ReceiptPdfJobSchema>;
+
+export function receiptPdfJobId(bookingId: string, document: BookingDocument): string {
+  return `${document}-${bookingId}`;
+}
+
+// Deterministic so the worker and the download endpoint agree on the object
+// without a column on Booking; the object is written once and never replaced.
+export function bookingDocumentKey(bookingId: string, document: BookingDocument): string {
+  return `bookings/${bookingId}/${document}.pdf`;
+}
 
 // Carries only the dataRequestId; `jobId = dataRequestId` and `status` on
 // the row is the source of truth (pending/processing/ready/failed/

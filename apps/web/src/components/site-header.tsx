@@ -63,6 +63,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
             currentLocale={locale}
             label={tSwitcher('label')}
             localeNames={localeNames}
+            signedIn={user !== null}
           />
           {user ? (
             <AccountMenu locale={locale} user={user} />
@@ -84,6 +85,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           menuTitle={t('menuTitle')}
           switcherLabel={tSwitcher('label')}
           localeNames={localeNames}
+          signedIn={user !== null}
         />
       </div>
     </header>

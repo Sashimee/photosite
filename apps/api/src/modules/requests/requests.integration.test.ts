@@ -250,6 +250,16 @@ describe('requests integration', () => {
       await prisma.conversation.deleteMany({
         where: { type: 'quote', participants: { some: { userId: { in: createdUserIds } } } },
       });
+      await prisma.booking.deleteMany({
+        where: {
+          quote: {
+            OR: [
+              { clientId: { in: createdUserIds } },
+              { photographerId: { in: createdProfileIds } },
+            ],
+          },
+        },
+      });
       await prisma.quote.deleteMany({
         where: {
           OR: [{ clientId: { in: createdUserIds } }, { photographerId: { in: createdProfileIds } }],

@@ -1,9 +1,12 @@
 import {
   ADMIN_PERMISSIONS,
+  BOOKING_STATUSES,
   DATA_REQUEST_CHANNELS,
   DATA_REQUEST_STATUSES,
   DATA_REQUEST_TYPES,
+  DISPUTE_STATUSES,
   FEATURE_FLAG_KEYS,
+  LEDGER_ENTRY_TYPES,
   NOTIFICATION_TYPES,
   PORTFOLIO_IMAGE_STATUSES,
   REPORT_STATUSES,
@@ -87,6 +90,69 @@ export const AdminMeSchema = z
   })
   .strict()
   .openapi('AdminMe');
+
+export const ADMIN_DASHBOARD_WINDOWS = ['7d', '30d', '90d'] as const;
+
+export const AdminDashboardQuerySchema = z
+  .object({ window: z.enum(ADMIN_DASHBOARD_WINDOWS).default('30d') })
+  .strict();
+
+const DashboardCountSchema = z.number().int().nonnegative();
+
+const DashboardWindowedCountSchema = z
+  .object({ current: DashboardCountSchema, previous: DashboardCountSchema })
+  .strict();
+
+const DashboardWindowedMoneySchema = z
+  .object({
+    currency: CurrencyCodeSchema,
+    current: DashboardCountSchema,
+    previous: DashboardCountSchema,
+  })
+  .strict();
+
+export const AdminDashboardSchema = z
+  .object({
+    window: z.enum(ADMIN_DASHBOARD_WINDOWS),
+    generatedAt: IsoDateTimeSchema,
+    signups: z
+      .object({
+        total: DashboardWindowedCountSchema,
+        client: DashboardWindowedCountSchema,
+        photographer: DashboardWindowedCountSchema,
+        professional: DashboardWindowedCountSchema,
+      })
+      .strict(),
+    activity: z
+      .object({
+        requests: DashboardWindowedCountSchema,
+        quotes: DashboardWindowedCountSchema,
+        bookings: DashboardWindowedCountSchema,
+      })
+      .strict(),
+    money: z
+      .object({
+        gmv: z.array(DashboardWindowedMoneySchema),
+        refunds: z.array(DashboardWindowedMoneySchema),
+        feeRevenue: z.array(DashboardWindowedMoneySchema),
+      })
+      .strict()
+      .nullable()
+      .openapi({
+        description:
+          'Per-currency integer cents, as positive magnitudes. Null unless the caller holds finance or superadmin.',
+      }),
+    backlogs: z
+      .object({
+        verification: DashboardCountSchema,
+        provenance: DashboardCountSchema,
+        reports: DashboardCountSchema,
+        dataRequests: DashboardCountSchema,
+      })
+      .strict(),
+  })
+  .strict()
+  .openapi('AdminDashboard');
 
 export const AdminUserSearchQuerySchema = z
   .object({
@@ -259,26 +325,252 @@ export const DirectTakedownRequestSchema = z
 // moderator-initiated entry apart from a public one without a schema change.
 export const MODERATOR_INITIATED_REPORT_REASON = 'Found by a moderator; no report was filed.';
 
+export const ADMIN_BOOKING_DISPUTE_FILTERS = ['any', 'open', 'none'] as const;
+
+export const ADMIN_BOOKINGS_MAX_CREATED_SPAN_DAYS = 366;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const BookingStatusSchema = z.enum(BOOKING_STATUSES);
+
+// `status` repeats in the query string (`?status=a&status=b`), which arrives
+// as a string for one value and an array for several.
+const BookingStatusFilterSchema = z
+  .union([BookingStatusSchema, z.array(BookingStatusSchema).min(1).max(BOOKING_STATUSES.length)])
+  .transform((value) => [...new Set(Array.isArray(value) ? value : [value])].sort());
+
+// Created dates are UTC calendar days and the range is half-open
+// `[createdFrom, createdTo)`; both bounds come together so every filtered
+// query has a bounded span.
+const AdminBookingsFilterShape = {
+  status: BookingStatusFilterSchema.optional(),
+  createdFrom: z.iso.date().optional(),
+  createdTo: z.iso.date().optional(),
+  dispute: z.enum(ADMIN_BOOKING_DISPUTE_FILTERS).optional(),
+};
+
+function refineCreatedRange(
+  query: { createdFrom?: string | undefined; createdTo?: string | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  const { createdFrom, createdTo } = query;
+  if (createdFrom === undefined && createdTo === undefined) {
+    return;
+  }
+  if (createdFrom === undefined || createdTo === undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      path: [createdFrom === undefined ? 'createdFrom' : 'createdTo'],
+      message: 'createdFrom and createdTo must be given together',
+    });
+    return;
+  }
+  const spanMs = Date.parse(createdTo) - Date.parse(createdFrom);
+  if (spanMs <= 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['createdTo'],
+      message: 'createdTo must be after createdFrom',
+    });
+  } else if (spanMs > ADMIN_BOOKINGS_MAX_CREATED_SPAN_DAYS * DAY_MS) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['createdTo'],
+      message: `the created range must span at most ${String(ADMIN_BOOKINGS_MAX_CREATED_SPAN_DAYS)} days`,
+    });
+  }
+}
+
+export const AdminBookingsQuerySchema = CursorPaginationQuerySchema.extend(AdminBookingsFilterShape)
+  .strict()
+  .superRefine(refineCreatedRange);
+
+// The list's filters without paging: the export streams every matching row
+// up to `ADMIN_BOOKINGS_EXPORT_ROW_CAP`.
+export const AdminBookingsExportQuerySchema = z
+  .object(AdminBookingsFilterShape)
+  .strict()
+  .superRefine(refineCreatedRange);
+
+export const ADMIN_BOOKINGS_EXPORT_ROW_CAP = 50_000;
+
+// Ends a capped export so a cut file is never mistaken for a complete one.
+export const ADMIN_BOOKINGS_EXPORT_TRUNCATED_LINE = '#truncated';
+
+export const ADMIN_BOOKINGS_EXPORT_COLUMNS = [
+  'id',
+  'status',
+  'currency',
+  'total',
+  'refunded',
+  'reversed',
+  'disputeStatus',
+  'createdAt',
+  'releasedAt',
+  'deliveredAt',
+  'cancelledAt',
+  'paymentIntentId',
+  'chargeId',
+  'transferId',
+] as const;
+
+// `refundedCents` and `reversedCents` are ledger sums (always >= 0), in the
+// booking's currency; `disputeStatus` is the latest Dispute's status, null
+// when the booking was never disputed. `refundableCents` and
+// `reversibleCents` are what the refund and reverse-transfer endpoints would
+// accept right now, computed by the API so the admin app does no money maths;
+// they are hints, and the endpoints stay authoritative.
 export const AdminBookingSchema = BookingBaseSchema.extend({
   paymentIntentId: z.string().nullable(),
   chargeId: z.string().nullable(),
   transferId: z.string().nullable(),
+  refundedCents: z.int().nonnegative(),
+  reversedCents: z.int().nonnegative(),
+  refundableCents: z.int().nonnegative(),
+  reversibleCents: z.int().nonnegative(),
+  disputeStatus: z.enum(DISPUTE_STATUSES).nullable(),
 })
   .strict()
   .openapi('AdminBooking');
 
+export const ADMIN_BOOKING_LEDGER_LIMIT = 200;
+
+// Signed as stored: charge and reversal positive, platform_fee, transfer and
+// refund negative.
+export const AdminLedgerEntrySchema = z
+  .object({
+    id: IdSchema,
+    type: z.enum(LEDGER_ENTRY_TYPES),
+    amountCents: z.int(),
+    currency: CurrencyCodeSchema,
+    stripeObjectId: z.string().min(1),
+    occurredAt: IsoDateTimeSchema,
+  })
+  .strict()
+  .openapi('AdminLedgerEntry');
+
+export const AdminDisputeSchema = z
+  .object({
+    id: IdSchema,
+    status: z.enum(DISPUTE_STATUSES),
+    reason: z.string(),
+    resolution: z.string().nullable(),
+    amountRefundedCents: z.int().nonnegative().nullable(),
+    openedById: IdSchema,
+    adminId: IdSchema.nullable(),
+    openedAt: IsoDateTimeSchema,
+    updatedAt: IsoDateTimeSchema,
+  })
+  .strict()
+  .openapi('AdminDispute');
+
+// The photographer's Connect account as last mirrored from `account.updated`
+// (docs/PAYMENTS.md), not a live Stripe read, plus this booking's own
+// `payout` ledger rows.
+export const AdminBookingPayoutSchema = z
+  .object({
+    stripeAccountId: z.string().min(1),
+    onboardingComplete: z.boolean(),
+    payoutsEnabled: z.boolean(),
+    entries: z.array(AdminLedgerEntrySchema),
+  })
+  .strict()
+  .openapi('AdminBookingPayout');
+
+// `ledger` is oldest first and holds at most `ADMIN_BOOKING_LEDGER_LIMIT`
+// rows; `ledgerTruncated` says more exist. `payout` is null when the
+// photographer has no Connect account on record.
+export const AdminBookingDetailSchema = AdminBookingSchema.extend({
+  ledger: z.array(AdminLedgerEntrySchema).max(ADMIN_BOOKING_LEDGER_LIMIT),
+  ledgerTruncated: z.boolean(),
+  disputes: z.array(AdminDisputeSchema),
+  payout: AdminBookingPayoutSchema.nullable(),
+})
+  .strict()
+  .openapi('AdminBookingDetail');
+
+// `expected*Cents` is the ledger sum the admin saw when opening the page; when
+// it no longer matches, the API answers 409 `LEDGER_CHANGED` before calling
+// Stripe.
 export const RefundBookingRequestSchema = z
   .object({
     amountCents: z.int().positive(),
     reason: z.string().min(1).max(2000),
+    expectedRefundedCents: z.int().nonnegative().optional(),
   })
   .strict();
 
 export const ReverseBookingTransferRequestSchema = z
   .object({
     reason: z.string().min(1).max(2000),
+    expectedReversedCents: z.int().nonnegative().optional(),
   })
   .strict();
+
+// The 409 codes the admin refund and reverse-transfer endpoints answer with,
+// each a distinct case the admin app handles differently.
+export const BOOKING_BUSY_ERROR_CODE = 'BOOKING_BUSY';
+export const BOOKING_STATE_ERROR_CODE = 'BOOKING_STATE';
+export const PENDING_REVERSAL_MISMATCH_ERROR_CODE = 'PENDING_REVERSAL_MISMATCH';
+export const LEDGER_CHANGED_ERROR_CODE = 'LEDGER_CHANGED';
+
+export const BookingStateErrorDetailsSchema = z
+  .object({ status: BookingStatusSchema })
+  .strict()
+  .openapi('BookingStateErrorDetails');
+
+// `pendingCents` is the amount an earlier attempt already reversed from the
+// transfer; retrying the refund with exactly that amount completes it.
+export const PendingReversalMismatchErrorDetailsSchema = z
+  .object({ pendingCents: z.int().positive() })
+  .strict()
+  .openapi('PendingReversalMismatchErrorDetails');
+
+function conflictErrorSchema<TCode extends string, TDetails extends z.ZodType | undefined>(
+  code: TCode,
+  details: TDetails,
+) {
+  return z
+    .object({
+      code: z.literal(code),
+      message: z.string(),
+      ...(details === undefined ? {} : { details }),
+      requestId: IdSchema,
+    })
+    .strict();
+}
+
+const LedgerChangedErrorSchema = conflictErrorSchema(LEDGER_CHANGED_ERROR_CODE, undefined).openapi(
+  'LedgerChangedError',
+);
+const BookingBusyErrorSchema = conflictErrorSchema(BOOKING_BUSY_ERROR_CODE, undefined).openapi(
+  'BookingBusyError',
+);
+const BookingStateErrorSchema = conflictErrorSchema(
+  BOOKING_STATE_ERROR_CODE,
+  BookingStateErrorDetailsSchema,
+).openapi('BookingStateError');
+const PendingReversalMismatchErrorSchema = conflictErrorSchema(
+  PENDING_REVERSAL_MISMATCH_ERROR_CODE,
+  PendingReversalMismatchErrorDetailsSchema,
+).openapi('PendingReversalMismatchError');
+
+export const AdminRefundConflictErrorSchema = z
+  .discriminatedUnion('code', [
+    LedgerChangedErrorSchema,
+    BookingBusyErrorSchema,
+    BookingStateErrorSchema,
+    PendingReversalMismatchErrorSchema,
+  ])
+  .openapi('AdminRefundConflictError');
+
+export const AdminReverseTransferConflictErrorSchema = z
+  .discriminatedUnion('code', [
+    LedgerChangedErrorSchema,
+    BookingBusyErrorSchema,
+    BookingStateErrorSchema,
+  ])
+  .openapi('AdminReverseTransferConflictError');
 
 // A free-text key/value editor on a table the API reads by key invites a
 // flag nothing reads, or a typo turning a live one off, so the known flags
@@ -303,7 +595,7 @@ export const FeatureFlagStateSchema = z
 // so a fee change here is never retroactive.
 export const PlatformSettingsSchema = z
   .object({
-    feePercent: z.number().min(0).max(100).nullable(),
+    feePercent: z.number().min(0).max(100).multipleOf(0.01).nullable(),
     autoReleaseDays: z.int().min(1).max(60),
     featureFlags: z.array(FeatureFlagStateSchema),
   })
@@ -322,7 +614,7 @@ export const UpdateFeatureFlagsRequestSchema = z
 
 export const UpdatePlatformSettingsRequestSchema = z
   .object({
-    feePercent: z.number().min(0).max(100).optional(),
+    feePercent: z.number().min(0).max(100).multipleOf(0.01).optional(),
     autoReleaseDays: z.int().min(1).max(60).optional(),
     featureFlags: UpdateFeatureFlagsRequestSchema.optional(),
   })
@@ -426,6 +718,23 @@ registry.registerPath({
       content: { 'application/json': { schema: AdminMeSchema } },
     },
     ...errorResponses([401, 403]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/dashboard'),
+  summary: 'Platform KPIs for a trailing window, with the previous window for comparison',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  ...adminOperation(),
+  request: { query: AdminDashboardQuerySchema },
+  responses: {
+    '200': {
+      description: 'Aggregate counts and backlogs; money is null without finance',
+      content: { 'application/json': { schema: AdminDashboardSchema } },
+    },
+    ...errorResponses([400, 401, 403]),
   },
 });
 
@@ -860,16 +1169,52 @@ registry.registerPath({
   summary: 'List bookings',
   tags: ['admin'],
   security: ADMIN_SECURITY,
+  description:
+    'Newest first. `status` repeats to match any of several statuses; `createdFrom`/`createdTo` are UTC dates, half-open `[from, to)`, given together, at most 366 days apart; `dispute` is `any` (ever disputed), `open` (an open dispute) or `none`. A cursor only continues the filter set it was issued for; reusing it with other filters is a 400.',
   ...adminOperation('finance'),
   request: {
-    query: CursorPaginationQuerySchema,
+    query: AdminBookingsQuerySchema,
   },
   responses: {
     '200': {
       description: 'A page of bookings',
       content: { 'application/json': { schema: paginatedResponseSchema(AdminBookingSchema) } },
     },
-    ...errorResponses([401, 403]),
+    ...errorResponses([400, 401, 403]),
+  },
+});
+
+registry.registerPath({
+  method: 'get',
+  path: apiPath('/admin/bookings/export.csv'),
+  summary: 'Export bookings as CSV',
+  tags: ['admin'],
+  security: ADMIN_SECURITY,
+  description:
+    'Takes the list filters (`status`, `createdFrom`/`createdTo`, `dispute`, same rules as the list) without cursor or limit and streams every matching booking, newest first, as an RFC 4180 CSV attachment (`photoo-bookings-<from>-<to>.csv`; `<from>` is `all` and `<to>` the export day without a created range). Columns: ' +
+    ADMIN_BOOKINGS_EXPORT_COLUMNS.map((column) => `\`${column}\``).join(', ') +
+    ". Ids only, no names or emails. Money columns are decimal major units of the booking currency (`12.34`), times are ISO 8601 UTC, empty cells are absent values. Every cell is quoted, and one starting with `=`, `+`, `-`, `@`, a tab or a carriage return is prefixed with `'`. At most " +
+    String(ADMIN_BOOKINGS_EXPORT_ROW_CAP) +
+    ' rows; a capped export ends with a final `' +
+    ADMIN_BOOKINGS_EXPORT_TRUNCATED_LINE +
+    '` line. Call it with `fetch` from the admin origin: a browser navigation (`Sec-Fetch-Mode: navigate`) or a request whose `Sec-Fetch-Site` is present and not `same-origin`/`same-site` is refused with 403 `FORBIDDEN` before anything is audited or counted; requests without Sec-Fetch headers still need the permission and second factor. Needs a fresh second factor (403 `TWO_FACTOR_REQUIRED`), is audit-logged as `admin.bookings_exported`, and has its own per-admin export rate limit, separate from the refund and reverse-transfer money limit (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).',
+  ...adminOperation('finance', { requires2fa: true }),
+  request: {
+    query: AdminBookingsExportQuerySchema,
+  },
+  responses: {
+    '200': {
+      description: 'The CSV file, streamed',
+      headers: {
+        'Content-Disposition': {
+          description: 'attachment; filename="photoo-bookings-<from>-<to>.csv"',
+          schema: { type: 'string' },
+        },
+        'Cache-Control': { description: 'no-store', schema: { type: 'string' } },
+      },
+      content: { 'text/csv': { schema: z.string() } },
+    },
+    ...errorResponses([400, 401, 403, 429]),
   },
 });
 
@@ -886,7 +1231,7 @@ registry.registerPath({
   responses: {
     '200': {
       description: 'The booking',
-      content: { 'application/json': { schema: AdminBookingSchema } },
+      content: { 'application/json': { schema: AdminBookingDetailSchema } },
     },
     ...errorResponses([401, 403, 404]),
   },
@@ -895,7 +1240,9 @@ registry.registerPath({
 registry.registerPath({
   method: 'post',
   path: apiPath('/admin/bookings/{id}/refund'),
-  summary: 'Refund a booking',
+  summary: 'Refund a booking after release',
+  description:
+    'Released bookings only, otherwise 409 `BOOKING_STATE` with `details.status`. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. When `expectedRefundedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. 409 `PENDING_REVERSAL_MISMATCH` when an earlier attempt reversed the transfer and failed to refund: `details.pendingCents` is the amount to retry with. Subject to the admin mutation rate limit and the admin money rate limit shared with reverse-transfer (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('finance', { requires2fa: true }),
@@ -906,9 +1253,13 @@ registry.registerPath({
   responses: {
     '200': {
       description: 'Booking refunded',
-      content: { 'application/json': { schema: AdminBookingSchema } },
+      content: { 'application/json': { schema: AdminBookingDetailSchema } },
     },
-    ...errorResponses([400, 401, 403, 404, 409, 422]),
+    ...errorResponses([400, 401, 403, 404, 422, 429]),
+    '409': {
+      description: 'Conflict, told apart by `code`',
+      content: { 'application/json': { schema: AdminRefundConflictErrorSchema } },
+    },
   },
 });
 
@@ -916,6 +1267,8 @@ registry.registerPath({
   method: 'post',
   path: apiPath('/admin/bookings/{id}/reverse-transfer'),
   summary: 'Reverse the payout transfer for a booking',
+  description:
+    'After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409 `BOOKING_STATE` with `details.status`. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. When `expectedReversedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. The booking keeps its status. Subject to the admin mutation rate limit and the admin money rate limit shared with refund (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).',
   tags: ['admin'],
   security: ADMIN_SECURITY,
   ...adminOperation('finance', { requires2fa: true }),
@@ -926,9 +1279,13 @@ registry.registerPath({
   responses: {
     '200': {
       description: 'Transfer reversed',
-      content: { 'application/json': { schema: AdminBookingSchema } },
+      content: { 'application/json': { schema: AdminBookingDetailSchema } },
     },
-    ...errorResponses([400, 401, 403, 404, 409, 422]),
+    ...errorResponses([400, 401, 403, 404, 422, 429]),
+    '409': {
+      description: 'Conflict, told apart by `code`',
+      content: { 'application/json': { schema: AdminReverseTransferConflictErrorSchema } },
+    },
   },
 });
 

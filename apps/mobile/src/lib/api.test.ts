@@ -31,6 +31,15 @@ describe('api client', () => {
     expect(get()?.headers.get('Authorization')).toBe('Bearer token-123');
   });
 
+  it('sends requests with credentials omitted so the native cookie jar never attaches the session cookie', async () => {
+    mockedGetSessionToken.mockResolvedValue('token-123');
+    const { fetchStub, get } = captureRequest();
+
+    await api.POST('/v1/auth/sign-out', { fetch: fetchStub });
+
+    expect(get()?.credentials).toBe('omit');
+  });
+
   it('omits the Authorization header when there is no session', async () => {
     mockedGetSessionToken.mockResolvedValue(null);
     const { fetchStub, get } = captureRequest();
@@ -57,6 +66,21 @@ describe('api client', () => {
     const listener = jest.fn();
     setUnauthorizedListener(listener);
     const fetchStub = () => Promise.resolve(new Response(JSON.stringify({}), { status: 401 }));
+
+    await api.GET('/v1/photographers', { fetch: fetchStub });
+
+    expect(listener).not.toHaveBeenCalled();
+    setUnauthorizedListener(null);
+  });
+
+  it('keeps the session when a 401 only reports a wrong one-time code', async () => {
+    mockedGetSessionToken.mockResolvedValue('token-123');
+    const listener = jest.fn();
+    setUnauthorizedListener(listener);
+    const fetchStub = () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ code: 'INVALID_CODE', message: 'nope' }), { status: 401 }),
+      );
 
     await api.GET('/v1/photographers', { fetch: fetchStub });
 

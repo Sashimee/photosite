@@ -48,6 +48,12 @@ function fakeDeps(
           dataRequest: { findMany: dataRequestFindMany, updateMany: dataRequestUpdateMany },
           user: { findMany: userFindMany },
           message: { findMany: messageFindMany },
+          provenanceCheck: {
+            findMany: vi.fn(() => Promise.resolve([])),
+            deleteMany: vi.fn(),
+            updateMany: vi.fn(),
+          },
+          report: { findMany: vi.fn(() => Promise.resolve([])) },
         },
       } as never,
       storage: {

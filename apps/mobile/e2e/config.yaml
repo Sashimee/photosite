@@ -1,0 +1,12 @@
+flows:
+  - flows/*
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - Launch and answer the consent prompt
+    - Sign up and verify the email with the emailed token
+    - Sign in with a verified account
+    - Sign out from the account tab
+    - Request a photographer, receive a quote and accept it
+    - Send a chat message and receive the photographer's reply live
+    - Refuse sign-in for an unverified account

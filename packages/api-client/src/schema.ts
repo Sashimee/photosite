@@ -124,6 +124,7 @@ export interface paths {
                          * @enum {string}
                          */
                         locale: "en" | "fr" | "de" | "pt" | "es";
+                        /** Format: uuid */
                         anonymousId?: string;
                     };
                 };
@@ -227,6 +228,7 @@ export interface paths {
                         } | {
                             /** @enum {boolean} */
                             twoFactorRequired: true;
+                            challengeToken: string;
                         };
                     };
                 };
@@ -306,6 +308,7 @@ export interface paths {
                         /** @example 123456 */
                         code?: string;
                         backupCode?: string;
+                        challengeToken?: string;
                     };
                 };
             };
@@ -495,6 +498,73 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/v1/me/locale": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change the current user's locale */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description BCP 47 locale
+                         * @example en
+                         * @enum {string}
+                         */
+                        locale: "en" | "fr" | "de" | "pt" | "es";
+                    };
+                };
+            };
+            responses: {
+                /** @description The updated session user */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            user: components["schemas"]["User"];
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/v1/auth/verify-email": {
@@ -1020,6 +1090,7 @@ export interface paths {
                     content: {
                         "application/json": {
                             user: components["schemas"]["User"];
+                            session?: components["schemas"]["AuthSession"];
                         };
                     };
                 };
@@ -1103,6 +1174,7 @@ export interface paths {
                     content: {
                         "application/json": {
                             user: components["schemas"]["User"];
+                            session?: components["schemas"]["AuthSession"];
                         };
                     };
                 };
@@ -4760,7 +4832,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Quote"];
+                        "application/json": components["schemas"]["AcceptedQuote"];
                     };
                 };
                 /** @description Unauthorized */
@@ -5445,6 +5517,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/bookings/{id}/documents/{document}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a 10-minute presigned download URL for a released booking document. The client gets the receipt, the photographer the platform-fee invoice; 403 for the other party, 404 for anyone else, 409 while the booking is not released or the PDF is not generated yet. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description UUID identifier */
+                    id: string;
+                    document: "receipt" | "fee-invoice";
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Presigned download URL issued */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BookingDocumentDownload"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/bookings/{id}/refund": {
         parameters: {
             query?: never;
@@ -5456,7 +5604,7 @@ export interface paths {
         put?: never;
         /**
          * Request a refund for a booking before release
-         * @description Self-service, before release only. After release a refund requires a transfer reversal and is admin-only (POST /v1/admin/bookings/{id}/refund).
+         * @description Client only, before release (paid_held, in_progress or delivered), otherwise 409. 409 `BOOKING_BUSY` while another refund or the release holds the booking; retry shortly. `amountCents` omitted refunds whatever is left; a cumulative refund above the charged total is 422. A full refund moves the booking to `refunded`, a partial one keeps its state. After release a refund requires a transfer reversal and is admin-only (POST /v1/admin/bookings/{id}/refund).
          */
         post: {
             parameters: {
@@ -5474,7 +5622,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Refund requested */
+                /** @description Refund created */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5537,6 +5685,99 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
+                /** @description Too many requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/stripe/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create the caller's Stripe Connect Express account
+         * @description Photographer only. Idempotent: the first call creates the Express account and returns 201; later calls return the existing account with 200.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Connected account already existed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StripeAccountResponse"];
+                    };
+                };
+                /** @description Connected account created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StripeAccountResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -5556,7 +5797,7 @@ export interface paths {
         put?: never;
         /**
          * Create a Stripe Connect Express onboarding link for the caller's account
-         * @description Requires a connected account to already exist (POST /v1/me/stripe/account, 1A.8b). Returns a short-lived, Stripe-hosted onboarding URL.
+         * @description Photographer only. Requires a connected account to already exist (POST /v1/me/stripe/account), otherwise 409. Returns a short-lived, Stripe-hosted onboarding URL.
          */
         post: {
             parameters: {
@@ -5603,8 +5844,17 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                /** @description Unprocessable entity */
-                422: {
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -5614,6 +5864,72 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/earnings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's released and held earnings per currency
+         * @description Photographer only. `totals` has one row per currency, never converted. `recent` lists at most 20 bookings with a transfer or reversal, newest first. A photographer with no bookings gets empty arrays.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Earnings summary */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EarningsResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -7659,6 +7975,7 @@ export interface paths {
             requestBody?: {
                 content: {
                     "application/json": {
+                        /** Format: uuid */
                         anonymousId?: string;
                         /**
                          * @example analytics
@@ -7738,6 +8055,71 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["AdminMe"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Platform KPIs for a trailing window, with the previous window for comparison */
+        get: {
+            parameters: {
+                query?: {
+                    window?: "7d" | "30d" | "90d";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Aggregate counts and backlogs; money is null without finance */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminDashboard"];
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
                     };
                 };
                 /** @description Unauthorized */
@@ -9141,12 +9523,19 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List bookings */
+        /**
+         * List bookings
+         * @description Newest first. `status` repeats to match any of several statuses; `createdFrom`/`createdTo` are UTC dates, half-open `[from, to)`, given together, at most 366 days apart; `dispute` is `any` (ever disputed), `open` (an open dispute) or `none`. A cursor only continues the filter set it was issued for; reusing it with other filters is a 400.
+         */
         get: {
             parameters: {
                 query?: {
                     cursor?: string;
                     limit?: number;
+                    status?: ("pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled") | ("pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled")[];
+                    createdFrom?: string;
+                    createdTo?: string;
+                    dispute?: "any" | "open" | "none";
                 };
                 header?: never;
                 path?: never;
@@ -9166,6 +9555,15 @@ export interface paths {
                         };
                     };
                 };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
                 /** @description Unauthorized */
                 401: {
                     headers: {
@@ -9177,6 +9575,90 @@ export interface paths {
                 };
                 /** @description Forbidden */
                 403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/bookings/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export bookings as CSV
+         * @description Takes the list filters (`status`, `createdFrom`/`createdTo`, `dispute`, same rules as the list) without cursor or limit and streams every matching booking, newest first, as an RFC 4180 CSV attachment (`photoo-bookings-<from>-<to>.csv`; `<from>` is `all` and `<to>` the export day without a created range). Columns: `id`, `status`, `currency`, `total`, `refunded`, `reversed`, `disputeStatus`, `createdAt`, `releasedAt`, `deliveredAt`, `cancelledAt`, `paymentIntentId`, `chargeId`, `transferId`. Ids only, no names or emails. Money columns are decimal major units of the booking currency (`12.34`), times are ISO 8601 UTC, empty cells are absent values. Every cell is quoted, and one starting with `=`, `+`, `-`, `@`, a tab or a carriage return is prefixed with `'`. At most 50000 rows; a capped export ends with a final `#truncated` line. Call it with `fetch` from the admin origin: a browser navigation (`Sec-Fetch-Mode: navigate`) or a request whose `Sec-Fetch-Site` is present and not `same-origin`/`same-site` is refused with 403 `FORBIDDEN` before anything is audited or counted; requests without Sec-Fetch headers still need the permission and second factor. Needs a fresh second factor (403 `TWO_FACTOR_REQUIRED`), is audit-logged as `admin.bookings_exported`, and has its own per-admin export rate limit, separate from the refund and reverse-transfer money limit (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    status?: ("pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled") | ("pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled")[];
+                    createdFrom?: string;
+                    createdTo?: string;
+                    dispute?: "any" | "open" | "none";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The CSV file, streamed */
+                200: {
+                    headers: {
+                        /** @description attachment; filename="photoo-bookings-<from>-<to>.csv" */
+                        "Content-Disposition"?: string;
+                        /** @description no-store */
+                        "Cache-Control"?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/csv": string;
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiError"];
+                    };
+                };
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -9220,7 +9702,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["AdminBooking"];
+                        "application/json": components["schemas"]["AdminBookingDetail"];
                     };
                 };
                 /** @description Unauthorized */
@@ -9269,7 +9751,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Refund a booking */
+        /**
+         * Refund a booking after release
+         * @description Released bookings only, otherwise 409 `BOOKING_STATE` with `details.status`. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. When `expectedRefundedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. 409 `PENDING_REVERSAL_MISMATCH` when an earlier attempt reversed the transfer and failed to refund: `details.pendingCents` is the amount to retry with. Subject to the admin mutation rate limit and the admin money rate limit shared with reverse-transfer (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).
+         */
         post: {
             parameters: {
                 query?: never;
@@ -9285,6 +9770,7 @@ export interface paths {
                     "application/json": {
                         amountCents: number;
                         reason: string;
+                        expectedRefundedCents?: number;
                     };
                 };
             };
@@ -9295,7 +9781,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["AdminBooking"];
+                        "application/json": components["schemas"]["AdminBookingDetail"];
                     };
                 };
                 /** @description Bad request */
@@ -9334,8 +9820,17 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                /** @description Conflict */
+                /** @description Conflict, told apart by `code` */
                 409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminRefundConflictError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -9343,8 +9838,8 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                /** @description Unprocessable entity */
-                422: {
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -9369,7 +9864,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reverse the payout transfer for a booking */
+        /**
+         * Reverse the payout transfer for a booking
+         * @description After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409 `BOOKING_STATE` with `details.status`. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. When `expectedReversedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. The booking keeps its status. Subject to the admin mutation rate limit and the admin money rate limit shared with refund (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).
+         */
         post: {
             parameters: {
                 query?: never;
@@ -9384,6 +9882,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         reason: string;
+                        expectedReversedCents?: number;
                     };
                 };
             };
@@ -9394,7 +9893,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["AdminBooking"];
+                        "application/json": components["schemas"]["AdminBookingDetail"];
                     };
                 };
                 /** @description Bad request */
@@ -9433,8 +9932,17 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                /** @description Conflict */
+                /** @description Conflict, told apart by `code` */
                 409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminReverseTransferConflictError"];
+                    };
+                };
+                /** @description Unprocessable entity */
+                422: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -9442,8 +9950,8 @@ export interface paths {
                         "application/json": components["schemas"]["ApiError"];
                     };
                 };
-                /** @description Unprocessable entity */
-                422: {
+                /** @description Too many requests */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -11438,6 +11946,7 @@ export interface components {
             isPublished: boolean;
             stripeOnboardingComplete: boolean;
             stripePayoutsEnabled: boolean;
+            stripeAccountConnected: boolean;
         };
         LatLng: {
             /** @example 49.6116 */
@@ -12113,6 +12622,64 @@ export interface components {
             platformFee: components["schemas"]["Money"];
             total: components["schemas"]["Money"];
         };
+        AcceptedQuote: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            requestId: string | null;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            photographerId: string;
+            photographer: components["schemas"]["QuotePhotographer"];
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            clientId: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            productId: string | null;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            productTierId: string | null;
+            lineItems: components["schemas"]["LineItem"][];
+            subtotal: components["schemas"]["Money"];
+            platformFee: components["schemas"]["Money"];
+            total: components["schemas"]["Money"];
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            validUntil: string;
+            message: string | null;
+            /** @enum {string} */
+            status: "draft" | "sent" | "accepted" | "declined" | "expired" | "withdrawn";
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            bookingId: string | null;
+        };
         Booking: {
             /**
              * Format: uuid
@@ -12143,8 +12710,8 @@ export interface components {
              * @description ISO 8601 date-time
              * @example 2026-09-16T12:00:00.000Z
              */
-            scheduledAt: string;
-            location: components["schemas"]["LatLng"];
+            scheduledAt: string | null;
+            location: components["schemas"]["LatLng"] & (Record<string, never> | null);
             total: components["schemas"]["Money"];
             /** @enum {string} */
             status: "pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled";
@@ -12207,14 +12774,37 @@ export interface components {
         BookingPaymentIntent: {
             /** @example pi_3P_secret_abc123 */
             clientSecret: string;
+            amount: components["schemas"]["Money"];
+        };
+        BookingDocumentDownload: {
+            /**
+             * Format: uri
+             * @example https://storage.photoo.lu/bookings/abc123/receipt.pdf?signature=xyz
+             */
+            url: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            expiresAt: string;
         };
         CreateRefundResponse: {
             /** @enum {string} */
-            status: "refunded";
+            status: "refunded" | "partially_refunded";
+            amount: components["schemas"]["Money"];
+            refundedTotal: components["schemas"]["Money"];
+            booking: components["schemas"]["Booking"];
         };
         CreateRefundRequest: {
             amountCents?: number;
             reason: string;
+        };
+        StripeAccountResponse: {
+            /** @example acct_1P000000000000000 */
+            stripeAccountId: string;
+            onboardingComplete: boolean;
+            payoutsEnabled: boolean;
         };
         StripeAccountLinkResponse: {
             /**
@@ -12222,6 +12812,42 @@ export interface components {
              * @example https://connect.stripe.com/setup/e/acct_1P/abc123
              */
             url: string;
+        };
+        EarningsResponse: {
+            totals: components["schemas"]["EarningsTotal"][];
+            recent: components["schemas"]["EarningsRecentEntry"][];
+        };
+        EarningsTotal: {
+            /**
+             * @description ISO 4217 currency code
+             * @example EUR
+             */
+            currency: string;
+            /** @example 23797 */
+            releasedCents: number;
+            /** @example 9500 */
+            heldCents: number;
+        };
+        EarningsRecentEntry: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            bookingId: string;
+            /** @example 23797 */
+            amountCents: number;
+            /**
+             * @description ISO 4217 currency code
+             * @example EUR
+             */
+            currency: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            occurredAt: string;
         };
         StripeWebhookAckResponse: {
             /** @enum {boolean} */
@@ -12622,6 +13248,84 @@ export interface components {
              */
             twoFactorFreshUntil: string | null;
         };
+        AdminDashboard: {
+            /** @enum {string} */
+            window: "7d" | "30d" | "90d";
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            generatedAt: string;
+            signups: {
+                total: {
+                    current: number;
+                    previous: number;
+                };
+                client: {
+                    current: number;
+                    previous: number;
+                };
+                photographer: {
+                    current: number;
+                    previous: number;
+                };
+                professional: {
+                    current: number;
+                    previous: number;
+                };
+            };
+            activity: {
+                requests: {
+                    current: number;
+                    previous: number;
+                };
+                quotes: {
+                    current: number;
+                    previous: number;
+                };
+                bookings: {
+                    current: number;
+                    previous: number;
+                };
+            };
+            /** @description Per-currency integer cents, as positive magnitudes. Null unless the caller holds finance or superadmin. */
+            money: {
+                gmv: {
+                    /**
+                     * @description ISO 4217 currency code
+                     * @example EUR
+                     */
+                    currency: string;
+                    current: number;
+                    previous: number;
+                }[];
+                refunds: {
+                    /**
+                     * @description ISO 4217 currency code
+                     * @example EUR
+                     */
+                    currency: string;
+                    current: number;
+                    previous: number;
+                }[];
+                feeRevenue: {
+                    /**
+                     * @description ISO 4217 currency code
+                     * @example EUR
+                     */
+                    currency: string;
+                    current: number;
+                    previous: number;
+                }[];
+            } | null;
+            backlogs: {
+                verification: number;
+                provenance: number;
+                reports: number;
+                dataRequests: number;
+            };
+        };
         AdminUser: {
             /**
              * Format: uuid
@@ -13014,8 +13718,8 @@ export interface components {
              * @description ISO 8601 date-time
              * @example 2026-09-16T12:00:00.000Z
              */
-            scheduledAt: string;
-            location: components["schemas"]["LatLng"];
+            scheduledAt: string | null;
+            location: components["schemas"]["LatLng"] & (Record<string, never> | null);
             total: components["schemas"]["Money"];
             /** @enum {string} */
             status: "pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled";
@@ -13047,7 +13751,220 @@ export interface components {
             paymentIntentId: string | null;
             chargeId: string | null;
             transferId: string | null;
+            refundedCents: number;
+            reversedCents: number;
+            refundableCents: number;
+            reversibleCents: number;
+            /** @enum {string|null} */
+            disputeStatus: "open" | "won" | "lost" | null;
         };
+        AdminBookingDetail: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            quoteId: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            clientId: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            photographerId: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            scheduledAt: string | null;
+            location: components["schemas"]["LatLng"] & (Record<string, never> | null);
+            total: components["schemas"]["Money"];
+            /** @enum {string} */
+            status: "pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled";
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            releaseDueAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            deliveredAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            releasedAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            cancelledAt: string | null;
+            cancellationReason: string | null;
+            paymentIntentId: string | null;
+            chargeId: string | null;
+            transferId: string | null;
+            refundedCents: number;
+            reversedCents: number;
+            refundableCents: number;
+            reversibleCents: number;
+            /** @enum {string|null} */
+            disputeStatus: "open" | "won" | "lost" | null;
+            ledger: components["schemas"]["AdminLedgerEntry"][];
+            ledgerTruncated: boolean;
+            disputes: components["schemas"]["AdminDispute"][];
+            payout: components["schemas"]["AdminBookingPayout"];
+        };
+        AdminLedgerEntry: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /** @enum {string} */
+            type: "charge" | "platform_fee" | "transfer" | "refund" | "reversal" | "payout";
+            amountCents: number;
+            /**
+             * @description ISO 4217 currency code
+             * @example EUR
+             */
+            currency: string;
+            stripeObjectId: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            occurredAt: string;
+        };
+        AdminDispute: {
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            id: string;
+            /** @enum {string} */
+            status: "open" | "won" | "lost";
+            reason: string;
+            resolution: string | null;
+            amountRefundedCents: number | null;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            openedById: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            adminId: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            openedAt: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 date-time
+             * @example 2026-09-16T12:00:00.000Z
+             */
+            updatedAt: string;
+        };
+        AdminBookingPayout: {
+            stripeAccountId: string;
+            onboardingComplete: boolean;
+            payoutsEnabled: boolean;
+            entries: components["schemas"]["AdminLedgerEntry"][];
+        } | null;
+        AdminRefundConflictError: components["schemas"]["LedgerChangedError"] | components["schemas"]["BookingBusyError"] | components["schemas"]["BookingStateError"] | components["schemas"]["PendingReversalMismatchError"];
+        LedgerChangedError: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "LEDGER_CHANGED";
+            message: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            requestId: string;
+        };
+        BookingBusyError: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "BOOKING_BUSY";
+            message: string;
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            requestId: string;
+        };
+        BookingStateError: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "BOOKING_STATE";
+            message: string;
+            details: components["schemas"]["BookingStateErrorDetails"];
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            requestId: string;
+        };
+        BookingStateErrorDetails: {
+            /** @enum {string} */
+            status: "pending_payment" | "paid_held" | "in_progress" | "delivered" | "released" | "refunded" | "disputed" | "cancelled";
+        };
+        PendingReversalMismatchError: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "PENDING_REVERSAL_MISMATCH";
+            message: string;
+            details: components["schemas"]["PendingReversalMismatchErrorDetails"];
+            /**
+             * Format: uuid
+             * @description UUID identifier
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            requestId: string;
+        };
+        PendingReversalMismatchErrorDetails: {
+            pendingCents: number;
+        };
+        AdminReverseTransferConflictError: components["schemas"]["LedgerChangedError"] | components["schemas"]["BookingBusyError"] | components["schemas"]["BookingStateError"];
         AdminReport: {
             /**
              * Format: uuid
@@ -13258,7 +14175,7 @@ export interface components {
          * @example quote_received
          * @enum {string}
          */
-        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "data-export-ready" | "data-export-failed" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision";
+        EmailTemplateName: "verify-email" | "reset-password" | "account-exists" | "account-deletion-requested" | "data-export-ready" | "data-export-failed" | "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision" | "payouts_disabled" | "dispute_opened";
         AdminEmailTemplatePreview: {
             subject: string;
             html: string;
@@ -13293,7 +14210,7 @@ export interface components {
              * @example quote_received
              * @enum {string}
              */
-            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision";
+            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision" | "payouts_disabled" | "dispute_opened";
             payload: components["schemas"]["NotificationPayload"];
             channels: ("email" | "push" | "in_app")[];
             /**
@@ -13366,7 +14283,7 @@ export interface components {
              * @example quote_received
              * @enum {string}
              */
-            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision";
+            type: "quote_received" | "quote_accepted" | "quote_declined" | "quote_withdrawn" | "quote_expired" | "message_received" | "verification_approved" | "verification_rejected" | "job_application_received" | "job_application_status_changed" | "report_decision" | "moderation_action" | "provenance_decision" | "payouts_disabled" | "dispute_opened";
             /**
              * @example email
              * @enum {string}

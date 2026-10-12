@@ -16,6 +16,7 @@ const MENU_LABELS: Record<string, string> = {
   dashboard: 'Dashboard',
   myRequests: 'My requests',
   quotes: 'Quotes',
+  bookings: 'Bookings',
   signOut: 'Sign out',
 };
 
@@ -68,6 +69,10 @@ describe('AccountMenu', () => {
       '/en/requests',
     );
     expect(screen.getByRole('menuitem', { name: 'Quotes' })).toHaveAttribute('href', '/en/quotes');
+    expect(screen.getByRole('menuitem', { name: 'Bookings' })).toHaveAttribute(
+      'href',
+      '/en/bookings',
+    );
     expect(screen.queryByRole('menuitem', { name: 'Dashboard' })).not.toBeInTheDocument();
   });
 

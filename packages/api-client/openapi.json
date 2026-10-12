@@ -780,6 +780,9 @@
           },
           "stripePayoutsEnabled": {
             "type": "boolean"
+          },
+          "stripeAccountConnected": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -802,7 +805,8 @@
           "verificationStatus",
           "isPublished",
           "stripeOnboardingComplete",
-          "stripePayoutsEnabled"
+          "stripePayoutsEnabled",
+          "stripeAccountConnected"
         ],
         "additionalProperties": false
       },
@@ -2483,6 +2487,127 @@
         ],
         "additionalProperties": false
       },
+      "AcceptedQuote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "requestId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "photographerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "photographer": {
+            "$ref": "#/components/schemas/QuotePhotographer"
+          },
+          "clientId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "productId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "productTierId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "lineItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LineItem"
+            },
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "subtotal": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "platformFee": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "sent",
+              "accepted",
+              "declined",
+              "expired",
+              "withdrawn"
+            ]
+          },
+          "bookingId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          }
+        },
+        "required": [
+          "id",
+          "requestId",
+          "photographerId",
+          "photographer",
+          "clientId",
+          "productId",
+          "productTierId",
+          "lineItems",
+          "subtotal",
+          "platformFee",
+          "total",
+          "validUntil",
+          "message",
+          "status",
+          "bookingId"
+        ],
+        "additionalProperties": false
+      },
       "Booking": {
         "type": "object",
         "properties": {
@@ -2511,13 +2636,26 @@
             "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
           },
           "scheduledAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
             "description": "ISO 8601 date-time",
             "example": "2026-09-16T12:00:00.000Z"
           },
           "location": {
-            "$ref": "#/components/schemas/LatLng"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LatLng"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
           },
           "total": {
             "$ref": "#/components/schemas/Money"
@@ -2667,10 +2805,35 @@
           "clientSecret": {
             "type": "string",
             "example": "pi_3P_secret_abc123"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
           }
         },
         "required": [
-          "clientSecret"
+          "clientSecret",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "BookingDocumentDownload": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://storage.photoo.lu/bookings/abc123/receipt.pdf?signature=xyz"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt"
         ],
         "additionalProperties": false
       },
@@ -2680,12 +2843,25 @@
           "status": {
             "type": "string",
             "enum": [
-              "refunded"
+              "refunded",
+              "partially_refunded"
             ]
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "refundedTotal": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "booking": {
+            "$ref": "#/components/schemas/Booking"
           }
         },
         "required": [
-          "status"
+          "status",
+          "amount",
+          "refundedTotal",
+          "booking"
         ],
         "additionalProperties": false
       },
@@ -2707,6 +2883,28 @@
         ],
         "additionalProperties": false
       },
+      "StripeAccountResponse": {
+        "type": "object",
+        "properties": {
+          "stripeAccountId": {
+            "type": "string",
+            "minLength": 1,
+            "example": "acct_1P000000000000000"
+          },
+          "onboardingComplete": {
+            "type": "boolean"
+          },
+          "payoutsEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stripeAccountId",
+          "onboardingComplete",
+          "payoutsEnabled"
+        ],
+        "additionalProperties": false
+      },
       "StripeAccountLinkResponse": {
         "type": "object",
         "properties": {
@@ -2718,6 +2916,91 @@
         },
         "required": [
           "url"
+        ],
+        "additionalProperties": false
+      },
+      "EarningsResponse": {
+        "type": "object",
+        "properties": {
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EarningsTotal"
+            }
+          },
+          "recent": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EarningsRecentEntry"
+            },
+            "maxItems": 20
+          }
+        },
+        "required": [
+          "totals",
+          "recent"
+        ],
+        "additionalProperties": false
+      },
+      "EarningsTotal": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "ISO 4217 currency code",
+            "example": "EUR"
+          },
+          "releasedCents": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 23797
+          },
+          "heldCents": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 9500
+          }
+        },
+        "required": [
+          "currency",
+          "releasedCents",
+          "heldCents"
+        ],
+        "additionalProperties": false
+      },
+      "EarningsRecentEntry": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "amountCents": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 23797
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "ISO 4217 currency code",
+            "example": "EUR"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "bookingId",
+          "amountCents",
+          "currency",
+          "occurredAt"
         ],
         "additionalProperties": false
       },
@@ -3698,6 +3981,310 @@
         ],
         "additionalProperties": false
       },
+      "AdminDashboard": {
+        "type": "object",
+        "properties": {
+          "window": {
+            "type": "string",
+            "enum": [
+              "7d",
+              "30d",
+              "90d"
+            ]
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "signups": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              },
+              "client": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              },
+              "photographer": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              },
+              "professional": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "total",
+              "client",
+              "photographer",
+              "professional"
+            ],
+            "additionalProperties": false
+          },
+          "activity": {
+            "type": "object",
+            "properties": {
+              "requests": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              },
+              "quotes": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              },
+              "bookings": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "previous": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "current",
+                  "previous"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "requests",
+              "quotes",
+              "bookings"
+            ],
+            "additionalProperties": false
+          },
+          "money": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "gmv": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "currency": {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$",
+                      "description": "ISO 4217 currency code",
+                      "example": "EUR"
+                    },
+                    "current": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "previous": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "currency",
+                    "current",
+                    "previous"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "refunds": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "currency": {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$",
+                      "description": "ISO 4217 currency code",
+                      "example": "EUR"
+                    },
+                    "current": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "previous": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "currency",
+                    "current",
+                    "previous"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "feeRevenue": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "currency": {
+                      "type": "string",
+                      "pattern": "^[A-Z]{3}$",
+                      "description": "ISO 4217 currency code",
+                      "example": "EUR"
+                    },
+                    "current": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "previous": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "currency",
+                    "current",
+                    "previous"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "gmv",
+              "refunds",
+              "feeRevenue"
+            ],
+            "additionalProperties": false,
+            "description": "Per-currency integer cents, as positive magnitudes. Null unless the caller holds finance or superadmin."
+          },
+          "backlogs": {
+            "type": "object",
+            "properties": {
+              "verification": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "provenance": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reports": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "dataRequests": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "verification",
+              "provenance",
+              "reports",
+              "dataRequests"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "window",
+          "generatedAt",
+          "signups",
+          "activity",
+          "money",
+          "backlogs"
+        ],
+        "additionalProperties": false
+      },
       "AdminUser": {
         "type": "object",
         "properties": {
@@ -4605,13 +5192,26 @@
             "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
           },
           "scheduledAt": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time",
             "description": "ISO 8601 date-time",
             "example": "2026-09-16T12:00:00.000Z"
           },
           "location": {
-            "$ref": "#/components/schemas/LatLng"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LatLng"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
           },
           "total": {
             "$ref": "#/components/schemas/Money"
@@ -4689,6 +5289,34 @@
               "string",
               "null"
             ]
+          },
+          "refundedCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reversedCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "refundableCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reversibleCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "disputeStatus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "open",
+              "won",
+              "lost",
+              null
+            ]
           }
         },
         "required": [
@@ -4707,9 +5335,565 @@
           "cancellationReason",
           "paymentIntentId",
           "chargeId",
-          "transferId"
+          "transferId",
+          "refundedCents",
+          "reversedCents",
+          "refundableCents",
+          "reversibleCents",
+          "disputeStatus"
         ],
         "additionalProperties": false
+      },
+      "AdminBookingDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "quoteId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "clientId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "photographerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "scheduledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "location": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LatLng"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_payment",
+              "paid_held",
+              "in_progress",
+              "delivered",
+              "released",
+              "refunded",
+              "disputed",
+              "cancelled"
+            ]
+          },
+          "releaseDueAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "deliveredAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "releasedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "cancelledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "cancellationReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "paymentIntentId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "chargeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "transferId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "refundedCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reversedCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "refundableCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reversibleCents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "disputeStatus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "open",
+              "won",
+              "lost",
+              null
+            ]
+          },
+          "ledger": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminLedgerEntry"
+            },
+            "maxItems": 200
+          },
+          "ledgerTruncated": {
+            "type": "boolean"
+          },
+          "disputes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminDispute"
+            }
+          },
+          "payout": {
+            "$ref": "#/components/schemas/AdminBookingPayout"
+          }
+        },
+        "required": [
+          "id",
+          "quoteId",
+          "clientId",
+          "photographerId",
+          "scheduledAt",
+          "location",
+          "total",
+          "status",
+          "releaseDueAt",
+          "deliveredAt",
+          "releasedAt",
+          "cancelledAt",
+          "cancellationReason",
+          "paymentIntentId",
+          "chargeId",
+          "transferId",
+          "refundedCents",
+          "reversedCents",
+          "refundableCents",
+          "reversibleCents",
+          "disputeStatus",
+          "ledger",
+          "ledgerTruncated",
+          "disputes",
+          "payout"
+        ],
+        "additionalProperties": false
+      },
+      "AdminLedgerEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "charge",
+              "platform_fee",
+              "transfer",
+              "refund",
+              "reversal",
+              "payout"
+            ]
+          },
+          "amountCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "ISO 4217 currency code",
+            "example": "EUR"
+          },
+          "stripeObjectId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "amountCents",
+          "currency",
+          "stripeObjectId",
+          "occurredAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminDispute": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "won",
+              "lost"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "resolution": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "amountRefundedCents": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "openedById": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "adminId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 date-time",
+            "example": "2026-09-16T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "reason",
+          "resolution",
+          "amountRefundedCents",
+          "openedById",
+          "adminId",
+          "openedAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminBookingPayout": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "stripeAccountId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "onboardingComplete": {
+            "type": "boolean"
+          },
+          "payoutsEnabled": {
+            "type": "boolean"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminLedgerEntry"
+            }
+          }
+        },
+        "required": [
+          "stripeAccountId",
+          "onboardingComplete",
+          "payoutsEnabled",
+          "entries"
+        ],
+        "additionalProperties": false
+      },
+      "AdminRefundConflictError": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/LedgerChangedError"
+          },
+          {
+            "$ref": "#/components/schemas/BookingBusyError"
+          },
+          {
+            "$ref": "#/components/schemas/BookingStateError"
+          },
+          {
+            "$ref": "#/components/schemas/PendingReversalMismatchError"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "code",
+          "mapping": {
+            "LEDGER_CHANGED": "#/components/schemas/LedgerChangedError",
+            "BOOKING_BUSY": "#/components/schemas/BookingBusyError",
+            "BOOKING_STATE": "#/components/schemas/BookingStateError",
+            "PENDING_REVERSAL_MISMATCH": "#/components/schemas/PendingReversalMismatchError"
+          }
+        }
+      },
+      "LedgerChangedError": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "LEDGER_CHANGED"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "additionalProperties": false
+      },
+      "BookingBusyError": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "BOOKING_BUSY"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "additionalProperties": false
+      },
+      "BookingStateError": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "BOOKING_STATE"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "$ref": "#/components/schemas/BookingStateErrorDetails"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "details",
+          "requestId"
+        ],
+        "additionalProperties": false
+      },
+      "BookingStateErrorDetails": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_payment",
+              "paid_held",
+              "in_progress",
+              "delivered",
+              "released",
+              "refunded",
+              "disputed",
+              "cancelled"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "PendingReversalMismatchError": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "PENDING_REVERSAL_MISMATCH"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "$ref": "#/components/schemas/PendingReversalMismatchErrorDetails"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID identifier",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "details",
+          "requestId"
+        ],
+        "additionalProperties": false
+      },
+      "PendingReversalMismatchErrorDetails": {
+        "type": "object",
+        "properties": {
+          "pendingCents": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "pendingCents"
+        ],
+        "additionalProperties": false
+      },
+      "AdminReverseTransferConflictError": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/LedgerChangedError"
+          },
+          {
+            "$ref": "#/components/schemas/BookingBusyError"
+          },
+          {
+            "$ref": "#/components/schemas/BookingStateError"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "code",
+          "mapping": {
+            "LEDGER_CHANGED": "#/components/schemas/LedgerChangedError",
+            "BOOKING_BUSY": "#/components/schemas/BookingBusyError",
+            "BOOKING_STATE": "#/components/schemas/BookingStateError"
+          }
+        }
       },
       "AdminReport": {
         "type": "object",
@@ -5319,7 +6503,9 @@
           "job_application_status_changed",
           "report_decision",
           "moderation_action",
-          "provenance_decision"
+          "provenance_decision",
+          "payouts_disabled",
+          "dispute_opened"
         ],
         "example": "quote_received"
       },
@@ -5418,7 +6604,9 @@
               "job_application_status_changed",
               "report_decision",
               "moderation_action",
-              "provenance_decision"
+              "provenance_decision",
+              "payouts_disabled",
+              "dispute_opened"
             ],
             "example": "quote_received"
           },
@@ -5607,7 +6795,9 @@
               "job_application_status_changed",
               "report_decision",
               "moderation_action",
-              "provenance_decision"
+              "provenance_decision",
+              "payouts_disabled",
+              "dispute_opened"
             ],
             "example": "quote_received"
           },
@@ -5770,8 +6960,7 @@
                   },
                   "anonymousId": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100
+                    "format": "uuid"
                   }
                 },
                 "required": [
@@ -5911,10 +7100,15 @@
                           "enum": [
                             true
                           ]
+                        },
+                        "challengeToken": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
                       "required": [
-                        "twoFactorRequired"
+                        "twoFactorRequired",
+                        "challengeToken"
                       ],
                       "additionalProperties": false
                     }
@@ -5994,6 +7188,10 @@
                     "example": "123456"
                   },
                   "backupCode": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "challengeToken": {
                     "type": "string",
                     "minLength": 1
                   }
@@ -6154,6 +7352,90 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SessionQueryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/locale": {
+      "patch": {
+        "summary": "Change the current user's locale",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "locale": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "fr",
+                      "de",
+                      "pt",
+                      "es"
+                    ],
+                    "description": "BCP 47 locale",
+                    "example": "en"
+                  }
+                },
+                "required": [
+                  "locale"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated session user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  },
+                  "required": [
+                    "user"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
@@ -6760,6 +8042,9 @@
                   "properties": {
                     "user": {
                       "$ref": "#/components/schemas/User"
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/AuthSession"
                     }
                   },
                   "required": [
@@ -6863,6 +8148,9 @@
                   "properties": {
                     "user": {
                       "$ref": "#/components/schemas/User"
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/AuthSession"
                     }
                   },
                   "required": [
@@ -11881,7 +13169,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Quote"
+                  "$ref": "#/components/schemas/AcceptedQuote"
                 }
               }
             }
@@ -12695,10 +13983,105 @@
         }
       }
     },
+    "/v1/bookings/{id}/documents/{document}": {
+      "get": {
+        "summary": "Get a 10-minute presigned download URL for a released booking document. The client gets the receipt, the photographer the platform-fee invoice; 403 for the other party, 404 for anyone else, 409 while the booking is not released or the PDF is not generated yet.",
+        "tags": [
+          "bookings"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID identifier",
+              "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            },
+            "required": true,
+            "description": "UUID identifier",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "receipt",
+                "fee-invoice"
+              ],
+              "example": "receipt"
+            },
+            "required": true,
+            "name": "document",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Presigned download URL issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingDocumentDownload"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/bookings/{id}/refund": {
       "post": {
         "summary": "Request a refund for a booking before release",
-        "description": "Self-service, before release only. After release a refund requires a transfer reversal and is admin-only (POST /v1/admin/bookings/{id}/refund).",
+        "description": "Client only, before release (paid_held, in_progress or delivered), otherwise 409. 409 `BOOKING_BUSY` while another refund or the release holds the booking; retry shortly. `amountCents` omitted refunds whatever is left; a cumulative refund above the charged total is 422. A full refund moves the booking to `refunded`, a partial one keeps its state. After release a refund requires a transfer reversal and is admin-only (POST /v1/admin/bookings/{id}/refund).",
         "tags": [
           "payments"
         ],
@@ -12735,7 +14118,7 @@
         },
         "responses": {
           "200": {
-            "description": "Refund requested",
+            "description": "Refund created",
             "content": {
               "application/json": {
                 "schema": {
@@ -12803,14 +14186,24 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
     },
-    "/v1/me/stripe/account-link": {
+    "/v1/me/stripe/account": {
       "post": {
-        "summary": "Create a Stripe Connect Express onboarding link for the caller's account",
-        "description": "Requires a connected account to already exist (POST /v1/me/stripe/account, 1A.8b). Returns a short-lived, Stripe-hosted onboarding URL.",
+        "summary": "Create the caller's Stripe Connect Express account",
+        "description": "Photographer only. Idempotent: the first call creates the Express account and returns 201; later calls return the existing account with 200.",
         "tags": [
           "payments"
         ],
@@ -12822,6 +14215,87 @@
             "bearerAuth": []
           }
         ],
+        "x-requires-verified-email": true,
+        "responses": {
+          "200": {
+            "description": "Connected account already existed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StripeAccountResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Connected account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StripeAccountResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/stripe/account-link": {
+      "post": {
+        "summary": "Create a Stripe Connect Express onboarding link for the caller's account",
+        "description": "Photographer only. Requires a connected account to already exist (POST /v1/me/stripe/account), otherwise 409. Returns a short-lived, Stripe-hosted onboarding URL.",
+        "tags": [
+          "payments"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-requires-verified-email": true,
         "responses": {
           "200": {
             "description": "Onboarding link created",
@@ -12863,8 +14337,77 @@
               }
             }
           },
-          "422": {
-            "description": "Unprocessable entity",
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/earnings": {
+      "get": {
+        "summary": "The caller's released and held earnings per currency",
+        "description": "Photographer only. `totals` has one row per currency, never converted. `recent` lists at most 20 bookings with a transfer or reversal, newest first. A photographer with no bookings gets empty arrays.",
+        "tags": [
+          "payments"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Earnings summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EarningsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
             "content": {
               "application/json": {
                 "schema": {
@@ -15292,8 +16835,7 @@
                 "properties": {
                   "anonymousId": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100
+                    "format": "uuid"
                   },
                   "purpose": {
                     "type": "string",
@@ -15379,6 +16921,77 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AdminMe"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/dashboard": {
+      "get": {
+        "summary": "Platform KPIs for a trailing window, with the previous window for comparison",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "30d",
+                "90d"
+              ],
+              "default": "30d"
+            },
+            "required": false,
+            "name": "window",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregate counts and backlogs; money is null without finance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDashboard"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             }
@@ -17187,6 +18800,7 @@
             "cookieAuth": []
           }
         ],
+        "description": "Newest first. `status` repeats to match any of several statuses; `createdFrom`/`createdTo` are UTC dates, half-open `[from, to)`, given together, at most 366 days apart; `dispute` is `any` (ever disputed), `open` (an open dispute) or `none`. A cursor only continues the filter set it was issued for; reusing it with other filters is a 400.",
         "x-required-permission": "finance",
         "parameters": [
           {
@@ -17207,6 +18821,77 @@
             },
             "required": false,
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "pending_payment",
+                    "paid_held",
+                    "in_progress",
+                    "delivered",
+                    "released",
+                    "refunded",
+                    "disputed",
+                    "cancelled"
+                  ]
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "pending_payment",
+                      "paid_held",
+                      "in_progress",
+                      "delivered",
+                      "released",
+                      "refunded",
+                      "disputed",
+                      "cancelled"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8
+                }
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "createdFrom",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "createdTo",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "open",
+                "none"
+              ]
+            },
+            "required": false,
+            "name": "dispute",
             "in": "query"
           }
         ],
@@ -17241,6 +18926,16 @@
               }
             }
           },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
             "content": {
@@ -17253,6 +18948,161 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/bookings/export.csv": {
+      "get": {
+        "summary": "Export bookings as CSV",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "description": "Takes the list filters (`status`, `createdFrom`/`createdTo`, `dispute`, same rules as the list) without cursor or limit and streams every matching booking, newest first, as an RFC 4180 CSV attachment (`photoo-bookings-<from>-<to>.csv`; `<from>` is `all` and `<to>` the export day without a created range). Columns: `id`, `status`, `currency`, `total`, `refunded`, `reversed`, `disputeStatus`, `createdAt`, `releasedAt`, `deliveredAt`, `cancelledAt`, `paymentIntentId`, `chargeId`, `transferId`. Ids only, no names or emails. Money columns are decimal major units of the booking currency (`12.34`), times are ISO 8601 UTC, empty cells are absent values. Every cell is quoted, and one starting with `=`, `+`, `-`, `@`, a tab or a carriage return is prefixed with `'`. At most 50000 rows; a capped export ends with a final `#truncated` line. Call it with `fetch` from the admin origin: a browser navigation (`Sec-Fetch-Mode: navigate`) or a request whose `Sec-Fetch-Site` is present and not `same-origin`/`same-site` is refused with 403 `FORBIDDEN` before anything is audited or counted; requests without Sec-Fetch headers still need the permission and second factor. Needs a fresh second factor (403 `TWO_FACTOR_REQUIRED`), is audit-logged as `admin.bookings_exported`, and has its own per-admin export rate limit, separate from the refund and reverse-transfer money limit (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).",
+        "x-required-permission": "finance",
+        "x-requires-2fa": true,
+        "parameters": [
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "pending_payment",
+                    "paid_held",
+                    "in_progress",
+                    "delivered",
+                    "released",
+                    "refunded",
+                    "disputed",
+                    "cancelled"
+                  ]
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "pending_payment",
+                      "paid_held",
+                      "in_progress",
+                      "delivered",
+                      "released",
+                      "refunded",
+                      "disputed",
+                      "cancelled"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8
+                }
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "createdFrom",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "createdTo",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "any",
+                "open",
+                "none"
+              ]
+            },
+            "required": false,
+            "name": "dispute",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The CSV file, streamed",
+            "headers": {
+              "Content-Disposition": {
+                "description": "attachment; filename=\"photoo-bookings-<from>-<to>.csv\"",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
             "content": {
               "application/json": {
                 "schema": {
@@ -17296,7 +19146,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminBooking"
+                  "$ref": "#/components/schemas/AdminBookingDetail"
                 }
               }
             }
@@ -17336,7 +19186,8 @@
     },
     "/v1/admin/bookings/{id}/refund": {
       "post": {
-        "summary": "Refund a booking",
+        "summary": "Refund a booking after release",
+        "description": "Released bookings only, otherwise 409 `BOOKING_STATE` with `details.status`. Reverses the same amount from the photographer transfer first, then refunds the client. 422 before any Stripe call when the amount exceeds what is still refundable or what is left on the transfer. When `expectedRefundedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. 409 `PENDING_REVERSAL_MISMATCH` when an earlier attempt reversed the transfer and failed to refund: `details.pendingCents` is the amount to retry with. Subject to the admin mutation rate limit and the admin money rate limit shared with reverse-transfer (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).",
         "tags": [
           "admin"
         ],
@@ -17375,6 +19226,10 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 2000
+                  },
+                  "expectedRefundedCents": {
+                    "type": "integer",
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -17392,7 +19247,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminBooking"
+                  "$ref": "#/components/schemas/AdminBookingDetail"
                 }
               }
             }
@@ -17438,7 +19293,17 @@
             }
           },
           "409": {
-            "description": "Conflict",
+            "description": "Conflict, told apart by `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRefundConflictError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -17447,8 +19312,8 @@
               }
             }
           },
-          "422": {
-            "description": "Unprocessable entity",
+          "429": {
+            "description": "Too many requests",
             "content": {
               "application/json": {
                 "schema": {
@@ -17463,6 +19328,7 @@
     "/v1/admin/bookings/{id}/reverse-transfer": {
       "post": {
         "summary": "Reverse the payout transfer for a booking",
+        "description": "After release only: a released booking, or a disputed one that had already been released (to recover a lost chargeback from the photographer), otherwise 409 `BOOKING_STATE` with `details.status`. Reverses whatever is left on the transfer back to the platform balance without refunding the client; 422 when nothing is left. When `expectedReversedCents` is given and no longer matches the ledger, 409 `LEDGER_CHANGED` before any Stripe call. 409 `BOOKING_BUSY` while another refund, reversal or release holds the booking; retry shortly. The booking keeps its status. Subject to the admin mutation rate limit and the admin money rate limit shared with refund (429 `TOO_MANY_REQUESTS` with `details.retryAfterSeconds`).",
         "tags": [
           "admin"
         ],
@@ -17497,6 +19363,10 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 2000
+                  },
+                  "expectedReversedCents": {
+                    "type": "integer",
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -17513,7 +19383,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminBooking"
+                  "$ref": "#/components/schemas/AdminBookingDetail"
                 }
               }
             }
@@ -17559,7 +19429,17 @@
             }
           },
           "409": {
-            "description": "Conflict",
+            "description": "Conflict, told apart by `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReverseTransferConflictError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -17568,8 +19448,8 @@
               }
             }
           },
-          "422": {
-            "description": "Unprocessable entity",
+          "429": {
+            "description": "Too many requests",
             "content": {
               "application/json": {
                 "schema": {

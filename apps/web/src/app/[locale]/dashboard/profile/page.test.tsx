@@ -48,6 +48,7 @@ const PROFILE = {
   isPublished: false,
   stripeOnboardingComplete: false,
   stripePayoutsEnabled: false,
+  stripeAccountConnected: false,
 };
 
 function mockApi({ profile, profileStatus = 200 }: { profile?: unknown; profileStatus?: number }) {

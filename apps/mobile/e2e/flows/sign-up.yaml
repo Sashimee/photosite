@@ -1,0 +1,44 @@
+appId: lu.photoo.app
+name: Sign up and verify the email with the emailed token
+---
+- runScript:
+    file: ../scripts/create-user.js
+    env:
+      REGISTER: 'false'
+- runFlow: ../subflows/fresh-start.yaml
+- openLink: photoo:///sign-up
+- extendedWaitUntil:
+    visible:
+      id: sign-up-submit
+    timeout: 10000
+- tapOn:
+    id: sign-up-email
+- inputText: ${output.email}
+- tapOn:
+    id: sign-up-password
+- inputText: ${output.password}
+- hideKeyboard
+- tapOn:
+    id: sign-up-role-client
+- tapOn:
+    id: sign-up-submit
+- extendedWaitUntil:
+    visible:
+      id: verify-email-token
+    timeout: 20000
+- assertVisible:
+    id: verify-email-go-to-sign-in
+- runScript:
+    file: ../scripts/mailpit-token.js
+    env:
+      EMAIL: ${output.email}
+- tapOn:
+    id: verify-email-token
+- inputText: ${output.token}
+- hideKeyboard
+- tapOn:
+    id: verify-email-token-submit
+- extendedWaitUntil:
+    visible:
+      id: verify-email-success
+    timeout: 20000

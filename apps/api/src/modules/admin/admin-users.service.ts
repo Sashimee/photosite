@@ -89,6 +89,7 @@ export class AdminUsersService {
       // same class of bug as #101/#127: kill every session, then drop
       // sockets outside the transaction once the change has committed.
       await tx.session.deleteMany({ where: { userId: id } });
+      await tx.device.deleteMany({ where: { userId: id } });
 
       await this.auditService.record(tx, {
         actorId: admin.id,
@@ -169,13 +170,10 @@ export class AdminUsersService {
       });
 
       if (removesPhotographer) {
-        const profile = await tx.photographerProfile.findUnique({ where: { userId: id } });
-        if (profile?.isPublished) {
-          await tx.photographerProfile.update({
-            where: { id: profile.id },
-            data: { isPublished: false },
-          });
-        }
+        await tx.photographerProfile.updateMany({
+          where: { userId: id, isPublished: true },
+          data: { isPublished: false },
+        });
       }
 
       await this.auditService.record(tx, {

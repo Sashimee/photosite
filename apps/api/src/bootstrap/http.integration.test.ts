@@ -156,6 +156,25 @@ describe('http bootstrap', () => {
     expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/i);
   });
 
+  it('lets an allowed origin read Content-Disposition and gives others no CORS grant', async () => {
+    const fastify = app.getHttpAdapter().getInstance();
+    const allowed = await fastify.inject({
+      method: 'GET',
+      url: '/v1/does-not-exist',
+      headers: { origin: 'http://localhost:3000' },
+    });
+    expect(allowed.headers['access-control-allow-origin']).toBe('http://localhost:3000');
+    expect(allowed.headers['access-control-allow-credentials']).toBe('true');
+    expect(allowed.headers['access-control-expose-headers']).toBe('Content-Disposition');
+
+    const other = await fastify.inject({
+      method: 'GET',
+      url: '/v1/does-not-exist',
+      headers: { origin: 'https://evil.example' },
+    });
+    expect(other.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
   it('echoes PHOTOO_REVISION on x-photoo-revision, defaulting to "unknown"', async () => {
     const originalRevision = process.env.PHOTOO_REVISION;
     delete process.env.PHOTOO_REVISION;

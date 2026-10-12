@@ -736,6 +736,406 @@
         "htmlLabel": "HTML",
         "textLabel": "Text"
       }
+    },
+    "provenance": {
+      "verdicts": {
+        "pass": "Pass",
+        "review": "Needs review",
+        "fail": "Fail"
+      },
+      "statuses": {
+        "processing": "Processing",
+        "pending_review": "Pending review",
+        "approved": "Approved",
+        "flagged": "Flagged",
+        "rejected": "Rejected"
+      },
+      "decisionStatuses": {
+        "approved": "Approve",
+        "flagged": "Flag",
+        "rejected": "Reject"
+      },
+      "reasons": {
+        "ai_generated": "AI-generated image",
+        "not_own_work": "Not the photographer's own work",
+        "manipulated_metadata": "Manipulated metadata",
+        "other": "Other"
+      },
+      "scoreValue": "{score, number, percent}",
+      "notChecked": "Not checked (no vendor configured)",
+      "errors": {
+        "generic": "That couldn't be completed. Please retry.",
+        "forbidden": "You don't have permission to do this.",
+        "notFound": "This check couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "conflict": "That couldn't be completed because something changed. Reload and retry.",
+        "alreadyRunning": "A recheck is already running for this image."
+      },
+      "list": {
+        "title": "Provenance queue",
+        "caption": "Provenance checks awaiting review, oldest first",
+        "columns": {
+          "select": "Select",
+          "thumbnail": "Image",
+          "photographer": "Photographer",
+          "verdict": "Verdict",
+          "score": "Score",
+          "checkedAt": "Checked",
+          "status": "Status"
+        },
+        "selectRow": "Select image by {photographer}",
+        "thumbnailAlt": "Portfolio image by {photographer}",
+        "notChecked": "Not checked",
+        "empty": {
+          "title": "No provenance checks match this filter.",
+          "hint": "The queue defaults to images pending review, oldest first."
+        },
+        "filters": {
+          "formLabel": "Provenance filters",
+          "statusLabel": "Image status",
+          "verdictLabel": "Verdict",
+          "allVerdicts": "All verdicts",
+          "submit": "Filter"
+        },
+        "bulk": {
+          "selected": "{count, plural, one {# image selected} other {# images selected}}",
+          "approve": "Approve selected",
+          "reject": "Reject selected",
+          "clear": "Clear selection"
+        }
+      },
+      "decision": {
+        "noteLabel": "Internal note (only admins see this)",
+        "noteHint": "Evidence, links and reasoning for other reviewers. Never shown to the photographer.",
+        "reasonLabel": "Reason (shown to the photographer)",
+        "reasonPlaceholder": "Choose a reason",
+        "reasonTextLabel": "Reason details (shown to the photographer)",
+        "reasonTextHint": "Required for \"Other\". Part of the statement of reasons the photographer receives. Do not put evidence links or detection details here.",
+        "statusLabel": "Decision",
+        "errors": {
+          "reasonRequired": "Choose a reason; the photographer is told why.",
+          "reasonTextRequired": "Describe the reason; it is required for \"Other\"."
+        }
+      },
+      "detail": {
+        "title": "Provenance check",
+        "photographer": "Photographer",
+        "thumbnailAlt": "Portfolio image by {photographer}",
+        "fields": {
+          "status": "Image status",
+          "verdict": "Verdict",
+          "score": "Score",
+          "checkedAt": "Checked",
+          "reviewedAt": "Reviewed",
+          "reviewer": "Reviewed by"
+        },
+        "signals": {
+          "title": "Signals",
+          "aiScore": "AI score",
+          "aiVendor": "AI vendor",
+          "reverseMatches": "Reverse image matches",
+          "reverseMatchesNone": "No matches found.",
+          "reverseMatchesHint": "Shown as text on purpose. Do not open unknown URLs from this session.",
+          "c2paValid": "C2PA signature",
+          "c2paValidYes": "Valid",
+          "c2paValidNo": "Invalid",
+          "exifCamera": "Camera (EXIF)",
+          "exifCapturedAt": "Captured (EXIF)",
+          "exifMissing": "Not present"
+        },
+        "decisionRecord": {
+          "title": "Decision on record",
+          "note": "Internal note",
+          "reason": "Reason sent to the photographer",
+          "reasonText": "Reason details sent to the photographer"
+        },
+        "actions": {
+          "title": "Actions",
+          "recheck": "Recheck",
+          "rechecking": "Rechecking...",
+          "rechecked": "Recheck started. Reload in a moment to see the new result.",
+          "decide": "Record decision",
+          "dialogTitle": "Record a decision",
+          "consequences": "This updates the image status immediately and is written to the audit log. Flag and reject notify the photographer with the reason you choose.",
+          "confirm": "Confirm decision"
+        },
+        "history": {
+          "title": "Decision history",
+          "caption": "Audit log entries for this check",
+          "empty": "No decisions recorded yet.",
+          "systemActor": "System",
+
+          "columns": {
+            "occurredAt": "When",
+            "action": "Action",
+            "actor": "Actor"
+          }
+        }
+      },
+      "bulk": {
+        "title": "{count, plural, one {Decide # image} other {Decide # images}}",
+        "consequences": "The same note and reason are applied to every selected image. Each decision is recorded separately in the audit log. Flagging is not available in bulk.",
+        "confirm": "Apply to selected",
+        "results": "Results",
+        "success": "Done",
+        "failure": "Failed: {message}",
+        "failedHint": "Failed images stay selected so you can retry.",
+        "notAttempted": "Not attempted",
+        "rateLimited": "Too many decisions in a short time. The remaining images were not attempted and stay selected. Try again later.",
+        "rateLimitedWithRetry": "Too many decisions in a short time. The remaining images were not attempted and stay selected. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      }
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "noPermissions": "You have no admin permissions yet; ask a superadmin to grant one.",
+      "windowLabel": "Time window",
+      "windows": {
+        "7d": "Last 7 days",
+        "30d": "Last 30 days",
+        "90d": "Last 90 days"
+      },
+      "comparison": "Compared with the previous {days, plural, one {# day} other {# days}}",
+      "generatedAt": "Generated {at}",
+      "signups": {
+        "title": "Sign-ups",
+        "total": "All new accounts",
+        "client": "Clients",
+        "photographer": "Photographers",
+        "professional": "Professionals"
+      },
+      "activity": {
+        "title": "Activity",
+        "requests": "Requests created",
+        "quotes": "Quotes sent",
+        "bookings": "Bookings paid"
+      },
+      "delta": {
+        "new": "New",
+        "unchanged": "No change",
+        "previous": "Previous: {value}",
+        "increase": "Up {value}",
+        "decrease": "Down {value}"
+      },
+      "money": {
+        "title": "Money",
+        "gmv": "GMV",
+        "refunds": "Refunds",
+        "feeRevenue": "Fee revenue (realised at release)",
+        "noData": "No money movement recorded",
+        "requiresFinance": "Money figures require the finance permission."
+      },
+      "backlogs": {
+        "title": "Backlogs",
+        "verification": "Verification cases awaiting review",
+        "provenance": "Provenance checks awaiting review",
+        "reports": "Open reports",
+        "dataRequests": "Open data requests",
+        "open": "Open queue"
+      }
+    },
+    "finance": {
+      "title": "Bookings",
+      "caption": "Bookings with refunded and reversed totals",
+      "columns": {
+        "id": "Booking",
+        "status": "Status",
+        "total": "Total",
+        "refunded": "Refunded",
+        "reversed": "Reversed",
+        "dispute": "Dispute",
+        "releasedAt": "Released"
+      },
+      "empty": {
+        "title": "No bookings yet.",
+        "hint": "Bookings appear here once a client pays a quote.",
+        "filteredTitle": "No bookings match these filters.",
+        "filteredHint": "Widen the date range or clear a filter."
+      },
+      "none": "None",
+      "statuses": {
+        "pending_payment": "Pending payment",
+        "paid_held": "Paid, held",
+        "in_progress": "In progress",
+        "delivered": "Delivered",
+        "released": "Released",
+        "refunded": "Refunded",
+        "disputed": "Disputed",
+        "cancelled": "Cancelled"
+      },
+      "disputeStatuses": {
+        "open": "Open",
+        "won": "Won",
+        "lost": "Lost"
+      },
+      "detail": {
+        "title": "Booking",
+        "money": {
+          "title": "Money",
+          "total": "Total",
+          "refunded": "Refunded so far",
+          "reversed": "Reversed from the transfer so far",
+          "refundable": "Refundable now",
+          "reversible": "Reversible now",
+          "limitHint": "The API checks the maximum refund when you submit. After release, a refund cannot exceed what is left on the photographer's transfer; the platform fee is not refunded."
+        },
+        "fields": {
+          "status": "Status",
+          "dispute": "Dispute",
+          "clientId": "Client",
+          "photographerId": "Photographer",
+          "scheduledAt": "Scheduled",
+          "deliveredAt": "Delivered",
+          "releaseDueAt": "Release due",
+          "releasedAt": "Released",
+          "cancelledAt": "Cancelled",
+          "cancellationReason": "Cancellation reason"
+        },
+        "stripe": {
+          "title": "Stripe references",
+          "paymentIntent": "Payment intent",
+          "charge": "Charge",
+          "transfer": "Transfer",
+          "hint": "Shown as text on purpose. Copy an id to look it up in the Stripe dashboard."
+        },
+        "ledger": {
+          "title": "Ledger",
+          "caption": "Ledger entries for this booking, oldest first",
+          "empty": "No ledger entries yet.",
+          "truncated": "Showing the oldest {count} entries. More exist and are not shown here.",
+          "columns": {
+            "occurredAt": "When",
+            "type": "Type",
+            "amount": "Amount",
+            "stripeObjectId": "Stripe object"
+          },
+          "types": {
+            "charge": "Charge",
+            "platform_fee": "Platform fee",
+            "transfer": "Transfer",
+            "refund": "Refund",
+            "reversal": "Reversal",
+            "payout": "Payout"
+          }
+        },
+        "disputes": {
+          "title": "Disputes",
+          "caption": "Disputes opened on this booking",
+          "empty": "No disputes on this booking.",
+          "columns": {
+            "id": "Dispute",
+            "status": "Status",
+            "reason": "Reason",
+            "resolution": "Resolution",
+            "amountRefunded": "Refunded",
+            "openedBy": "Opened by",
+            "admin": "Admin",
+            "openedAt": "Opened",
+            "updatedAt": "Updated"
+          }
+        },
+        "payout": {
+          "title": "Photographer payout",
+          "hint": "The Connect account as last reported by Stripe webhooks, not a live lookup.",
+          "none": "The photographer has no Connect account on record.",
+          "stripeAccountId": "Connect account",
+          "onboardingComplete": "Onboarding complete",
+          "payoutsEnabled": "Payouts enabled",
+          "yes": "Yes",
+          "no": "No",
+          "entriesCaption": "Payout ledger entries for this booking",
+          "noEntries": "No payout entries recorded for this booking."
+        },
+        "actions": {
+          "title": "Actions",
+          "none": "Refunds are only available for released bookings, and transfer reversals for released bookings or disputed bookings that already have a transfer."
+        }
+      },
+      "refund": {
+        "open": "Refund after release",
+        "title": "Refund booking",
+        "description": "Reverses this amount from the photographer's transfer first, then refunds the client. This moves real money and is written to the audit log.",
+        "summary": "You are about to refund {amount} ({currency}) on booking {id}.",
+        "twoFactorNotice": "Submitting asks for your second factor again. Anything typed here is cleared when you come back.",
+        "amountLabel": "Amount ({currency})",
+        "amountHint": "The API checks the maximum. After release, a refund cannot exceed what is left on the photographer's transfer; the platform fee is not refunded.",
+        "amountMax": "Refundable right now according to the API: {amount}.",
+        "usePending": "Use {amount}",
+        "reasonLabel": "Internal reason (audit log only, not shown to the client or photographer)",
+        "submit": "Refund",
+        "submitting": "Refunding...",
+        "errors": {
+          "amountInvalid": "Enter an amount like 12.34.",
+          "amountNotPositive": "The amount must be greater than zero.",
+          "amountTooManyDecimals": "{currency} allows at most {digits, plural, one {# decimal place} other {# decimal places}}.",
+          "amountTooLarge": "That amount is too large.",
+          "reasonRequired": "Give a reason for the audit log.",
+          "reasonTooLong": "The reason is too long (2000 characters at most).",
+          "conflict": "The refund was not made because of a conflict. Server message: {detail}",
+          "unprocessable": "That amount is more than can still be refunded, or more than is left on the photographer's transfer. Nothing was refunded."
+        }
+      },
+      "reverse": {
+        "open": "Reverse transfer",
+        "title": "Reverse payout transfer",
+        "description": "Use this to recover a lost chargeback from the photographer: it takes back whatever is left on their transfer to the platform balance. To refund the client, use Refund instead, which already reverses and refunds in one step. After a reversal, this booking can no longer be refunded to the client from here. This moves real money and is written to the audit log.",
+        "summary": "You are about to reverse the remaining transfer ({currency}) on booking {id}.",
+        "twoFactorNotice": "Submitting asks for your second factor again. Anything typed here is cleared when you come back.",
+        "reasonLabel": "Internal reason (audit log only, not shown to the client or photographer)",
+        "submit": "Reverse transfer",
+        "submitting": "Reversing...",
+        "errors": {
+          "reasonRequired": "Give a reason for the audit log.",
+          "reasonTooLong": "The reason is too long (2000 characters at most).",
+          "conflict": "The reversal was not made because of a conflict. Server message: {detail}",
+          "unprocessable": "Nothing is left on the transfer to reverse. Nothing was changed."
+        }
+      },
+      "success": {
+        "refunded": "Refund submitted. The figures above are up to date.",
+        "reversed": "Transfer reversed. The figures above are up to date."
+      },
+      "errors": {
+        "generic": "That couldn't be completed. Reload to check the ledger sums before trying again.",
+        "forbidden": "You don't have permission to do this.",
+        "notFound": "This booking couldn't be found.",
+        "invalid": "That request wasn't valid.",
+        "unknownOutcome": "The outcome is unknown: the request may or may not have gone through. Reload the page and check the refunded and reversed figures before trying again. Refund and reverse stay disabled until you reload.",
+        "conflict": "This booking is no longer in a state that allows that. Reload and check.",
+        "tooManyRequests": "Too many admin changes in a short time. Wait a moment, then reload to check the ledger before retrying.",
+        "ledgerChanged": "The booking changed since you opened it. Reload the page and check the refunded and reversed figures. Nothing was sent to Stripe.",
+        "bookingBusy": "Another money operation on this booking is still running. Wait a few seconds, reload to check the ledger, then try again.",
+        "bookingState": "This booking is \"{status}\", which does not allow that. Reload and check.",
+        "pendingReversalMismatch": "A reversal of {amount} is waiting for its refund, so this refund must be exactly that amount. Nothing was refunded."
+      },
+      "filters": {
+        "formLabel": "Filter bookings",
+        "statusLegend": "Status",
+        "createdFromLabel": "Created from (UTC)",
+        "createdToLabel": "Created before (UTC)",
+        "createdHint": "Both dates are needed together. The end date is not included, and the range can span at most 366 days.",
+        "disputeLabel": "Dispute",
+        "disputeAll": "Any",
+        "dispute": {
+          "any": "Ever disputed",
+          "open": "Open dispute",
+          "none": "Never disputed"
+        },
+        "submit": "Apply filters",
+        "clear": "Clear filters"
+      },
+      "export": {
+        "action": "Export CSV",
+        "exporting": "Exporting...",
+        "notice": "Exports the bookings matching the filters above. It asks for your second factor again and counts toward the limit of 5 refunds, reversals and exports per 10 minutes.",
+        "truncated": "The export hit the 50,000-row cap, so the file is incomplete. It was saved anyway; narrow the filters and export again for the rest.",
+        "errors": {
+          "generic": "The export failed and no file was saved. Try again.",
+          "forbidden": "You don't have permission to export bookings.",
+          "invalid": "Those filters can't be exported. Adjust them and try again.",
+          "tooManyRequests": "Too many refunds, reversals and exports in a short time. Try again later.",
+          "tooManyRequestsWithRetry": "Too many refunds, reversals and exports in a short time. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      }
     }
   },
   "common": {
@@ -743,6 +1143,7 @@
     "cancel": "Cancel",
     "close": "Close",
     "copy": "Copy",
+
     "copied": "Copied",
     "error": "An error occurred",
     "loading": "Loading...",
@@ -768,6 +1169,39 @@
       "commercial": "Commercial use",
       "editorial": "Editorial use",
       "extended": "Extended use"
+    }
+  },
+  "documents": {
+    "common": {
+      "reference": "Booking reference: {reference}",
+      "issuedOn": "Date: {date}",
+      "contact": "photoo.lu · hello@photoo.lu",
+      "page": "Page {page} of {pages}"
+    },
+    "receipt": {
+      "title": "Booking receipt",
+      "sellerHeading": "Photographer (seller)",
+      "buyerHeading": "Client",
+      "itemsHeading": "Services",
+      "lineItem": "{qty} × {label}",
+      "totalPaid": "Total paid",
+      "refunded": "Refunded to you",
+      "netPaid": "Net amount paid",
+      "sellerNotice": "This receipt confirms a payment made through {appName}. {appName} is not the seller of these services: the photographer is, and remains responsible for issuing any invoice the law requires."
+    },
+    "feeInvoice": {
+      "title": "Platform fee invoice",
+      "issuerHeading": "Issued by",
+      "recipientHeading": "Issued to",
+      "bookingAmount": "Booking amount paid by the client",
+      "refundedToClient": "Refunded to the client",
+      "platformFee": "Platform fee ({percent})",
+      "vatOnFee": "VAT on the platform fee ({rate})",
+      "totalFee": "Total platform fee",
+      "transferred": "Transferred to you",
+      "reversed": "Reversed from your transfer",
+      "payout": "Your payout",
+      "payoutNotice": "Your payout is transferred to your connected Stripe account. You remain responsible for invoicing your client and for declaring this income."
     }
   },
   "email": {
@@ -894,6 +1328,14 @@
         "not_own_work": "it does not appear to be your own work",
         "manipulated_metadata": "its metadata appears to have been manipulated",
         "other": "other"
+      },
+      "payoutsDisabled": {
+        "subject": "Payouts are paused on your account",
+        "body": "Stripe has paused payouts on your connected account, so your profile is hidden from search until this is resolved. Complete the details Stripe asks for here: {url}"
+      },
+      "disputeOpened": {
+        "subject": "A booking payment was disputed",
+        "body": "A client disputed a booking payment of {total} with their bank. The booking is frozen and will not be released until a finance admin reviews it in the admin backend. Details: {url}"
       }
     }
   },
@@ -905,11 +1347,583 @@
     "pt": "Portuguese"
   },
   "mobile": {
+    "studio": {
+      "title": "Studio",
+      "accountEntry": "Studio",
+      "accountEntryHint": "Manage your profile and portfolio",
+      "back": "Back",
+      "intro": "Manage how clients see you on Photoo.",
+      "unavailable": {
+        "title": "Studio is for photographers",
+        "description": "Your account doesn't have the photographer role. Becoming a photographer is done on photoo.lu."
+      },
+      "sessionExpired": "Your session has ended. Sign in again to continue.",
+      "loadFailed": "We couldn't load this. Check your connection and try again.",
+      "retry": "Try again",
+      "hub": {
+        "profileTitle": "Profile",
+        "profileDescription": "Your name, bio, categories and location.",
+        "portfolioTitle": "Portfolio",
+        "portfolioDescription": "Upload photos, set their order and see their review status.",
+        "productsTitle": "Products",
+        "productsDescription": "Your packages and the pricing tiers clients can request.",
+        "verificationTitle": "Verification",
+        "verificationDescription": "Upload the documents we need to verify your identity and business.",
+        "requestsTitle": "Incoming requests",
+        "requestsDescription": "Client requests that match you, and the quotes you can send.",
+        "quotesTitle": "Your quotes",
+        "quotesDescription": "Quotes you've sent, their status and payout.",
+        "bookingsTitle": "Bookings",
+        "bookingsDescription": "Bookings from quotes clients accepted, and where each stands.",
+        "payoutsTitle": "Payouts",
+        "payoutsDescription": "Connect your bank account with Stripe to get paid."
+      },
+      "profile": {
+        "title": "Your profile",
+        "createTitle": "Create your photographer profile",
+        "createIntro": "This is what clients see when they find you on Photoo.",
+        "slugHint": "Your profile URL is assigned automatically from your display name and can't be changed afterwards.",
+        "displayNameLabel": "Display name",
+        "categoriesHeading": "Categories",
+        "categoriesHint": "Choose at least one.",
+        "languagesHeading": "Languages you work in",
+        "languagesHint": "Choose at least one.",
+        "bioHeading": "Bio",
+        "bioHint": "Write a short bio in each language you want to offer it in. Leave a language blank to skip it.",
+        "bioLabel": "Bio ({language})",
+        "locationHeading": "Location",
+        "locationExplanation": "Pick your city or share your location so clients know where to find you.",
+        "locationSet": "Location set.",
+        "locationRequired": "Choose a city or use your location before saving.",
+        "cityLabel": "City",
+        "countryLabel": "Country",
+        "countriesError": "We couldn't load the list of countries.",
+        "createCta": "Create profile",
+        "saveCta": "Save changes",
+        "saving": "Saving…",
+        "created": "Profile created.",
+        "saved": "Saved.",
+        "verification": {
+          "unverified": "Not verified",
+          "pending": "Verification pending",
+          "verified": "Verified",
+          "rejected": "Verification rejected"
+        },
+        "published": "Published",
+        "unpublished": "Not published yet",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "Your profile changed elsewhere. Reload and try again.",
+          "invalid": "Check the highlighted fields and try again.",
+          "forbidden": "You don't have access to this profile.",
+          "notFound": "Your profile could not be found.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "portfolio": {
+        "title": "Portfolio",
+        "intro": "Photos are reviewed before they're shown on your public profile.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Your portfolio lives on your photographer profile, so set that up before adding photos.",
+        "needsProfileCta": "Create your profile",
+        "originalNotice": "Photos upload as originals so we can check their authenticity. Location data in the original stays private: public versions don't carry it.",
+        "uploadCta": "Upload photos",
+        "dismissCta": "Dismiss",
+        "retryCta": "Retry",
+        "uploading": "Uploading… {percent}%",
+        "scanning": "Scanning for viruses…",
+        "attaching": "Adding to your portfolio…",
+        "processing": "Processing…",
+        "empty": "You haven't uploaded any photos yet.",
+        "imageAlt": "Portfolio photo {index}",
+        "moveUpCta": "Move photo {index} up",
+        "moveDownCta": "Move photo {index} down",
+        "deleteCta": "Delete",
+        "deleteConfirmTitle": "Delete this photo?",
+        "deleteConfirmDescription": "This photo will be removed from your portfolio. This can't be undone.",
+        "deleteConfirmCta": "Yes, delete photo",
+        "deletePending": "Deleting…",
+        "deleteDismissCta": "Keep photo",
+        "libraryDenied": "Allow photo library access in Settings to upload photos.",
+        "openSettings": "Open settings",
+        "status": {
+          "processing": "Processing",
+          "pending_review": "Pending review",
+          "approved": "Approved",
+          "flagged": "Flagged",
+          "rejected": "Rejected"
+        },
+        "unsupportedType": "{name} can't be uploaded. Use a JPEG, PNG or WebP photo.",
+        "tooLarge": "{name} is larger than {limit} MB.",
+        "uploadErrors": {
+          "upload": "The upload failed. Try again.",
+          "infected": "This file failed a virus scan and wasn't added.",
+          "scanFailed": "The scan couldn't complete. Try again.",
+          "scanTimeout": "The scan is taking longer than expected. Try again shortly.",
+          "scanPending": "The file is still being scanned. Try again in a moment.",
+          "apiError": "The photo couldn't be added. Try again.",
+          "unknown": "Something went wrong. Try again."
+        },
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "Your portfolio changed elsewhere. Reload and try again.",
+          "invalid": "That couldn't be completed. Try again.",
+          "forbidden": "You don't have access to this portfolio.",
+          "notFound": "This photo could not be found.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "products": {
+        "title": "Products",
+        "intro": "Products are the services clients can request a quote for, each with usage-based pricing tiers.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Products are attached to your photographer profile, so set that up before adding one.",
+        "needsProfileCta": "Create your profile",
+        "newCta": "Add a product",
+        "empty": "You haven't added any products yet.",
+        "fromPrice": "From {price}",
+        "durationMinutes": "{minutes} min",
+        "inactiveLabel": "Inactive",
+        "deleteCta": "Delete",
+        "deleteConfirmTitle": "Delete this product?",
+        "deleteConfirmDescription": "Clients won't be able to request a quote for it any more. This can't be undone.",
+        "deleteConfirmCta": "Yes, delete product",
+        "deletePending": "Deleting…",
+        "deleteDismissCta": "Keep product",
+        "form": {
+          "createTitle": "Add a product",
+          "editTitle": "Edit product",
+          "titleHeading": "Title",
+          "titleHint": "Write a short title in each language you want to offer it in.",
+          "titleLabel": "Title ({language})",
+          "titleRequired": "Add a title in at least one language.",
+          "descriptionHeading": "Description",
+          "descriptionHint": "Optional. Leave a language blank to skip it.",
+          "descriptionLabel": "Description ({language})",
+          "categoryLabel": "Category",
+          "categoryPlaceholder": "Choose a category",
+          "durationMinutesLabel": "Duration (minutes)",
+          "basePriceLabel": "Starting price",
+          "isActiveLabel": "Visible to clients",
+          "deliverablesHeading": "Deliverables",
+          "deliverablesHint": "List what's included, e.g. number of photos or turnaround time.",
+          "deliverableKeyLabel": "Label",
+          "deliverableKeyPlaceholder": "e.g. photos",
+          "deliverableTypeLabel": "Type",
+          "deliverableType": {
+            "text": "Text",
+            "number": "Number",
+            "boolean": "Yes/No"
+          },
+          "deliverableValueLabel": "Value",
+          "deliverableValueYes": "Yes",
+          "deliverableValueNo": "No",
+          "addDeliverableCta": "Add a deliverable",
+          "removeDeliverableCta": "Remove deliverable",
+          "duplicateDeliverableKey": "Each deliverable needs a unique label.",
+          "tiersHeading": "Pricing tiers",
+          "tiersHint": "At least one tier is required, up to one per usage. Each usage can only be offered once.",
+          "tierUsageLabel": "Usage",
+          "tierUsagePlaceholder": "Choose a usage",
+          "tierPriceLabel": "Price",
+          "tierDescriptionLabel": "What's included",
+          "tierLicenceTextVersionLabel": "Licence text version",
+          "addTierCta": "Add a tier",
+          "removeTierCta": "Remove tier",
+          "duplicateTierUsage": "Each usage can only be used once.",
+          "createCta": "Add product",
+          "saveCta": "Save changes",
+          "saving": "Saving…",
+          "currencyHint": "Prices are in {currency}, set by your profile's country.",
+          "priceInvalid": "Enter an amount with at most two decimals, like 150 or 149.99."
+        },
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "This product changed elsewhere. Reload and try again.",
+          "invalid": "Check the highlighted fields and try again.",
+          "forbidden": "You don't have access to this product.",
+          "notFound": "This product could not be found.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "verification": {
+        "title": "Verification",
+        "intro": "We verify your identity and business details before your profile can be published. Documents are reviewed by our team and never shown publicly.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Verification is tied to your photographer profile, so set that up before starting it.",
+        "needsProfileCta": "Create your profile",
+        "countryUnavailable": "Verification isn't set up for your profile's country yet. Check back later.",
+        "statusHeading": "Status",
+        "status": {
+          "draft": "Draft, not submitted",
+          "submitted": "Submitted, waiting for review",
+          "in_review": "Under review",
+          "approved": "Verified",
+          "rejected": "Rejected",
+          "expired": "Expired"
+        },
+        "submittedAtLabel": "Submitted",
+        "decidedAtLabel": "Decided",
+        "rejectionReasonHeading": "Why it was rejected",
+        "readOnlyNotice": "Your details and documents are locked while the case is with our team.",
+        "startNewCaseCta": "Start a new verification case",
+        "startNewCaseConfirmTitle": "Start a new verification case?",
+        "startNewCaseConfirmDescription": "This starts a fresh case with new documents. Your previous case and its outcome are kept for our records.",
+        "startNewCaseConfirmCta": "Yes, start again",
+        "startNewCasePending": "Starting…",
+        "startNewCaseDismissCta": "Cancel",
+        "businessHeading": "Business details",
+        "businessNameLabel": "Business name",
+        "businessNameHint": "Required before you can submit.",
+        "vatNumberLabel": "VAT number (optional)",
+        "businessRegistrationNumberLabel": "Business registration number (optional)",
+        "saveDetailsCta": "Save details",
+        "startCaseCta": "Start verification",
+        "saving": "Saving…",
+        "detailsSaved": "Details saved.",
+        "caseStarted": "Verification started. Add your documents below.",
+        "documentsHeading": "Required documents",
+        "documentsHint": "Which documents are required depends on your country.",
+        "documentsNeedCase": "Start verification above to add your documents.",
+        "documentStatus": {
+          "missing": "Not added",
+          "clean": "Added",
+          "pending": "Scanning…",
+          "infected": "Failed the virus scan",
+          "failed": "Scan failed"
+        },
+        "cameraCta": "Take photo",
+        "libraryCta": "Choose photo",
+        "filesCta": "Choose file",
+        "replaceHint": "Adding a new file replaces the current one.",
+        "photoNotice": "Photos are resized and their location data is removed before upload.",
+        "uploading": "Uploading… {percent}%",
+        "scanning": "Scanning for viruses…",
+        "attaching": "Saving…",
+        "retryCta": "Retry",
+        "dismissCta": "Dismiss",
+        "permissionDenied": "Allow camera or photo access in Settings to add this document, or choose a file instead.",
+        "openSettings": "Open settings",
+        "unsupportedType": "This file type isn't accepted for this document.",
+        "tooLarge": "That file is larger than {limit} MB.",
+        "uploadErrors": {
+          "upload": "The upload failed. Try again.",
+          "infected": "This file failed a virus scan and wasn't added.",
+          "scanFailed": "The scan couldn't complete. Try again.",
+          "scanTimeout": "The scan is taking longer than expected. Try again shortly.",
+          "scanPending": "The file is still being scanned. Try again in a moment.",
+          "apiError": "The document couldn't be added. Try again.",
+          "unknown": "Something went wrong. Try again."
+        },
+        "submitHeading": "Submit for review",
+        "submitRequirementsHint": "Add a business name and upload every required document before submitting.",
+        "submitCta": "Submit for review",
+        "submitConfirmTitle": "Submit for review?",
+        "submitConfirmDescription": "Once submitted, your details and documents are locked until our team reviews them.",
+        "submitConfirmCta": "Yes, submit",
+        "submitPending": "Submitting…",
+        "submitDismissCta": "Cancel",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "Your verification case changed elsewhere. Reload and try again.",
+          "invalid": "That couldn't be completed. Check your details and try again.",
+          "forbidden": "You don't have access to this verification case.",
+          "notFound": "This verification case could not be found.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "requests": {
+        "title": "Incoming requests",
+        "intro": "Requests from clients matching your categories and location.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Incoming requests are matched to your photographer profile, so set that up first.",
+        "needsProfileCta": "Create your profile",
+        "needsPublishedTitle": "Your profile isn't published yet",
+        "needsPublishedDescription": "Incoming requests only show once your profile is published. Check your profile for what's still missing.",
+        "needsPublishedCta": "Open your profile",
+        "empty": "No requests are matching your categories and location right now.",
+        "alreadyQuotedLabel": "Quote sent",
+        "alreadyQuotedNotice": "You've already sent a quote for this request.",
+        "expiredNotice": "This request is no longer accepting quotes.",
+        "loadMoreFailed": "We couldn't load more requests.",
+        "detailTitle": "Request",
+        "notFound": "This request could not be found.",
+        "dateLabel": "Event date",
+        "dateFlexible": "The date is flexible",
+        "locationLabel": "Where",
+        "budgetLabel": "Budget",
+        "usageLabel": "Licence usage",
+        "expiresLabel": "Accepting quotes until",
+        "sendQuoteCta": "Send a quote",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "This request is no longer accepting quotes.",
+          "invalid": "This quote can't be sent as entered. Reload the request and try again.",
+          "forbidden": "You don't have access to this request.",
+          "notFound": "This request could not be found.",
+          "tooManyRequests": "You're sending quotes too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're sending quotes too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        },
+        "sendQuote": {
+          "title": "Send a quote",
+          "intro": "Add each item you're offering and its price. You'll see your payout before it sends.",
+          "lineItemsHeading": "What's included",
+          "lineItemLabel": "Item",
+          "lineItemQty": "Quantity",
+          "lineItemPrice": "Unit price ({currency})",
+          "lineItemPriceHint": "Use at most two decimals, for example 120.50.",
+          "removeLineItemCta": "Remove item",
+          "addLineItemCta": "Add item",
+          "validUntilLabel": "Valid until",
+          "validUntilPlaceholder": "Choose a date and time",
+          "validUntilAfterRequestExpiry": "Choose a time before the request stops accepting quotes.",
+          "messageLabel": "Message (optional)",
+          "invalidAmount": "Enter an amount with at most two decimals.",
+          "invalidQty": "Enter a whole number of at least 1.",
+          "invalidForm": "Check the highlighted fields and try again.",
+          "reviewCta": "Review quote",
+          "reviewTitle": "Review before you send",
+          "reviewStale": "You changed the items. Review the quote again to see your payout.",
+          "reviewLoading": "Calculating your payout\u2026",
+          "reviewError": "Couldn't calculate your payout right now. You can still send this quote.",
+          "reviewRetryCta": "Calculate again",
+          "lineItemSummary": "{qty} \u00d7 {unit}",
+          "totalLabel": "Total",
+          "feeLabel": "Platform fee",
+          "payoutLabel": "Your payout",
+          "feeNotice": "A platform fee is deducted from your payout at release; it isn't added on top of this total.",
+          "confirmSendCta": "Send quote",
+          "sending": "Sending\u2026"
+        }
+      },
+      "quotes": {
+        "title": "Your quotes",
+        "intro": "Quotes you've sent to clients.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Quotes are sent from your photographer profile, so set that up first.",
+        "needsProfileCta": "Create your profile",
+        "needsPublishedTitle": "Your profile isn't published yet",
+        "needsPublishedDescription": "Sending quotes needs a published profile. Check your profile for what's still missing.",
+        "needsPublishedCta": "Open your profile",
+        "empty": "You haven't sent any quotes yet.",
+        "loadMoreFailed": "We couldn't load more quotes.",
+        "payoutLabel": "Your payout",
+        "validUntilLabel": "Valid until",
+        "withdrawCta": "Withdraw quote",
+        "withdrawConfirmTitle": "Withdraw this quote?",
+        "withdrawConfirmDescription": "The client will no longer be able to accept it. You can send a new quote for the request afterwards.",
+        "withdrawConfirmCta": "Yes, withdraw quote",
+        "withdrawPending": "Withdrawing\u2026",
+        "withdrawDismissCta": "Keep quote",
+        "withdrawnNotice": "Quote withdrawn.",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "This quote can no longer be withdrawn. Refresh to see its current status.",
+          "invalid": "This quote can't be changed right now.",
+          "forbidden": "You don't have access to this quote.",
+          "notFound": "This quote could not be found.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "bookings": {
+        "title": "Bookings",
+        "intro": "Bookings from quotes clients accepted.",
+        "empty": "No client has booked you yet.",
+        "loadMoreFailed": "We couldn't load more bookings.",
+        "detailTitle": "Booking",
+        "notFound": "This booking doesn't exist, or it isn't yours.",
+        "delivery": {
+          "messageLabel": "Message to the client",
+          "linkLabel": "Link to the files",
+          "linkHint": "A link starting with https://",
+          "invalidLink": "Enter a valid link starting with https://.",
+          "submitCta": "Send delivery",
+          "errors": {
+            "generic": "Something went wrong. Try again.",
+            "conflict": "This booking can't take a delivery right now. Refresh to see its current status.",
+            "invalid": "Check the message and the link, then try again.",
+            "forbidden": "Only the photographer of this booking can deliver it.",
+            "notFound": "This booking could not be found."
+          }
+        },
+        "releaseDue": "Payment releases to you automatically on {date} unless the client acts before then.",
+        "disputed": "The client's bank has disputed this payment. Payouts for this booking are on hold until the dispute is resolved."
+      },
+      "payouts": {
+        "title": "Payouts",
+        "intro": "Payouts go through Stripe. Photoo never sees your bank details.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Payouts are connected to your photographer profile, so set that up first.",
+        "needsProfileCta": "Create your profile",
+        "status": {
+          "notStarted": "Not started",
+          "incomplete": "In review",
+          "enabled": "Payouts enabled"
+        },
+        "description": {
+          "notStarted": "Connect a bank account with Stripe so you can get paid for bookings.",
+          "incomplete": "Stripe is reviewing your details. This can take a little while. If Stripe asks for more information, continue setup.",
+          "enabled": "Payouts are enabled. Your earnings go to your bank account."
+        },
+        "setupCta": "Set up payouts",
+        "continueCta": "Continue setup",
+        "pending": "Opening Stripe…",
+        "returnedNotice": "You're back from Stripe. Verification can take a moment. Refresh to see the latest status.",
+        "refreshCta": "Refresh status",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "Payouts setup is not available right now. Try again later.",
+          "invalid": "Check your details and try again.",
+          "forbidden": "You don't have access to payouts.",
+          "notFound": "Your photographer profile could not be found.",
+          "emailNotVerified": "Verify your email address before setting up payouts.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      }
+    },
     "tabs": {
       "discover": "Discover",
       "requests": "Requests",
       "messages": "Messages",
       "account": "Account"
+    },
+    "account": {
+      "signedOutIntro": "Sign in to manage your bookings and profile.",
+      "profile": {
+        "title": "Your account",
+        "signedInAs": "Signed in as {email}",
+        "rolesLabel": "Roles",
+        "roles": {
+          "client": "Client",
+          "photographer": "Photographer",
+          "professional": "Professional",
+          "admin": "Admin"
+        },
+        "becomePhotographer": "Become a photographer",
+        "becomingPhotographer": "Adding the role…",
+        "errors": {
+          "generic": "Something went wrong. Please try again.",
+          "roleAlreadyAssigned": "You already have this role.",
+          "unauthorized": "Your session has ended. Please sign in again.",
+          "tooManyRequests": "Too many attempts. Please try again later."
+        }
+      },
+      "language": {
+        "title": "Language",
+        "errors": {
+          "generic": "We couldn't save your language. Check your connection and try again.",
+          "unauthorized": "Your session has ended. Please sign in again."
+        }
+      },
+      "twoFactor": {
+        "rowTitle": "Two-factor authentication",
+        "rowOn": "On",
+        "rowOff": "Off",
+        "rowHintOff": "Ask for a code from an authenticator app when you sign in.",
+        "rowHintOn": "Your account asks for a code when you sign in.",
+        "enroll": {
+          "title": "Turn on two-factor authentication",
+          "passwordDescription": "Confirm your password to set up an authenticator app.",
+          "passwordLabel": "Password",
+          "passwordSubmit": "Continue",
+          "secretTitle": "Set up your authenticator app",
+          "secretDescription": "Add this key to your authenticator app. It won't be shown again once you continue.",
+          "secretLabel": "Setup key",
+          "copySecret": "Copy key",
+          "openAuthenticator": "Open in authenticator app",
+          "openAuthenticatorFailed": "No authenticator app could be opened. Enter the key manually.",
+          "backupCodesTitle": "Backup codes",
+          "backupCodesDescription": "Save these codes somewhere safe. Each works once if you lose your authenticator app. They won't be shown again.",
+          "copyBackupCodes": "Copy backup codes",
+          "copied": "Copied",
+          "copyFailed": "Couldn't copy. Write it down instead.",
+          "stored": "I stored these",
+          "codeTitle": "Enter the code",
+          "codeDescription": "Enter the 6-digit code your authenticator app shows to finish turning on two-factor authentication.",
+          "codeLabel": "Authenticator code",
+          "codeSubmit": "Turn on"
+        },
+        "disable": {
+          "title": "Turn off two-factor authentication",
+          "description": "Enter a code from your authenticator app and your password to turn it off.",
+          "codeLabel": "Authenticator code",
+          "passwordLabel": "Password",
+          "submit": "Turn off"
+        },
+        "errors": {
+          "invalidPassword": "That password isn't correct."
+        }
+      },
+      "session": {
+        "signOut": "Sign out",
+        "signingOut": "Signing out…",
+        "signOutEverywhere": "Sign out everywhere",
+        "signOutEverywhereTitle": "Sign out everywhere?",
+        "signOutEverywhereDescription": "This ends your session on every device, including this one. You will need to sign in again.",
+        "signOutEverywhereConfirm": "Yes, sign out everywhere",
+        "signOutEverywherePending": "Signing out…",
+        "dismiss": "Cancel",
+        "errors": {
+          "generic": "We couldn't end your other sessions. Check your connection and try again."
+        }
+      },
+      "deletion": {
+        "cta": "Delete account",
+        "confirmTitle": "Delete your account?",
+        "confirmDescription": "Your account is deactivated immediately and you are signed out on every device. After a 30-day grace period, your personal data is deleted or anonymised, except records we must keep by law or to handle disputes (e.g. invoices, identity verification and booking records). Your chat messages are deleted 90 days after your request. We'll email you a link to cancel the deletion at any time before the grace period ends. Your open requests, quotes, job offers and applications are cancelled straight away and are not restored if you cancel the deletion; your public profile is hidden. Deletion can't start while a verification is in review or a recently accepted quote is still inside the withdrawal period.",
+        "confirmCta": "Yes, delete my account",
+        "pending": "Deleting…",
+        "dismissCta": "Cancel",
+        "errors": {
+          "generic": "Something went wrong. Please try again.",
+          "conflict": "Your account can't be deleted right now.",
+          "verificationInReview": "Your account can't be deleted while an identity verification is in review. Try again once it has been decided, or contact support.",
+          "acceptedQuoteWithdrawalWindow": "Your account can't be deleted while an accepted quote is still inside the withdrawal period. Try again once it has ended.",
+          "invalid": "We couldn't process this request. Please try again.",
+          "unauthorized": "Your session has ended. Please sign in again.",
+          "forbidden": "You don't have access to this request.",
+          "notFound": "This request could not be found.",
+          "gone": "This request is no longer available.",
+          "tooManyRequests": "Too many attempts. Please try again later.",
+          "tooManyRequestsWithRetry": "Too many attempts. Please try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "export": {
+        "title": "Download my data",
+        "description": "Get a copy of your personal data as a zip file. We prepare it in the background and the download link stays valid for a limited time. You can request one export per 24 hours.",
+        "requestCta": "Request my data",
+        "requesting": "Requesting…",
+        "downloadCta": "Download my data",
+        "opening": "Opening…",
+        "refreshCta": "Refresh status",
+        "status": {
+          "none": "No export requested yet.",
+          "pending": "Your export is queued.",
+          "processing": "Your export is being prepared.",
+          "ready": "Your export is ready to download.",
+          "failed": "Your last export failed. You can request a new one.",
+          "expired": "Your last export has expired. You can request a new one."
+        },
+        "errors": {
+          "generic": "Something went wrong. Please try again.",
+          "conflict": "This export isn't ready yet. Try again shortly.",
+          "verificationInReview": "This request can't be processed right now.",
+          "acceptedQuoteWithdrawalWindow": "This request can't be processed right now.",
+          "invalid": "We couldn't process this request. Please try again.",
+          "unauthorized": "Your session has ended. Please sign in again.",
+          "forbidden": "You don't have access to this export.",
+          "notFound": "This export could not be found.",
+          "gone": "This download has expired. Request a new export.",
+          "tooManyRequests": "You can request one export per 24 hours. Please try again later.",
+          "tooManyRequestsWithRetry": "You can request one export per 24 hours. Please try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      }
     },
     "notFound": {
       "title": "Page not found",
@@ -947,6 +1961,95 @@
         "rating": "{ratingAvg, number, ::.0} ({ratingCount, plural, one {# review} other {# reviews}})"
       }
     },
+    "requests": {
+      "list": {
+        "newRequest": "New request",
+        "title": "My requests",
+        "empty": "You haven't sent any requests yet.",
+        "quoteCount": "{count, plural, =0 {No quotes yet} one {# quote} other {# quotes}}",
+        "quotesReceived": "Quotes received",
+        "bookings": "My bookings",
+        "loadFailed": "We couldn't load your requests.",
+        "retry": "Try again"
+      },
+      "new": {
+        "title": "Tell photographers what you need",
+        "intro": "Describe your shoot and matching photographers can send you a quote.",
+        "photographerIntro": "This request goes out to every matching photographer nearby, not just the one you were viewing.",
+        "cancel": "Cancel",
+        "countriesError": "We couldn't load the list of countries.",
+        "countriesRetry": "Try again"
+      },
+      "form": {
+        "titleLabel": "Title",
+        "categoryLabel": "Category",
+        "descriptionLabel": "Description",
+        "eventDateLabel": "Event date and time",
+        "eventDatePlaceholder": "Choose a date and time",
+        "eventDateInPast": "Choose a date and time in the future.",
+        "dateFlexibleLabel": "My date is flexible",
+        "locationHeading": "Location",
+        "locationExplanation": "Pick your city or share your location so photographers know where you need them.",
+        "cityLabel": "City",
+        "locationSet": "Location set.",
+        "locationRequired": "Choose a city or use your location before sending the request.",
+        "addressHeading": "Address",
+        "addressHint": "Only shared with a photographer once you accept their quote.",
+        "addressLine1Label": "Address line 1",
+        "addressLine2Label": "Address line 2 (optional)",
+        "addressCityLabel": "City",
+        "addressPostalCodeLabel": "Postal code",
+        "addressCountryLabel": "Country",
+        "budgetHeading": "Budget",
+        "budgetMinLabel": "Minimum (whole amounts)",
+        "budgetMaxLabel": "Maximum (whole amounts)",
+        "budgetCurrencyHint": "Choose a country to set your currency.",
+        "budgetMinGreaterThanMax": "Minimum must not be greater than maximum.",
+        "usageLabel": "How will you use the photos?",
+        "submit": "Send request",
+        "submitting": "Sending…",
+        "submitFailed": "Your request was not sent. Nothing was lost, so check your connection and try again."
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "conflict": "This request can't be changed right now.",
+        "invalid": "Check the highlighted fields and try again.",
+        "forbidden": "You don't have access to this request.",
+        "notFound": "This request could not be found.",
+        "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      },
+      "status": {
+        "open": "Open",
+        "quoted": "Quoted",
+        "booked": "Booked",
+        "closed": "Closed",
+        "cancelled": "Cancelled"
+      },
+      "detail": {
+        "title": "Request",
+        "eventDateLabel": "Event date",
+        "budgetLabel": "Budget",
+        "budgetRange": "{min} to {max}",
+        "usageLabel": "Usage",
+        "addressLabel": "Address",
+        "quotesHeading": "Quotes",
+        "noQuotes": "No quotes yet. Matching photographers can send one any time.",
+        "quotesFailed": "We couldn't load the quotes for this request.",
+        "retry": "Try again",
+        "loadFailed": "We couldn't load this request.",
+        "back": "Back",
+        "cancelCta": "Cancel request",
+        "cancelConfirmTitle": "Cancel this request?",
+        "cancelConfirmDescription": "Photographers won't be able to send new quotes once it's cancelled.",
+        "cancelConfirmCta": "Yes, cancel request",
+        "cancelPending": "Cancelling…",
+        "cancelDismissCta": "Keep request",
+        "cancelledNotice": "This request has been cancelled.",
+        "cancelFailed": "The request was not cancelled. Check your connection and try again.",
+        "notFound": "This request doesn't exist, or it isn't yours."
+      }
+    },
     "auth": {
       "roles": {
         "client": "Client looking to book a photographer",
@@ -968,6 +2071,7 @@
         "twoFactorNotEnabled": "Two-factor authentication isn't enabled.",
         "tooManyAttempts": "Too many attempts. Request a new code.",
         "accountLocked": "Your account is temporarily locked. Try again later.",
+        "challengeExpired": "Your sign-in timed out. Enter your email and password again.",
         "roleAlreadyAssigned": "You already have this role.",
         "validationError": "Please check the highlighted fields.",
         "tooManyRequests": "Too many attempts. Try again later.",
@@ -1035,6 +2139,331 @@
         "success": "Password updated. You can now sign in.",
         "signInLink": "Sign in"
       }
+    },
+    "bookings": {
+      "list": {
+        "title": "Bookings",
+        "intro": "Bookings from quotes you've accepted.",
+        "empty": "You don't have any bookings yet.",
+        "loadFailed": "We couldn't load your bookings.",
+        "retry": "Try again",
+        "sessionExpired": "Your session has expired. Sign in again to see your bookings."
+      },
+      "detail": {
+        "title": "Booking",
+        "back": "Back",
+        "totalLabel": "Total",
+        "scheduleLabel": "Scheduled for",
+        "notScheduled": "Not scheduled yet",
+        "locationLabel": "Location",
+        "noLocation": "No location set",
+        "coordinates": "{latitude}, {longitude}",
+        "timelineLabel": "Booking status",
+        "timelineExited": "This booking left the normal process:",
+        "notFound": "This booking doesn't exist, or it isn't yours.",
+        "loadFailed": "We couldn't load this booking.",
+        "retry": "Try again",
+        "sessionExpired": "Your session has expired. Sign in again to see this booking.",
+        "releaseDue": "If you don't accept the delivery or ask for a refund, payment is released to the photographer automatically on {date}.",
+        "disputed": "This payment has been disputed with your bank. Photoo is handling the dispute, and there's nothing you need to do in the app."
+      },
+      "acceptDelivery": {
+        "cta": "Accept delivery",
+        "confirmTitle": "Accept this delivery?",
+        "confirmDescription": "Accepting releases the payment to the photographer. This can't be undone.",
+        "confirmCta": "Accept and release payment",
+        "pending": "Accepting…",
+        "dismissCta": "Cancel",
+        "done": "Delivery accepted. The payment is being released to the photographer.",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "This delivery can't be accepted right now. Refresh to see the current status.",
+          "forbidden": "Only the client of this booking can accept the delivery.",
+          "notFound": "This booking could not be found."
+        }
+      },
+      "refund": {
+        "cta": "Request a refund",
+        "title": "Request a refund",
+        "description": "Leave the amount empty to refund everything still refundable. A partial refund doesn't stop the scheduled release: the photographer receives the reduced amount. A full refund ends the booking.",
+        "amountLabel": "Amount",
+        "amountPlaceholder": "Full amount",
+        "reasonLabel": "Reason",
+        "submitCta": "Request refund",
+        "pending": "Requesting…",
+        "dismissCta": "Cancel",
+        "invalidAmount": "Enter an amount above zero with at most 2 decimal places.",
+        "donePartial": "Refund of {amount} recorded. Refunded so far: {total}. The booking stays open, and the scheduled release still goes ahead with the reduced amount.",
+        "doneFull": "Refund of {amount} recorded. The booking is now refunded in full.",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "busy": "Another refund or the payment release is in progress for this booking. Try again in a moment.",
+          "conflict": "This booking can't be refunded right now. It may have changed, have an open dispute, or its payment may not have settled yet. Refresh to see its current status.",
+          "invalid": "This amount can't be refunded. It may be more than what's still refundable, or leave too little of the booking behind. Try another amount, or leave it empty to refund everything that's left.",
+          "forbidden": "Only the client of this booking can request a refund.",
+          "notFound": "This booking could not be found.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "cancel": {
+        "cta": "Cancel booking",
+        "confirmTitle": "Cancel this booking?",
+        "confirmDescription": "The booking won't go ahead. This can't be undone.",
+        "reasonLabel": "Reason (optional)",
+        "confirmCta": "Cancel booking",
+        "pending": "Cancelling…",
+        "dismissCta": "Keep booking",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "This booking can't be cancelled anymore. Refresh to see its current status.",
+          "invalid": "Check the reason and try again.",
+          "forbidden": "You don't have access to this booking.",
+          "notFound": "This booking could not be found."
+        }
+      },
+      "documents": {
+        "receiptCta": "Download receipt",
+        "feeInvoiceCta": "Download fee invoice",
+        "pending": "Preparing…",
+        "preparing": "This document is being prepared. Try again shortly.",
+        "errors": {
+          "generic": "We couldn't open the document. Try again.",
+          "forbidden": "You don't have access to this document.",
+          "notFound": "This booking could not be found."
+        }
+      },
+      "pay": {
+        "title": "Pay for this booking",
+        "description": "Pay by card, Apple Pay or Google Pay. The payment is held until the photographer delivers.",
+        "unavailable": "Payment is not available in this environment",
+        "loading": "Preparing payment…",
+        "payCta": "Pay {amount}",
+        "processing": "Payment submitted. We're waiting for confirmation, which can take a moment.",
+        "processingTimeout": "Still processing. If you completed the payment, it can take a few minutes to show here. Refresh to check again.",
+        "refresh": "Refresh",
+        "failed": "The payment didn't go through. Try again or use another payment method.",
+        "loadFailed": "We couldn't prepare the payment. Check your connection and try again.",
+        "retry": "Try again"
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "conflict": "This booking is no longer awaiting payment.",
+        "invalid": "This booking can't be paid right now.",
+        "forbidden": "You don't have access to this booking.",
+        "notFound": "This booking could not be found.",
+        "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      },
+      "status": {
+        "pending_payment": "Awaiting payment",
+        "paid_held": "Paid, held until delivery",
+        "in_progress": "In progress",
+        "delivered": "Delivered",
+        "released": "Released",
+        "refunded": "Refunded",
+        "disputed": "Disputed",
+        "cancelled": "Cancelled"
+      }
+    },
+    "quotes": {
+      "list": {
+        "title": "Quotes",
+        "intro": "Quotes photographers have sent you.",
+        "empty": "You haven't received any quotes yet.",
+        "loadFailed": "We couldn't load your quotes.",
+        "retry": "Try again"
+      },
+      "card": {
+        "validUntil": "Valid until {date}"
+      },
+      "status": {
+        "draft": "Draft",
+        "sent": "Sent",
+        "accepted": "Accepted",
+        "declined": "Declined",
+        "expired": "Expired",
+        "withdrawn": "Withdrawn"
+      },
+      "detail": {
+        "title": "Quote",
+        "validUntilLabel": "Valid until",
+        "lineItemsHeading": "What's included",
+        "lineItem": "{qty} × {unit}",
+        "totalLabel": "Total",
+        "messageHeading": "Message from the photographer",
+        "photographerRating": "{ratingAvg} ({ratingCount, plural, one {# review} other {# reviews}})",
+        "loadFailed": "We couldn't load this quote.",
+        "retry": "Try again",
+        "back": "Back",
+        "notFound": "This quote doesn't exist, or it isn't yours.",
+        "acceptCta": "Accept quote",
+        "declineCta": "Decline quote",
+        "acceptConfirmTitle": "Accept this quote?",
+        "acceptConfirmDescription": "Accepting records your choice. Payment is a separate step and nothing is charged now.",
+        "acceptConfirmCta": "Yes, accept quote",
+        "acceptPending": "Accepting…",
+        "acceptDismissCta": "Not yet",
+        "declineConfirmTitle": "Decline this quote?",
+        "declineConfirmDescription": "The photographer will be notified that you declined.",
+        "declineConfirmCta": "Yes, decline quote",
+        "declinePending": "Declining…",
+        "declineDismissCta": "Keep quote",
+        "acceptedNotice": "Quote accepted. Nothing has been charged yet.",
+        "viewBookingsCta": "View my bookings",
+        "declinedNotice": "Quote declined.",
+        "withdrawnNotice": "This quote was withdrawn by the photographer.",
+        "expiredNotice": "This quote has expired."
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "conflict": "This quote is no longer available.",
+        "invalid": "This quote can't be changed right now.",
+        "forbidden": "You don't have access to this quote.",
+        "notFound": "This quote could not be found.",
+        "actionFailed": "That didn't go through and the quote is unchanged. Check your connection and try again.",
+        "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      }
+    },
+    "profile": {
+      "title": "Photographer",
+      "back": "Back",
+      "avatarAlt": "{displayName}",
+      "languages": "Speaks: {languages}",
+      "rating": "{ratingAvg, number, ::.0} ({ratingCount, plural, one {# review} other {# reviews}})",
+      "portfolioHeading": "Portfolio",
+      "portfolioImageAlt": "Photo {index} by {displayName}",
+      "productsHeading": "Packages",
+      "noProducts": "No packages yet.",
+      "fromPrice": "From {price}",
+      "durationMinutes": "{minutes} min",
+      "requestQuoteCta": "Request a quote",
+      "requestTierQuote": "Request this quote",
+      "requestingTierQuote": "Sending...",
+      "tierQuoteLabel": "Request a quote for {product}, {usage}",
+      "loadFailed": "We couldn't load this profile.",
+      "retry": "Try again",
+      "notFound": {
+        "title": "Photographer not found",
+        "description": "This photographer profile doesn't exist, or isn't published yet.",
+        "backHome": "Back to discover"
+      },
+      "viewer": {
+        "close": "Close",
+        "previous": "Previous photo",
+        "next": "Next photo",
+        "position": "{index} of {total}"
+      }
+    },
+    "chat": {
+      "list": {
+        "title": "Messages",
+        "empty": "No conversations yet.",
+        "subjectQuote": "About: {title}",
+        "subjectQuoteUntitled": "About a quote",
+        "noMessagesYet": "No messages yet",
+        "unreadBadge": "{count, plural, one {# unread message} other {# unread messages}}",
+        "loadFailed": "We couldn't load your conversations.",
+        "retry": "Try again"
+      },
+      "thread": {
+        "title": "Conversation",
+        "back": "Back",
+        "loadFailed": "We couldn't load this conversation.",
+        "retry": "Try again",
+        "notFound": "This conversation doesn't exist, or it isn't yours.",
+        "typingIndicator": "{name} is typing…",
+        "loadOlderCta": "Load older messages",
+        "loadingOlder": "Loading…",
+        "deletedMessage": "This message was deleted.",
+        "sendingStatus": "Sending…",
+        "failedStatus": "Not sent.",
+        "retryCta": "Retry",
+        "reconnecting": "Reconnecting…"
+      },
+      "composer": {
+        "label": "Message",
+        "placeholder": "Write a message…",
+        "sendCta": "Send"
+      },
+      "attachments": {
+        "viewCta": "View attachment",
+        "downloadCta": "Open attachment",
+        "opening": "Opening…",
+        "openFailed": "Couldn't open this attachment. Try again.",
+        "imageAlt": "Shared image",
+        "closeCta": "Close",
+        "kindImage": "IMG",
+        "kindPdf": "PDF",
+        "sizeKb": "{size} KB",
+        "sizeMb": "{size} MB",
+        "attachCta": "Attach",
+        "camera": "Take a photo",
+        "library": "Photo library",
+        "files": "Choose a file",
+        "removeCta": "Remove {name}",
+        "retryCta": "Retry",
+        "uploading": "Uploading {percent}%",
+        "scanning": "Checking the file…",
+        "ready": "Ready",
+        "uploadFailed": "Upload failed.",
+        "infected": "This file didn't pass the security check.",
+        "scanTimeout": "The security check is taking too long.",
+        "stillScanning": "An attachment is still being checked. Try again in a moment.",
+        "stillScanningStatus": "Waiting for the file check.",
+        "unsupportedType": "{name} can't be attached. Use a JPEG, PNG, WebP or PDF file.",
+        "tooLarge": "{name} is larger than {limit} MB.",
+        "tooManyFiles": "You can attach up to {max} files to a message.",
+        "waitForUploads": "Wait for the files to finish uploading.",
+        "cameraDenied": "Allow camera access in Settings to take a photo. You can still send messages and choose other files.",
+        "libraryDenied": "Allow photo library access in Settings to attach a photo. You can still send messages and choose other files.",
+        "openSettings": "Open settings"
+      },
+      "participant": {
+        "clientLabel": "Client"
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "conflict": "This message can't be changed right now.",
+        "invalidBody": "This message is empty, too long or contains characters that can't be sent.",
+        "invalid": "One of the attachments has a problem. Remove it and try again.",
+        "forbidden": "You don't have access to this conversation.",
+        "notFound": "This conversation is no longer available.",
+        "tooManyRequests": "You're sending messages too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're sending messages too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      }
+    },
+    "notifications": {
+      "prompt": {
+        "explanation": "Get notified when someone replies, even when the app is closed. Notifications show the sender's name, never the message.",
+        "enableCta": "Turn on notifications",
+        "dismissCta": "Not now"
+      }
+    },
+    "consent": {
+      "title": "Your privacy choices",
+      "intro": "Choose what we may do beyond running the app. You can change this at any time in the Account tab.",
+      "necessary": {
+        "title": "Necessary",
+        "description": "Keeps you signed in, secures your account and makes bookings and chat work."
+      },
+      "analytics": {
+        "title": "Analytics",
+        "description": "Lets us measure which screens are used and where the app is confusing, so we can improve it."
+      },
+      "adsMarketing": {
+        "title": "Ads and marketing",
+        "description": "Lets us measure our own advertising and send you offers and news about photoo.lu."
+      },
+      "alwaysOn": "Always on",
+      "acceptAll": "Accept all",
+      "declineAll": "Decline all",
+      "save": "Save my choices",
+      "saved": "Your choices are saved.",
+      "loading": "Loading your choices",
+      "settingsEntry": "Privacy choices",
+      "settingsEntryHint": "Review or change what you allow."
     }
   },
   "push": {
@@ -1112,6 +2541,14 @@
           "title": "One of your portfolio images was rejected",
           "body": "See the details by email"
         }
+      },
+      "payoutsDisabled": {
+        "title": "Payouts paused",
+        "body": "Your profile is hidden until your payout details are complete"
+      },
+      "disputeOpened": {
+        "title": "Payment disputed",
+        "body": "A booking is frozen until finance reviews it"
       }
     }
   },
@@ -1310,6 +2747,7 @@
         "account": "Account",
         "myRequests": "My requests",
         "quotes": "Quotes",
+        "bookings": "Bookings",
         "messages": "Messages",
         "signOut": "Sign out",
         "dashboard": "Dashboard"
@@ -1571,7 +3009,7 @@
         "acceptCta": "Accept quote",
         "declineCta": "Decline quote",
         "acceptConfirmTitle": "Accept this quote?",
-        "acceptConfirmDescription": "Booking and payment are coming soon; accepting reserves this quote and we'll follow up with next steps.",
+        "acceptConfirmDescription": "Accepting reserves this quote and creates a booking you'll pay for next.",
         "acceptConfirmCta": "Yes, accept quote",
         "acceptPending": "Accepting…",
         "acceptDismissCta": "Not yet",
@@ -1586,7 +3024,8 @@
         "withdrawConfirmCta": "Yes, withdraw quote",
         "withdrawPending": "Withdrawing…",
         "withdrawDismissCta": "Keep quote",
-        "acceptedNotice": "Quote accepted. Booking and payment are coming soon — we'll be in touch with next steps.",
+        "acceptedNotice": "Quote accepted.",
+        "viewBookingsCta": "View your bookings",
         "declinedNotice": "Quote declined.",
         "withdrawnNotice": "This quote was withdrawn by the photographer.",
         "notFound": {
@@ -1609,6 +3048,106 @@
         "invalid": "Check the highlighted fields and try again.",
         "forbidden": "You don't have access to this quote.",
         "notFound": "This quote could not be found.",
+        "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+        "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+      }
+    },
+    "bookings": {
+      "list": {
+        "metaTitle": "Bookings",
+        "title": "Bookings",
+        "intro": "Bookings from quotes you've accepted.",
+        "empty": "You don't have any bookings yet.",
+        "loadMore": "Next page"
+      },
+      "detail": {
+        "metaTitle": "Booking",
+        "backToList": "Back to bookings",
+        "totalLabel": "Total",
+        "scheduleLabel": "Scheduled for",
+        "notScheduled": "Not scheduled yet",
+        "locationLabel": "Location",
+        "noLocation": "No location set",
+        "coordinates": "{lat}, {lng}",
+        "statusTimelineLabel": "Booking status",
+        "statusTimelineExited": "This booking left the normal process:",
+        "checkout": {
+          "title": "Pay for this booking",
+          "description": "Your payment is held securely until the booking is delivered and released.",
+          "payCta": "Pay now",
+          "processing": "Processing your payment…",
+          "unavailable": "Payment is not available in this environment.",
+          "loadError": "We couldn't start the payment. Try again.",
+          "processingReturn": "We're confirming your payment. This page will update automatically.",
+          "processingTimeout": "This is taking longer than expected. Reload the page to check the latest status.",
+          "paymentFailed": "Your payment didn't go through. You can try again below."
+        },
+        "notFound": {
+          "title": "Booking not found",
+          "description": "This booking doesn't exist, or it isn't yours.",
+          "backCta": "Back to bookings"
+        },
+        "delivery": {
+          "title": "Deliver this booking",
+          "description": "Share a message and a link to the final files.",
+          "messageLabel": "Message",
+          "externalLinkLabel": "Link to the files",
+          "submitCta": "Send delivery",
+          "pending": "Sending…",
+          "success": "Delivery sent."
+        },
+        "acceptDelivery": {
+          "cta": "Accept delivery",
+          "confirmTitle": "Accept this delivery?",
+          "confirmDescription": "Accepting releases the payment to the photographer. This can't be undone.",
+          "confirmCta": "Accept and release payment",
+          "pending": "Accepting…",
+          "dismissCta": "Cancel"
+        },
+        "refund": {
+          "cta": "Request a refund",
+          "title": "Request a refund",
+          "description": "Leave the amount empty to refund the full remaining total.",
+          "amountLabel": "Amount",
+          "amountPlaceholder": "Full amount",
+          "reasonLabel": "Reason",
+          "submitCta": "Request refund",
+          "pending": "Requesting…",
+          "cancelCta": "Cancel",
+          "invalidAmount": "Enter a valid amount with at most 2 decimal places."
+        },
+        "cancel": {
+          "cta": "Cancel booking",
+          "confirmTitle": "Cancel this booking?",
+          "confirmDescription": "This can't be undone.",
+          "reasonLabel": "Reason (optional)",
+          "confirmCta": "Cancel booking",
+          "pending": "Cancelling…",
+          "dismissCta": "Keep booking"
+        },
+        "documents": {
+          "receiptCta": "Download receipt",
+          "feeInvoiceCta": "Download fee invoice",
+          "pending": "Preparing…",
+          "preparing": "This document is being prepared. Try again shortly."
+        }
+      },
+      "status": {
+        "pending_payment": "Awaiting payment",
+        "paid_held": "Paid, held in escrow",
+        "in_progress": "In progress",
+        "delivered": "Delivered",
+        "released": "Released",
+        "refunded": "Refunded",
+        "disputed": "Disputed",
+        "cancelled": "Cancelled"
+      },
+      "errors": {
+        "generic": "Something went wrong. Try again.",
+        "conflict": "This booking can't be changed right now.",
+        "invalid": "Check the highlighted fields and try again.",
+        "forbidden": "You don't have access to this booking.",
+        "notFound": "This booking could not be found.",
         "tooManyRequests": "You're doing that too fast. Slow down and try again.",
         "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
       }
@@ -1681,7 +3220,10 @@
         "products": "Packages",
         "verification": "Verification",
         "requests": "Requests",
-        "quotes": "Quotes"
+        "quotes": "Quotes",
+        "bookings": "Bookings",
+        "payouts": "Payouts",
+        "earnings": "Earnings"
       },
       "needsRole": {
         "title": "Photographer dashboard",
@@ -1702,8 +3244,7 @@
         "checklist": {
           "status": {
             "done": "Done",
-            "todo": "Not started",
-            "comingSoon": "Coming soon"
+            "todo": "Not started"
           },
           "profile": {
             "title": "Profile details",
@@ -1733,8 +3274,14 @@
           },
           "payouts": {
             "title": "Payouts",
-            "description": "Connect a bank account with Stripe so you can get paid.",
-            "comingSoon": "Not available yet."
+            "todoDescription": "Connect a bank account with Stripe so you can get paid.",
+            "incompleteStatus": "In review",
+            "incompleteDescription": "Stripe is reviewing your details. Continue setup if it asks for more.",
+            "doneDescription": "Payouts are enabled. Your earnings go to your bank account.",
+            "startCta": "Set up payouts",
+            "continueCta": "Continue setup",
+            "cta": "View payouts",
+            "needsProfile": "Create your profile first."
           }
         }
       },
@@ -2049,6 +3596,67 @@
         "payoutLabel": "Your payout",
         "validUntilLabel": "Valid until",
         "loadMore": "Next page"
+      },
+      "bookings": {
+        "metaTitle": "Your bookings",
+        "title": "Your bookings",
+        "backToOverview": "Back to overview",
+        "intro": "Bookings from quotes clients have accepted.",
+        "empty": "You don't have any bookings yet.",
+        "loadMore": "Next page"
+      },
+      "payouts": {
+        "metaTitle": "Payouts",
+        "title": "Payouts",
+        "backToOverview": "Back to overview",
+        "intro": "Payouts go through Stripe. Photoo never sees your bank details.",
+        "needsProfileTitle": "Create your profile first",
+        "needsProfileDescription": "Payouts are connected to your photographer profile, so set that up first.",
+        "needsProfileCta": "Create your profile",
+        "status": {
+          "notStarted": "Not started",
+          "incomplete": "In review",
+          "enabled": "Payouts enabled"
+        },
+        "description": {
+          "notStarted": "Connect a bank account with Stripe so you can get paid for bookings.",
+          "incomplete": "Stripe is reviewing your details. This can take a little while. If Stripe asks for more information, continue setup.",
+          "enabled": "Payouts are enabled. Your earnings go to your bank account."
+        },
+        "setupCta": "Set up payouts",
+        "continueCta": "Continue setup",
+        "pending": "Opening Stripe…",
+        "errors": {
+          "generic": "Something went wrong. Try again.",
+          "conflict": "Payouts setup is not available right now. Try again later.",
+          "invalid": "Check your details and try again.",
+          "forbidden": "You don't have access to payouts.",
+          "notFound": "Your photographer profile could not be found.",
+          "emailNotVerified": "Verify your email address before setting up payouts.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
+      },
+      "earnings": {
+        "metaTitle": "Earnings",
+        "title": "Earnings",
+        "backToOverview": "Back to overview",
+        "intro": "What you have earned from bookings, per currency.",
+        "releasedLabel": "Released to your Stripe account",
+        "heldLabel": "Held until delivery is accepted",
+        "recentHeading": "Recent activity",
+        "recentDate": "Date",
+        "recentAmount": "Amount",
+        "recentLink": "View booking",
+        "payoutSchedule": "Released money goes to your Stripe balance. Stripe then pays it to your bank on your payout schedule, usually within a few days, as long as payouts are enabled on your Stripe account.",
+        "emptyTitle": "No earnings yet",
+        "emptyDescription": "Earnings appear here once a client books and pays.",
+        "errors": {
+          "generic": "Something went wrong loading your earnings. Reload the page to try again.",
+          "forbidden": "Only photographers can see earnings.",
+          "tooManyRequests": "You're doing that too fast. Slow down and try again.",
+          "tooManyRequestsWithRetry": "You're doing that too fast. Try again in {seconds, plural, one {# second} other {# seconds}}."
+        }
       }
     },
     "emailVerification": {

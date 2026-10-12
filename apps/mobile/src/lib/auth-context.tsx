@@ -3,13 +3,18 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
 
+import * as Sentry from '@sentry/react-native';
+
 import type { components } from '@photoo/api-client';
 
 import { api, setUnauthorizedListener } from './api';
+import { resetChatSocket } from './chat-socket';
+import { unregisterPushDevice } from './push';
 import {
   clearStoredSession,
   getStoredSession,
@@ -25,7 +30,9 @@ export interface AuthContextValue {
   status: AuthStatus;
   user: SessionUser | null;
   signIn: (user: SessionUser, session: StoredSession) => Promise<void>;
-  signOut: () => Promise<void>;
+  signOut: (options?: { remote?: boolean }) => Promise<void>;
+  updateUser: (user: SessionUser) => void;
+  replaceSession: (session: StoredSession) => Promise<void>;
   // Re-checks GET /v1/auth/session against whatever token is already stored,
   // for the "check your email" continue button: no-op when there is none.
   checkSession: () => Promise<boolean>;
@@ -42,10 +49,34 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<SessionUser | null>(null);
 
-  const signOut = useCallback(async () => {
-    await clearStoredSession();
-    setUser(null);
-    setStatus('signed-out');
+  const signingOutRef = useRef(false);
+
+  const signOut = useCallback(async (options?: { remote?: boolean }) => {
+    if (signingOutRef.current) {
+      return;
+    }
+    signingOutRef.current = true;
+    try {
+      await unregisterPushDevice();
+      if (options?.remote) {
+        await api.POST('/v1/auth/sign-out').catch(() => undefined);
+      }
+      resetChatSocket();
+      await clearStoredSession();
+      setUser(null);
+      setStatus('signed-out');
+    } finally {
+      signingOutRef.current = false;
+    }
+  }, []);
+
+  const updateUser = useCallback((nextUser: SessionUser) => {
+    setUser(nextUser);
+  }, []);
+
+  const replaceSession = useCallback(async (session: StoredSession) => {
+    await setStoredSession(session);
+    resetChatSocket();
   }, []);
 
   const signIn = useCallback(async (nextUser: SessionUser, session: StoredSession) => {
@@ -77,10 +108,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let cancelled = false;
 
     async function restore() {
-      const stored = await getStoredSession();
-      if (!stored || isExpired(stored.expiresAt)) {
-        if (stored) {
+      let stored: StoredSession | null;
+      try {
+        stored = await getStoredSession();
+      } catch (error) {
+        Sentry.captureException(error);
+        try {
           await clearStoredSession();
+        } catch (clearError) {
+          Sentry.captureException(clearError);
         }
         if (!cancelled) {
           setStatus('signed-out');
@@ -88,7 +124,31 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return;
       }
 
-      const { data, response } = await api.GET('/v1/auth/session');
+      if (!stored || isExpired(stored.expiresAt)) {
+        if (stored) {
+          try {
+            await clearStoredSession();
+          } catch (clearError) {
+            Sentry.captureException(clearError);
+          }
+        }
+        if (!cancelled) {
+          setStatus('signed-out');
+        }
+        return;
+      }
+
+      let result;
+      try {
+        result = await api.GET('/v1/auth/session');
+      } catch (error) {
+        Sentry.captureException(error);
+        if (!cancelled) {
+          setStatus('signed-out');
+        }
+        return;
+      }
+      const { data, response } = result;
       if (cancelled) {
         return;
       }
@@ -115,7 +175,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ status, user, signIn, signOut, checkSession }}>
+    <AuthContext.Provider
+      value={{ status, user, signIn, signOut, updateUser, replaceSession, checkSession }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -17,3 +17,7 @@ playwright-report/
 test-results/
 tests/smoke/.auth/
 .lighthouseci/
+
+# expo prebuild output (apps/mobile/e2e/README.md)
+apps/mobile/android/
+apps/mobile/ios/

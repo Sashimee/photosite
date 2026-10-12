@@ -13,6 +13,8 @@ jest.mock('../../src/lib/api', () => ({
   setUnauthorizedListener: jest.fn(),
 }));
 
+import * as SecureStore from 'expo-secure-store';
+
 import { api } from '../../src/lib/api';
 
 const mockedPost = jest.mocked(api.POST);
@@ -57,5 +59,38 @@ describe('sign-up screen', () => {
     });
 
     await waitFor(() => screen.getByText('Check your email'));
+  });
+
+  it('passes the stored anonymousId so the API links the earlier consent decision', async () => {
+    const store = jest.mocked(SecureStore);
+    store.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(key === 'photoo.consent.anonymousId' ? 'anon-123' : null),
+    );
+    mockedPost.mockResolvedValue({
+      data: { user: {} },
+      error: undefined,
+      response: new Response(null, { status: 201 }),
+    });
+
+    renderRouter('./app', { initialUrl: '/sign-up' });
+
+    await waitFor(() => screen.getByTestId('sign-up-email'));
+    fireEvent.changeText(screen.getByTestId('sign-up-email'), 'client@example.com');
+    fireEvent.changeText(screen.getByTestId('sign-up-password'), 'correct horse battery staple');
+    fireEvent.press(screen.getByTestId('sign-up-role-client'));
+    fireEvent.press(screen.getByTestId('sign-up-submit'));
+
+    await waitFor(() => {
+      expect(mockedPost).toHaveBeenCalledWith('/v1/auth/sign-up', {
+        body: expect.objectContaining({ anonymousId: 'anon-123' }),
+      });
+    });
+    await waitFor(() => {
+      expect(store.deleteItemAsync).toHaveBeenCalledWith(
+        'photoo.consent.anonymousId',
+        expect.anything(),
+      );
+    });
+    store.getItemAsync.mockImplementation(() => Promise.resolve(null));
   });
 });

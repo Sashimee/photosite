@@ -889,12 +889,67 @@ describe('verification integration', () => {
       });
       expect(approveAudit).not.toBeNull();
       expect(approveAudit?.ip).toBe(FAKE_IP);
+      expect(approveAudit?.before).toEqual({ status: 'in_review', isPublished: false });
+      expect(approveAudit?.after).toEqual({ status: 'approved', isPublished: false });
 
       const notification = await prisma.notification.findFirst({
         where: { userId: photographer.id, type: 'verification_approved' },
       });
       expect(notification).not.toBeNull();
       expect(notification?.channels).not.toContain('push');
+    });
+
+    it('publishes the profile on approval when payouts are enabled and audits it', async () => {
+      const { profile, caseId } = await createSubmittedCase('approve-publish');
+      await prisma.photographerProfile.update({
+        where: { id: profile.id },
+        data: { stripePayoutsEnabled: true },
+      });
+      const admin = await makeAdmin('approve-publish-admin', true);
+      for (const action of ['start-review', 'approve']) {
+        const response = await fastify().inject({
+          method: 'POST',
+          url: `/v1/admin/verification-cases/${caseId}/${action}`,
+          headers: admin.headers,
+        });
+        expect(response.statusCode).toBe(200);
+      }
+
+      const updated = await prisma.photographerProfile.findUniqueOrThrow({
+        where: { id: profile.id },
+      });
+      expect(updated.isPublished).toBe(true);
+      const audit = await prisma.auditLog.findFirstOrThrow({
+        where: { action: 'verification_case.approved', targetId: caseId },
+      });
+      expect(audit.before).toEqual({ status: 'in_review', isPublished: false });
+      expect(audit.after).toEqual({ status: 'approved', isPublished: true });
+    });
+
+    it('does not publish on approval while a deletion request is pending', async () => {
+      const { photographer, profile, caseId } = await createSubmittedCase('approve-pending-delete');
+      await prisma.photographerProfile.update({
+        where: { id: profile.id },
+        data: { stripePayoutsEnabled: true },
+      });
+      await prisma.dataRequest.create({
+        data: { userId: photographer.id, type: 'delete', status: 'pending' },
+      });
+      const admin = await makeAdmin('approve-pending-delete-admin', true);
+      for (const action of ['start-review', 'approve']) {
+        const response = await fastify().inject({
+          method: 'POST',
+          url: `/v1/admin/verification-cases/${caseId}/${action}`,
+          headers: admin.headers,
+        });
+        expect(response.statusCode).toBe(200);
+      }
+
+      const updated = await prisma.photographerProfile.findUniqueOrThrow({
+        where: { id: profile.id },
+      });
+      expect(updated.verificationStatus).toBe('verified');
+      expect(updated.isPublished).toBe(false);
     });
 
     it('omits the download link for a document whose upload has not been scanned clean', async () => {

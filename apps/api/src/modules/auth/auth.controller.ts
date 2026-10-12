@@ -34,7 +34,13 @@ import type { Env } from '../../config/env.js';
 import { APP_CONFIG } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { ChatSocketBridge } from '../chat/chat-socket-bridge.js';
-import { applyFetchResponse, rethrowAsHttpException, toFetchHeaders } from './auth-http.js';
+import {
+  applyFetchResponse,
+  readSetCookieValue,
+  rethrowAsHttpException,
+  toFetchHeaders,
+  withCookie,
+} from './auth-http.js';
 import { AUTH_INSTANCE } from './auth-instance.provider.js';
 import type { Auth } from './auth-instance.js';
 import { AuthRateLimitService } from './auth-rate-limit.service.js';
@@ -96,17 +102,42 @@ export class AuthController {
   // Stamps the session that just proved a second factor, identified by its
   // (possibly rotated, see totpVerify) token - never every session the user
   // has open elsewhere.
-  private async stampTwoFactorVerified(token: string, headers: Headers): Promise<void> {
+  private async stampTwoFactorVerified(
+    token: string,
+    headers: Headers,
+  ): Promise<string | undefined> {
     const lookupHeaders = new Headers(headers);
     lookupHeaders.set('authorization', `Bearer ${token}`);
     const session = await this.auth.api.getSession({ headers: lookupHeaders });
     if (!session) {
-      return;
+      return undefined;
     }
+    const sessionId = (session.session as unknown as BetterAuthSessionRow).id;
     await this.prisma.client.session.update({
-      where: { id: (session.session as unknown as BetterAuthSessionRow).id },
+      where: { id: sessionId },
       data: { twoFactorVerifiedAt: new Date() },
     });
+    return sessionId;
+  }
+
+  // A session that predates 2FA must not keep admin access once it's on,
+  // but the session that just verified the code must survive it.
+  // auth.api.revokeOtherSessions can do neither here: it lists sessions
+  // by userId, hardened-adapter.ts refuses to hand back their tokens
+  // (see #127), and better-auth has no token to delete by. userId/id is
+  // the only field this can reliably revoke by.
+  private async revokeOtherCredentials(userId: string, keepSessionId: string): Promise<void> {
+    await this.prisma.client.$transaction([
+      this.prisma.client.session.deleteMany({
+        where: { userId, id: { not: keepSessionId } },
+      }),
+      this.prisma.client.device.deleteMany({ where: { userId } }),
+    ]);
+  }
+
+  private async twoFactorCookieName(): Promise<string> {
+    const context = await this.auth.$context;
+    return context.createAuthCookie('two_factor').name;
   }
 
   private async defaultCountryCode(): Promise<string> {
@@ -165,7 +196,7 @@ export class AuthController {
       });
       const parsed = await applyFetchResponse<{ user: BetterAuthUserRow }>(response, reply);
       if (input.anonymousId) {
-        await this.linkAnonymousConsents(input.anonymousId, parsed.user.id);
+        await this.tryLinkAnonymousConsents(input.anonymousId, parsed.user.id);
       }
       reply.status(201);
       reply.send({ user: mapUser(parsed.user) });
@@ -188,6 +219,28 @@ export class AuthController {
       where: { anonymousId, userId: null },
       data: { userId, anonymousId: null },
     });
+  }
+
+  // Deliberate exception to fail-loudly: for an already-registered email
+  // Better Auth returns a fake user whose id has no row, and any failure here
+  // must not change the sign-up response or it reveals the account exists
+  // (docs/SECURITY.md "no user enumeration").
+  private async tryLinkAnonymousConsents(anonymousId: string, userId: string): Promise<void> {
+    try {
+      const created = await this.prisma.client.user.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      });
+      if (!created) {
+        return;
+      }
+      await this.linkAnonymousConsents(anonymousId, userId);
+    } catch (error) {
+      this.logger.warn(
+        { context: 'AuthController', errorName: error instanceof Error ? error.name : 'unknown' },
+        'Failed to link anonymous consents during sign-up',
+      );
+    }
   }
 
   @Post('sign-in')
@@ -213,8 +266,15 @@ export class AuthController {
       }>(response, reply);
 
       if (parsed.twoFactorRedirect || !parsed.token) {
+        const challengeToken = readSetCookieValue(response, await this.twoFactorCookieName());
+        if (!challengeToken) {
+          throw new HttpException(
+            { code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' },
+            500,
+          );
+        }
         reply.status(200);
-        reply.send({ twoFactorRequired: true });
+        reply.send({ twoFactorRequired: true, challengeToken });
         return;
       }
 
@@ -233,10 +293,24 @@ export class AuthController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: false }) reply: FastifyReply,
   ): Promise<void> {
-    const input = body as { code?: string; backupCode?: string };
+    const input = body as { code?: string; backupCode?: string; challengeToken?: string };
     await this.rateLimit.enforce('sign-in-totp', request.ip);
-    const headers = toFetchHeaders(request);
+    let headers = toFetchHeaders(request);
     try {
+      if (input.challengeToken) {
+        const withChallenge = withCookie(
+          headers,
+          await this.twoFactorCookieName(),
+          input.challengeToken,
+        );
+        if (!withChallenge) {
+          throw new HttpException(
+            { code: 'INVALID_TWO_FACTOR_COOKIE', message: 'Invalid two factor cookie' },
+            401,
+          );
+        }
+        headers = withChallenge;
+      }
       const response = input.code
         ? await this.auth.api.verifyTOTP({ body: { code: input.code }, headers, asResponse: true })
         : await this.auth.api.verifyBackupCode({
@@ -285,6 +359,7 @@ export class AuthController {
     const { user, headers } = await requireSession(this.auth, request);
     try {
       const response = await this.auth.api.revokeSessions({ headers, asResponse: true });
+      await this.prisma.client.device.deleteMany({ where: { userId: user.id } });
       await applyFetchResponse(response, reply);
       this.chatSocketBridge.disconnectUser(user.id);
       reply.status(204);
@@ -507,17 +582,6 @@ export class AuthController {
     await this.rateLimit.enforce('totp-verify', request.ip, user.id);
     const isEnabling = !user.twoFactorEnabled;
     try {
-      // A session that predates 2FA must not keep admin access once it's on,
-      // but the session that just called this endpoint must survive it.
-      // auth.api.revokeOtherSessions can do neither here: it lists sessions
-      // by userId, hardened-adapter.ts refuses to hand back their tokens
-      // (see #127), and better-auth has no token to delete by. userId/id is
-      // the only field this can reliably revoke by.
-      if (isEnabling) {
-        await this.prisma.client.session.deleteMany({
-          where: { userId: user.id, id: { not: session.id } },
-        });
-      }
       const response = await this.auth.api.verifyTOTP({
         body: { code: input.code },
         headers: toFetchHeaders(request),
@@ -527,40 +591,63 @@ export class AuthController {
       // on first verification, rotates the session (invalidating this
       // request's own bearer token/cookie), so the user is built from the
       // pre-fetched value above rather than a post-call lookup. The rotated
-      // token (if any) is only ever exposed via the `set-auth-token`
-      // response header, never the JSON body (see auth-instance.ts).
+      // token (if any) is returned in the body's `session` as well as via
+      // Set-Cookie, because a bearer-only client never sees the cookie.
       await applyFetchResponse(response, reply);
       const rotatedToken = response.headers.get('set-auth-token');
+      let rotatedSession: { token: string; expiresAt: string } | undefined;
+      let currentSessionId = session.id;
       if (rotatedToken) {
-        await this.stampTwoFactorVerified(rotatedToken, toFetchHeaders(request));
+        const rotatedSessionId = await this.stampTwoFactorVerified(
+          rotatedToken,
+          toFetchHeaders(request),
+        );
+        rotatedSession = (await this.signedInBody(rotatedToken, toFetchHeaders(request))).session;
+        if (rotatedSessionId) {
+          currentSessionId = rotatedSessionId;
+        }
       } else {
         await this.prisma.client.session.update({
           where: { id: session.id },
           data: { twoFactorVerifiedAt: new Date() },
         });
       }
+      if (isEnabling) {
+        await this.revokeOtherCredentials(user.id, currentSessionId);
+      }
       reply.status(200);
-      reply.send({ user: mapUser({ ...user, twoFactorEnabled: true }) });
+      reply.send({
+        user: mapUser({ ...user, twoFactorEnabled: true }),
+        ...(rotatedSession ? { session: rotatedSession } : {}),
+      });
     } catch (error) {
       rethrowAsHttpException(error);
     }
   }
 
-  @HttpCode(200)
   @Post('totp/disable')
   async totpDisable(
     @Body(new ZodValidationPipe(TotpDisableRequestSchema)) body: unknown,
     @Req() request: FastifyRequest,
-  ): Promise<{ user: ReturnType<typeof mapUser> }> {
+    @Res({ passthrough: false }) reply: FastifyReply,
+  ): Promise<void> {
     const input = body as { code: string; password: string };
     const { user, headers } = await requireSession(this.auth, request);
     await this.rateLimit.enforce('totp-disable', request.ip, user.id);
     try {
       await this.auth.api.verifyTOTP({ body: { code: input.code }, headers });
-      await this.auth.api.disableTwoFactor({
+      // disableTwoFactor replaces the session and deletes the caller's own
+      // token, so the new one must reach both cookie and bearer clients.
+      const response = await this.auth.api.disableTwoFactor({
         body: { password: input.password },
         headers,
+        asResponse: true,
       });
+      await applyFetchResponse(response, reply);
+      const rotatedToken = response.headers.get('set-auth-token');
+      const rotatedSession = rotatedToken
+        ? (await this.signedInBody(rotatedToken, toFetchHeaders(request))).session
+        : undefined;
       await this.auditLog.record({
         actorType: 'user',
         actorId: user.id,
@@ -569,7 +656,11 @@ export class AuthController {
         targetId: user.id,
         ip: request.ip,
       });
-      return { user: mapUser({ ...user, twoFactorEnabled: false }) };
+      reply.status(200);
+      reply.send({
+        user: mapUser({ ...user, twoFactorEnabled: false }),
+        ...(rotatedSession ? { session: rotatedSession } : {}),
+      });
     } catch (error) {
       rethrowAsHttpException(error);
     }

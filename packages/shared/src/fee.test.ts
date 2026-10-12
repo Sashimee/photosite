@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculatePlatformFee, quoteTotals } from './fee.js';
+import { calculatePlatformFee, payoutAmount, quoteTotals } from './fee.js';
 
 describe('calculatePlatformFee', () => {
   it('rounds .5 up per PAYMENTS.md (round half up)', () => {
@@ -140,5 +140,25 @@ describe('quoteTotals', () => {
       vatOnFeeRatePercent: 17,
     });
     expect(totals.platformFeeCents).toBe(117);
+  });
+});
+
+describe('payoutAmount', () => {
+  it('is the subtotal minus the stored fee', () => {
+    expect(payoutAmount({ subtotalCents: 25050, platformFeeCents: 1253 })).toBe(23797);
+  });
+
+  it('pays out everything when the fee is zero and nothing when the fee is the whole subtotal', () => {
+    expect(payoutAmount({ subtotalCents: 1000, platformFeeCents: 0 })).toBe(1000);
+    expect(payoutAmount({ subtotalCents: 1000, platformFeeCents: 1000 })).toBe(0);
+  });
+
+  it('refuses a fee larger than the subtotal or below zero', () => {
+    expect(() => payoutAmount({ subtotalCents: 1000, platformFeeCents: 1001 })).toThrow(RangeError);
+    expect(() => payoutAmount({ subtotalCents: 1000, platformFeeCents: -1 })).toThrow(RangeError);
+  });
+
+  it('refuses fractional cents', () => {
+    expect(() => payoutAmount({ subtotalCents: 1000.5, platformFeeCents: 50 })).toThrow(RangeError);
   });
 });

@@ -1,9 +1,15 @@
-import type { QuoteStatus, RequestStatus } from '@photoo/shared';
+import type { BookingStatus, QuoteStatus, RequestStatus } from '@photoo/shared';
 
 import { cn } from '@/lib/utils';
 
 const TERMINAL_REQUEST_STATUSES: readonly RequestStatus[] = ['closed', 'cancelled'];
 const TERMINAL_QUOTE_STATUSES: readonly QuoteStatus[] = ['declined', 'expired', 'withdrawn'];
+const TERMINAL_BOOKING_STATUSES: readonly BookingStatus[] = [
+  'released',
+  'refunded',
+  'cancelled',
+  'disputed',
+];
 
 export function isTerminalRequestStatus(status: RequestStatus): boolean {
   return TERMINAL_REQUEST_STATUSES.includes(status);
@@ -11,6 +17,10 @@ export function isTerminalRequestStatus(status: RequestStatus): boolean {
 
 export function isTerminalQuoteStatus(status: QuoteStatus): boolean {
   return TERMINAL_QUOTE_STATUSES.includes(status);
+}
+
+export function isTerminalBookingStatus(status: BookingStatus): boolean {
+  return TERMINAL_BOOKING_STATUSES.includes(status);
 }
 
 export function StatusBadge({ label, muted = false }: { label: string; muted?: boolean }) {

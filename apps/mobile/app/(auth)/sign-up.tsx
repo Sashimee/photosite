@@ -10,6 +10,7 @@ import { PrimaryButton } from '../../src/components/form/primary-button';
 import { TextField } from '../../src/components/form/text-field';
 import { api } from '../../src/lib/api';
 import { authErrorMessage, scopedAuthTranslate } from '../../src/lib/auth-errors';
+import { clearAnonymousId, getAnonymousId } from '../../src/lib/consent-store';
 import { fieldErrorMessages } from '../../src/lib/form-errors';
 import { getDeviceLocale } from '../../src/lib/i18n';
 
@@ -43,16 +44,23 @@ export default function SignUpScreen() {
     setFieldErrors({});
     setSubmitError(null);
     setIsSubmitting(true);
-    // Built key-by-key rather than spread from `parsed.data`: there is no
-    // consent banner in the app yet (1C.8), so `anonymousId` is never set,
-    // and `exactOptionalPropertyTypes` rejects the schema's `T | undefined`
-    // for it against the client's `T | omitted` optional field.
+    // Built key-by-key rather than spread from `parsed.data`:
+    // `exactOptionalPropertyTypes` rejects the schema's `T | undefined` for
+    // `anonymousId` against the client's `T | omitted` optional field.
+    const anonymousId = await getAnonymousId().catch((storeError: unknown) => {
+      console.error(
+        'Failed to read the anonymous consent id; sign-up proceeds unlinked',
+        storeError,
+      );
+      return null;
+    });
     const { error } = await api.POST('/v1/auth/sign-up', {
       body: {
         email: parsed.data.email,
         password: parsed.data.password,
         roles: parsed.data.roles,
         locale: parsed.data.locale,
+        ...(anonymousId ? { anonymousId } : {}),
       },
     });
     setIsSubmitting(false);
@@ -62,6 +70,11 @@ export default function SignUpScreen() {
       return;
     }
 
+    if (anonymousId) {
+      await clearAnonymousId().catch((storeError: unknown) => {
+        console.error('Failed to clear the linked anonymous consent id', storeError);
+      });
+    }
     router.push('/verify-email');
   }
 

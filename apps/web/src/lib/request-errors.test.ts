@@ -16,6 +16,7 @@ describe('requestErrorMessage', () => {
   it('maps 409 conflicts, 422 validation and 403/404 to their translation keys', () => {
     const t = vi.fn((key: string) => key);
     expect(requestErrorMessage(t, { code: 'CONFLICT' })).toBe('errors.conflict');
+    expect(requestErrorMessage(t, { code: 'BOOKING_BUSY' })).toBe('errors.conflict');
     expect(requestErrorMessage(t, { code: 'UNPROCESSABLE_ENTITY' })).toBe('errors.invalid');
     expect(requestErrorMessage(t, { code: 'FORBIDDEN' })).toBe('errors.forbidden');
     expect(requestErrorMessage(t, { code: 'NOT_FOUND' })).toBe('errors.notFound');

@@ -246,6 +246,7 @@ jobs:
       TRUSTED_PROXIES: ''
       AUTH_SECRET: dev-only-auth-secret-change-me-please-32-chars-min
       AUTH_ENCRYPTION_KEY: qA5jxlkWykGDbMKLOSqgSGG+lbzsuDkUWUS8nV9twig=
+      STRIPE_FAKE: 'true'
       SMOKE_BASE_URL: http://127.0.0.1:3000
     services:
       postgres:
@@ -450,6 +451,7 @@ jobs:
       TRUSTED_PROXIES: ''
       AUTH_SECRET: dev-only-auth-secret-change-me-please-32-chars-min
       AUTH_ENCRYPTION_KEY: qA5jxlkWykGDbMKLOSqgSGG+lbzsuDkUWUS8nV9twig=
+      STRIPE_FAKE: 'true'
       # apps/worker's own SMTP target for the mailpit service below - see the
       # job comment for why apps/worker has to run here at all.
       SMTP_HOST: 127.0.0.1
@@ -684,6 +686,7 @@ jobs:
       TRUSTED_PROXIES: ''
       AUTH_SECRET: dev-only-auth-secret-change-me-please-32-chars-min
       AUTH_ENCRYPTION_KEY: qA5jxlkWykGDbMKLOSqgSGG+lbzsuDkUWUS8nV9twig=
+      STRIPE_FAKE: 'true'
     services:
       postgres:
         image: postgis/postgis:16-3.5

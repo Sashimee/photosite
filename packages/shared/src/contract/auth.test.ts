@@ -8,7 +8,9 @@ import {
   TotpDisableRequestSchema,
   TotpEnrollRequestSchema,
   TotpEnrollResponseSchema,
+  TotpResponseSchema,
   TotpVerifyRequestSchema,
+  UpdateLocaleRequestSchema,
   UserSchema,
 } from './auth.js';
 
@@ -99,6 +101,26 @@ describe('SignInRequestSchema', () => {
   });
 });
 
+describe('UpdateLocaleRequestSchema', () => {
+  it('accepts a supported locale', () => {
+    expect(UpdateLocaleRequestSchema.safeParse({ locale: 'fr' }).success).toBe(true);
+  });
+
+  it('rejects an unsupported locale', () => {
+    expect(UpdateLocaleRequestSchema.safeParse({ locale: 'xx' }).success).toBe(false);
+  });
+
+  it('rejects a missing locale', () => {
+    expect(UpdateLocaleRequestSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects extra fields', () => {
+    expect(UpdateLocaleRequestSchema.safeParse({ locale: 'fr', roles: ['admin'] }).success).toBe(
+      false,
+    );
+  });
+});
+
 describe('AddRoleRequestSchema', () => {
   it('accepts a signup-eligible role', () => {
     expect(AddRoleRequestSchema.safeParse({ role: 'photographer' }).success).toBe(true);
@@ -125,7 +147,14 @@ describe('TotpVerifyRequestSchema', () => {
 
 describe('SignInResponseSchema', () => {
   it('accepts a two-factor-required response', () => {
-    expect(SignInResponseSchema.safeParse({ twoFactorRequired: true }).success).toBe(true);
+    expect(
+      SignInResponseSchema.safeParse({ twoFactorRequired: true, challengeToken: 'signed.value' })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects a two-factor-required response without a challengeToken', () => {
+    expect(SignInResponseSchema.safeParse({ twoFactorRequired: true }).success).toBe(false);
   });
 
   it('accepts a full signed-in response', () => {
@@ -139,7 +168,11 @@ describe('SignInResponseSchema', () => {
 
   it('rejects a mixed shape', () => {
     expect(
-      SignInResponseSchema.safeParse({ twoFactorRequired: true, user: validUser }).success,
+      SignInResponseSchema.safeParse({
+        twoFactorRequired: true,
+        challengeToken: 'signed.value',
+        user: validUser,
+      }).success,
     ).toBe(false);
   });
 });
@@ -161,6 +194,33 @@ describe('SignInTotpRequestSchema', () => {
 
   it('rejects neither', () => {
     expect(SignInTotpRequestSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('accepts an optional challengeToken', () => {
+    expect(
+      SignInTotpRequestSchema.safeParse({ code: '123456', challengeToken: 'signed.value' }).success,
+    ).toBe(true);
+  });
+
+  it('rejects an empty challengeToken', () => {
+    expect(SignInTotpRequestSchema.safeParse({ code: '123456', challengeToken: '' }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe('TotpResponseSchema', () => {
+  it('accepts a response without a session', () => {
+    expect(TotpResponseSchema.safeParse({ user: validUser }).success).toBe(true);
+  });
+
+  it('accepts a rotated session', () => {
+    expect(
+      TotpResponseSchema.safeParse({
+        user: validUser,
+        session: { token: 'tok', expiresAt: '2026-11-01T00:00:00.000Z' },
+      }).success,
+    ).toBe(true);
   });
 });
 

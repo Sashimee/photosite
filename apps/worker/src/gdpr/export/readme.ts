@@ -16,12 +16,16 @@ Each other .json file holds one type of record:
 
 - user.json, accounts.json: your account and linked sign-in methods.
 - sessions.json, devices.json: your active sign-in sessions and devices.
+  The push notification token of a device is left out of devices.json on
+  purpose: it is a delivery credential, not information about you.
 - consents.json: your consent choices.
 - notifications.json: notifications sent to you.
 - requests.json, quotes.json: photo requests and quotes you sent or
   received.
 - photographer-profile.json, products.json, portfolio-images.json: your
-  public photographer profile, if you have one.
+  public photographer profile, if you have one. Each portfolio image
+  carries the result of its automated check (verdict, check time and, for
+  a rejection, the reasons given to you) in its provenance field.
 - uploads.json: metadata about files you uploaded.
 - verification-cases.json: your professional verification case, if any.
   This file lists the documents you submitted by name and metadata only;

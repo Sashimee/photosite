@@ -640,6 +640,17 @@ describe('admin integration', () => {
     it('suspends the user, revokes sessions, disconnects sockets, and writes a redacted audit row', async () => {
       const admin = await makeAdmin('suspend-ok', ['support']);
       const target = await signUpVerifyAndSignIn(['client'], 'suspend-target');
+      const bystander = await signUpVerifyAndSignIn(['client'], 'suspend-bystander');
+      for (const userId of [target.id, bystander.id]) {
+        await prisma.device.create({
+          data: {
+            userId,
+            expoPushToken: `ExponentPushToken[${randomUUID()}]`,
+            platform: 'ios',
+            lastSeenAt: new Date(),
+          },
+        });
+      }
       const socket = await connectSocket(target.token);
       expect(socket.connected).toBe(true);
 
@@ -658,6 +669,8 @@ describe('admin integration', () => {
 
       const sessionsAfter = await prisma.session.findMany({ where: { userId: target.id } });
       expect(sessionsAfter).toHaveLength(0);
+      expect(await prisma.device.findMany({ where: { userId: target.id } })).toHaveLength(0);
+      expect(await prisma.device.findMany({ where: { userId: bystander.id } })).toHaveLength(1);
 
       await waitFor(() => socket.disconnected);
 

@@ -29,6 +29,36 @@ export function toFetchHeaders(request: FastifyRequest): Headers {
   return headers;
 }
 
+export function readSetCookieValue(response: Response, name: string): string | undefined {
+  const setCookies =
+    typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [];
+  for (const setCookie of setCookies) {
+    const [pair = ''] = setCookie.split(';');
+    const separator = pair.indexOf('=');
+    if (separator !== -1 && pair.slice(0, separator).trim() === name) {
+      const value = pair.slice(separator + 1).trim();
+      return value.length > 0 ? value : undefined;
+    }
+  }
+  return undefined;
+}
+
+// Replaces any incoming cookie of that name rather than appending, so a
+// request cookie can never shadow the explicitly supplied value. Returns
+// null when the value could smuggle extra cookies into the header.
+export function withCookie(headers: Headers, name: string, value: string): Headers | null {
+  if (/[;,\s]/.test(value)) {
+    return null;
+  }
+  const kept = (headers.get('cookie') ?? '')
+    .split(';')
+    .map((pair) => pair.trim())
+    .filter((pair) => pair.length > 0 && pair.split('=')[0]?.trim() !== name);
+  const next = new Headers(headers);
+  next.set('cookie', [...kept, `${name}=${value}`].join('; '));
+  return next;
+}
+
 // Better Auth's endpoints called with `asResponse: true` never throw: every
 // outcome, including a thrown APIError, is turned into a Response with the
 // matching status. Error responses must therefore be detected here and

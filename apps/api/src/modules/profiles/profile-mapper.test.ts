@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PortfolioImage as DbPortfolioImage, ProvenanceCheck, Upload } from '@photoo/db';
-import { mapPortfolioImage } from './profile-mapper.js';
+import { mapOwnProfile, mapPortfolioImage, type ProfileWithUploads } from './profile-mapper.js';
 
 const BASE_URL = 'https://cdn.example.com';
 
@@ -114,5 +114,48 @@ describe('mapPortfolioImage', () => {
       decisionReasonText: 'Detected generative artifacts',
     });
     expect(JSON.stringify(result)).not.toContain('admin-internal detail');
+  });
+});
+
+describe('mapOwnProfile stripeAccountConnected', () => {
+  function fakeProfile(overrides: Partial<ProfileWithUploads> = {}): ProfileWithUploads {
+    return {
+      id: '22222222-2222-4222-8222-222222222222',
+      slug: 'jane-doe',
+      displayName: 'Jane Doe',
+      headline: null,
+      bio: {},
+      links: { other: [] },
+      categories: [],
+      languages: ['en'],
+      serviceRadiusKm: 25,
+      city: 'Luxembourg',
+      countryCode: 'LU',
+      ratingAvg: '0',
+      ratingCount: 0,
+      verificationStatus: 'unverified',
+      isPublished: false,
+      stripeAccountId: null,
+      stripeOnboardingComplete: false,
+      stripePayoutsEnabled: false,
+      avatarUpload: null,
+      coverUpload: null,
+      portfolio: [],
+      ...overrides,
+    } as unknown as ProfileWithUploads;
+  }
+  const location = { lat: 49.6116, lng: 6.1319 };
+
+  it('is false when the profile has no stripe account id', () => {
+    const result = mapOwnProfile(fakeProfile(), location, BASE_URL);
+
+    expect(result.stripeAccountConnected).toBe(false);
+  });
+
+  it('is true when a stripe account id exists and never exposes the id', () => {
+    const result = mapOwnProfile(fakeProfile({ stripeAccountId: 'acct_123' }), location, BASE_URL);
+
+    expect(result.stripeAccountConnected).toBe(true);
+    expect(result).not.toHaveProperty('stripeAccountId');
   });
 });

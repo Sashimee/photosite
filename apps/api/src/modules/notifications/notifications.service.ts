@@ -29,6 +29,8 @@ import { NotifyQueueService } from './notify-queue.service.js';
 
 const MAX_DEVICES_PER_USER = 10;
 
+type NotificationWriter = Pick<Prisma.TransactionClient, 'notification' | 'notificationPreference'>;
+
 interface SessionUser {
   id: string;
 }
@@ -65,21 +67,34 @@ export class NotificationsService {
     type: NotificationType,
     payload: NotificationPayload,
   ): Promise<void> {
+    const notificationId = await this.createNotification(this.prisma.client, userId, type, payload);
+    await this.enqueue(notificationId);
+  }
+
+  // For producers that must write the row inside their own transaction: call
+  // this with the transaction client, then enqueue() after commit.
+  async createNotification(
+    db: NotificationWriter,
+    userId: string,
+    type: NotificationType,
+    payload: NotificationPayload,
+  ): Promise<string> {
     const validated = NotificationPayloadSchema.parse(payload);
-    const preferences = await this.prisma.client.notificationPreference.findMany({
-      where: { userId, type },
-    });
+    const preferences = await db.notificationPreference.findMany({ where: { userId, type } });
     const channels = resolveNotificationChannels(type, preferences);
-
-    const notification = await this.prisma.client.notification.create({
+    const notification = await db.notification.create({
       data: { userId, type, payload: validated, channels },
+      select: { id: true },
     });
+    return notification.id;
+  }
 
+  async enqueue(notificationId: string): Promise<void> {
     try {
-      await this.notifyQueue.enqueue(notification.id);
+      await this.notifyQueue.enqueue(notificationId);
     } catch (error) {
       this.logger.error(
-        { err: error, notificationId: notification.id },
+        { err: error, notificationId },
         'notifications: failed to enqueue the notify job, relying on notify-sweep',
       );
     }

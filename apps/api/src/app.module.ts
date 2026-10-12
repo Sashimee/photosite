@@ -8,12 +8,14 @@ import { EnvModule } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { BookingsModule } from './modules/bookings/bookings.module.js';
 import { ChatModule } from './modules/chat/chat.module.js';
 import { CitiesModule } from './modules/cities/cities.module.js';
 import { CountriesModule } from './modules/countries/countries.module.js';
 import { GdprModule } from './modules/gdpr/gdpr.module.js';
 import { JobBoardModule } from './modules/job-board/job-board.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
+import { PaymentsModule } from './modules/payments/payments.module.js';
 import { ProductsModule } from './modules/products/products.module.js';
 import { ProfessionalsModule } from './modules/professionals/professionals.module.js';
 import { ProfilesModule } from './modules/profiles/profiles.module.js';
@@ -52,6 +54,8 @@ import { StorageModule } from './storage/storage.module.js';
     GdprModule,
     ProfessionalsModule,
     JobBoardModule,
+    PaymentsModule,
+    BookingsModule,
     OpenapiModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],

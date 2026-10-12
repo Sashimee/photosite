@@ -92,8 +92,9 @@ services:
       VERIFICATION_ENCRYPTION_KEY: ${VERIFICATION_ENCRYPTION_KEY:?generate with `openssl rand -base64 32`}
       S3_ENDPOINT: http://minio:9000
       S3_REGION: eu-west-1
-      # Scoped MinIO user (photoo-private only), created by `minio-init`;
-      # see README.md "Object storage users" for the policy.
+      # Scoped MinIO user (photoo-private only, plus a ListBucket scoped to
+      # bookings/* so a missing key 404s instead of 403 on HeadObject),
+      # created by `minio-init`; see README.md "Object storage users".
       S3_ACCESS_KEY_ID: ${MINIO_API_ACCESS_KEY:?set in .env}
       S3_SECRET_ACCESS_KEY: ${MINIO_API_SECRET_KEY:?set in .env}
       S3_FORCE_PATH_STYLE: 'true'
@@ -148,8 +149,10 @@ services:
       WEB_APP_URL: https://${PREVIEW_HOST:-footoo.bas.lu}
       S3_ENDPOINT: http://minio:9000
       S3_REGION: eu-west-1
-      # Scoped MinIO user (read+delete photoo-private, write photoo-public),
-      # created by `minio-init`; see README.md "Object storage users".
+      # Scoped MinIO user (read+delete photoo-private, write photoo-public,
+      # plus write+ListBucket on photoo-private scoped to bookings/* and
+      # gdpr-exports/* for the PDF/export jobs below), created by
+      # `minio-init`; see README.md "Object storage users".
       S3_ACCESS_KEY_ID: ${MINIO_WORKER_ACCESS_KEY:?set in .env}
       S3_SECRET_ACCESS_KEY: ${MINIO_WORKER_SECRET_KEY:?set in .env}
       S3_FORCE_PATH_STYLE: 'true'
@@ -383,6 +386,12 @@ services:
               "Effect": "Allow",
               "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
               "Resource": ["arn:aws:s3:::photoo-private/*"]
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:ListBucket"],
+              "Resource": ["arn:aws:s3:::photoo-private"],
+              "Condition": {"StringLike": {"s3:prefix": ["bookings/*"]}}
             }
           ]
         }
@@ -399,6 +408,20 @@ services:
               "Effect": "Allow",
               "Action": ["s3:GetObject", "s3:DeleteObject"],
               "Resource": ["arn:aws:s3:::photoo-private/*"]
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:PutObject"],
+              "Resource": [
+                "arn:aws:s3:::photoo-private/bookings/*",
+                "arn:aws:s3:::photoo-private/gdpr-exports/*"
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:ListBucket"],
+              "Resource": ["arn:aws:s3:::photoo-private"],
+              "Condition": {"StringLike": {"s3:prefix": ["bookings/*", "gdpr-exports/*"]}}
             },
             {
               "Effect": "Allow",

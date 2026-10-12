@@ -165,7 +165,7 @@ async function signedInClient(
 }
 
 test.describe('request -> quote -> accept', () => {
-  test('client accepts a quote: request becomes booked, the quote shows the booking/payment stand-in copy', async ({
+  test('client accepts a quote: request becomes booked, the client lands on the booking checkout', async ({
     page,
     context,
     browser,
@@ -185,7 +185,7 @@ test.describe('request -> quote -> accept', () => {
     const photographerContext = await browser.newContext();
     try {
       const photographerPage = await signedInPhotographerContext(photographerContext, baseURL);
-      const quoteId = await photographerSendsQuote(photographerPage, tag, {
+      await photographerSendsQuote(photographerPage, tag, {
         label: 'Full day portrait session',
         qty: 2,
         unitPriceEuros: 200,
@@ -198,31 +198,36 @@ test.describe('request -> quote -> accept', () => {
       await page.getByRole('button', { name: 'Accept quote' }).click();
       await page.getByRole('button', { name: 'Yes, accept quote' }).click();
 
-      // Accepted quotes drop out of QuoteCompare's `sent`-only filter, so the
-      // accept control disappears once the request re-renders with the new
-      // state, and the request's own status badge flips to "Booked".
-      await expect(page.getByText('Booked', { exact: true })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Accept quote' })).toHaveCount(0);
+      // On success QuoteActions.accept() (apps/web/src/components/requests/quote-actions.tsx)
+      // pushes straight to the new booking's own page - the client never sees
+      // the request re-render with the quote gone before navigating away.
+      await page.waitForURL(new RegExp(`/${LOCALE}/bookings/[0-9a-f-]{36}$`));
 
-      // "Booking and payment are coming soon" (apps/web/src/app/[locale]/quotes/[id]/page.tsx's
-      // acceptedNotice) only renders on the quote's own page, not here - follow
-      // the same link the request page still offers to it.
-      await page.getByRole('link', { name: new RegExp(formatEuros(400)) }).click();
-      await page.waitForURL(`**/${LOCALE}/quotes/${quoteId}`);
+      // A fresh booking starts `pending_payment` (BookingStatusTimeline,
+      // apps/web/src/components/requests/booking-status-timeline.tsx), whose
+      // label is the only one of the five steps rendered as "Awaiting payment".
+      await expect(page.getByText('Awaiting payment', { exact: true })).toBeVisible();
 
       // Client's own total contract (docs/steps/1B.12-web-e2e.md "Money is
       // integer cents"): quoteTotals sets totalCents = subtotalCents, the
       // platform fee is deducted from the photographer's payout, never added
-      // on top of what the client sees - so the client's total is exactly
-      // qty * unitPrice, no fee line at all (payout/fee are photographer-only,
-      // apps/web/src/app/[locale]/quotes/[id]/page.tsx's `isOwnPhotographerQuote` gate).
+      // on top of what the client sees - so the booking's total is exactly
+      // qty * unitPrice, no fee line at all (`platformFee` isn't shown to the
+      // client, docs/steps/1B.7-checkout.md "Money").
       await expect(page.getByRole('heading', { name: formatEuros(400) })).toBeVisible();
       await expect(page.getByText('Platform fee')).not.toBeVisible();
-      await expect(
-        page.getByText(
-          "Quote accepted. Booking and payment are coming soon — we'll be in touch with next steps.",
-        ),
-      ).toBeVisible();
+
+      // CI has no NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY (docs/steps/1B.7-checkout.md),
+      // so getStripe() (apps/web/src/lib/stripe.ts) resolves null and
+      // BookingCheckout falls back to this notice instead of mounting Elements.
+      await expect(page.getByText('Payment is not available in this environment.')).toBeVisible();
+
+      // Accepted quotes drop out of QuoteCompare's `sent`-only filter, so
+      // revisiting the request shows its status badge flipped to "Booked" and
+      // the accept control gone.
+      await page.goto(`/${LOCALE}/requests/${requestId}`);
+      await expect(page.getByText('Booked', { exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Accept quote' })).toHaveCount(0);
     } finally {
       await photographerContext.close();
     }
@@ -283,7 +288,7 @@ test.describe('request -> quote -> accept', () => {
   // parsing the API's message text, onto `web.quotes.errors.conflict` -
   // which for this namespace happens to already read "This quote is no
   // longer available." The mapping is generic, not specific to double-accept.
-  test('accepting the same quote twice maps the second attempt to the 409 conflict message', async ({
+  test('accepting the same quote twice: the first tab reaches the booking, the second gets the 409 conflict message', async ({
     page,
     context,
     browser,
@@ -319,11 +324,9 @@ test.describe('request -> quote -> accept', () => {
 
         await page.getByRole('button', { name: 'Accept quote' }).click();
         await page.getByRole('button', { name: 'Yes, accept quote' }).click();
-        await expect(
-          page.getByText(
-            "Quote accepted. Booking and payment are coming soon — we'll be in touch with next steps.",
-          ),
-        ).toBeVisible();
+        // The winning accept pushes straight to the new booking
+        // (QuoteActions.accept(), apps/web/src/components/requests/quote-actions.tsx).
+        await page.waitForURL(new RegExp(`/${LOCALE}/bookings/[0-9a-f-]{36}$`));
 
         await secondPage.getByRole('button', { name: 'Accept quote' }).click();
         await secondPage.getByRole('button', { name: 'Yes, accept quote' }).click();

@@ -36,7 +36,136 @@
             "tooManyRequestsWithRetry": "Sie senden Angebote zu schnell. Versuchen Sie es in {seconds, plural, one {# Sekunde} other {# Sekunden}} erneut."
           }
         }
+      },
+      "nav": {
+        "payouts": "Auszahlungen",
+        "earnings": "Einnahmen"
+      },
+      "overview": {
+        "checklist": {
+          "payouts": {
+            "title": "Auszahlungen",
+            "todoDescription": "Verbinde über Stripe ein Bankkonto, um bezahlt zu werden.",
+            "incompleteStatus": "In Prüfung",
+            "incompleteDescription": "Stripe prüft deine Angaben. Setze die Einrichtung fort, falls Stripe weitere Angaben verlangt.",
+            "doneDescription": "Auszahlungen sind aktiviert. Dein Verdienst geht auf dein Bankkonto.",
+            "startCta": "Auszahlungen einrichten",
+            "continueCta": "Einrichtung fortsetzen",
+            "cta": "Auszahlungen ansehen",
+            "needsProfile": "Lege zuerst dein Profil an."
+          }
+        }
+      },
+      "payouts": {
+        "metaTitle": "Auszahlungen",
+        "title": "Auszahlungen",
+        "backToOverview": "Zurück zur Übersicht",
+        "intro": "Auszahlungen laufen über Stripe. Photoo sieht deine Bankdaten nie.",
+        "needsProfileTitle": "Lege zuerst dein Profil an",
+        "needsProfileDescription": "Auszahlungen gehören zu deinem Fotografenprofil. Richte es also zuerst ein.",
+        "needsProfileCta": "Profil anlegen",
+        "status": {
+          "notStarted": "Nicht begonnen",
+          "incomplete": "In Prüfung",
+          "enabled": "Auszahlungen aktiviert"
+        },
+        "description": {
+          "notStarted": "Verbinde über Stripe ein Bankkonto, um für Buchungen bezahlt zu werden.",
+          "incomplete": "Stripe prüft deine Angaben. Das kann etwas dauern. Falls Stripe weitere Angaben verlangt, setze die Einrichtung fort.",
+          "enabled": "Auszahlungen sind aktiviert. Dein Verdienst geht auf dein Bankkonto."
+        },
+        "setupCta": "Auszahlungen einrichten",
+        "continueCta": "Einrichtung fortsetzen",
+        "pending": "Stripe wird geöffnet…",
+        "errors": {
+          "generic": "Etwas ist schiefgelaufen. Versuche es erneut.",
+          "conflict": "Die Einrichtung der Auszahlungen ist derzeit nicht verfügbar. Versuche es später erneut.",
+          "invalid": "Prüfe deine Angaben und versuche es erneut.",
+          "forbidden": "Du hast keinen Zugriff auf Auszahlungen.",
+          "notFound": "Dein Fotografenprofil wurde nicht gefunden.",
+          "emailNotVerified": "Bestätige deine E-Mail-Adresse, bevor du Auszahlungen einrichtest.",
+          "tooManyRequests": "Du gehst zu schnell vor. Warte kurz und versuche es erneut.",
+          "tooManyRequestsWithRetry": "Du gehst zu schnell vor. Versuche es in {seconds, plural, one {# Sekunde} other {# Sekunden}} erneut."
+        }
+      },
+      "earnings": {
+        "metaTitle": "Einnahmen",
+        "title": "Einnahmen",
+        "backToOverview": "Zurück zur Übersicht",
+        "intro": "Was Sie mit Buchungen verdient haben, pro Währung.",
+        "releasedLabel": "Auf Ihr Stripe-Konto freigegeben",
+        "heldLabel": "Zurückgehalten, bis die Lieferung akzeptiert ist",
+        "recentHeading": "Letzte Aktivität",
+        "recentDate": "Datum",
+        "recentAmount": "Betrag",
+        "recentLink": "Buchung ansehen",
+        "payoutSchedule": "Freigegebenes Geld geht auf Ihr Stripe-Guthaben. Stripe überweist es dann nach Ihrem Auszahlungsplan auf Ihr Bankkonto, in der Regel innerhalb weniger Tage, sofern Auszahlungen in Ihrem Stripe-Konto aktiviert sind.",
+        "emptyTitle": "Noch keine Einnahmen",
+        "emptyDescription": "Einnahmen erscheinen hier, sobald ein Kunde bucht und bezahlt.",
+        "errors": {
+          "generic": "Beim Laden Ihrer Einnahmen ist etwas schiefgelaufen. Laden Sie die Seite neu und versuchen Sie es erneut.",
+          "forbidden": "Nur Fotografen können Einnahmen sehen.",
+          "tooManyRequests": "Sie sind zu schnell. Bitte langsamer und erneut versuchen.",
+          "tooManyRequestsWithRetry": "Sie sind zu schnell. Versuchen Sie es in {seconds, plural, one {# Sekunde} other {# Sekunden}} erneut."
+        }
       }
+    }
+  },
+  "push": {
+    "notifications": {
+      "payoutsDisabled": {
+        "title": "Auszahlungen pausiert",
+        "body": "Ihr Profil ist verborgen, bis Ihre Zahlungsangaben vollständig sind"
+      },
+      "disputeOpened": {
+        "title": "Zahlung angefochten",
+        "body": "Eine Buchung ist bis zur Prüfung durch die Finanzabteilung eingefroren"
+      }
+    }
+  },
+  "email": {
+    "notifications": {
+      "payoutsDisabled": {
+        "subject": "Auszahlungen sind auf Ihrem Konto pausiert",
+        "body": "Stripe hat Auszahlungen auf Ihrem verbundenen Konto pausiert, daher ist Ihr Profil in der Suche verborgen, bis dies behoben ist. Füllen Sie die von Stripe angeforderten Angaben hier aus: {url}"
+      },
+      "disputeOpened": {
+        "subject": "Eine Buchungszahlung wurde angefochten",
+        "body": "Ein Kunde hat eine Buchungszahlung von {total} bei seiner Bank angefochten. Die Buchung ist eingefroren und wird erst freigegeben, nachdem ein Finanz-Admin sie im Admin-Backend geprüft hat. Details: {url}"
+      }
+    }
+  },
+  "documents": {
+    "common": {
+      "reference": "Buchungsreferenz: {reference}",
+      "issuedOn": "Datum: {date}",
+      "contact": "photoo.lu · hello@photoo.lu",
+      "page": "Seite {page} von {pages}"
+    },
+    "receipt": {
+      "title": "Buchungsbeleg",
+      "sellerHeading": "Fotograf (Verkäufer)",
+      "buyerHeading": "Kunde",
+      "itemsHeading": "Leistungen",
+      "lineItem": "{qty} × {label}",
+      "totalPaid": "Gesamt bezahlt",
+      "refunded": "Erstattet",
+      "netPaid": "Netto bezahlter Betrag",
+      "sellerNotice": "Dieser Beleg bestätigt eine über {appName} geleistete Zahlung. {appName} ist nicht der Verkäufer dieser Leistungen: Das ist der Fotograf, der für jede gesetzlich vorgeschriebene Rechnung verantwortlich bleibt."
+    },
+    "feeInvoice": {
+      "title": "Rechnung über die Plattformgebühr",
+      "issuerHeading": "Ausgestellt von",
+      "recipientHeading": "Ausgestellt an",
+      "bookingAmount": "Vom Kunden bezahlter Buchungsbetrag",
+      "refundedToClient": "An den Kunden erstattet",
+      "platformFee": "Plattformgebühr ({percent})",
+      "vatOnFee": "MwSt. auf die Plattformgebühr ({rate})",
+      "totalFee": "Plattformgebühr gesamt",
+      "transferred": "An Sie überwiesen",
+      "reversed": "Von Ihrer Überweisung zurückgebucht",
+      "payout": "Ihre Auszahlung",
+      "payoutNotice": "Ihre Auszahlung wird auf Ihr verbundenes Stripe-Konto überwiesen. Sie bleiben dafür verantwortlich, Ihrem Kunden eine Rechnung zu stellen und dieses Einkommen zu versteuern."
     }
   }
 }

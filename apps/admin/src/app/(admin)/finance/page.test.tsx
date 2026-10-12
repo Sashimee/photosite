@@ -1,0 +1,33 @@
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('next-intl/server', async () => {
+  const { translate } = await import('@/testing/mock-translations');
+  return {
+    getTranslations: (namespace: string) => (key: string, values?: Record<string, unknown>) =>
+      translate(namespace, key, values),
+  };
+});
+
+vi.mock('./finance-filters', () => ({
+  FinanceFilters: () => <div data-testid="finance-filters" />,
+}));
+
+vi.mock('./bookings-table', () => ({
+  BookingsTable: () => <div data-testid="bookings-table" />,
+}));
+
+vi.mock('./export-button', () => ({
+  ExportButton: () => <div data-testid="export-button" />,
+}));
+
+describe('FinancePage', () => {
+  it('renders the title and the bookings table', async () => {
+    const FinancePage = (await import('./page')).default;
+
+    render(await FinancePage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole('heading', { name: 'Bookings' })).toBeInTheDocument();
+    expect(screen.getByTestId('bookings-table')).toBeInTheDocument();
+  });
+});

@@ -271,11 +271,21 @@ describe('CreateConsentRequestSchema', () => {
   it('accepts a consent for an anonymous visitor', () => {
     expect(
       CreateConsentRequestSchema.safeParse({
-        anonymousId: 'anon_abc123',
+        anonymousId: '0b6f1c0e-6a1f-4c2e-9d57-3f1a2b4c5d6e',
         purpose: 'ads',
         granted: false,
       }).success,
     ).toBe(true);
+  });
+
+  it('rejects an anonymousId that is not a UUID', () => {
+    expect(
+      CreateConsentRequestSchema.safeParse({
+        anonymousId: 'anon_abc123',
+        purpose: 'ads',
+        granted: false,
+      }).success,
+    ).toBe(false);
   });
 
   it('rejects an unknown purpose', () => {

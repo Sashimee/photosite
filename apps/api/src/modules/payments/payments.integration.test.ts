@@ -1,0 +1,579 @@
+import { randomUUID } from 'node:crypto';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { createPrismaClient, type PrismaClient } from '@photoo/db';
+import { Redis } from 'ioredis';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { createTestApp } from '../../testing/create-test-app.js';
+import { waitForLinkInEmail } from '../../testing/mailpit.js';
+import { applyAccountDeletion } from '../gdpr/apply-account-deletion.js';
+import { requireIntegrationEnv } from '../../testing/require-integration-env.js';
+import { TEST_ENV } from '../../testing/test-env.js';
+import { StripeConnectService } from './stripe-connect.service.js';
+import { FakeStripeGateway } from './stripe/fake-stripe-gateway.js';
+import { STRIPE_GATEWAY } from './stripe/stripe-gateway.js';
+
+const testEnv = requireIntegrationEnv(['TEST_DATABASE_URL', 'REDIS_URL']);
+const PASSWORD = `photoo-test-${randomUUID()}`;
+// Distinct per-file IP and coordinates (issue #97): shared Redis and DB with
+// other integration suites running in parallel.
+const FAKE_IP = '10.50.18.1';
+const RUN_ID = randomUUID().replaceAll('-', '').slice(0, 8);
+const RUN_SEED = Number.parseInt(RUN_ID, 16);
+const RUN_LAT = 35 + (RUN_SEED % 200) / 10;
+const RUN_LNG = 35 + (RUN_SEED % 150) / 10;
+const ORIGIN = 'http://localhost:3000';
+
+interface StripeAccountBody {
+  stripeAccountId: string;
+  onboardingComplete: boolean;
+  payoutsEnabled: boolean;
+}
+
+interface ApiErrorBody {
+  code: string;
+  message: string;
+}
+
+describe('payments (Stripe Connect onboarding) integration', () => {
+  if (!testEnv) {
+    it.skip('skipped: TEST_DATABASE_URL or REDIS_URL is not set', () => undefined);
+    return;
+  }
+
+  let app: NestFastifyApplication;
+  let prisma: PrismaClient;
+  let redis: Redis;
+  const createdUserIds: string[] = [];
+  const eventIds: string[] = [];
+
+  function fastify() {
+    return app.getHttpAdapter().getInstance();
+  }
+
+  function headers(token: string) {
+    return { authorization: `Bearer ${token}`, origin: ORIGIN };
+  }
+
+  async function signUpAndSignIn(
+    label: string,
+    roles: readonly string[],
+  ): Promise<{ token: string; id: string }> {
+    const email = `payments-${label}-${randomUUID()}@photoo.test`;
+    const signUpResponse = await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/sign-up',
+      remoteAddress: FAKE_IP,
+      payload: { email, password: PASSWORD, roles, locale: 'en' },
+    });
+    const userId = signUpResponse.json<{ user: { id: string } }>().user.id;
+    createdUserIds.push(userId);
+
+    const link = await waitForLinkInEmail(email, /https?:\/\/\S*verify-email#token=\S+/);
+    const token = decodeURIComponent(link.slice(link.indexOf('#token=') + '#token='.length));
+    await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/verify-email',
+      remoteAddress: FAKE_IP,
+      payload: { token },
+    });
+
+    const signInResponse = await fastify().inject({
+      method: 'POST',
+      url: '/v1/auth/sign-in',
+      remoteAddress: FAKE_IP,
+      payload: { email, password: PASSWORD },
+    });
+    const body = signInResponse.json<{ user: { id: string }; session: { token: string } | null }>();
+    if (!body.session) {
+      throw new Error(`sign-in for ${label} did not return a session`);
+    }
+    return { token: body.session.token, id: body.user.id };
+  }
+
+  async function createPhotographer(label: string) {
+    const user = await signUpAndSignIn(label, ['photographer']);
+    const response = await fastify().inject({
+      method: 'POST',
+      url: '/v1/me/photographer-profile',
+      headers: headers(user.token),
+      payload: {
+        displayName: `Fx Payments Photog ${label}`,
+        categories: ['wedding'],
+        languages: ['en'],
+        location: { lat: RUN_LAT, lng: RUN_LNG },
+        city: `Fx Payments City ${RUN_ID}`,
+        countryCode: 'LU',
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    return { ...user, profileId: response.json<{ id: string }>().id };
+  }
+
+  // Password sign-in is blocked until the email is verified, so the gate is
+  // exercised by clearing the flag on an already-signed-in user's row.
+  async function unverifyEmail(userId: string): Promise<void> {
+    await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: null } });
+  }
+
+  function createAccount(token: string) {
+    return fastify().inject({
+      method: 'POST',
+      url: '/v1/me/stripe/account',
+      remoteAddress: FAKE_IP,
+      headers: headers(token),
+    });
+  }
+
+  function createAccountLink(token: string) {
+    return fastify().inject({
+      method: 'POST',
+      url: '/v1/me/stripe/account-link',
+      remoteAddress: FAKE_IP,
+      headers: headers(token),
+    });
+  }
+
+  async function clearRateLimitKeys(): Promise<void> {
+    const patterns = [
+      `rate-limit:auth:*:${FAKE_IP}`,
+      `lockout:auth:*:${FAKE_IP}`,
+      ...createdUserIds.map((id) => `rate-limit:payments:*:${id}`),
+    ];
+    const keys = (await Promise.all(patterns.map((pattern) => redis.keys(pattern)))).flat();
+    if (keys.length > 0) {
+      await redis.del(...keys);
+    }
+  }
+
+  beforeAll(async () => {
+    app = await createTestApp({
+      ...TEST_ENV,
+      DATABASE_URL: testEnv.TEST_DATABASE_URL,
+      REDIS_URL: testEnv.REDIS_URL,
+    });
+    prisma = createPrismaClient(testEnv.TEST_DATABASE_URL);
+    redis = new Redis(testEnv.REDIS_URL);
+    await clearRateLimitKeys();
+  });
+
+  afterEach(async () => {
+    await clearRateLimitKeys();
+  });
+
+  afterAll(async () => {
+    await prisma.stripeEvent.deleteMany({ where: { id: { in: eventIds } } });
+    if (createdUserIds.length > 0) {
+      const profiles = await prisma.photographerProfile.findMany({
+        where: { userId: { in: createdUserIds } },
+        select: { id: true },
+      });
+      await prisma.auditLog.deleteMany({
+        where: {
+          OR: [
+            { actorId: { in: createdUserIds } },
+            { targetId: { in: profiles.map((profile) => profile.id) } },
+          ],
+        },
+      });
+      await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+    }
+    await prisma.$disconnect();
+    redis.disconnect();
+    await app.close();
+  });
+
+  describe('POST /v1/me/stripe/account', () => {
+    it('returns 401 without a session', async () => {
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/me/stripe/account',
+        headers: { origin: ORIGIN },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('returns 403 for a client', async () => {
+      const client = await signUpAndSignIn('client', ['client']);
+      const response = await createAccount(client.token);
+      expect(response.statusCode).toBe(403);
+      expect(response.json<ApiErrorBody>().code).toBe('FORBIDDEN');
+    });
+
+    it('rejects an unverified photographer with EMAIL_NOT_VERIFIED and creates no account', async () => {
+      const photographer = await createPhotographer('unverified-create');
+      await unverifyEmail(photographer.id);
+
+      const response = await createAccount(photographer.token);
+      expect(response.statusCode).toBe(403);
+      expect(response.json<ApiErrorBody>().code).toBe('EMAIL_NOT_VERIFIED');
+
+      const profile = await prisma.photographerProfile.findUniqueOrThrow({
+        where: { id: photographer.profileId },
+      });
+      expect(profile.stripeAccountId).toBeNull();
+      expect(
+        await prisma.auditLog.count({
+          where: { action: 'stripe_account.created', targetId: photographer.profileId },
+        }),
+      ).toBe(0);
+      expect(await redis.keys(`rate-limit:payments:*:${photographer.id}`)).toEqual([]);
+    });
+
+    it('returns 404 for a photographer without a profile', async () => {
+      const photographer = await signUpAndSignIn('no-profile', ['photographer']);
+      const response = await createAccount(photographer.token);
+      expect(response.statusCode).toBe(404);
+      expect(response.json<ApiErrorBody>().code).toBe('NOT_FOUND');
+    });
+
+    it('creates the account once, returns it again with 200, and audits the creation', async () => {
+      const photographer = await createPhotographer('create');
+
+      const first = await createAccount(photographer.token);
+      expect(first.statusCode).toBe(201);
+      const created = first.json<StripeAccountBody>();
+      expect(created.stripeAccountId).toMatch(/^acct_/);
+      expect(created).toEqual({
+        stripeAccountId: created.stripeAccountId,
+        onboardingComplete: false,
+        payoutsEnabled: false,
+      });
+
+      const second = await createAccount(photographer.token);
+      expect(second.statusCode).toBe(200);
+      expect(second.json<StripeAccountBody>()).toEqual(created);
+
+      const profile = await prisma.photographerProfile.findUniqueOrThrow({
+        where: { id: photographer.profileId },
+      });
+      expect(profile.stripeAccountId).toBe(created.stripeAccountId);
+
+      const audits = await prisma.auditLog.findMany({
+        where: { action: 'stripe_account.created', targetId: photographer.profileId },
+      });
+      expect(audits).toHaveLength(1);
+      expect(audits[0]).toMatchObject({
+        actorType: 'user',
+        actorId: photographer.id,
+        after: { stripeAccountId: created.stripeAccountId },
+      });
+    });
+
+    it('stores a single account when two creations race', async () => {
+      const photographer = await createPhotographer('race');
+
+      const responses = await Promise.all([
+        createAccount(photographer.token),
+        createAccount(photographer.token),
+      ]);
+
+      const ids = responses.map((response) => response.json<StripeAccountBody>().stripeAccountId);
+      expect(new Set(ids).size).toBe(1);
+      expect(responses.map((response) => response.statusCode).sort()).toEqual([200, 201]);
+      const audits = await prisma.auditLog.count({
+        where: { action: 'stripe_account.created', targetId: photographer.profileId },
+      });
+      expect(audits).toBe(1);
+    });
+  });
+
+  describe('POST /v1/me/stripe/account-link', () => {
+    it('returns 409 before the account exists, then an onboarding url', async () => {
+      const photographer = await createPhotographer('link');
+
+      const before = await createAccountLink(photographer.token);
+      expect(before.statusCode).toBe(409);
+      expect(before.json<ApiErrorBody>().code).toBe('CONFLICT');
+
+      await createAccount(photographer.token);
+      const after = await createAccountLink(photographer.token);
+      expect(after.statusCode).toBe(200);
+      expect(after.json<{ url: string }>().url).toMatch(/^https:\/\//);
+    });
+
+    it('rejects an unverified photographer with EMAIL_NOT_VERIFIED', async () => {
+      const photographer = await createPhotographer('unverified-link');
+      const account = (await createAccount(photographer.token)).json<StripeAccountBody>();
+      await unverifyEmail(photographer.id);
+      await clearRateLimitKeys();
+
+      const response = await createAccountLink(photographer.token);
+      expect(response.statusCode).toBe(403);
+      expect(response.json<ApiErrorBody>().code).toBe('EMAIL_NOT_VERIFIED');
+      expect(await redis.keys(`rate-limit:payments:*:${photographer.id}`)).toEqual([]);
+
+      const profile = await prisma.photographerProfile.findUniqueOrThrow({
+        where: { id: photographer.profileId },
+      });
+      expect(profile.stripeAccountId).toBe(account.stripeAccountId);
+    });
+
+    it('returns 403 for a client', async () => {
+      const client = await signUpAndSignIn('link-client', ['client']);
+      const response = await createAccountLink(client.token);
+      expect(response.statusCode).toBe(403);
+    });
+  });
+
+  describe('account.updated handling', () => {
+    function gateway(): FakeStripeGateway {
+      const instance = app.get<unknown>(STRIPE_GATEWAY);
+      if (!(instance instanceof FakeStripeGateway)) {
+        throw new Error('payments integration: expected the fake gateway under TEST_ENV');
+      }
+      return instance;
+    }
+
+    async function onboardedAccount(label: string) {
+      const photographer = await createPhotographer(label);
+      const account = (await createAccount(photographer.token)).json<StripeAccountBody>();
+      return { ...photographer, accountId: account.stripeAccountId };
+    }
+
+    const ENABLED = { chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true };
+
+    async function verifiedAccount(label: string) {
+      const photographer = await onboardedAccount(label);
+      await prisma.photographerProfile.update({
+        where: { id: photographer.profileId },
+        data: { verificationStatus: 'verified' },
+      });
+      return photographer;
+    }
+
+    function profileOf(profileId: string) {
+      return prisma.photographerProfile.findUniqueOrThrow({ where: { id: profileId } });
+    }
+
+    function updateAudits(profileId: string) {
+      return prisma.auditLog.findMany({
+        where: { action: 'stripe_account.updated', targetId: profileId },
+      });
+    }
+
+    function sendAccountUpdated(accountId: string, eventId = `evt_it_${randomUUID()}`) {
+      eventIds.push(eventId);
+      const payload = JSON.stringify({
+        id: eventId,
+        object: 'event',
+        type: 'account.updated',
+        livemode: false,
+        account: accountId,
+        data: {
+          object: {
+            id: accountId,
+            object: 'account',
+            charges_enabled: true,
+            payouts_enabled: true,
+            details_submitted: true,
+          },
+        },
+      });
+      return fastify().inject({
+        method: 'POST',
+        url: '/v1/stripe/webhook',
+        remoteAddress: FAKE_IP,
+        headers: {
+          'content-type': 'application/json',
+          'stripe-signature': gateway().signPayload(payload),
+        },
+        payload,
+      });
+    }
+
+    it('publishes a verified profile once payouts get enabled and audits the publish', async () => {
+      const photographer = await verifiedAccount('publish');
+      gateway().updateAccount(photographer.accountId, ENABLED);
+
+      await app.get(StripeConnectService).handleAccountUpdated(photographer.accountId);
+
+      expect(await profileOf(photographer.profileId)).toMatchObject({
+        stripePayoutsEnabled: true,
+        isPublished: true,
+      });
+      const audits = await updateAudits(photographer.profileId);
+      expect(audits).toHaveLength(1);
+      expect(audits[0]).toMatchObject({
+        before: { stripePayoutsEnabled: false, isPublished: false },
+        after: { stripePayoutsEnabled: true, isPublished: true },
+      });
+    });
+
+    it('publishes once when the same webhook event is delivered twice or a new event repeats the state', async () => {
+      const photographer = await verifiedAccount('publish-replay');
+      gateway().updateAccount(photographer.accountId, ENABLED);
+      const eventId = `evt_it_${randomUUID()}`;
+
+      const responses = [
+        await sendAccountUpdated(photographer.accountId, eventId),
+        await sendAccountUpdated(photographer.accountId, eventId),
+        await sendAccountUpdated(photographer.accountId),
+      ];
+
+      expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 200]);
+      expect(await profileOf(photographer.profileId)).toMatchObject({ isPublished: true });
+      const audits = await updateAudits(photographer.profileId);
+      expect(audits).toHaveLength(1);
+      expect(audits[0]?.after).toMatchObject({ isPublished: true });
+      const stored = await prisma.stripeEvent.findUniqueOrThrow({ where: { id: eventId } });
+      expect(stored.processedAt).not.toBeNull();
+    });
+
+    it('unpublishes when payouts get disabled and publishes again when they come back', async () => {
+      const photographer = await verifiedAccount('publish-cycle');
+      const connect = app.get(StripeConnectService);
+      const seen = new Set<string>();
+      async function mirror(payoutsEnabled: boolean) {
+        gateway().updateAccount(photographer.accountId, { ...ENABLED, payoutsEnabled });
+        await connect.handleAccountUpdated(photographer.accountId);
+        const fresh = (await updateAudits(photographer.profileId)).filter(
+          (audit) => !seen.has(audit.id),
+        );
+        fresh.forEach((audit) => seen.add(audit.id));
+        return {
+          profile: await profileOf(photographer.profileId),
+          audits: fresh.map((audit) => audit.after),
+        };
+      }
+
+      expect(await mirror(true)).toMatchObject({
+        profile: { isPublished: true },
+        audits: [{ stripePayoutsEnabled: true, isPublished: true }],
+      });
+      expect(await mirror(false)).toMatchObject({
+        profile: { isPublished: false },
+        audits: [{ stripePayoutsEnabled: false, isPublished: false }],
+      });
+      expect(await mirror(true)).toMatchObject({
+        profile: { isPublished: true },
+        audits: [{ stripePayoutsEnabled: true, isPublished: true }],
+      });
+    });
+
+    it('does not publish a suspended photographer', async () => {
+      const photographer = await verifiedAccount('publish-suspended');
+      await prisma.user.update({ where: { id: photographer.id }, data: { status: 'suspended' } });
+      gateway().updateAccount(photographer.accountId, ENABLED);
+
+      await app.get(StripeConnectService).handleAccountUpdated(photographer.accountId);
+
+      expect(await profileOf(photographer.profileId)).toMatchObject({
+        stripePayoutsEnabled: true,
+        isPublished: false,
+      });
+      const [audit] = await updateAudits(photographer.profileId);
+      expect(audit?.after).toMatchObject({ stripePayoutsEnabled: true, isPublished: false });
+    });
+
+    it('does not publish a photographer whose deletion is pending', async () => {
+      const photographer = await verifiedAccount('publish-deleting');
+      await prisma.$transaction((tx) =>
+        applyAccountDeletion(tx, {
+          userId: photographer.id,
+          receivedAt: new Date(),
+          channel: 'in_app',
+          audit: {
+            actorType: 'user',
+            actorId: photographer.id,
+            action: 'data_request.deletion_requested',
+          },
+        }),
+      );
+      gateway().updateAccount(photographer.accountId, ENABLED);
+
+      await app.get(StripeConnectService).handleAccountUpdated(photographer.accountId);
+
+      expect(await profileOf(photographer.profileId)).toMatchObject({
+        stripePayoutsEnabled: true,
+        isPublished: false,
+      });
+      const [audit] = await updateAudits(photographer.profileId);
+      expect(audit?.after).toMatchObject({ stripePayoutsEnabled: true, isPublished: false });
+    });
+
+    it('mirrors enabled flags on an unverified profile without publishing or notifying', async () => {
+      const photographer = await onboardedAccount('enable');
+      const connect = app.get(StripeConnectService);
+
+      gateway().updateAccount(photographer.accountId, {
+        chargesEnabled: true,
+        payoutsEnabled: true,
+        detailsSubmitted: true,
+      });
+      await connect.handleAccountUpdated(photographer.accountId);
+
+      const profile = await prisma.photographerProfile.findUniqueOrThrow({
+        where: { id: photographer.profileId },
+      });
+      expect(profile).toMatchObject({
+        stripeOnboardingComplete: true,
+        stripePayoutsEnabled: true,
+        isPublished: false,
+      });
+      expect(
+        await prisma.auditLog.count({
+          where: { action: 'stripe_account.updated', targetId: photographer.profileId },
+        }),
+      ).toBe(1);
+      expect(
+        await prisma.notification.count({
+          where: { userId: photographer.id, type: 'payouts_disabled' },
+        }),
+      ).toBe(0);
+    });
+
+    it('unpublishes and notifies once when payouts get disabled, even when replayed', async () => {
+      const photographer = await onboardedAccount('disable');
+      await prisma.photographerProfile.update({
+        where: { id: photographer.profileId },
+        data: {
+          verificationStatus: 'verified',
+          stripeOnboardingComplete: true,
+          stripePayoutsEnabled: true,
+          isPublished: true,
+        },
+      });
+      const connect = app.get(StripeConnectService);
+      gateway().updateAccount(photographer.accountId, {
+        chargesEnabled: true,
+        payoutsEnabled: false,
+        detailsSubmitted: true,
+      });
+
+      await connect.handleAccountUpdated(photographer.accountId);
+      await connect.handleAccountUpdated(photographer.accountId);
+
+      const profile = await prisma.photographerProfile.findUniqueOrThrow({
+        where: { id: photographer.profileId },
+      });
+      expect(profile).toMatchObject({ stripePayoutsEnabled: false, isPublished: false });
+      const audits = await prisma.auditLog.findMany({
+        where: { action: 'stripe_account.updated', targetId: photographer.profileId },
+      });
+      expect(audits).toHaveLength(1);
+      expect(audits[0]?.after).toMatchObject({ stripePayoutsEnabled: false, isPublished: false });
+      expect(
+        await prisma.notification.count({
+          where: { userId: photographer.id, type: 'payouts_disabled' },
+        }),
+      ).toBe(1);
+    });
+
+    it('ignores an account no profile links to', async () => {
+      const connect = app.get(StripeConnectService);
+      const orphan = await gateway().createConnectedAccount({
+        country: 'LU',
+        metadata: {},
+        idempotencyKey: `orphan_${RUN_ID}`,
+      });
+      await expect(connect.handleAccountUpdated(orphan.id)).resolves.toBeUndefined();
+    });
+
+    it('rejects an account Stripe does not know without writing anything', async () => {
+      const connect = app.get(StripeConnectService);
+      await expect(connect.handleAccountUpdated(`acct_unknown_${RUN_ID}`)).rejects.toThrow(
+        /no such account/,
+      );
+    });
+  });
+});

@@ -30,7 +30,7 @@ const ERROR_CODE_KEYS: Record<string, string> = {
   PROVIDER_NOT_CONFIGURED: 'providerNotConfigured',
 };
 
-function retryAfterSeconds(details: unknown): number | undefined {
+export function retryAfterSeconds(details: unknown): number | undefined {
   if (typeof details !== 'object' || details === null || !('retryAfterSeconds' in details)) {
     return undefined;
   }

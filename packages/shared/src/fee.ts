@@ -81,3 +81,22 @@ export function quoteTotals(
     totalCents: subtotalCents,
   };
 }
+
+// The Transfer to the photographer at release: the fee stays on the platform
+// balance. Read from the Quote snapshot, never recomputed from current rates.
+export function payoutAmount(
+  totals: Pick<QuoteTotals, 'subtotalCents' | 'platformFeeCents'>,
+): number {
+  const { subtotalCents, platformFeeCents } = totals;
+  if (!Number.isInteger(subtotalCents) || !Number.isInteger(platformFeeCents)) {
+    throw new RangeError(
+      `payoutAmount: amounts must be integer cents, got subtotal ${String(subtotalCents)} and fee ${String(platformFeeCents)}`,
+    );
+  }
+  if (platformFeeCents < 0 || platformFeeCents > subtotalCents) {
+    throw new RangeError(
+      `payoutAmount: platformFeeCents must be between 0 and subtotalCents, got fee ${String(platformFeeCents)} on subtotal ${String(subtotalCents)}`,
+    );
+  }
+  return subtotalCents - platformFeeCents;
+}

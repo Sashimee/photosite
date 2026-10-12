@@ -70,7 +70,7 @@ export const SignUpRequestSchema = z
     // The anonymousId a pre-sign-in consent banner recorded consent under
     // (contract/gdpr.ts `CreateConsentRequestSchema`): passing it here lets
     // sign-up link those records to the new account.
-    anonymousId: z.string().min(1).max(100).optional(),
+    anonymousId: z.uuid().optional(),
   })
   .strict();
 
@@ -97,6 +97,7 @@ export const SignedInResponseSchema = z
 export const TwoFactorRequiredResponseSchema = z
   .object({
     twoFactorRequired: z.literal(true),
+    challengeToken: z.string().min(1),
   })
   .strict();
 
@@ -109,12 +110,15 @@ export const SignInTotpRequestSchema = z
   .object({
     code: TotpCodeSchema.optional(),
     backupCode: z.string().min(1).optional(),
+    challengeToken: z.string().min(1).optional(),
   })
   .strict()
   .refine(
     (value) => Boolean(value.code) !== Boolean(value.backupCode),
     'exactly one of code or backupCode is required',
   );
+
+export const UpdateLocaleRequestSchema = z.object({ locale: LocaleSchema }).strict();
 
 export const SessionResponseSchema = z
   .object({
@@ -222,6 +226,7 @@ export const TotpDisableRequestSchema = z
 export const TotpResponseSchema = z
   .object({
     user: UserSchema,
+    session: AuthSessionSchema.optional(),
   })
   .strict();
 
@@ -312,6 +317,24 @@ registry.registerPath({
       content: { 'application/json': { schema: SessionQueryResponseSchema } },
     },
     ...errorResponses([401]),
+  },
+});
+
+registry.registerPath({
+  method: 'patch',
+  path: apiPath('/me/locale'),
+  summary: "Change the current user's locale",
+  tags: ['auth'],
+  security: AUTH_SECURITY,
+  request: {
+    body: { content: { 'application/json': { schema: UpdateLocaleRequestSchema } } },
+  },
+  responses: {
+    '200': {
+      description: 'The updated session user',
+      content: { 'application/json': { schema: SessionResponseSchema } },
+    },
+    ...errorResponses([400, 401]),
   },
 });
 

@@ -26,6 +26,10 @@ export function buildJobApplicationsPath(locale: string): string {
   return `/${locale}/account/job-applications`;
 }
 
+export function buildAccountPath(locale: string): string {
+  return `/${locale}/account`;
+}
+
 export function buildModerationNoticePath(locale: string): string {
   return `/${locale}/account/notifications`;
 }
@@ -232,6 +236,8 @@ export function renderNotifyEmail(
     verification_rejected: t.verificationRejected,
     job_application_received: t.jobApplicationReceived,
     job_application_status_changed: t.jobApplicationStatusChanged,
+    payouts_disabled: t.payoutsDisabled,
+    dispute_opened: t.disputeOpened,
   };
   const template = templates[type];
 
@@ -244,7 +250,9 @@ export function renderNotifyEmail(
           ? buildJobOfferApplicationsPath(locale, requireJobOfferId(type, payload))
           : type === 'job_application_status_changed'
             ? buildJobApplicationsPath(locale)
-            : buildNotificationPath(locale, requireQuoteId(type, payload));
+            : type === 'payouts_disabled' || type === 'dispute_opened'
+              ? buildAccountPath(locale)
+              : buildNotificationPath(locale, requireQuoteId(type, payload));
   const url = `${webAppUrl}${path}`;
   const preferencesUrl = `${webAppUrl}/${locale}/account/notifications`;
   const fallbackCounterpart = PHOTOGRAPHER_FACING_TYPES.has(type)

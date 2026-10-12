@@ -1,0 +1,10 @@
+appId: lu.photoo.app
+---
+- tapOn:
+    id: tab-account
+- tapOn:
+    id: account-sign-in
+- extendedWaitUntil:
+    visible:
+      id: sign-in-submit
+    timeout: 10000

@@ -1,6 +1,17 @@
 import type { ExpoConfig } from 'expo/config';
 
 const easProjectId = process.env.EAS_PROJECT_ID;
+const stripeMerchantIdentifier = process.env.EXPO_PUBLIC_STRIPE_MERCHANT_IDENTIFIER;
+const e2eBuild = process.env.E2E_BUILD === '1';
+
+function collectedData(type: string, { linked = true }: { linked?: boolean } = {}) {
+  return {
+    NSPrivacyCollectedDataType: `NSPrivacyCollectedDataType${type}`,
+    NSPrivacyCollectedDataTypeLinked: linked,
+    NSPrivacyCollectedDataTypeTracking: false,
+    NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+  };
+}
 
 const config: ExpoConfig = {
   name: 'Photoo',
@@ -15,11 +26,33 @@ const config: ExpoConfig = {
     supportsTablet: false,
     usesAppleSignIn: false,
     privacyManifests: {
+      NSPrivacyTracking: false,
+      NSPrivacyTrackingDomains: [],
       NSPrivacyAccessedAPITypes: [
         {
           NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults',
           NSPrivacyAccessedAPITypeReasons: ['CA92.1'],
         },
+        {
+          NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryFileTimestamp',
+          NSPrivacyAccessedAPITypeReasons: ['3B52.1'],
+        },
+      ],
+      NSPrivacyCollectedDataTypes: [
+        collectedData('EmailAddress'),
+        collectedData('Name'),
+        collectedData('PhysicalAddress'),
+        collectedData('PreciseLocation'),
+        collectedData('CoarseLocation'),
+        collectedData('PhotosorVideos'),
+        collectedData('EmailsOrTextMessages'),
+        collectedData('OtherUserContent'),
+        collectedData('PaymentInfo'),
+        collectedData('PurchaseHistory'),
+        collectedData('UserID'),
+        collectedData('DeviceID'),
+        collectedData('CrashData', { linked: false }),
+        collectedData('OtherDiagnosticData', { linked: false }),
       ],
     },
   },
@@ -37,6 +70,7 @@ const config: ExpoConfig = {
     'expo-localization',
     'expo-status-bar',
     'expo-image',
+    'expo-web-browser',
     [
       'expo-splash-screen',
       {
@@ -54,13 +88,33 @@ const config: ExpoConfig = {
         locationAlwaysAndWhenInUsePermission: false,
         locationAlwaysPermission: false,
         locationWhenInUsePermission:
-          'Photoo uses your location, rounded to about 1 km, to sort photographers near you when you tap "Near me". It is never stored.',
+          'Photoo uses your location, rounded to about 1 km, only when you tap "Near me": to find photographers near you, or to set your request or studio location.',
         motionUsagePermission: false,
         isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
       },
     ],
+    [
+      'expo-image-picker',
+      {
+        photosPermission:
+          'Photoo accesses your photos only when you choose one to attach to a message, add to your portfolio or use as a verification document.',
+        cameraPermission:
+          'Photoo uses the camera only when you take a photo to attach to a message or to capture a verification document.',
+        microphonePermission: false,
+      },
+    ],
+    'expo-document-picker',
+    'expo-notifications',
+    [
+      '@stripe/stripe-react-native',
+      {
+        ...(stripeMerchantIdentifier ? { merchantIdentifier: stripeMerchantIdentifier } : {}),
+        enableGooglePay: true,
+      },
+    ],
     '@sentry/react-native',
+    ...(e2eBuild ? ['./plugins/with-cleartext-traffic'] : []),
   ],
   experiments: {
     typedRoutes: true,

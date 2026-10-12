@@ -64,6 +64,12 @@ export const QuoteSchema = z
   .strict()
   .openapi('Quote');
 
+export const AcceptQuoteResponseSchema = QuoteSchema.extend({
+  bookingId: IdSchema.nullable(),
+})
+  .strict()
+  .openapi('AcceptedQuote');
+
 export const CreateQuoteRequestSchema = z
   .object({
     requestId: IdSchema,
@@ -228,7 +234,7 @@ registry.registerPath({
   responses: {
     '200': {
       description: 'Quote accepted',
-      content: { 'application/json': { schema: QuoteSchema } },
+      content: { 'application/json': { schema: AcceptQuoteResponseSchema } },
     },
     ...errorResponses([401, 403, 404, 409, 422]),
   },

@@ -1,0 +1,25 @@
+appId: lu.photoo.app
+name: Refuse sign-in for an unverified account
+---
+- runScript:
+    file: ../scripts/create-user.js
+- runFlow: ../subflows/fresh-start.yaml
+- runFlow: ../subflows/open-sign-in.yaml
+- tapOn:
+    id: sign-in-email
+- inputText: ${output.email}
+- tapOn:
+    id: sign-in-password
+- inputText: ${output.password}
+- hideKeyboard
+- tapOn:
+    id: sign-in-submit
+- extendedWaitUntil:
+    visible:
+      id: sign-in-error
+    timeout: 20000
+- assertVisible: Please verify your email before signing in.
+- assertVisible:
+    id: sign-in-submit
+- assertNotVisible:
+    id: account-deletion

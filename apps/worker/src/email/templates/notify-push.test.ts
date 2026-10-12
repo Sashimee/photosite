@@ -109,6 +109,24 @@ describe('renderNotifyPush', () => {
     expect(push.url).toBe('/en/account/job-applications');
   });
 
+  it('renders payouts_disabled with an account deep link and no ids required', () => {
+    const push = renderNotifyPush('payouts_disabled', {}, 'en');
+    expect(push.title).toBe('Payouts paused');
+    expect(push.body).toBe('Your profile is hidden until your payout details are complete');
+    expect(push.url).toBe('/en/account');
+  });
+
+  it('renders dispute_opened without an amount and with an account deep link', () => {
+    const push = renderNotifyPush(
+      'dispute_opened',
+      { total: { amountCents: 150000, currency: 'EUR' } },
+      'en',
+    );
+    expect(push.title).toBe('Payment disputed');
+    expect(push.body).not.toContain('1,500');
+    expect(push.url).toBe('/en/account');
+  });
+
   it('throws when a job application notification has no jobOfferId', () => {
     expect(() => renderNotifyPush('job_application_received', {}, 'en')).toThrow(/jobOfferId/);
   });

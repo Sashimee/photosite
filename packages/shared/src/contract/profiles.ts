@@ -132,6 +132,7 @@ export const OwnPhotographerProfileSchema = PhotographerProfileBaseSchema.extend
   isPublished: z.boolean(),
   stripeOnboardingComplete: z.boolean(),
   stripePayoutsEnabled: z.boolean(),
+  stripeAccountConnected: z.boolean(),
 })
   .strict()
   .openapi('OwnPhotographerProfile');

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   CreateRefundRequestSchema,
+  CreateRefundResponseSchema,
+  EARNINGS_RECENT_LIMIT,
+  EarningsResponseSchema,
   StripeAccountLinkResponseSchema,
+  StripeAccountResponseSchema,
   StripeWebhookEventSchema,
 } from './payments.js';
 
@@ -51,6 +55,24 @@ describe('StripeAccountLinkResponseSchema', () => {
   });
 });
 
+describe('StripeAccountResponseSchema', () => {
+  it('accepts a connected account summary', () => {
+    expect(
+      StripeAccountResponseSchema.safeParse({
+        stripeAccountId: 'acct_1P000000000000000',
+        onboardingComplete: false,
+        payoutsEnabled: false,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a missing status flag', () => {
+    expect(
+      StripeAccountResponseSchema.safeParse({ stripeAccountId: 'acct_1P000000000000000' }).success,
+    ).toBe(false);
+  });
+});
+
 describe('StripeWebhookEventSchema', () => {
   const validEvent = {
     id: 'evt_1P000000000000000',
@@ -87,5 +109,133 @@ describe('StripeWebhookEventSchema', () => {
 
   it('rejects a missing data.object', () => {
     expect(StripeWebhookEventSchema.safeParse({ ...validEvent, data: {} }).success).toBe(false);
+  });
+});
+
+describe('CreateRefundResponseSchema', () => {
+  const booking = {
+    id: '0190a0b2-0000-7000-8000-000000000001',
+    quoteId: '0190a0b2-0000-7000-8000-000000000002',
+    clientId: '0190a0b2-0000-7000-8000-000000000003',
+    photographerId: '0190a0b2-0000-7000-8000-000000000004',
+    scheduledAt: '2026-10-01T10:00:00.000Z',
+    location: null,
+    total: { amountCents: 150000, currency: 'EUR' },
+    status: 'paid_held',
+    releaseDueAt: null,
+    deliveredAt: null,
+    releasedAt: null,
+    cancelledAt: null,
+    cancellationReason: null,
+  };
+  const partial = {
+    status: 'partially_refunded',
+    amount: { amountCents: 5000, currency: 'EUR' },
+    refundedTotal: { amountCents: 5000, currency: 'EUR' },
+    booking,
+  };
+
+  it('accepts a partial refund that keeps the booking state', () => {
+    expect(CreateRefundResponseSchema.safeParse(partial).success).toBe(true);
+  });
+
+  it('accepts a full refund of a refunded booking', () => {
+    expect(
+      CreateRefundResponseSchema.safeParse({
+        ...partial,
+        status: 'refunded',
+        refundedTotal: { amountCents: 150000, currency: 'EUR' },
+        booking: { ...booking, status: 'refunded' },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects an unknown status and unknown keys', () => {
+    expect(CreateRefundResponseSchema.safeParse({ ...partial, status: 'pending' }).success).toBe(
+      false,
+    );
+    expect(CreateRefundResponseSchema.safeParse({ ...partial, refundId: 're_123' }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe('EarningsResponseSchema', () => {
+  const entry = {
+    bookingId: '0190a0b2-0000-7000-8000-000000000001',
+    amountCents: 23797,
+    currency: 'EUR',
+    occurredAt: '2026-10-01T10:00:00.000Z',
+  };
+
+  it('accepts empty arrays for a photographer with no bookings', () => {
+    expect(EarningsResponseSchema.safeParse({ totals: [], recent: [] }).success).toBe(true);
+  });
+
+  it('accepts one totals row per currency', () => {
+    expect(
+      EarningsResponseSchema.safeParse({
+        totals: [
+          { currency: 'EUR', releasedCents: 23797, heldCents: 0 },
+          { currency: 'USD', releasedCents: 0, heldCents: 9500 },
+        ],
+        recent: [entry],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects negative or fractional amounts', () => {
+    expect(
+      EarningsResponseSchema.safeParse({
+        totals: [{ currency: 'EUR', releasedCents: -1, heldCents: 0 }],
+        recent: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      EarningsResponseSchema.safeParse({
+        totals: [],
+        recent: [{ ...entry, amountCents: 10.5 }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a negative recent amount and a malformed booking id', () => {
+    expect(
+      EarningsResponseSchema.safeParse({ totals: [], recent: [{ ...entry, amountCents: -1 }] })
+        .success,
+    ).toBe(false);
+    expect(
+      EarningsResponseSchema.safeParse({ totals: [], recent: [{ ...entry, bookingId: 'nope' }] })
+        .success,
+    ).toBe(false);
+    expect(
+      EarningsResponseSchema.safeParse({
+        totals: [{ currency: 'EUR', releasedCents: 0, heldCents: -1 }],
+        recent: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a lowercase currency and unknown keys', () => {
+    expect(
+      EarningsResponseSchema.safeParse({
+        totals: [{ currency: 'eur', releasedCents: 0, heldCents: 0 }],
+        recent: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      EarningsResponseSchema.safeParse({
+        totals: [{ currency: 'EUR', releasedCents: 0, heldCents: 0, feePercent: 5 }],
+        recent: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('caps recent at the documented limit', () => {
+    const recent = Array.from({ length: EARNINGS_RECENT_LIMIT + 1 }, () => entry);
+    expect(EarningsResponseSchema.safeParse({ totals: [], recent }).success).toBe(false);
+    expect(EarningsResponseSchema.safeParse({ totals: [], recent: recent.slice(1) }).success).toBe(
+      true,
+    );
   });
 });

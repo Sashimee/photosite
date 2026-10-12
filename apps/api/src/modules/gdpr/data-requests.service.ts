@@ -7,6 +7,7 @@ import {
   type DataRequestSchema,
 } from '@photoo/shared';
 import type { z } from 'zod';
+import { PublishPolicy } from '../../common/publish/publish-policy.js';
 import { APP_CONFIG, type Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { StorageService } from '../../storage/storage.service.js';
@@ -167,7 +168,16 @@ export class DataRequestsService {
         data: { status: 'active', deletedAt: null },
       });
 
-      if (before?.profileIsPublished) {
+      // Payouts may have been disabled while the deletion was pending, so the
+      // restore goes through the same publish gate as every other publish.
+      const profile = before?.profileIsPublished
+        ? await tx.photographerProfile.findUnique({
+            where: { userId: row.userId },
+            select: { verificationStatus: true, stripePayoutsEnabled: true },
+          })
+        : null;
+      const restoredIsPublished = profile !== null && PublishPolicy.canPublish(profile);
+      if (restoredIsPublished) {
         await tx.photographerProfile.updateMany({
           where: { userId: row.userId },
           data: { isPublished: true },
@@ -182,7 +192,7 @@ export class DataRequestsService {
           targetType: 'DataRequest',
           targetId: id,
           before: { status: 'pending' },
-          after: { status: 'cancelled', restoredIsPublished: Boolean(before?.profileIsPublished) },
+          after: { status: 'cancelled', restoredIsPublished },
         },
       });
 

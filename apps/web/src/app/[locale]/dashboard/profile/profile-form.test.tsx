@@ -40,6 +40,7 @@ const EXISTING_PROFILE = {
   isPublished: false,
   stripeOnboardingComplete: false,
   stripePayoutsEnabled: false,
+  stripeAccountConnected: false,
 };
 
 async function loadProfileForm() {

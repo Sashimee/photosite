@@ -184,6 +184,14 @@ export interface ProductExportRow {
   tiers: ProductTierExportRow[];
 }
 
+export interface PortfolioImageProvenanceExportRow {
+  verdict: string;
+  checkedAt: string;
+  reviewedAt: string | null;
+  decisionReason: string | null;
+  decisionReasonText: string | null;
+}
+
 export interface PortfolioImageExportRow {
   id: string;
   uploadId: string;
@@ -191,6 +199,7 @@ export interface PortfolioImageExportRow {
   status: string;
   width: number | null;
   height: number | null;
+  provenance: PortfolioImageProvenanceExportRow | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -326,10 +335,14 @@ interface JobOfferRawRow {
 // lives in the return shape and in `archive.ts`'s per-file write, not in a
 // dozen near-identical one-query modules. Every field list below is
 // deliberate: never the counterpart's email/phone/address in `messages`,
-// never `AuditLog`, admin notes, provenance scores/vendors, password
-// hashes, 2FA secrets or backup codes, and verification document bytes are
-// listed in `files` for portfolio/avatar/cover only, never for a
-// `VerificationDocument`'s upload.
+// never `AuditLog`, admin notes, password hashes, 2FA secrets or backup
+// codes, and verification document bytes are listed in `files` for
+// portfolio/avatar/cover only, never for a `VerificationDocument`'s upload.
+// Provenance exports what the photographer already sees (verdict, check
+// time, decisionReason/decisionReasonText) plus `reviewedAt`, for Art. 22.
+// Withheld pending the Art. 15(4) lawyer answer (docs/steps/human-followups.md):
+// score, aiScore, aiVendor, reverseMatches, c2paValid, exifCamera,
+// exifCapturedAt, note, reviewedByAdminId and raw.
 export async function collectExportData(
   prisma: PrismaClient,
   userId: string,
@@ -609,17 +622,37 @@ export async function collectExportData(
           status: true,
           width: true,
           height: true,
+          provenanceCheck: {
+            select: {
+              verdict: true,
+              createdAt: true,
+              reviewedAt: true,
+              decisionReason: true,
+              decisionReasonText: true,
+            },
+          },
           createdAt: true,
           updatedAt: true,
         },
         orderBy: { order: 'asc' },
       })
     : [];
-  const portfolioImages: PortfolioImageExportRow[] = portfolioImageRows.map((image) => ({
-    ...image,
-    createdAt: image.createdAt.toISOString(),
-    updatedAt: image.updatedAt.toISOString(),
-  }));
+  const portfolioImages: PortfolioImageExportRow[] = portfolioImageRows.map(
+    ({ provenanceCheck, ...image }) => ({
+      ...image,
+      provenance: provenanceCheck
+        ? {
+            verdict: provenanceCheck.verdict,
+            checkedAt: provenanceCheck.createdAt.toISOString(),
+            reviewedAt: provenanceCheck.reviewedAt?.toISOString() ?? null,
+            decisionReason: provenanceCheck.decisionReason,
+            decisionReasonText: provenanceCheck.decisionReasonText,
+          }
+        : null,
+      createdAt: image.createdAt.toISOString(),
+      updatedAt: image.updatedAt.toISOString(),
+    }),
+  );
 
   const uploadRows = await prisma.upload.findMany({
     where: { ownerId: userId },

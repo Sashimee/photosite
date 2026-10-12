@@ -185,11 +185,11 @@ describe('QuoteDetailPage', () => {
     });
     render(element);
 
-    expect(
-      screen.getByText(
-        "Quote accepted. Booking and payment are coming soon — we'll be in touch with next steps.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Quote accepted.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View your bookings' })).toHaveAttribute(
+      'href',
+      '/en/bookings',
+    );
   });
 
   it('only shows quote actions to the quote’s own client', async () => {

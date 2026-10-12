@@ -318,10 +318,37 @@ describe('auth integration', () => {
     }, 20_000);
   });
 
+  async function seedDevices(email: string): Promise<{ userId: string; bystanderId: string }> {
+    const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+    const bystanderEmail = uniqueEmail('device-bystander');
+    await signUp(bystanderEmail);
+    const bystander = await prisma.user.findUniqueOrThrow({ where: { email: bystanderEmail } });
+    for (const userId of [user.id, bystander.id]) {
+      await prisma.device.create({
+        data: {
+          userId,
+          expoPushToken: `ExponentPushToken[${randomUUID()}]`,
+          platform: 'ios',
+          lastSeenAt: new Date(),
+        },
+      });
+    }
+    return { userId: user.id, bystanderId: bystander.id };
+  }
+
+  async function expectOnlyBystanderDevices(ids: {
+    userId: string;
+    bystanderId: string;
+  }): Promise<void> {
+    expect(await prisma.device.findMany({ where: { userId: ids.userId } })).toHaveLength(0);
+    expect(await prisma.device.findMany({ where: { userId: ids.bystanderId } })).toHaveLength(1);
+  }
+
   it('resets a forgotten password end to end', async () => {
     const email = uniqueEmail('reset');
     await signUp(email);
     await verifyByEmail(email);
+    const deviceOwners = await seedDevices(email);
 
     const signInBeforeReset = await fastify().inject({
       method: 'POST',
@@ -350,6 +377,7 @@ describe('auth integration', () => {
       payload: { token, password: newPassword },
     });
     expect(confirmResponse.statusCode).toBe(200);
+    await expectOnlyBystanderDevices(deviceOwners);
 
     const sessionAfterReset = await fastify().inject({
       method: 'GET',
@@ -414,6 +442,7 @@ describe('auth integration', () => {
     const email = uniqueEmail('totp');
     await signUp(email);
     await verifyByEmail(email);
+    const deviceOwners = await seedDevices(email);
     const signInResponse = await fastify().inject({
       method: 'POST',
       url: '/v1/auth/sign-in',
@@ -448,6 +477,7 @@ describe('auth integration', () => {
       payload: { code: generateTotpCode(secret) },
     });
     expect(verifyTotpResponse.statusCode).toBe(200);
+    await expectOnlyBystanderDevices(deviceOwners);
     expect(
       verifyTotpResponse.json<{ user: { twoFactorEnabled: boolean } }>().user.twoFactorEnabled,
     ).toBe(true);
@@ -468,6 +498,28 @@ describe('auth integration', () => {
     expect(
       disableResponse.json<{ user: { twoFactorEnabled: boolean } }>().user.twoFactorEnabled,
     ).toBe(false);
+    const disabledCookie = disableResponse.cookies.find(
+      (cookie) => cookie.name === 'photoo_session',
+    );
+    if (!disabledCookie) {
+      throw new Error('expected a rotated photoo_session cookie on the disable response');
+    }
+    expect(`${disabledCookie.name}=${disabledCookie.value}`).not.toBe(cookieHeader);
+
+    const afterDisable = await fastify().inject({
+      method: 'GET',
+      url: '/v1/auth/session',
+      headers: { cookie: `${disabledCookie.name}=${disabledCookie.value}` },
+    });
+    expect(afterDisable.statusCode).toBe(200);
+    expect(afterDisable.json<{ user: { email: string } | null }>().user?.email).toBe(email);
+
+    const staleAfterDisable = await fastify().inject({
+      method: 'GET',
+      url: '/v1/auth/session',
+      headers: { cookie: cookieHeader },
+    });
+    expect(staleAfterDisable.statusCode).toBe(401);
   }, 20_000);
 
   it('rate limits repeated bad sign-ins with a 429 ApiError', async () => {
@@ -699,6 +751,78 @@ describe('auth integration', () => {
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
       );
     }, 20_000);
+
+    describe('sign-up with anonymousId (#619)', () => {
+      function signUpWithAnonymousId(email: string, anonymousId: string) {
+        createdEmails.push(email);
+        return fastify().inject({
+          method: 'POST',
+          url: '/v1/auth/sign-up',
+          payload: { email, password: PASSWORD, roles: ['client'], locale: 'en', anonymousId },
+        });
+      }
+
+      async function recordAnonymousConsent(anonymousId: string) {
+        return prisma.consentRecord.create({
+          data: { anonymousId, purpose: 'analytics', granted: true, policyVersion: 'test' },
+        });
+      }
+
+      it('answers an existing email like a new one and leaves the existing user consents alone', async () => {
+        const email = uniqueEmail('enum-anon');
+        const first = await signUpWithAnonymousId(email, randomUUID());
+        expect(first.statusCode).toBe(201);
+        const existing = await prisma.user.findUniqueOrThrow({ where: { email } });
+        const ownConsent = await prisma.consentRecord.create({
+          data: {
+            userId: existing.id,
+            purpose: 'analytics',
+            granted: true,
+            policyVersion: 'test',
+          },
+        });
+
+        const anonymousId = randomUUID();
+        const pending = await recordAnonymousConsent(anonymousId);
+        const second = await signUpWithAnonymousId(email, anonymousId);
+        const fresh = await signUpWithAnonymousId(uniqueEmail('fresh-anon'), randomUUID());
+
+        expect(second.statusCode).toBe(201);
+        expect(Object.keys(second.json<{ user: object }>())).toEqual(
+          Object.keys(fresh.json<{ user: object }>()),
+        );
+        expect(Object.keys(second.json<{ user: object }>().user)).toEqual(
+          Object.keys(fresh.json<{ user: object }>().user),
+        );
+        const pendingAfter = await prisma.consentRecord.findUniqueOrThrow({
+          where: { id: pending.id },
+        });
+        expect(pendingAfter.userId).toBeNull();
+        expect(pendingAfter.anonymousId).toBe(anonymousId);
+        const ownAfter = await prisma.consentRecord.findUniqueOrThrow({
+          where: { id: ownConsent.id },
+        });
+        expect(ownAfter.userId).toBe(existing.id);
+        await prisma.consentRecord.deleteMany({
+          where: { id: { in: [pending.id, ownConsent.id] } },
+        });
+      }, 20_000);
+
+      it('still links the anonymous consents for a new email', async () => {
+        const email = uniqueEmail('link-anon');
+        const anonymousId = randomUUID();
+        const pending = await recordAnonymousConsent(anonymousId);
+
+        const response = await signUpWithAnonymousId(email, anonymousId);
+
+        expect(response.statusCode).toBe(201);
+        const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+        const linked = await prisma.consentRecord.findUniqueOrThrow({ where: { id: pending.id } });
+        expect(linked.userId).toBe(user.id);
+        expect(linked.anonymousId).toBeNull();
+        await prisma.consentRecord.delete({ where: { id: pending.id } });
+      }, 20_000);
+    });
   });
 
   // Backup codes must be stored through our own AES-256-GCM envelope
@@ -817,6 +941,7 @@ describe('auth integration', () => {
       }>();
       expect(completionBody.user.email).toBe(email);
 
+      const deviceOwners = await seedDevices(email);
       const revokeCookie = completion.cookies.find((c) => c.name === 'photoo_session');
       const revokeCookieHeader = revokeCookie
         ? `${revokeCookie.name}=${revokeCookie.value}`
@@ -828,6 +953,12 @@ describe('auth integration', () => {
         headers: { cookie: revokeCookieHeader, origin: 'http://localhost:3000' },
       });
       expect(revokeResponse.statusCode).toBe(204);
+      expect(await prisma.device.findMany({ where: { userId: deviceOwners.userId } })).toHaveLength(
+        0,
+      );
+      expect(
+        await prisma.device.findMany({ where: { userId: deviceOwners.bystanderId } }),
+      ).toHaveLength(1);
 
       const afterRevoke = await fastify().inject({
         method: 'GET',
@@ -962,6 +1093,352 @@ describe('auth integration', () => {
         headers: { cookie: secondCookieHeader },
       });
       expect(afterEnable.statusCode).toBe(401);
+    }, 20_000);
+  });
+
+  describe('issue #23: 2FA for bearer-only clients', () => {
+    async function enableTotpWithBearer(email: string): Promise<{
+      secret: string;
+      bearer: string;
+      verifyResponse: Awaited<ReturnType<ReturnType<typeof fastify>['inject']>>;
+      oldBearer: string;
+    }> {
+      await signUp(email);
+      await verifyByEmail(email);
+      const signIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const oldBearer = signIn.json<{ session: { token: string } }>().session.token;
+      const enroll = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/enroll',
+        headers: { authorization: `Bearer ${oldBearer}` },
+        payload: { password: PASSWORD },
+      });
+      const { secret } = enroll.json<{ secret: string }>();
+      const verifyResponse = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/verify',
+        headers: { authorization: `Bearer ${oldBearer}` },
+        payload: { code: generateTotpCode(secret) },
+      });
+      const bearer = verifyResponse.json<{ session?: { token: string } }>().session?.token ?? '';
+      return { secret, bearer, verifyResponse, oldBearer };
+    }
+
+    async function startChallenge(email: string): Promise<string> {
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ twoFactorRequired?: boolean; challengeToken?: string }>();
+      expect(body.twoFactorRequired).toBe(true);
+      if (!body.challengeToken) {
+        throw new Error('expected a challengeToken');
+      }
+      return body.challengeToken;
+    }
+
+    function wrongCode(secret: string): string {
+      return generateTotpCode(secret) === '000000' ? '111111' : '000000';
+    }
+
+    it('enabling TOTP with a bearer returns a working rotated session and revokes the old token', async () => {
+      const email = uniqueEmail('bearer-enable');
+      const { bearer, oldBearer, verifyResponse } = await enableTotpWithBearer(email);
+      expect(verifyResponse.statusCode).toBe(200);
+      const { session } = verifyResponse.json<{
+        session: { token: string; expiresAt: string };
+      }>();
+      expect(Date.parse(session.expiresAt)).toBeGreaterThan(Date.now());
+      expect(bearer).not.toBe(oldBearer);
+
+      const fresh = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${bearer}` },
+      });
+      expect(fresh.statusCode).toBe(200);
+      expect(fresh.json<{ user: { email: string } | null }>().user?.email).toBe(email);
+
+      const stale = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${oldBearer}` },
+      });
+      expect(stale.statusCode).toBe(401);
+    }, 20_000);
+
+    it('keeps other sessions and devices on a wrong code, revokes them once the code verifies (#676)', async () => {
+      const email = uniqueEmail('verify-order');
+      await signUp(email);
+      await verifyByEmail(email);
+      const deviceOwners = await seedDevices(email);
+      const signInBearer = async (): Promise<string> => {
+        const response = await fastify().inject({
+          method: 'POST',
+          url: '/v1/auth/sign-in',
+          payload: { email, password: PASSWORD },
+        });
+        return response.json<{ session: { token: string } }>().session.token;
+      };
+      const callerBearer = await signInBearer();
+      const otherBearer = await signInBearer();
+      const sessionStatus = async (token: string): Promise<number> =>
+        (
+          await fastify().inject({
+            method: 'GET',
+            url: '/v1/auth/session',
+            headers: { authorization: `Bearer ${token}` },
+          })
+        ).statusCode;
+
+      const enroll = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/enroll',
+        headers: { authorization: `Bearer ${callerBearer}` },
+        payload: { password: PASSWORD },
+      });
+      const { secret } = enroll.json<{ secret: string }>();
+
+      const wrong = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/verify',
+        headers: { authorization: `Bearer ${callerBearer}` },
+        payload: { code: wrongCode(secret) },
+      });
+      expect(wrong.statusCode).toBe(401);
+      expect(await sessionStatus(otherBearer)).toBe(200);
+      expect(await sessionStatus(callerBearer)).toBe(200);
+      expect(await prisma.device.findMany({ where: { userId: deviceOwners.userId } })).toHaveLength(
+        1,
+      );
+
+      const verified = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/verify',
+        headers: { authorization: `Bearer ${callerBearer}` },
+        payload: { code: generateTotpCode(secret) },
+      });
+      expect(verified.statusCode).toBe(200);
+      const rotatedToken = verified.json<{ session: { token: string } }>().session.token;
+      expect(await sessionStatus(rotatedToken)).toBe(200);
+      expect(await sessionStatus(otherBearer)).toBe(401);
+      expect(await sessionStatus(callerBearer)).toBe(401);
+      await expectOnlyBystanderDevices(deviceOwners);
+    }, 30_000);
+
+    it('does not return a session from totp/verify when the session was not rotated', async () => {
+      const email = uniqueEmail('bearer-reverify');
+      const { secret, bearer } = await enableTotpWithBearer(email);
+      const again = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/verify',
+        headers: { authorization: `Bearer ${bearer}` },
+        payload: { code: generateTotpCode(secret) },
+      });
+      expect(again.statusCode).toBe(200);
+      expect(again.json<Record<string, unknown>>().session).toBeUndefined();
+    }, 20_000);
+
+    it('returns the rotated session from totp/disable and invalidates the old token', async () => {
+      const email = uniqueEmail('bearer-disable');
+      const { secret, bearer } = await enableTotpWithBearer(email);
+      const disable = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/disable',
+        headers: { authorization: `Bearer ${bearer}` },
+        payload: { code: generateTotpCode(secret), password: PASSWORD },
+      });
+      expect(disable.statusCode).toBe(200);
+      const body = disable.json<{
+        user: { twoFactorEnabled: boolean };
+        session?: { token: string; expiresAt: string };
+      }>();
+      expect(body.user.twoFactorEnabled).toBe(false);
+      const newToken = body.session?.token ?? '';
+      expect(newToken).toBeTruthy();
+      expect(newToken).not.toBe(bearer);
+
+      const fresh = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${newToken}` },
+      });
+      expect(fresh.statusCode).toBe(200);
+      expect(fresh.json<{ user: { email: string } | null }>().user?.email).toBe(email);
+
+      const stale = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${bearer}` },
+      });
+      expect(stale.statusCode).toBe(401);
+    }, 20_000);
+
+    it('rejects totp/disable without a session', async () => {
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/disable',
+        payload: { code: '123456', password: PASSWORD },
+      });
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('completes sign-in with a challengeToken, no Cookie and no Origin', async () => {
+      const email = uniqueEmail('bearer-signin');
+      const { secret } = await enableTotpWithBearer(email);
+      const challengeToken = await startChallenge(email);
+
+      const completion = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        payload: { code: generateTotpCode(secret), challengeToken },
+      });
+      expect(completion.statusCode).toBe(200);
+      const { session, user } = completion.json<{
+        session: { token: string };
+        user: { email: string };
+      }>();
+      expect(user.email).toBe(email);
+
+      const check = await fastify().inject({
+        method: 'GET',
+        url: '/v1/auth/session',
+        headers: { authorization: `Bearer ${session.token}` },
+      });
+      expect(check.statusCode).toBe(200);
+      expect(check.json<{ user: { email: string } | null }>().user?.email).toBe(email);
+    }, 30_000);
+
+    it('accepts a backup code with a challengeToken', async () => {
+      const email = uniqueEmail('bearer-backup');
+      await signUp(email);
+      await verifyByEmail(email);
+      const signIn = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const first = signIn.json<{ session: { token: string } }>().session.token;
+      const enroll = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/enroll',
+        headers: { authorization: `Bearer ${first}` },
+        payload: { password: PASSWORD },
+      });
+      const { secret, backupCodes } = enroll.json<{ secret: string; backupCodes: string[] }>();
+      await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/totp/verify',
+        headers: { authorization: `Bearer ${first}` },
+        payload: { code: generateTotpCode(secret) },
+      });
+      const challengeToken = await startChallenge(email);
+      const completion = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        payload: { backupCode: backupCodes[0], challengeToken },
+      });
+      expect(completion.statusCode).toBe(200);
+      expect(completion.json<{ session: { token: string } }>().session.token).toBeTruthy();
+    }, 30_000);
+
+    it('counts wrong codes toward the per-challenge limit of 5 attempts', async () => {
+      const email = uniqueEmail('bearer-attempts');
+      const { secret } = await enableTotpWithBearer(email);
+      const challengeToken = await startChallenge(email);
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const wrong = await fastify().inject({
+          method: 'POST',
+          url: '/v1/auth/sign-in/totp',
+          payload: { code: wrongCode(secret), challengeToken },
+        });
+        expect(wrong.statusCode).toBe(401);
+      }
+      await clearRateLimitKeys(redis);
+
+      const sixth = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        payload: { code: generateTotpCode(secret), challengeToken },
+      });
+      expect(sixth.statusCode).toBe(400);
+      expect(sixth.json<{ session?: unknown }>().session).toBeUndefined();
+    }, 30_000);
+
+    it('rejects a tampered challengeToken', async () => {
+      const email = uniqueEmail('bearer-tampered');
+      const { secret } = await enableTotpWithBearer(email);
+      const challengeToken = await startChallenge(email);
+      const tampered = `${challengeToken.slice(0, -4)}AAAA`;
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        payload: { code: generateTotpCode(secret), challengeToken: tampered },
+      });
+      expect(response.statusCode).toBe(401);
+    }, 20_000);
+
+    it('rejects a challengeToken that tries to inject extra cookies', async () => {
+      const email = uniqueEmail('bearer-inject');
+      const { secret } = await enableTotpWithBearer(email);
+      const challengeToken = await startChallenge(email);
+
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        payload: { code: generateTotpCode(secret), challengeToken: `${challengeToken}; x=y` },
+      });
+      expect(response.statusCode).toBe(401);
+    }, 20_000);
+
+    it('rejects a request with neither a challengeToken nor a cookie', async () => {
+      const email = uniqueEmail('bearer-none');
+      const { secret } = await enableTotpWithBearer(email);
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        payload: { code: generateTotpCode(secret) },
+      });
+      expect(response.statusCode).toBe(401);
+    }, 20_000);
+
+    it('lets the body challengeToken win over a stale two-factor cookie', async () => {
+      const email = uniqueEmail('bearer-replace');
+      const { secret } = await enableTotpWithBearer(email);
+      const challengeToken = await startChallenge(email);
+      const cookieName = (await auth.$context).createAuthCookie('two_factor').name;
+
+      const completion = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in/totp',
+        headers: { cookie: `${cookieName}=stale.value`, origin: 'http://localhost:3000' },
+        payload: { code: generateTotpCode(secret), challengeToken },
+      });
+      expect(completion.statusCode).toBe(200);
+    }, 30_000);
+
+    it('still hands the web a two-factor cookie alongside the challengeToken', async () => {
+      const email = uniqueEmail('bearer-web-cookie');
+      await enableTotpWithBearer(email);
+      const response = await fastify().inject({
+        method: 'POST',
+        url: '/v1/auth/sign-in',
+        payload: { email, password: PASSWORD },
+      });
+      const cookieName = (await auth.$context).createAuthCookie('two_factor').name;
+      const cookie = response.cookies.find((c) => c.name === cookieName);
+      expect(cookie).toBeDefined();
+      expect(response.json<{ challengeToken: string }>().challengeToken).toBe(
+        encodeURIComponent(cookie?.value ?? ''),
+      );
     }, 20_000);
   });
 

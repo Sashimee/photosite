@@ -57,6 +57,21 @@ describe('buildCspHeader', () => {
     const header = buildCspHeader('abc123', false, [], ['https://footoo.bas.lu']);
     expect(header).toContain("img-src 'self' blob: data: https://footoo.bas.lu;");
   });
+
+  it('omits every Stripe origin when the publishable key is unset', () => {
+    const header = buildCspHeader('abc123', false);
+    expect(header).not.toContain('stripe.com');
+    expect(header).not.toContain('frame-src');
+  });
+
+  it('adds the Stripe origins to script-src, connect-src and frame-src when enabled', () => {
+    const header = buildCspHeader('abc123', false, ['https://api.photoo.lu'], [], true);
+    expect(header).toContain(
+      `script-src 'self' 'nonce-abc123' 'strict-dynamic' https://js.stripe.com`,
+    );
+    expect(header).toContain("connect-src 'self' https://api.photoo.lu https://api.stripe.com;");
+    expect(header).toContain('frame-src https://js.stripe.com https://hooks.stripe.com');
+  });
 });
 
 describe('originOf', () => {

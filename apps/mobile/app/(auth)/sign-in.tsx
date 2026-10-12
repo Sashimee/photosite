@@ -1,6 +1,6 @@
 import { SignInRequestSchema } from '@photoo/shared';
-import { Link, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { Link, useFocusEffect, useGlobalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Text } from 'react-native';
 
@@ -12,16 +12,25 @@ import { api } from '../../src/lib/api';
 import { authErrorMessage, scopedAuthTranslate } from '../../src/lib/auth-errors';
 import { useAuth } from '../../src/lib/auth-context';
 import { fieldErrorMessages } from '../../src/lib/form-errors';
+import { sanitizeReturnPath } from '../../src/lib/return-path';
+import { clearTwoFactorChallenge, setTwoFactorChallenge } from '../../src/lib/two-factor-challenge';
 
 export default function SignInScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { signIn } = useAuth();
+  const { next, reason } = useGlobalSearchParams<{ next?: string; reason?: string }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      clearTwoFactorChallenge();
+    }, []),
+  );
 
   async function handleSubmit() {
     const parsed = SignInRequestSchema.safeParse({ email, password });
@@ -42,7 +51,11 @@ export default function SignInScreen() {
     }
 
     if ('twoFactorRequired' in data) {
-      router.push('/two-factor');
+      setTwoFactorChallenge(data.challengeToken);
+      const returnPath = sanitizeReturnPath(next);
+      router.push(
+        returnPath ? { pathname: '/two-factor', params: { next: returnPath } } : '/two-factor',
+      );
       return;
     }
 
@@ -54,6 +67,11 @@ export default function SignInScreen() {
       <Text className="text-2xl font-semibold text-foreground">
         {t('mobile.auth.signIn.title')}
       </Text>
+      {reason === 'challenge-expired' && !submitError ? (
+        <FormNotice tone="error" testID="sign-in-challenge-expired">
+          {t('mobile.auth.errors.challengeExpired')}
+        </FormNotice>
+      ) : null}
       {submitError ? (
         <FormNotice tone="error" testID="sign-in-error">
           {submitError}

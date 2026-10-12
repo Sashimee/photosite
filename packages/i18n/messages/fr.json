@@ -36,7 +36,136 @@
             "tooManyRequestsWithRetry": "Vous envoyez des devis trop rapidement. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}."
           }
         }
+      },
+      "nav": {
+        "payouts": "Paiements",
+        "earnings": "Revenus"
+      },
+      "overview": {
+        "checklist": {
+          "payouts": {
+            "title": "Paiements",
+            "todoDescription": "Reliez un compte bancaire via Stripe pour être payé.",
+            "incompleteStatus": "En cours de vérification",
+            "incompleteDescription": "Stripe vérifie vos informations. Poursuivez la configuration s'il en demande davantage.",
+            "doneDescription": "Les paiements sont activés. Vos revenus sont versés sur votre compte bancaire.",
+            "startCta": "Configurer les paiements",
+            "continueCta": "Poursuivre la configuration",
+            "cta": "Voir les paiements",
+            "needsProfile": "Créez d'abord votre profil."
+          }
+        }
+      },
+      "payouts": {
+        "metaTitle": "Paiements",
+        "title": "Paiements",
+        "backToOverview": "Retour à l'aperçu",
+        "intro": "Les paiements passent par Stripe. Photoo ne voit jamais vos coordonnées bancaires.",
+        "needsProfileTitle": "Créez d'abord votre profil",
+        "needsProfileDescription": "Les paiements sont rattachés à votre profil de photographe : commencez par le créer.",
+        "needsProfileCta": "Créer votre profil",
+        "status": {
+          "notStarted": "Non commencé",
+          "incomplete": "En cours de vérification",
+          "enabled": "Paiements activés"
+        },
+        "description": {
+          "notStarted": "Reliez un compte bancaire via Stripe pour être payé pour vos réservations.",
+          "incomplete": "Stripe vérifie vos informations, ce qui peut prendre un peu de temps. Si Stripe demande plus d'informations, poursuivez la configuration.",
+          "enabled": "Les paiements sont activés. Vos revenus sont versés sur votre compte bancaire."
+        },
+        "setupCta": "Configurer les paiements",
+        "continueCta": "Poursuivre la configuration",
+        "pending": "Ouverture de Stripe…",
+        "errors": {
+          "generic": "Une erreur est survenue. Réessayez.",
+          "conflict": "La configuration des paiements n'est pas disponible pour le moment. Réessayez plus tard.",
+          "invalid": "Vérifiez vos informations et réessayez.",
+          "forbidden": "Vous n'avez pas accès aux paiements.",
+          "notFound": "Votre profil de photographe est introuvable.",
+          "emailNotVerified": "Vérifiez votre adresse e-mail avant de configurer les paiements.",
+          "tooManyRequests": "Vous allez trop vite. Ralentissez et réessayez.",
+          "tooManyRequestsWithRetry": "Vous allez trop vite. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}."
+        }
+      },
+      "earnings": {
+        "metaTitle": "Revenus",
+        "title": "Revenus",
+        "backToOverview": "Retour à l'aperçu",
+        "intro": "Ce que vous avez gagné grâce aux réservations, par devise.",
+        "releasedLabel": "Versé sur votre compte Stripe",
+        "heldLabel": "Retenu jusqu'à l'acceptation de la livraison",
+        "recentHeading": "Activité récente",
+        "recentDate": "Date",
+        "recentAmount": "Montant",
+        "recentLink": "Voir la réservation",
+        "payoutSchedule": "L'argent libéré est versé sur votre solde Stripe. Stripe le verse ensuite sur votre compte bancaire selon votre calendrier de versements, généralement sous quelques jours, tant que les versements sont activés sur votre compte Stripe.",
+        "emptyTitle": "Aucun revenu pour l'instant",
+        "emptyDescription": "Vos revenus apparaissent ici dès qu'un client réserve et paie.",
+        "errors": {
+          "generic": "Une erreur est survenue lors du chargement de vos revenus. Rechargez la page pour réessayer.",
+          "forbidden": "Seuls les photographes peuvent voir les revenus.",
+          "tooManyRequests": "Vous allez trop vite. Ralentissez et réessayez.",
+          "tooManyRequestsWithRetry": "Vous allez trop vite. Réessayez dans {seconds, plural, one {# seconde} other {# secondes}}."
+        }
       }
+    }
+  },
+  "push": {
+    "notifications": {
+      "payoutsDisabled": {
+        "title": "Versements en pause",
+        "body": "Votre profil est caché jusqu'à ce que les informations de paiement soient complètes"
+      },
+      "disputeOpened": {
+        "title": "Paiement contesté",
+        "body": "Une réservation est gelée jusqu'à l'examen par la finance"
+      }
+    }
+  },
+  "email": {
+    "notifications": {
+      "payoutsDisabled": {
+        "subject": "Les versements sont en pause sur votre compte",
+        "body": "Stripe a mis en pause les versements sur votre compte connecté. Votre profil est donc caché de la recherche jusqu'à ce que ce problème soit résolu. Complétez les informations demandées par Stripe ici : {url}"
+      },
+      "disputeOpened": {
+        "subject": "Un paiement de réservation a été contesté",
+        "body": "Un client a contesté auprès de sa banque un paiement de réservation de {total}. La réservation est gelée et ne sera pas libérée avant l'examen d'un administrateur finance dans le back-office. Détails : {url}"
+      }
+    }
+  },
+  "documents": {
+    "common": {
+      "reference": "Référence de la réservation : {reference}",
+      "issuedOn": "Date : {date}",
+      "contact": "photoo.lu · hello@photoo.lu",
+      "page": "Page {page} sur {pages}"
+    },
+    "receipt": {
+      "title": "Reçu de réservation",
+      "sellerHeading": "Photographe (vendeur)",
+      "buyerHeading": "Client",
+      "itemsHeading": "Prestations",
+      "lineItem": "{qty} × {label}",
+      "totalPaid": "Total payé",
+      "refunded": "Remboursé",
+      "netPaid": "Montant net payé",
+      "sellerNotice": "Ce reçu confirme un paiement effectué via {appName}. {appName} n'est pas le vendeur de ces prestations : c'est le photographe, qui reste responsable d'émettre toute facture exigée par la loi."
+    },
+    "feeInvoice": {
+      "title": "Facture des frais de plateforme",
+      "issuerHeading": "Émise par",
+      "recipientHeading": "Émise à",
+      "bookingAmount": "Montant de la réservation payé par le client",
+      "refundedToClient": "Remboursé au client",
+      "platformFee": "Frais de plateforme ({percent})",
+      "vatOnFee": "TVA sur les frais de plateforme ({rate})",
+      "totalFee": "Total des frais de plateforme",
+      "transferred": "Viré sur votre compte",
+      "reversed": "Repris sur votre virement",
+      "payout": "Votre versement",
+      "payoutNotice": "Votre versement est viré sur votre compte Stripe connecté. Vous restez responsable de la facturation de votre client et de la déclaration de ce revenu."
     }
   }
 }

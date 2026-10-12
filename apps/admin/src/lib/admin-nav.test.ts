@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { resolveNavSections } from './admin-nav';
+import type { AdminPermission } from '@photoo/shared';
+
+import { canOpenSection, resolveNavSections } from './admin-nav';
 
 function fakeT() {
   return vi.fn((key: string, values?: Record<string, unknown>) =>
@@ -9,13 +11,15 @@ function fakeT() {
 }
 
 describe('resolveNavSections', () => {
-  it('marks the dashboard, health, users and verification sections as available with no note', () => {
+  it('marks the dashboard, health, users, verification, provenance and finance sections as available with no note', () => {
     const sections = resolveNavSections(fakeT());
 
     const dashboard = sections.find((section) => section.id === 'dashboard');
     const health = sections.find((section) => section.id === 'health');
     const users = sections.find((section) => section.id === 'users');
     const verification = sections.find((section) => section.id === 'verification');
+    const provenance = sections.find((section) => section.id === 'provenance');
+    const finance = sections.find((section) => section.id === 'finance');
     const moderation = sections.find((section) => section.id === 'moderation');
     const dataRequests = sections.find((section) => section.id === 'data-requests');
     const settings = sections.find((section) => section.id === 'settings');
@@ -32,6 +36,14 @@ describe('resolveNavSections', () => {
       available: true,
     });
     expect(verification?.note).toBeUndefined();
+    expect(provenance).toMatchObject({
+      href: '/provenance',
+      label: 'nav.provenance',
+      available: true,
+    });
+    expect(provenance?.note).toBeUndefined();
+    expect(finance).toMatchObject({ href: '/finance', label: 'nav.finance', available: true });
+    expect(finance?.note).toBeUndefined();
     expect(moderation).toMatchObject({
       href: '/moderation',
       label: 'nav.moderation',
@@ -52,15 +64,6 @@ describe('resolveNavSections', () => {
     expect(settings?.note).toBeUndefined();
   });
 
-  it('labels a section blocked on a missing endpoint as available after that step', () => {
-    const sections = resolveNavSections(fakeT());
-
-    const provenance = sections.find((section) => section.id === 'provenance');
-
-    expect(provenance?.available).toBe(false);
-    expect(provenance?.note).toBe('nav.availableAfter:{"step":"1A.10"}');
-  });
-
   it('resolves every section exactly once, in a stable order', () => {
     const sections = resolveNavSections(fakeT());
 
@@ -75,5 +78,40 @@ describe('resolveNavSections', () => {
       'data-requests',
       'settings',
     ]);
+  });
+});
+
+describe('canOpenSection', () => {
+  it.each([
+    ['verification', 'verification'],
+    ['provenance', 'moderation'],
+    ['moderation', 'moderation'],
+    ['data-requests', 'support'],
+    ['finance', 'finance'],
+  ] as const)('opens %s only with the %s permission', (id, permission) => {
+    const others = (['verification', 'moderation', 'support', 'finance'] as const).filter(
+      (candidate) => candidate !== permission,
+    );
+
+    expect(canOpenSection(id, [permission])).toBe(true);
+    expect(canOpenSection(id, [])).toBe(false);
+    expect(canOpenSection(id, others)).toBe(false);
+  });
+
+  it.each(['dashboard', 'health', 'users', 'settings'])(
+    'opens %s with no permission at all',
+    (id) => {
+      expect(canOpenSection(id, [])).toBe(true);
+    },
+  );
+
+  it('does not treat superadmin as a grant for another section', () => {
+    const permissions: AdminPermission[] = ['superadmin'];
+
+    expect(canOpenSection('verification', permissions)).toBe(false);
+  });
+
+  it('throws on an unknown section id instead of defaulting to open', () => {
+    expect(() => canOpenSection('nope', ['finance'])).toThrow(/Unknown admin nav section: nope/);
   });
 });
