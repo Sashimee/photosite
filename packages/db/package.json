@@ -26,21 +26,21 @@
   },
   "devDependencies": {
     "@photoo/config": "workspace:*",
-    "@types/node": "26.6.2",
+    "@types/node": "26.6.5",
     "@types/pg": "8.23.1",
-    "@vitest/coverage-v8": "5.0.1",
+    "@vitest/coverage-v8": "5.0.5",
     "eslint": "9.39.5",
-    "prisma": "7.10.0",
+    "prisma": "7.10.1",
     "typescript": "6.0.3",
-    "vitest": "5.0.1"
+    "vitest": "5.0.5"
   },
   "dependencies": {
-    "@node-rs/argon2": "2.2.1",
+    "@node-rs/argon2": "2.2.2",
     "@photoo/shared": "workspace:*",
-    "@prisma/adapter-pg": "7.10.0",
-    "@prisma/client": "7.10.0",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
     "dotenv": "17.4.2",
     "ioredis": "6.0.0",
-    "pg": "8.23.0"
+    "pg": "8.23.1"
   }
 }
